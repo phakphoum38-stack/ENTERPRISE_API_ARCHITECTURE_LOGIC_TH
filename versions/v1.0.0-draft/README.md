@@ -4,7 +4,7 @@
 
 - Status: Active Development
 - Current Part: Part 1 — Foundation
-- Latest Document: ANEF-006 — Design Principles
+- Latest Document: ANEF-007 — Enterprise Glossary
 - Language: Thai with standard English technical terms
 
 ## Documents
@@ -15,10 +15,10 @@
 4. [ANEF-004 — Core Values](docs/00_FOUNDATION/ANEF-004_CORE_VALUES.md)
 5. [ANEF-005 — Constitution](docs/00_FOUNDATION/ANEF-005_CONSTITUTION.md)
 6. [ANEF-006 — Design Principles](docs/00_FOUNDATION/ANEF-006_DESIGN_PRINCIPLES.md)
+7. [ANEF-007 — Enterprise Glossary](docs/00_FOUNDATION/ANEF-007_GLOSSARY.md)
 
 ## Planned Next Documents
 
-- ANEF-007 — Glossary
 - ANEF-008 — Naming Standard
 - ANEF-009 — Documentation Standard
 - ANEF-010 — Versioning
