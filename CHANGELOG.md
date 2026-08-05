@@ -13,9 +13,11 @@
 - เพิ่ม ANEF-002 — Vision
 - เพิ่ม ANEF-003 — Mission
 - เพิ่ม ANEF-004 — Core Values
+- เพิ่ม ANEF-005 — Constitution
+- เพิ่ม ANEF-006 — Design Principles
 - เพิ่ม Version Index และนโยบายรักษาเวอร์ชัน
 - กำหนด `current/` เป็นตัวชี้ไปยังเวอร์ชันที่กำลังพัฒนา
 
 ### Updated
 
-- อัปเดตสารบัญเวอร์ชัน `v1.0.0-draft` ให้ชี้ไปยัง ANEF-004
+- อัปเดตสารบัญเวอร์ชัน `v1.0.0-draft` ให้ครอบคลุม ANEF-001 ถึง ANEF-006
