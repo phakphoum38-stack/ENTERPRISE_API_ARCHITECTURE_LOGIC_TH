@@ -18,9 +18,10 @@
 - เพิ่ม ANEF-007 — Enterprise Glossary พร้อมคำศัพท์มาตรฐาน 100 รายการ
 - เพิ่ม ANEF-008 — Naming Standard
 - เพิ่ม ANEF-009 — Documentation Standard
+- เพิ่ม ANEF-010 — Versioning Standard
 - เพิ่ม Version Index และนโยบายรักษาเวอร์ชัน
 - กำหนด `current/` เป็นตัวชี้ไปยังเวอร์ชันที่กำลังพัฒนา
 
 ### Updated
 
-- อัปเดตสารบัญเวอร์ชัน `v1.0.0-draft` ให้ครอบคลุม ANEF-001 ถึง ANEF-009
+- อัปเดตสารบัญเวอร์ชัน `v1.0.0-draft` ให้ครอบคลุม ANEF-001 ถึง ANEF-010
