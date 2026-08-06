@@ -20,6 +20,9 @@
 - เพิ่ม ANEF-009 — Documentation Standard
 - เพิ่ม ANEF-010 — Versioning Standard
 - เพิ่ม ANEF-011 — Repository Structure
+- เพิ่ม Research Curator CLI v0.1 สำหรับแปลงบทสนทนาเป็น Research Artifact
+- เพิ่ม Research Artifact แรก: Conversation-to-Knowledge Continuous Publishing
+- เพิ่ม GitHub Actions สำหรับ compile และ validate Research Curator artifacts
 - เพิ่ม Version Index และนโยบายรักษาเวอร์ชัน
 - กำหนด `current/` เป็นตัวชี้ไปยังเวอร์ชันที่กำลังพัฒนา
 
@@ -27,3 +30,4 @@
 
 - อัปเดตสารบัญเวอร์ชัน `v1.0.0-draft` ให้ครอบคลุม ANEF-001 ถึง ANEF-011
 - แก้สถานะเอกสารล่าสุดใน Root README, Current README และ Version Index ให้ตรงกัน
+- เริ่ม Workflow แบบคุย → สกัด Knowledge Diff → Commit → Pull Request
