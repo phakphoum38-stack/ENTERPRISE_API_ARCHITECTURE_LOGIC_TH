@@ -16,7 +16,7 @@ SPEC.loader.exec_module(curator)
 class ResearchCuratorTests(unittest.TestCase):
     def test_low_value_message_is_filtered(self):
         self.assertTrue(curator._is_low_value("ครับ"))
-        self.assertLess(curator._knowledge_score("เยี่ยมครับ"), 0)
+        self.assertEqual(curator._filter_sentences(["เยี่ยมครับ"]), [])
 
     def test_knowledge_sentence_scores_positive(self):
         sentence = "เราควรแยก Knowledge ออกจาก Renderer เพื่อให้เปลี่ยนการแสดงผลได้"
