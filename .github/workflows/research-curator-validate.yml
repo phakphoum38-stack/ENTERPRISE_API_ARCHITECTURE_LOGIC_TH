@@ -31,7 +31,10 @@ jobs:
       - name: Compile Research Curator
         run: python -m py_compile tools/research_curator/curator.py
 
-      - name: Validate research artifacts
+      - name: Run unit tests
+        run: python -m unittest tools/research_curator/test_curator.py -v
+
+      - name: Validate research artifacts and relationships
         run: python tools/research_curator/curator.py validate --output research/artifacts
 
       - name: Verify generated index is current
