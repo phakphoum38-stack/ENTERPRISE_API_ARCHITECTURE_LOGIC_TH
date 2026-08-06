@@ -1,0 +1,41 @@
+name: Research Curator Validate
+
+on:
+  pull_request:
+    paths:
+      - "research/**"
+      - "tools/research_curator/**"
+      - ".github/workflows/research-curator-validate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/**"
+      - "tools/research_curator/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Research Curator
+        run: python -m py_compile tools/research_curator/curator.py
+
+      - name: Validate research artifacts
+        run: python tools/research_curator/curator.py validate --output research/artifacts
+
+      - name: Verify generated index is current
+        run: |
+          cp research/artifacts/README.md /tmp/research-index-before.md
+          python tools/research_curator/curator.py index --output research/artifacts
+          diff -u /tmp/research-index-before.md research/artifacts/README.md
