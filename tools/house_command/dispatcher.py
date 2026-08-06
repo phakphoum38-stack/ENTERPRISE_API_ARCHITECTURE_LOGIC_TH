@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
+from house_brain import analyze
+
 ROOT = Path(__file__).resolve().parents[2]
 REPORT_DIR = ROOT / "artifacts" / "house-command"
 
@@ -24,6 +26,7 @@ COMMANDS: dict[str, list[list[str]]] = {
     "test": [
         [sys.executable, "-m", "unittest", "discover", "-s", "tools/research_curator", "-p", "test_*.py", "-v"],
         [sys.executable, "-m", "unittest", "discover", "-s", "tools/research_os_api", "-p", "test_*.py", "-v"],
+        [sys.executable, "-m", "unittest", "discover", "-s", "tools/house_command", "-p", "test_*.py", "-v"],
     ],
     "graph": [
         [sys.executable, "tools/research_curator/knowledge_ops.py", "graph", "--artifacts", "research/artifacts", "--output", "artifacts/house-command/knowledge-graph"],
@@ -50,19 +53,8 @@ def run_process(command: Sequence[str]) -> dict[str, object]:
 
 
 def build_house_status() -> dict[str, object]:
-    files = [
-        ROOT / "house" / "MISSION_REPORT.md",
-        ROOT / "house" / "HOUSE_LOG.md",
-        ROOT / "house" / "HOUSE_STRUCTURE.md",
-    ]
-    sections: list[dict[str, str]] = []
-    missing: list[str] = []
-    for path in files:
-        if path.exists():
-            sections.append({"path": str(path.relative_to(ROOT)), "content": path.read_text(encoding="utf-8")})
-        else:
-            missing.append(str(path.relative_to(ROOT)))
-    return {"sections": sections, "missing": missing, "ok": not missing}
+    status = analyze(ROOT)
+    return {"ok": not status["missing"], "status": status}
 
 
 def execute(command_name: str) -> dict[str, object]:
@@ -86,7 +78,7 @@ def execute(command_name: str) -> dict[str, object]:
         ok = ok and item_ok
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "command": command_name,
         "ok": ok,
         "executed_at": datetime.now(timezone.utc).isoformat(),
