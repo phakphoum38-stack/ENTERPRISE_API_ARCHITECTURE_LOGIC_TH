@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ MODULE_PATH = Path(__file__).with_name("curator.py")
 SPEC = importlib.util.spec_from_file_location("research_curator", MODULE_PATH)
 assert SPEC and SPEC.loader
 curator = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = curator
 SPEC.loader.exec_module(curator)
 
 
