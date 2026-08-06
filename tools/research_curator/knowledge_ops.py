@@ -175,17 +175,22 @@ def render_mermaid(payload: dict[str, object]) -> str:
     nodes = payload["nodes"]
     edges = payload["edges"]
     assert isinstance(nodes, list) and isinstance(edges, list)
+    declared: set[str] = set()
     for node in nodes:
         assert isinstance(node, dict)
         node_id = str(node["id"])
         label = str(node["title"]).replace('"', "'")
         lines.append(f'  {safe_id(node_id)}["{node_id}: {label}"]')
+        declared.add(node_id)
     for edge in edges:
         assert isinstance(edge, dict)
-        source = safe_id(str(edge["source"]))
-        target = safe_id(str(edge["target"]))
+        source_value = str(edge["source"])
+        target_value = str(edge["target"])
+        if target_value not in declared:
+            lines.append(f'  {safe_id(target_value)}["{target_value}"]')
+            declared.add(target_value)
         relation = str(edge["relation"]).replace('"', "'")
-        lines.append(f'  {source} -->|"{relation}"| {target}')
+        lines.append(f'  {safe_id(source_value)} -->|"{relation}"| {safe_id(target_value)}')
     return "\n".join(lines) + "\n"
 
 
