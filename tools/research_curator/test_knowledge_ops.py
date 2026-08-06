@@ -81,12 +81,15 @@ class KnowledgeOpsTests(unittest.TestCase):
             self.assertEqual("supports", payload["edges"][0]["relation"])
             self.assertEqual([], payload["external_targets"])
 
-    def test_graph_marks_external_targets(self):
+    def test_graph_marks_and_renders_external_targets(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             self.write_artifact(root, "RES-A", ["A"], [("relates_to", "EXT-001")])
             payload = knowledge_ops.graph_payload(knowledge_ops.load_all(root))
+            diagram = knowledge_ops.render_mermaid(payload)
             self.assertEqual(["EXT-001"], payload["external_targets"])
+            self.assertIn("N_EXT_001", diagram)
+            self.assertIn("relates_to", diagram)
 
 
 if __name__ == "__main__":
