@@ -23,12 +23,14 @@
 - เพิ่ม Version Index และนโยบายรักษาเวอร์ชัน
 - กำหนด `current/` เป็นตัวชี้ไปยังเวอร์ชันที่กำลังพัฒนา
 - เพิ่ม Research Curator v0.1 สำหรับแปลงบทสนทนาเป็น Research Artifact
-- เพิ่ม Research Curator v0.2 พร้อม Knowledge Filter, Knowledge Diff duplicate detection, quality score, typed relationships และ Truth Status promotion
-- เพิ่ม Unit Tests สำหรับ filter, duplicate detection, relationship parser และ evidence-aware promotion
-- เพิ่ม GitHub Actions สำหรับ compile, unit test, artifact validation และ index drift
+- เพิ่ม Research Curator v0.2 พร้อม Knowledge Filter, Quality Gate, Duplicate Detection, Typed Relationships และ Truth Status Promotion
+- เพิ่ม Research Curator v0.3 พร้อม Knowledge Diff Report, JSON/Mermaid Knowledge Graph Export และ Validated Git Publisher
+- เพิ่ม Unit Tests สำหรับ Curator Core และ Knowledge Operations
+- เพิ่ม GitHub Actions สำหรับ Compile, Test, Validate, Index Drift และ Graph Export
 
 ### Updated
 
 - อัปเดตสารบัญเวอร์ชัน `v1.0.0-draft` ให้ครอบคลุม ANEF-001 ถึง ANEF-011
 - แก้สถานะเอกสารล่าสุดใน Root README, Current README และ Version Index ให้ตรงกัน
-- ย้าย Research Artifact แรกเข้าสู่ Metadata Schema v0.2
+- ย้าย Research Artifact รุ่นแรกเข้าสู่ Metadata Schema v0.2
+- อัปเดตคู่มือ Research Curator สำหรับ Workflow แบบ Conversation → Knowledge Diff → Artifact → Graph → Git → Pull Request
