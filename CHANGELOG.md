@@ -4,7 +4,7 @@
 
 รูปแบบเวอร์ชันใช้ Semantic Versioning และเก็บ Snapshot ทุกเวอร์ชันไว้ใน `versions/`
 
-## [v1.0.0-draft] — 2026-08-05
+## [v1.0.0-draft] — 2026-08-06
 
 ### Added
 
@@ -19,9 +19,11 @@
 - เพิ่ม ANEF-008 — Naming Standard
 - เพิ่ม ANEF-009 — Documentation Standard
 - เพิ่ม ANEF-010 — Versioning Standard
+- เพิ่ม ANEF-011 — Repository Structure
 - เพิ่ม Version Index และนโยบายรักษาเวอร์ชัน
 - กำหนด `current/` เป็นตัวชี้ไปยังเวอร์ชันที่กำลังพัฒนา
 
 ### Updated
 
-- อัปเดตสารบัญเวอร์ชัน `v1.0.0-draft` ให้ครอบคลุม ANEF-001 ถึง ANEF-010
+- อัปเดตสารบัญเวอร์ชัน `v1.0.0-draft` ให้ครอบคลุม ANEF-001 ถึง ANEF-011
+- แก้สถานะเอกสารล่าสุดใน Root README, Current README และ Version Index ให้ตรงกัน
