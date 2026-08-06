@@ -4,7 +4,7 @@
 
 | Version | Status | Part | Latest Document | Path |
 |---|---|---|---|---|
-| v1.0.0-draft | Active Development | Part 1 — Foundation | ANEF-003 — Mission | `versions/v1.0.0-draft/` |
+| v1.0.0-draft | Active Development | Part 1 — Foundation | ANEF-011 — Repository Structure | `versions/v1.0.0-draft/` |
 
 ## Version Preservation Policy
 

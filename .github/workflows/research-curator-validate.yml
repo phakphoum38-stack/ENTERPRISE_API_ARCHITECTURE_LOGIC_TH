@@ -1,0 +1,66 @@
+name: Research OS Validate
+
+on:
+  pull_request:
+    paths:
+      - "research/**"
+      - "tools/research_curator/**"
+      - "tools/research_os_api/**"
+      - ".github/workflows/research-curator-validate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/**"
+      - "tools/research_curator/**"
+      - "tools/research_os_api/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Research OS tools
+        run: |
+          python -m py_compile tools/research_curator/curator.py
+          python -m py_compile tools/research_curator/knowledge_ops.py
+          python -m py_compile tools/research_curator/git_publisher.py
+          python -m py_compile tools/research_os_api/providers.py
+          python -m py_compile tools/research_os_api/server.py
+
+      - name: Run Research Curator tests
+        working-directory: tools/research_curator
+        run: python -m unittest test_curator.py test_knowledge_ops.py -v
+
+      - name: Run Research OS API tests
+        working-directory: tools/research_os_api
+        env:
+          RESEARCH_OS_PROVIDER: mock
+        run: python -m unittest test_api.py -v
+
+      - name: Validate research artifacts and relationships
+        run: python tools/research_curator/curator.py validate --output research/artifacts
+
+      - name: Verify generated index is current
+        run: |
+          cp research/artifacts/README.md /tmp/research-index-before.md
+          python tools/research_curator/curator.py index --output research/artifacts
+          diff -u /tmp/research-index-before.md research/artifacts/README.md
+
+      - name: Export knowledge graph
+        run: python tools/research_curator/knowledge_ops.py graph --artifacts research/artifacts --output /tmp/knowledge-graph
+
+      - name: Verify graph export
+        run: |
+          test -s /tmp/knowledge-graph.json
+          test -s /tmp/knowledge-graph.mmd

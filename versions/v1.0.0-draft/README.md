@@ -4,7 +4,7 @@
 
 - Status: Active Development
 - Current Part: Part 1 — Foundation
-- Latest Document: ANEF-010 — Versioning Standard
+- Latest Document: ANEF-011 — Repository Structure
 - Language: Thai with standard English technical terms
 
 ## Documents
@@ -19,10 +19,10 @@
 8. [ANEF-008 — Naming Standard](docs/00_FOUNDATION/ANEF-008_NAMING_STANDARD.md)
 9. [ANEF-009 — Documentation Standard](docs/00_FOUNDATION/ANEF-009_DOCUMENTATION_STANDARD.md)
 10. [ANEF-010 — Versioning Standard](docs/00_FOUNDATION/ANEF-010_VERSIONING.md)
+11. [ANEF-011 — Repository Structure](docs/00_FOUNDATION/ANEF-011_REPOSITORY_STRUCTURE.md)
 
 ## Planned Next Documents
 
-- ANEF-011 — Repository Structure
 - ANEF-012 — Document Lifecycle
 - ANEF-013 — Review Process
 - ANEF-014 — Approval Workflow

@@ -1,0 +1,95 @@
+openapi: 3.1.0
+info:
+  title: Research OS API
+  version: 0.1.0
+  description: Provider-agnostic API for conversation analysis, knowledge access, and AI generation.
+servers:
+  - url: http://127.0.0.1:8787
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+  /v1/providers:
+    get:
+      summary: List supported AI provider adapters
+      responses:
+        "200":
+          description: Provider list
+  /v1/ai/generate:
+    post:
+      summary: Generate text through a selected provider adapter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                provider:
+                  type: string
+                model:
+                  type: string
+                system:
+                  type: string
+                prompt:
+                  type: string
+      responses:
+        "200":
+          description: Generated output
+        "502":
+          description: Provider failure
+  /v1/conversations/analyze:
+    post:
+      summary: Analyze a conversation and return a preview Research Artifact
+      description: This endpoint does not persist or publish the artifact.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conversation]
+              properties:
+                title:
+                  type: string
+                conversation:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: object
+                status:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                evidence:
+                  type: array
+                  items:
+                    type: string
+                relationships:
+                  type: array
+                  items:
+                    type: string
+                min_quality:
+                  type: integer
+      responses:
+        "200":
+          description: Artifact preview and quality decision
+  /v1/knowledge/artifacts:
+    get:
+      summary: List Research Artifacts
+      responses:
+        "200":
+          description: Artifact index
+  /v1/knowledge/graph:
+    get:
+      summary: Return the current knowledge graph as JSON
+      responses:
+        "200":
+          description: Graph nodes and edges
