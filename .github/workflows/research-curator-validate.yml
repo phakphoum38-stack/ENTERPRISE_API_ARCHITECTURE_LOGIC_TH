@@ -1,10 +1,11 @@
-name: Research Curator Validate
+name: Research OS Validate
 
 on:
   pull_request:
     paths:
       - "research/**"
       - "tools/research_curator/**"
+      - "tools/research_os_api/**"
       - ".github/workflows/research-curator-validate.yml"
   push:
     branches:
@@ -12,6 +13,7 @@ on:
     paths:
       - "research/**"
       - "tools/research_curator/**"
+      - "tools/research_os_api/**"
 
 permissions:
   contents: read
@@ -28,15 +30,23 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile Research Curator tools
+      - name: Compile Research OS tools
         run: |
           python -m py_compile tools/research_curator/curator.py
           python -m py_compile tools/research_curator/knowledge_ops.py
           python -m py_compile tools/research_curator/git_publisher.py
+          python -m py_compile tools/research_os_api/providers.py
+          python -m py_compile tools/research_os_api/server.py
 
-      - name: Run unit tests
+      - name: Run Research Curator tests
         working-directory: tools/research_curator
         run: python -m unittest test_curator.py test_knowledge_ops.py -v
+
+      - name: Run Research OS API tests
+        working-directory: tools/research_os_api
+        env:
+          RESEARCH_OS_PROVIDER: mock
+        run: python -m unittest test_api.py -v
 
       - name: Validate research artifacts and relationships
         run: python tools/research_curator/curator.py validate --output research/artifacts
