@@ -3,8 +3,13 @@ artifact_id: "RES-20260806-CONVERSATION-TO-KNOWLEDGE"
 title: "Conversation-to-Knowledge Continuous Publishing"
 status: "observed"
 created_at: "2026-08-06T07:45:00+00:00"
+updated_at: "2026-08-06T08:20:00+00:00"
 source_hash: "conversation:chat-session-2026-08-06"
+content_hash: "sha256:5740e1d1f47ce8075378275596470785551ac64bdd31fd6d4bd0197fb6bbeab1"
+quality_score: 86
+duplicate_of: ""
 tags: ["research", "knowledge", "automation", "github", "curation"]
+relationships: []
 ---
 
 # RES-20260806-CONVERSATION-TO-KNOWLEDGE — Conversation-to-Knowledge Continuous Publishing
@@ -56,8 +61,18 @@ tags: ["research", "knowledge", "automation", "github", "curation"]
 - เพิ่มคำสั่ง `promote` สำหรับเปลี่ยน Truth Status พร้อม Evidence reference
 - ออกแบบ GitHub Action ที่สร้าง Pull Request จาก Conversation Export โดยอัตโนมัติ
 
+## Evidence
+
+- บทสนทนาจริงระหว่างผู้ใช้และ AI วันที่ 6 สิงหาคม 2026
+- Prototype Research Curator v0.1 ถูกเพิ่มเข้า Repository และสร้าง Artifact นี้ได้จริง
+
+## Relationships
+
+- ยังไม่มีรายการ
+
 ## Provenance
 
 - Source: บทสนทนาระหว่างผู้ใช้และ AI วันที่ 6 สิงหาคม 2026
 - Captured manually as the first live Research Curator artifact
-- Generator target: `Research Curator v0.1.0`
+- Migrated to metadata schema v0.2
+- Generator target: `Research Curator v0.2.0`
