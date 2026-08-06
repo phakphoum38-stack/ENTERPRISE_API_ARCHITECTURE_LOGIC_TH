@@ -4,16 +4,21 @@ on:
   pull_request:
     paths:
       - "research/**"
+      - "house/**"
       - "tools/research_curator/**"
       - "tools/research_os_api/**"
+      - "tools/house_command/**"
       - ".github/workflows/research-curator-validate.yml"
+      - ".github/workflows/house-command.yml"
   push:
     branches:
       - main
     paths:
       - "research/**"
+      - "house/**"
       - "tools/research_curator/**"
       - "tools/research_os_api/**"
+      - "tools/house_command/**"
 
 permissions:
   contents: read
@@ -37,6 +42,8 @@ jobs:
           python -m py_compile tools/research_curator/git_publisher.py
           python -m py_compile tools/research_os_api/providers.py
           python -m py_compile tools/research_os_api/server.py
+          python -m py_compile tools/house_command/house_brain.py
+          python -m py_compile tools/house_command/dispatcher.py
 
       - name: Run Research Curator tests
         working-directory: tools/research_curator
@@ -47,6 +54,13 @@ jobs:
         env:
           RESEARCH_OS_PROVIDER: mock
         run: python -m unittest test_api.py -v
+
+      - name: Run House Brain tests
+        working-directory: tools/house_command
+        run: python -m unittest test_house_brain.py -v
+
+      - name: Verify house-status command
+        run: python tools/house_command/dispatcher.py house-status --report /tmp/house-status.json
 
       - name: Validate research artifacts and relationships
         run: python tools/research_curator/curator.py validate --output research/artifacts
