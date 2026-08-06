@@ -6,7 +6,7 @@ Repository นี้เป็นแหล่งอ้างอิงหลัก
 
 - ทุกเวอร์ชันต้องถูกเก็บแยกไว้ใน `versions/`
 - ห้ามเขียนทับหรือลบเวอร์ชันเก่าโดยไม่มีบันทึกการตัดสินใจ
-- `current/` ใช้เก็บเอกสารของเวอร์ชันที่กำลังพัฒนา
+- `current/` ใช้ชี้สถานะของเวอร์ชันที่กำลังพัฒนา
 - ทุกเอกสารต้องมี Document ID, Version, Status และ Revision History
 - ใช้ Semantic Versioning เช่น `v1.0.0-draft`, `v1.0.0`, `v1.1.0`, `v2.0.0`
 
@@ -15,7 +15,7 @@ Repository นี้เป็นแหล่งอ้างอิงหลัก
 - **Version:** `v1.0.0-draft`
 - **Status:** Foundation Phase
 - **Part:** Part 1 — Foundation
-- **เอกสารล่าสุด:** ANEF-003 — Mission
+- **เอกสารล่าสุด:** ANEF-011 — Repository Structure
 
 ## โครงสร้าง
 
@@ -25,7 +25,7 @@ Repository นี้เป็นแหล่งอ้างอิงหลัก
 ├── CHANGELOG.md
 ├── VERSION_INDEX.md
 ├── current/
-│   └── docs/
+│   └── README.md
 └── versions/
     └── v1.0.0-draft/
         ├── README.md
@@ -35,6 +35,6 @@ Repository นี้เป็นแหล่งอ้างอิงหลัก
 
 ## เป้าหมาย
 
-ANEF เป็น Framework ที่เป็นกลางต่อภาษา แพลตฟอร์ม ผู้ให้บริการ AI ระบบฐานข้อมูล และ Cloud Provider โดยใช้เอกสารและสถาปัตยกรรมเป็นแหล่งอ้างอิงหลัก
+ANEF เป็น Framework ที่เป็นกลางต่อภาษา แพลตฟอร์ม ผู้ให้บริการ AI ระบบฐานข้อมูล และ Cloud Provider โดยใช้เอกสาร Contract และหลักฐานทางสถาปัตยกรรมเป็นแหล่งอ้างอิงหลัก
 
 > Design Once. Build Everywhere. Scale Forever.
