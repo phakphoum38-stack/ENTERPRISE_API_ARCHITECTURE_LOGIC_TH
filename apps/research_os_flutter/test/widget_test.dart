@@ -33,13 +33,30 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
+  Future<Map<String, dynamic>> answerWithMemory(String question) async =>
+      <String, dynamic>{
+        'text': 'คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด',
+        'memory_hits': <Map<String, dynamic>>[
+          <String, dynamic>{'artifact_id': 'RES-TEST'},
+        ],
+      };
+
+  @override
+  Future<Map<String, dynamic>> generateText(String prompt) async =>
+      <String, dynamic>{'text': 'คำตอบจาก Gemini โดยตรง'};
+
+  @override
   void close() {}
+}
+
+void setDesktopTestSize(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1200, 900);
+  tester.view.devicePixelRatio = 1.0;
 }
 
 void main() {
   testWidgets('home dashboard shows Research OS status', (tester) async {
-    tester.view.physicalSize = const Size(1200, 900);
-    tester.view.devicePixelRatio = 1.0;
+    setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
@@ -61,9 +78,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('AI Chat answers with memory', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.text('AI Chat'));
+    await tester.pump();
+
+    expect(find.text('คุยกับ Gemini'), findsOneWidget);
+    expect(find.text('ใช้ Memory'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'บ้านเรามีความรู้อะไรบ้าง');
+    await tester.tap(find.byTooltip('ส่ง'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('บ้านเรามีความรู้อะไรบ้าง'), findsOneWidget);
+    expect(find.text('คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
+    expect(find.text('อ้างอิง Memory 1 รายการ'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('library shows knowledge artifacts', (tester) async {
-    tester.view.physicalSize = const Size(1200, 900);
-    tester.view.devicePixelRatio = 1.0;
+    setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
