@@ -50,7 +50,7 @@ def _json_bytes(payload: Any) -> bytes:
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
-    server_version = "ResearchOSAPI/0.4"
+    server_version = "ResearchOSAPI/0.5"
 
     def _send(self, status: int, payload: Any) -> None:
         body = _json_bytes(payload)
@@ -95,7 +95,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {
                     "error": "cloud_sync_not_configured",
-                    "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using cloud conversation sync.",
+                    "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using protected cloud operations.",
                 },
             )
             return False
@@ -121,9 +121,10 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     {
                         "status": "ok",
                         "service": "research-os-api",
-                        "version": "0.4.0",
+                        "version": "0.5.0",
                         "ui": WEB_DIR.is_dir(),
                         "memory": True,
+                        "memory_commit": sync_configured(),
                         "github": True,
                         "cloud_sync": sync_configured(),
                     },
@@ -271,6 +272,11 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             if path == "/v1/conversations/analyze":
                 self._send(HTTPStatus.OK, self._analyze_conversation(body))
                 return
+            if path == "/v1/memory/commit":
+                if not self._authorize_cloud_sync():
+                    return
+                self._send(HTTPStatus.OK, self._commit_memory(body))
+                return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
         except (TypeError, ValueError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
@@ -279,7 +285,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
-    def _analyze_conversation(self, body: dict[str, Any]) -> dict[str, Any]:
+    def _extract_conversation_artifact(self, body: dict[str, Any]):
         conversation = body.get("conversation")
         if isinstance(conversation, list):
             source = json.dumps(conversation, ensure_ascii=False)
@@ -299,11 +305,55 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             relationships,
             ARTIFACT_DIR,
         )
+        return curator, artifact
+
+    def _analyze_conversation(self, body: dict[str, Any]) -> dict[str, Any]:
+        curator, artifact = self._extract_conversation_artifact(body)
         return {
             "artifact": curator.asdict(artifact),
             "accepted": artifact.quality_score >= int(body.get("min_quality", 20)),
             "persisted": False,
-            "note": "API analysis is preview-only; persistence requires explicit Git workflow.",
+            "note": "API analysis is preview-only; persistence requires explicit memory commit.",
+        }
+
+    def _commit_memory(self, body: dict[str, Any]) -> dict[str, Any]:
+        if body.get("confirm") is not True:
+            raise ValueError("confirm must be true for explicit memory persistence")
+        curator, artifact = self._extract_conversation_artifact(body)
+        min_quality = int(body.get("min_quality", 20))
+        if artifact.quality_score < min_quality:
+            return {
+                "artifact": curator.asdict(artifact),
+                "accepted": False,
+                "persisted": False,
+                "reason": "quality_below_threshold",
+                "durability": "runtime-ephemeral",
+            }
+        if artifact.duplicate_of and not bool(body.get("allow_duplicate", False)):
+            return {
+                "artifact": curator.asdict(artifact),
+                "accepted": True,
+                "persisted": False,
+                "reason": "duplicate",
+                "duplicate_of": artifact.duplicate_of,
+                "durability": "runtime-ephemeral",
+            }
+        target = curator._write_artifact(
+            ARTIFACT_DIR,
+            artifact,
+            allow_duplicate=bool(body.get("allow_duplicate", False)),
+        )
+        curator._update_index(ARTIFACT_DIR)
+        return {
+            "artifact": curator.asdict(artifact),
+            "accepted": True,
+            "persisted": True,
+            "path": str(target.relative_to(ROOT)) if ROOT in target.parents else str(target),
+            "durability": "runtime-ephemeral",
+            "note": (
+                "Memory is available to Research OS immediately. "
+                "Render free-service filesystem is ephemeral; durable Git-backed memory is a later storage phase."
+            ),
         }
 
     @staticmethod
@@ -326,7 +376,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     "artifact_id": metadata.get("artifact_id", path.stem),
                     "title": metadata.get("title", ""),
                     "status": metadata.get("status", ""),
-                    "path": str(path.relative_to(ROOT)),
+                    "path": str(path.relative_to(ROOT)) if ROOT in path.parents else str(path),
                 }
             )
         return results
