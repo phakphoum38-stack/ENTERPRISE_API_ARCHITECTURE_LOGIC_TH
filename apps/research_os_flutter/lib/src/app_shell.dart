@@ -53,7 +53,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
       LibraryPage(apiClient: widget.apiClient),
       KnowledgeGraphPage(apiClient: widget.apiClient),
       GitHubDashboardPage(apiClient: widget.apiClient),
-      const GoogleWorkspacePage(),
+      GoogleWorkspacePage(apiClient: widget.apiClient),
       const LocalApiControlPage(),
       SystemMonitorPage(apiClient: widget.apiClient),
       SettingsPage(
@@ -109,7 +109,9 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                           key: const Key('desktop-navigation-rail'),
                           extended: _railExtended,
                           selectedIndex: _selectedIndex,
-                          labelType: _railExtended ? NavigationRailLabelType.none : NavigationRailLabelType.all,
+                          labelType: _railExtended
+                              ? NavigationRailLabelType.none
+                              : NavigationRailLabelType.all,
                           leading: const Padding(
                             padding: EdgeInsets.only(bottom: 8),
                             child: Icon(Icons.auto_awesome, size: 28),
@@ -121,7 +123,9 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                         Expanded(
                           child: Column(
                             children: <Widget>[
-                              Expanded(child: IndexedStack(index: _selectedIndex, children: pages)),
+                              Expanded(
+                                child: IndexedStack(index: _selectedIndex, children: pages),
+                              ),
                               const _DesktopStatusBar(),
                             ],
                           ),
@@ -159,7 +163,11 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 }
 
 class _DesktopTopBar extends StatelessWidget {
-  const _DesktopTopBar({required this.title, required this.railExtended, required this.onToggleRail});
+  const _DesktopTopBar({
+    required this.title,
+    required this.railExtended,
+    required this.onToggleRail,
+  });
 
   final String title;
   final bool railExtended;
@@ -182,14 +190,26 @@ class _DesktopTopBar extends StatelessWidget {
             const SizedBox(width: 8),
             const Icon(Icons.hub_outlined),
             const SizedBox(width: 10),
-            const Text('Research OS Desktop', key: Key('desktop-shell-title'), style: TextStyle(fontWeight: FontWeight.w700)),
+            const Text(
+              'Research OS Desktop',
+              key: Key('desktop-shell-title'),
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(width: 16),
             Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(title, key: const Key('desktop-workspace-title'), overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+              child: Text(
+                title,
+                key: const Key('desktop-workspace-title'),
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ),
-            const Tooltip(message: 'Backend secrets stay on the Research OS API', child: Icon(Icons.shield_outlined)),
+            const Tooltip(
+              message: 'Backend secrets stay on the Research OS API',
+              child: Icon(Icons.shield_outlined),
+            ),
           ],
         ),
       ),
@@ -216,13 +236,13 @@ class _DesktopStatusBar extends StatelessWidget {
           SizedBox(width: 6),
           Text('Research OS Workspace'),
           Spacer(),
-          Icon(Icons.apps_outlined, size: 16),
-          SizedBox(width: 4),
-          Text('Google Workspace'),
-          SizedBox(width: 14),
           Icon(Icons.memory, size: 16),
           SizedBox(width: 4),
           Text('Memory'),
+          SizedBox(width: 14),
+          Icon(Icons.apps_outlined, size: 16),
+          SizedBox(width: 4),
+          Text('Google Workspace'),
           SizedBox(width: 14),
           Icon(Icons.dns_outlined, size: 16),
           SizedBox(width: 4),
