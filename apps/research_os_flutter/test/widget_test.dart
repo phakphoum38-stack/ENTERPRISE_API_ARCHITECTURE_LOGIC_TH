@@ -81,6 +81,13 @@ void setDesktopTestSize(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
 }
 
+Finder navigationRailLabel(String label) {
+  return find.descendant(
+    of: find.byType(NavigationRail),
+    matching: find.text(label),
+  );
+}
+
 void main() {
   testWidgets('home dashboard shows Research OS status', (tester) async {
     setDesktopTestSize(tester);
@@ -118,13 +125,16 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    await tester.tap(find.text('AI Chat'));
+    await tester.tap(navigationRailLabel('AI Chat'));
     await tester.pump();
 
     expect(find.text('คุยกับ Gemini'), findsOneWidget);
     expect(find.text('ใช้ Memory'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField).first, 'บ้านเรามีความรู้อะไรบ้าง');
+    await tester.enterText(
+      find.byType(TextField).first,
+      'บ้านเรามีความรู้อะไรบ้าง',
+    );
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -148,7 +158,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    await tester.tap(find.text('ห้องสมุด'));
+    await tester.tap(navigationRailLabel('ห้องสมุด'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -171,7 +181,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    await tester.tap(find.text('GitHub'));
+    await tester.tap(navigationRailLabel('GitHub'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
