@@ -1,6 +1,7 @@
 import json
 import threading
 import unittest
+import urllib.parse
 import urllib.request
 from http.server import ThreadingHTTPServer
 
@@ -36,6 +37,7 @@ class ResearchOSAPITests(unittest.TestCase):
         status, payload = self.request("GET", "/health")
         self.assertEqual(200, status)
         self.assertEqual("ok", payload["status"])
+        self.assertTrue(payload["memory"])
 
     def test_mock_provider_generation(self):
         status, payload = self.request("POST", "/v1/ai/generate", {
@@ -45,6 +47,26 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertEqual("mock", payload["provider"])
         self.assertIn("วิเคราะห์", payload["text"])
+
+    def test_memory_search(self):
+        query = urllib.parse.quote("conversation knowledge")
+        status, payload = self.request("GET", f"/v1/memory/search?q={query}&limit=3")
+        self.assertEqual(200, status)
+        self.assertGreaterEqual(payload["count"], 1)
+        self.assertIn("artifact_id", payload["hits"][0])
+        self.assertIn("score", payload["hits"][0])
+
+    def test_answer_with_memory_uses_mock_provider(self):
+        status, payload = self.request("POST", "/v1/ai/answer-with-memory", {
+            "provider": "mock",
+            "question": "conversation knowledge",
+            "session_id": "memory-test",
+        })
+        self.assertEqual(200, status)
+        self.assertEqual("mock", payload["provider"])
+        self.assertEqual("memory-test", payload["session_id"])
+        self.assertGreaterEqual(payload["memory_count"], 1)
+        self.assertTrue(payload["text"])
 
     def test_conversation_analysis_is_preview_only(self):
         status, payload = self.request("POST", "/v1/conversations/analyze", {
