@@ -2,45 +2,32 @@ name: Research OS Google Workspace
 
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows:
+      - Research OS Windows Desktop
+    types:
+      - completed
     branches:
       - main
-    paths:
-      - "tools/research_os_api/google_workspace.py"
-      - "tools/research_os_api/google_oauth.py"
-      - "tools/research_os_api/test_google_workspace.py"
-      - "tools/research_os_api/test_google_oauth.py"
-      - "tools/research_os_api/server.py"
-      - "apps/research_os_flutter/lib/src/features/google_workspace/**"
-      - "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
-      - "apps/research_os_flutter/lib/src/app_shell.dart"
-      - "apps/research_os_flutter/pubspec.yaml"
-      - "docs/GOOGLE_WORKSPACE_HUB.md"
-      - ".github/workflows/research-os-google-workspace.yml"
-  pull_request:
-    paths:
-      - "tools/research_os_api/google_workspace.py"
-      - "tools/research_os_api/google_oauth.py"
-      - "tools/research_os_api/test_google_workspace.py"
-      - "tools/research_os_api/test_google_oauth.py"
-      - "tools/research_os_api/server.py"
-      - "apps/research_os_flutter/lib/src/features/google_workspace/**"
-      - "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
-      - "apps/research_os_flutter/lib/src/app_shell.dart"
-      - "apps/research_os_flutter/pubspec.yaml"
-      - "docs/GOOGLE_WORKSPACE_HUB.md"
-      - ".github/workflows/research-os-google-workspace.yml"
 
 permissions:
   contents: read
 
+concurrency:
+  group: research-os-workspace-secondary-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate-workspace-foundation:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -83,23 +70,6 @@ jobs:
           print("OAuth URL guard OK")
           PY
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Flutter dependencies
-        working-directory: apps/research_os_flutter
-        run: flutter pub get
-
-      - name: Flutter analyze
-        working-directory: apps/research_os_flutter
-        run: flutter analyze
-
-      - name: Flutter tests
-        working-directory: apps/research_os_flutter
-        run: flutter test
-
       - name: Workspace security guard
         run: |
           if grep -R -n -E "(RESEARCH_OS_GOOGLE_CLIENT_SECRET|GOOGLE_CLIENT_SECRET)[[:space:]]*=[[:space:]]*['\"][^'\"]+" apps/research_os_flutter; then
@@ -114,11 +84,8 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          # Google Workspace Hub
-          - Service registry: Drive, Docs, Sheets, Calendar, Gmail, Contacts, Tasks, Keep, Meet, Forms, Chat
-          - OAuth broker: local API callback + backend-only token storage
-          - Connect/disconnect controls: available from Flutter UI
-          - Secrets: backend-only
-          - Flutter UI: validated when job succeeds
-          EOF
+          {
+            echo "# Google Workspace Hub — Secondary"
+            echo "- Generic Flutter analyze/test removed; owned by main workflow"
+            echo "- Workspace core, OAuth, registry and secret guards remain"
+          } >> "$GITHUB_STEP_SUMMARY"
