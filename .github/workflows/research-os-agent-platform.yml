@@ -6,14 +6,18 @@ on:
     branches: [main]
     paths:
       - "tools/research_os_api/agent_platform.py"
+      - "tools/research_os_api/agent_runtime.py"
       - "tools/research_os_api/test_agent_platform.py"
+      - "tools/research_os_api/test_agent_runtime.py"
       - "apps/research_os_flutter/lib/src/features/agents/**"
       - "apps/research_os_flutter/lib/src/app_shell.dart"
       - ".github/workflows/research-os-agent-platform.yml"
   pull_request:
     paths:
       - "tools/research_os_api/agent_platform.py"
+      - "tools/research_os_api/agent_runtime.py"
       - "tools/research_os_api/test_agent_platform.py"
+      - "tools/research_os_api/test_agent_runtime.py"
       - "apps/research_os_flutter/lib/src/features/agents/**"
       - "apps/research_os_flutter/lib/src/app_shell.dart"
       - ".github/workflows/research-os-agent-platform.yml"
@@ -32,12 +36,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile Agent Platform
-        run: python -m py_compile tools/research_os_api/agent_platform.py
+      - name: Compile Agent Platform and Runtime
+        run: |
+          python -m py_compile tools/research_os_api/agent_platform.py
+          python -m py_compile tools/research_os_api/agent_runtime.py
 
-      - name: Test Agent Registry Router and Permissions
+      - name: Test Agent Registry Router Permissions and Runtime
         working-directory: tools/research_os_api
-        run: python -m unittest test_agent_platform.py -v
+        run: python -m unittest test_agent_platform.py test_agent_runtime.py -v
 
       - name: Validate initial agent registry
         working-directory: tools/research_os_api
@@ -54,17 +60,39 @@ jobs:
           print("Agent registry OK:", ", ".join(sorted(actual)))
           PY
 
-      - name: Enforce confirmation policy on write-capable initial agents
+      - name: Enforce confirmation policy on write-capable agents
         working-directory: tools/research_os_api
         run: |
           python - <<'PY'
-          from agent_platform import AgentRouter
-          router = AgentRouter()
-          for agent in ("google_workspace", "shift"):
-              result = router.route("write task", requested_agent=agent)
-              if not result["requires_confirmation_for_writes"]:
-                  raise SystemExit(f"Write confirmation missing for {agent}")
-          print("Write confirmation policy OK")
+          import tempfile
+          from agent_runtime import AgentEventBus, AgentTaskQueue, SharedContextStore
+          with tempfile.TemporaryDirectory() as tmp:
+              runtime = AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp))
+              task = runtime.submit("analyze shift roster and calendar_sync")
+              if task["status"] != "awaiting_confirmation":
+                  raise SystemExit(f"Expected awaiting_confirmation, got {task['status']}")
+              task = runtime.confirm(task["task_id"])
+              if task["status"] != "completed":
+                  raise SystemExit(f"Confirmed task did not complete: {task['status']}")
+              print("Runtime confirmation policy OK")
+          PY
+
+      - name: Validate Event Bus and persistent Shared Context
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          import tempfile
+          from agent_runtime import AgentEventBus, AgentTaskQueue, SharedContextStore
+          with tempfile.TemporaryDirectory() as tmp:
+              runtime = AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp))
+              task = runtime.submit("review github repository workflow")
+              events = runtime.events.list(task_id=task["task_id"])
+              names = [e["event_type"] for e in events]
+              if names != ["task.queued", "task.started", "task.completed"]:
+                  raise SystemExit(f"Unexpected event sequence: {names}")
+              if runtime.dashboard()["shared_context"] != "local_persistent":
+                  raise SystemExit("Shared context is not local-persistent")
+              print("Agent Runtime OK")
           PY
 
       - uses: subosito/flutter-action@v2
@@ -91,8 +119,10 @@ jobs:
           # Research OS Agent Platform
           - Registry: Research, Document, GitHub, Google Workspace, Shift
           - Router: capability-based with Research fallback
+          - Task Queue: active
+          - Event Bus: active
+          - Shared Context: local persistent
           - Permissions: explicit per agent
-          - Write actions: confirmation policy enforced
-          - Shared context/memory: interface-ready
+          - Write actions: confirmation gate enforced
           - Agent Center: validated when job succeeds
           EOF
