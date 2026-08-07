@@ -26,6 +26,18 @@ class ResearchOSApiClient {
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
       _getJson('/v1/knowledge/graph');
+  Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() =>
+      _getJson('/v1/google-workspace/dashboard');
+  Future<Map<String, dynamic>> getGoogleWorkspaceOAuthStatus() =>
+      _getJson('/v1/google-workspace/oauth/status');
+  Future<Map<String, dynamic>> startGoogleWorkspaceOAuth() =>
+      _postJson('/v1/google-workspace/oauth/start', const <String, Object?>{});
+  Future<Map<String, dynamic>> disconnectGoogleWorkspace() =>
+      _postJson('/v1/google-workspace/oauth/disconnect', const <String, Object?>{});
+  Future<Map<String, dynamic>> setGoogleWorkspaceServices(List<String> services) =>
+      _postJson('/v1/google-workspace/services', <String, Object?>{
+        'enabled_services': services,
+      });
 
   Future<Map<String, dynamic>> getGitHubDashboard({String? repository}) async {
     final query = repository?.trim();
