@@ -176,7 +176,7 @@ class _HomePageState extends State<HomePage> {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  mainAxisExtent: 120,
+                  mainAxisExtent: 140,
                   children: <Widget>[
                     _StatusCard(
                       icon: Icons.dns_outlined,
