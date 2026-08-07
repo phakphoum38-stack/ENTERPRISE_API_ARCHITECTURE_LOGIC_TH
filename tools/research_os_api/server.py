@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from github_status import GitHubStatusError, dashboard as github_dashboard
 from memory import build_context, search_memory
 from providers import ProviderError, build_provider
 
@@ -24,6 +25,7 @@ KNOWLEDGE_OPS_PATH = ROOT / "tools" / "research_curator" / "knowledge_ops.py"
 ARTIFACT_DIR = ROOT / "research" / "artifacts"
 WEB_DIR = ROOT / "apps" / "research_os_web"
 STATIC_ROUTES = {"/": "index.html", "/index.html": "index.html", "/app.css": "app.css", "/app.js": "app.js"}
+DEFAULT_GITHUB_REPOSITORY = "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH"
 
 
 def _load_module(name: str, path: Path):
@@ -41,7 +43,7 @@ def _json_bytes(payload: Any) -> bytes:
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
-    server_version = "ResearchOSAPI/0.2"
+    server_version = "ResearchOSAPI/0.3"
 
     def _send(self, status: int, payload: Any) -> None:
         body = _json_bytes(payload)
@@ -93,9 +95,10 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     {
                         "status": "ok",
                         "service": "research-os-api",
-                        "version": "0.2.0",
+                        "version": "0.3.0",
                         "ui": WEB_DIR.is_dir(),
                         "memory": True,
+                        "github": True,
                     },
                 )
                 return
@@ -131,9 +134,21 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 artifacts = knowledge_ops.load_all(ARTIFACT_DIR)
                 self._send(HTTPStatus.OK, knowledge_ops.graph_payload(artifacts))
                 return
+            if path == "/v1/github/dashboard":
+                params = parse_qs(parsed.query)
+                repository = str(
+                    params.get(
+                        "repository",
+                        [os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY)],
+                    )[0]
+                ).strip()
+                self._send(HTTPStatus.OK, github_dashboard(repository))
+                return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
         except ValueError as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+        except GitHubStatusError as exc:
+            self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
