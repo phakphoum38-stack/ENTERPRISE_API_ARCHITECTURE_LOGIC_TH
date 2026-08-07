@@ -43,6 +43,7 @@ jobs:
           python -m py_compile tools/research_curator/knowledge_ops.py
           python -m py_compile tools/research_curator/git_publisher.py
           python -m py_compile tools/research_os_api/providers.py
+          python -m py_compile tools/research_os_api/provider_readiness.py
           python -m py_compile tools/research_os_api/server.py
           python -m py_compile tools/research_os_api/test_e2e.py
           python -m py_compile tools/house_command/house_brain.py
@@ -60,11 +61,16 @@ jobs:
         working-directory: tools/research_curator
         run: python -m unittest test_curator.py test_knowledge_ops.py -v
 
-      - name: Run Research OS API and E2E tests
+      - name: Run Research OS API, provider readiness, and E2E tests
         working-directory: tools/research_os_api
         env:
           RESEARCH_OS_PROVIDER: mock
-        run: python -m unittest test_api.py test_e2e.py -v
+        run: python -m unittest test_api.py test_provider_readiness.py test_e2e.py -v
+
+      - name: Verify active provider readiness
+        env:
+          RESEARCH_OS_PROVIDER: mock
+        run: python tools/research_os_api/provider_readiness.py
 
       - name: Run House Brain tests
         working-directory: tools/house_command
