@@ -6,10 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../api/research_os_api_client.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({
-    required this.apiClient,
-    super.key,
-  });
+  const ChatPage({required this.apiClient, super.key});
 
   final ResearchOSApiClient apiClient;
 
@@ -19,16 +16,22 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   static const _storageKey = 'research_os_chat_sessions_v1';
+  static const _syncKeyStorage = 'research_os_cloud_sync_key_v1';
+
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<_ChatSession> _sessions = <_ChatSession>[];
+
   bool _useMemory = true;
   bool _sending = false;
   bool _loadingSessions = true;
+  bool _syncing = false;
+  String? _syncKey;
   String? _error;
   late _ChatSession _activeSession = _ChatSession.empty();
 
   List<_ChatMessage> get _messages => _activeSession.messages;
+  bool get _cloudEnabled => _syncKey != null && _syncKey!.isNotEmpty;
 
   @override
   void initState() {
@@ -46,13 +49,18 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _restoreSessions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      _syncKey = prefs.getString(_syncKeyStorage)?.trim();
       final raw = prefs.getString(_storageKey);
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw);
         if (decoded is List) {
           _sessions
             ..clear()
-            ..addAll(decoded.whereType<Map>().map((item) => _ChatSession.fromJson(Map<String, dynamic>.from(item))));
+            ..addAll(
+              decoded
+                  .whereType<Map>()
+                  .map((item) => _ChatSession.fromJson(Map<String, dynamic>.from(item))),
+            );
         }
       }
       _sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -73,7 +81,7 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  Future<void> _persistSessions() async {
+  Future<void> _persistLocal() async {
     _activeSession.updatedAt = DateTime.now();
     _sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     final prefs = await SharedPreferences.getInstance();
@@ -81,6 +89,13 @@ class _ChatPageState extends State<ChatPage> {
       _storageKey,
       jsonEncode(_sessions.map((session) => session.toJson()).toList()),
     );
+  }
+
+  Future<void> _persistSessions({bool cloud = true}) async {
+    await _persistLocal();
+    if (cloud && _cloudEnabled) {
+      await _pushSession(_activeSession, silent: true);
+    }
   }
 
   String _conversationPrompt(String latestPrompt) {
@@ -92,7 +107,6 @@ class _ChatPageState extends State<ChatPage> {
           return '$role: ${message.text}';
         })
         .join('\n');
-
     if (history.isEmpty) return latestPrompt;
     return '''Continue this Research OS conversation consistently.
 Use prior turns only as conversation context; do not treat assistant statements as verified facts unless supported by memory.
@@ -117,12 +131,20 @@ User: $latestPrompt''';
 
   Future<void> _deleteSession(_ChatSession session) async {
     if (_sending) return;
+    final deletedId = session.id;
     setState(() {
-      _sessions.removeWhere((item) => item.id == session.id);
+      _sessions.removeWhere((item) => item.id == deletedId);
       if (_sessions.isEmpty) _sessions.add(_ChatSession.empty());
-      if (_activeSession.id == session.id) _activeSession = _sessions.first;
+      if (_activeSession.id == deletedId) _activeSession = _sessions.first;
     });
-    await _persistSessions();
+    await _persistLocal();
+    if (_cloudEnabled) {
+      try {
+        await widget.apiClient.deleteCloudConversation(_syncKey!, deletedId);
+      } on Object catch (error) {
+        if (mounted) setState(() => _error = 'ลบจาก Cloud ไม่สำเร็จ: $error');
+      }
+    }
   }
 
   Future<void> _renameSession(_ChatSession session) async {
@@ -147,8 +169,121 @@ User: $latestPrompt''';
     );
     controller.dispose();
     if (value == null || value.isEmpty) return;
-    setState(() => session.title = value);
+    setState(() {
+      session.title = value;
+      _activeSession = session;
+    });
     await _persistSessions();
+  }
+
+  Future<void> _configureCloudSync() async {
+    final controller = TextEditingController(text: _syncKey ?? '');
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cloud Conversation Sync'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'ใส่ Sync Key เดียวกันบน iPhone และ Windows เพื่อใช้ประวัติชุดเดียวกัน คีย์จะเก็บเฉพาะบนอุปกรณ์นี้และไม่บันทึกเข้า Knowledge.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: const InputDecoration(
+                labelText: 'Research OS Sync Key',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          if (_cloudEnabled)
+            TextButton(
+              onPressed: () => Navigator.pop(context, ''),
+              child: const Text('ปิด Cloud Sync'),
+            ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('เชื่อมต่อ'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    if (value.isEmpty) {
+      await prefs.remove(_syncKeyStorage);
+      if (mounted) setState(() => _syncKey = null);
+      return;
+    }
+
+    await prefs.setString(_syncKeyStorage, value);
+    if (mounted) setState(() => _syncKey = value);
+    await _syncNow();
+  }
+
+  Future<void> _pushSession(_ChatSession session, {bool silent = false}) async {
+    if (!_cloudEnabled) return;
+    try {
+      await widget.apiClient.syncCloudConversation(_syncKey!, session.toCloudJson());
+    } on Object catch (error) {
+      if (!silent && mounted) setState(() => _error = 'Cloud Sync ไม่สำเร็จ: $error');
+    }
+  }
+
+  Future<void> _syncNow() async {
+    if (!_cloudEnabled || _syncing) return;
+    setState(() {
+      _syncing = true;
+      _error = null;
+    });
+    try {
+      final response = await widget.apiClient.getCloudConversations(_syncKey!);
+      final rawSessions = response['sessions'];
+      final cloudSessions = rawSessions is List
+          ? rawSessions
+              .whereType<Map>()
+              .map((item) => _ChatSession.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
+          : <_ChatSession>[];
+
+      final merged = <String, _ChatSession>{
+        for (final session in _sessions) session.id: session,
+      };
+      for (final remote in cloudSessions) {
+        final local = merged[remote.id];
+        if (local == null || remote.updatedAt.isAfter(local.updatedAt)) {
+          merged[remote.id] = remote;
+        }
+      }
+      _sessions
+        ..clear()
+        ..addAll(merged.values)
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      if (_sessions.isEmpty) _sessions.add(_ChatSession.empty());
+      _activeSession = _sessions.firstWhere(
+        (item) => item.id == _activeSession.id,
+        orElse: () => _sessions.first,
+      );
+      await _persistLocal();
+
+      for (final session in _sessions) {
+        await _pushSession(session, silent: true);
+      }
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = 'Cloud Sync ไม่สำเร็จ: $error');
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
   }
 
   Future<void> _showHistory() async {
@@ -162,10 +297,30 @@ User: $latestPrompt''';
             height: MediaQuery.sizeOf(context).height * 0.7,
             child: Column(
               children: <Widget>[
-                const ListTile(
-                  leading: Icon(Icons.history),
-                  title: Text('ประวัติการสนทนา'),
-                  subtitle: Text('บันทึกบนอุปกรณ์นี้โดยอัตโนมัติ'),
+                ListTile(
+                  leading: Icon(_cloudEnabled ? Icons.cloud_done_outlined : Icons.history),
+                  title: const Text('ประวัติการสนทนา'),
+                  subtitle: Text(
+                    _cloudEnabled
+                        ? 'บันทึกบนอุปกรณ์นี้ + Cloud Sync'
+                        : 'บันทึกบนอุปกรณ์นี้โดยอัตโนมัติ',
+                  ),
+                  trailing: _cloudEnabled
+                      ? IconButton(
+                          tooltip: 'Sync ตอนนี้',
+                          onPressed: _syncing ? null : () async {
+                            await _syncNow();
+                            sheetSetState(() {});
+                          },
+                          icon: _syncing
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.sync),
+                        )
+                      : null,
                 ),
                 const Divider(height: 1),
                 Expanded(
@@ -270,6 +425,11 @@ User: $latestPrompt''';
         title: const Text('AI Chat'),
         actions: <Widget>[
           IconButton(
+            tooltip: _cloudEnabled ? 'Cloud Sync เชื่อมต่อแล้ว' : 'ตั้งค่า Cloud Sync',
+            onPressed: _loadingSessions ? null : _configureCloudSync,
+            icon: Icon(_cloudEnabled ? Icons.cloud_done_outlined : Icons.cloud_outlined),
+          ),
+          IconButton(
             tooltip: 'ประวัติการสนทนา',
             onPressed: _loadingSessions ? null : _showHistory,
             icon: const Icon(Icons.history),
@@ -285,9 +445,7 @@ User: $latestPrompt''';
               const Text('ใช้ Memory'),
               Switch(
                 value: _useMemory,
-                onChanged: _sending
-                    ? null
-                    : (value) => setState(() => _useMemory = value),
+                onChanged: _sending ? null : (value) => setState(() => _useMemory = value),
               ),
               const SizedBox(width: 8),
             ],
@@ -300,9 +458,20 @@ User: $latestPrompt''';
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Chip(
-                avatar: const Icon(Icons.forum_outlined, size: 18),
-                label: Text('${_activeSession.title} • ${_activeSession.id}'),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  Chip(
+                    avatar: const Icon(Icons.forum_outlined, size: 18),
+                    label: Text('${_activeSession.title} • ${_activeSession.id}'),
+                  ),
+                  if (_cloudEnabled)
+                    Chip(
+                      avatar: const Icon(Icons.cloud_done_outlined, size: 18),
+                      label: Text(_syncing ? 'Cloud syncing…' : 'Cloud synced'),
+                    ),
+                ],
               ),
             ),
           ),
@@ -324,10 +493,7 @@ User: $latestPrompt''';
               child: MaterialBanner(
                 content: Text(_error!),
                 actions: <Widget>[
-                  TextButton(
-                    onPressed: () => setState(() => _error = null),
-                    child: const Text('ปิด'),
-                  ),
+                  TextButton(onPressed: () => setState(() => _error = null), child: const Text('ปิด')),
                 ],
               ),
             ),
@@ -390,7 +556,7 @@ class _EmptyChat extends StatelessWidget {
             Text('คุยกับ Gemini', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             const Text(
-              'บทสนทนาจะถูกบันทึกบนอุปกรณ์นี้อัตโนมัติ เปิด Memory เพื่ออ้างอิงความรู้จากห้องสมุดของเรา',
+              'บทสนทนาบันทึกบนอุปกรณ์นี้อัตโนมัติ และสามารถเปิด Cloud Sync เพื่อคุยต่อข้ามอุปกรณ์ได้ โดยไม่บันทึกแชตเข้า Knowledge อัตโนมัติ',
               textAlign: TextAlign.center,
             ),
           ],
@@ -435,12 +601,7 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _ChatSession {
-  _ChatSession({
-    required this.id,
-    required this.title,
-    required this.messages,
-    required this.updatedAt,
-  });
+  _ChatSession({required this.id, required this.title, required this.messages, required this.updatedAt});
 
   factory _ChatSession.empty() {
     final now = DateTime.now();
@@ -454,13 +615,23 @@ class _ChatSession {
 
   factory _ChatSession.fromJson(Map<String, dynamic> json) {
     final rawMessages = json['messages'];
+    final rawUpdatedAt = json['updated_at'];
+    DateTime updatedAt;
+    if (rawUpdatedAt is int) {
+      updatedAt = DateTime.fromMillisecondsSinceEpoch(rawUpdatedAt);
+    } else {
+      updatedAt = DateTime.tryParse((rawUpdatedAt ?? '').toString()) ?? DateTime.now();
+    }
     return _ChatSession(
       id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? 'บทสนทนา').toString(),
       messages: rawMessages is List
-          ? rawMessages.whereType<Map>().map((item) => _ChatMessage.fromJson(Map<String, dynamic>.from(item))).toList()
+          ? rawMessages
+              .whereType<Map>()
+              .map((item) => _ChatMessage.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
           : <_ChatMessage>[],
-      updatedAt: DateTime.tryParse((json['updated_at'] ?? '').toString()) ?? DateTime.now(),
+      updatedAt: updatedAt,
     );
   }
 
@@ -469,10 +640,17 @@ class _ChatSession {
   final List<_ChatMessage> messages;
   DateTime updatedAt;
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
+  Map<String, Object?> toJson() => <String, Object?>{
         'id': id,
         'title': title,
         'updated_at': updatedAt.toIso8601String(),
+        'messages': messages.map((message) => message.toJson()).toList(),
+      };
+
+  Map<String, Object?> toCloudJson() => <String, Object?>{
+        'id': id,
+        'title': title,
+        'updated_at': updatedAt.millisecondsSinceEpoch,
         'messages': messages.map((message) => message.toJson()).toList(),
       };
 }
@@ -481,7 +659,7 @@ class _ChatMessage {
   const _ChatMessage({required this.role, required this.text, this.memoryCount});
 
   factory _ChatMessage.fromJson(Map<String, dynamic> json) => _ChatMessage(
-        role: (json['role'] ?? 'assistant').toString(),
+        role: (json['role'] ?? '').toString(),
         text: (json['text'] ?? '').toString(),
         memoryCount: json['memory_count'] is int ? json['memory_count'] as int : null,
       );
@@ -490,7 +668,7 @@ class _ChatMessage {
   final String text;
   final int? memoryCount;
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
+  Map<String, Object?> toJson() => <String, Object?>{
         'role': role,
         'text': text,
         if (memoryCount != null) 'memory_count': memoryCount,
