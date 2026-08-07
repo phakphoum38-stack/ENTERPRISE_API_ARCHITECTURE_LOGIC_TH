@@ -1,0 +1,80 @@
+name: Research OS Build Service Host
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/research_os_service/**"
+      - "tools/research_os_api/**"
+      - "scripts/research-os-service.ps1"
+      - ".github/workflows/02-build-service-host.yml"
+  pull_request:
+    paths:
+      - "tools/research_os_service/**"
+      - "tools/research_os_api/**"
+      - "scripts/research-os-service.ps1"
+      - ".github/workflows/02-build-service-host.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-build-service-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-service:
+    name: Build ServiceHost
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile API modules
+        shell: pwsh
+        run: |
+          python -m py_compile tools/research_os_api/server.py
+          python -m py_compile tools/research_os_api/render_server.py
+          python -m py_compile tools/research_os_api/conversation_store.py
+          python -m py_compile tools/research_os_api/memory.py
+          python -m py_compile tools/research_os_api/google_workspace.py
+          python -m py_compile tools/research_os_api/google_oauth.py
+
+      - name: Run API tests
+        shell: pwsh
+        env:
+          RESEARCH_OS_PROVIDER: mock
+          RESEARCH_OS_SYNC_KEY: windows-ci-test-key
+          RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\ResearchOSData
+          RESEARCH_OS_CONVERSATION_STORE: ${{ runner.temp }}\ResearchOSData\sessions\conversations.json
+        run: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+
+      - name: Publish Research OS ServiceHost
+        shell: pwsh
+        run: |
+          dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:PublishTrimmed=false `
+            -o tools/research_os_service/publish
+          if (-not (Test-Path "tools/research_os_service/publish/ResearchOS.ServiceHost.exe")) {
+            throw "ServiceHost executable was not produced"
+          }
+
+      - name: Upload ServiceHost artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-service-host-${{ github.sha }}
+          path: tools/research_os_service/publish/**
+          if-no-files-found: error
+          retention-days: 14
