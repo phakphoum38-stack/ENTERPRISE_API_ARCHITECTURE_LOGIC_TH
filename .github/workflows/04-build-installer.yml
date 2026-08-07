@@ -2,24 +2,23 @@ name: Research OS Build Installer
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Research OS Runtime Smoke Test"]
-    types: [completed]
+    inputs:
+      target_sha:
+        description: Commit SHA to package
+        required: false
+        type: string
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 jobs:
   build-installer:
     name: Build Setup EXE from verified components
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
     timeout-minutes: 30
     env:
-      TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
     steps:
       - name: Checkout tested revision
         uses: actions/checkout@v4
@@ -37,8 +36,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $appRun = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Windows App" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
-          $serviceRun = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Service Host" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+          $appRun = $null
+          $serviceRun = $null
+          for ($i = 0; $i -lt 30; $i++) {
+            if (-not $appRun) {
+              $appRun = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Windows App" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+            }
+            if (-not $serviceRun) {
+              $serviceRun = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Service Host" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+            }
+            if ($appRun -and $serviceRun) { break }
+            Start-Sleep -Seconds 10
+          }
           if (-not $appRun) { throw "No successful Windows app run found for $env:TARGET_SHA" }
           if (-not $serviceRun) { throw "No successful ServiceHost run found for $env:TARGET_SHA" }
           "app_run=$appRun" >> $env:GITHUB_OUTPUT
@@ -68,19 +77,14 @@ jobs:
           $package = Join-Path $PWD "installer\package"
           if (Test-Path $package) { Remove-Item $package -Recurse -Force }
           New-Item -ItemType Directory -Force -Path $package | Out-Null
-
           New-Item -ItemType Directory -Force -Path "$package\app" | Out-Null
           Copy-Item "build-input\app\*" "$package\app" -Recurse -Force
-
           New-Item -ItemType Directory -Force -Path "$package\tools\research_os_service\publish" | Out-Null
           Copy-Item "build-input\service\*" "$package\tools\research_os_service\publish" -Recurse -Force
-
           New-Item -ItemType Directory -Force -Path "$package\tools\research_os_api" | Out-Null
           Copy-Item "tools\research_os_api\*.py" "$package\tools\research_os_api" -Force
-
           New-Item -ItemType Directory -Force -Path "$package\tools\research_curator" | Out-Null
           Copy-Item "tools\research_curator\*" "$package\tools\research_curator" -Recurse -Force
-
           if (Test-Path "apps\research_os_web") {
             New-Item -ItemType Directory -Force -Path "$package\apps\research_os_web" | Out-Null
             Copy-Item "apps\research_os_web\*" "$package\apps\research_os_web" -Recurse -Force
@@ -89,15 +93,12 @@ jobs:
             New-Item -ItemType Directory -Force -Path "$package\research\artifacts" | Out-Null
             Copy-Item "research\artifacts\*" "$package\research\artifacts" -Recurse -Force
           }
-
           New-Item -ItemType Directory -Force -Path "$package\scripts" | Out-Null
           Copy-Item "scripts\*research-os*.ps1" "$package\scripts" -Force
-
           $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim()
           if (-not (Test-Path "$pythonRoot\python.exe")) { throw "Python runtime root not found: $pythonRoot" }
           New-Item -ItemType Directory -Force -Path "$package\runtime\python" | Out-Null
           Copy-Item "$pythonRoot\*" "$package\runtime\python" -Recurse -Force
-
           if (-not (Test-Path "$package\runtime\python\python.exe")) { throw "Bundled Python runtime missing" }
           if (-not (Test-Path "$package\app\research_os_flutter.exe")) { throw "Desktop executable missing from package" }
           if (-not (Test-Path "$package\tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) { throw "ServiceHost missing from package" }
@@ -124,3 +125,9 @@ jobs:
           path: installer/output/Research-OS-Setup-*-x64.exe
           if-no-files-found: error
           retention-days: 14
+
+      - name: Dispatch installer validation
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run 05-installer-validation.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}"
