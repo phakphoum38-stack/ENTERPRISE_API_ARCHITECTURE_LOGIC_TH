@@ -6,11 +6,23 @@ on:
     branches: [main]
     paths:
       - "apps/research_os_flutter/**"
-      - ".github/workflows/01-build-windows-app.yml"
+      - "tools/research_os_api/**"
+      - "tools/research_os_service/**"
+      - "tools/research_curator/**"
+      - "scripts/*research-os*.ps1"
+      - "installer/**"
+      - ".github/workflows/0*-*.yml"
+      - ".github/workflows/research-os-windows-desktop.yml"
   pull_request:
     paths:
       - "apps/research_os_flutter/**"
-      - ".github/workflows/01-build-windows-app.yml"
+      - "tools/research_os_api/**"
+      - "tools/research_os_service/**"
+      - "tools/research_curator/**"
+      - "scripts/*research-os*.ps1"
+      - "installer/**"
+      - ".github/workflows/0*-*.yml"
+      - ".github/workflows/research-os-windows-desktop.yml"
 
 permissions:
   contents: read
