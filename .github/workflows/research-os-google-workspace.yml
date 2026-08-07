@@ -1,0 +1,91 @@
+name: Research OS Google Workspace
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/research_os_api/google_workspace.py"
+      - "tools/research_os_api/test_google_workspace.py"
+      - "apps/research_os_flutter/lib/src/features/google_workspace/**"
+      - "apps/research_os_flutter/lib/src/app_shell.dart"
+      - "docs/GOOGLE_WORKSPACE_HUB.md"
+      - ".github/workflows/research-os-google-workspace.yml"
+  pull_request:
+    paths:
+      - "tools/research_os_api/google_workspace.py"
+      - "tools/research_os_api/test_google_workspace.py"
+      - "apps/research_os_flutter/lib/src/features/google_workspace/**"
+      - "apps/research_os_flutter/lib/src/app_shell.dart"
+      - "docs/GOOGLE_WORKSPACE_HUB.md"
+      - ".github/workflows/research-os-google-workspace.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-workspace-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Workspace core
+        run: python -m py_compile tools/research_os_api/google_workspace.py
+
+      - name: Test Workspace core
+        working-directory: tools/research_os_api
+        run: python -m unittest test_google_workspace.py -v
+
+      - name: Verify service registry
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from google_workspace import WORKSPACE_SERVICES
+          expected = {"drive","docs","sheets","calendar","gmail","contacts","tasks","keep","meet","forms","chat"}
+          actual = set(WORKSPACE_SERVICES)
+          if actual != expected:
+              raise SystemExit(f"Workspace registry mismatch: {actual}")
+          print("Workspace registry OK:", ", ".join(WORKSPACE_SERVICES))
+          PY
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Flutter tests
+        working-directory: apps/research_os_flutter
+        run: flutter test
+
+      - name: Workspace security guard
+        run: |
+          if grep -R -n -E "(RESEARCH_OS_GOOGLE_CLIENT_SECRET|GOOGLE_CLIENT_SECRET)[[:space:]]*=[[:space:]]*['\"][^'\"]+" apps/research_os_flutter; then
+            echo "Google secret must not be embedded in Flutter"
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          # Google Workspace Hub
+          - Service registry: Drive, Docs, Sheets, Calendar, Gmail, Contacts, Tasks, Keep, Meet, Forms, Chat
+          - Secrets: backend-only
+          - OAuth: capability-gated until credentials and user authorization exist
+          - Flutter UI: validated when job succeeds
+          EOF
