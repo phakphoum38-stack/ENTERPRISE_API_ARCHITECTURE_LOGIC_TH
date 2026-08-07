@@ -734,9 +734,9 @@ class _EmptyChat extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
-            const ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 620),
-              child: Text(
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 620),
+              child: const Text(
                 'บทสนทนาบันทึกบนอุปกรณ์นี้อัตโนมัติ เปิด Memory เมื่อต้องการใช้ Knowledge ของ Research OS และเปิด Cloud Sync เมื่อต้องการคุยต่อข้ามอุปกรณ์',
                 textAlign: TextAlign.center,
               ),
