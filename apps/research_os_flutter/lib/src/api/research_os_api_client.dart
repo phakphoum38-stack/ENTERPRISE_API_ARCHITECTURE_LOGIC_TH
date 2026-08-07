@@ -30,9 +30,13 @@ class ResearchOSApiClient {
     return _getJson('/v1/providers');
   }
 
+  Future<Map<String, dynamic>> getKnowledgeArtifacts() async {
+    return _getJson('/v1/knowledge/artifacts');
+  }
+
   Future<Map<String, dynamic>> searchMemory(String query) async {
     final uri = _uri('/v1/memory/search').replace(
-      queryParameters: <String, String>{'q': query, 'limit': '5'},
+      queryParameters: <String, String>{'q': query, 'limit': '10'},
     );
     final response = await _client.get(uri);
     return _decode(response);
