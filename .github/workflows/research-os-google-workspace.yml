@@ -7,17 +7,27 @@ on:
       - main
     paths:
       - "tools/research_os_api/google_workspace.py"
+      - "tools/research_os_api/google_oauth.py"
       - "tools/research_os_api/test_google_workspace.py"
+      - "tools/research_os_api/test_google_oauth.py"
+      - "tools/research_os_api/server.py"
       - "apps/research_os_flutter/lib/src/features/google_workspace/**"
+      - "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
       - "apps/research_os_flutter/lib/src/app_shell.dart"
+      - "apps/research_os_flutter/pubspec.yaml"
       - "docs/GOOGLE_WORKSPACE_HUB.md"
       - ".github/workflows/research-os-google-workspace.yml"
   pull_request:
     paths:
       - "tools/research_os_api/google_workspace.py"
+      - "tools/research_os_api/google_oauth.py"
       - "tools/research_os_api/test_google_workspace.py"
+      - "tools/research_os_api/test_google_oauth.py"
+      - "tools/research_os_api/server.py"
       - "apps/research_os_flutter/lib/src/features/google_workspace/**"
+      - "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
       - "apps/research_os_flutter/lib/src/app_shell.dart"
+      - "apps/research_os_flutter/pubspec.yaml"
       - "docs/GOOGLE_WORKSPACE_HUB.md"
       - ".github/workflows/research-os-google-workspace.yml"
 
@@ -36,12 +46,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile Workspace core
-        run: python -m py_compile tools/research_os_api/google_workspace.py
+      - name: Compile Workspace core and API
+        run: |
+          python -m py_compile tools/research_os_api/google_workspace.py
+          python -m py_compile tools/research_os_api/google_oauth.py
+          python -m py_compile tools/research_os_api/server.py
 
-      - name: Test Workspace core
+      - name: Test Workspace core and OAuth broker
         working-directory: tools/research_os_api
-        run: python -m unittest test_google_workspace.py -v
+        run: python -m unittest test_google_workspace.py test_google_oauth.py -v
 
       - name: Verify service registry
         working-directory: tools/research_os_api
@@ -53,6 +66,21 @@ jobs:
           if actual != expected:
               raise SystemExit(f"Workspace registry mismatch: {actual}")
           print("Workspace registry OK:", ", ".join(WORKSPACE_SERVICES))
+          PY
+
+      - name: Verify OAuth authorization URL does not expose secret
+        working-directory: tools/research_os_api
+        env:
+          RESEARCH_OS_GOOGLE_CLIENT_ID: ci-client.apps.googleusercontent.com
+          RESEARCH_OS_GOOGLE_CLIENT_SECRET: ci-secret-value
+          RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
+        run: |
+          python - <<'PY'
+          from google_oauth import GoogleOAuthBroker
+          result = GoogleOAuthBroker().begin()
+          assert "ci-client.apps.googleusercontent.com" in result["authorization_url"]
+          assert "ci-secret-value" not in result["authorization_url"]
+          print("OAuth URL guard OK")
           PY
 
       - uses: subosito/flutter-action@v2
@@ -78,6 +106,10 @@ jobs:
             echo "Google secret must not be embedded in Flutter"
             exit 1
           fi
+          if grep -R -n -E "refresh_token|client_secret" apps/research_os_flutter/lib; then
+            echo "Raw Google OAuth credentials must not be represented in Flutter source"
+            exit 1
+          fi
 
       - name: Summary
         if: always()
@@ -85,7 +117,8 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           # Google Workspace Hub
           - Service registry: Drive, Docs, Sheets, Calendar, Gmail, Contacts, Tasks, Keep, Meet, Forms, Chat
+          - OAuth broker: local API callback + backend-only token storage
+          - Connect/disconnect controls: available from Flutter UI
           - Secrets: backend-only
-          - OAuth: capability-gated until credentials and user authorization exist
           - Flutter UI: validated when job succeeds
           EOF
