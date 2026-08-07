@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/research_os_api_client.dart';
@@ -18,18 +20,47 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
   Map<String, dynamic> _providers = const <String, dynamic>{};
   Map<String, dynamic> _github = const <String, dynamic>{};
   int _responseTimeMs = 0;
+  DateTime? _lastCheckedAt;
+  Timer? _timer;
+
+  bool get _isLocalApi {
+    final uri = Uri.tryParse(widget.apiClient.baseUrl);
+    if (uri == null) return false;
+    return uri.host == '127.0.0.1' ||
+        uri.host == 'localhost' ||
+        uri.host.startsWith('192.168.') ||
+        uri.host.startsWith('10.') ||
+        uri.host.startsWith('172.16.') ||
+        uri.host.startsWith('172.17.') ||
+        uri.host.startsWith('172.18.') ||
+        uri.host.startsWith('172.19.') ||
+        uri.host.startsWith('172.2') ||
+        uri.host.startsWith('172.30.') ||
+        uri.host.startsWith('172.31.');
+  }
 
   @override
   void initState() {
     super.initState();
     _refresh();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && !_loading) _refresh(silent: true);
+    });
   }
 
-  Future<void> _refresh() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refresh({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     final stopwatch = Stopwatch()..start();
     try {
@@ -45,7 +76,9 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
         _providers = results[1];
         _github = results[2];
         _responseTimeMs = stopwatch.elapsedMilliseconds;
+        _lastCheckedAt = DateTime.now();
         _loading = false;
+        _error = null;
       });
     } on Object catch (error) {
       stopwatch.stop();
@@ -53,6 +86,7 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
       setState(() {
         _error = error.toString();
         _responseTimeMs = stopwatch.elapsedMilliseconds;
+        _lastCheckedAt = DateTime.now();
         _loading = false;
       });
     }
@@ -82,6 +116,15 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
           Text('ศูนย์ตรวจสอบระบบ', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
           const Text('ตรวจ API, Provider, Memory, GitHub Actions และเวลาตอบสนองจากจุดเดียว'),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: Icon(_isLocalApi ? Icons.computer_outlined : Icons.cloud_outlined),
+              title: Text(_isLocalApi ? 'Local API' : 'Cloud API'),
+              subtitle: SelectableText(widget.apiClient.baseUrl),
+              trailing: Chip(label: Text(_isLocalApi ? 'Local-first' : 'Remote')),
+            ),
+          ),
           const SizedBox(height: 20),
           if (_loading) const LinearProgressIndicator(),
           if (_error != null)
@@ -109,7 +152,7 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
                       width: width,
                       title: 'API',
                       value: _health['status']?.toString() ?? 'unknown',
-                      detail: _health['service']?.toString() ?? 'research-os-api',
+                      detail: '${_health['service'] ?? 'research-os-api'} • v${_health['version'] ?? '-'}',
                       icon: Icons.dns_outlined,
                     ),
                     _MonitorCard(
@@ -123,14 +166,20 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
                       width: width,
                       title: 'Memory',
                       value: _health['memory'] == true ? 'ready' : 'unavailable',
-                      detail: 'Knowledge memory service',
+                      detail: _health['memory_commit'] == true
+                          ? 'Memory + explicit commit ready'
+                          : 'Knowledge memory service',
                       icon: Icons.memory_outlined,
                     ),
                     _MonitorCard(
                       width: width,
                       title: 'Response Time',
                       value: '$_responseTimeMs ms',
-                      detail: 'เวลารวมของการตรวจล่าสุด',
+                      detail: _responseTimeMs <= 1000
+                          ? 'ตอบสนองเร็ว'
+                          : _responseTimeMs <= 5000
+                              ? 'ตอบสนองปานกลาง'
+                              : 'ตอบสนองช้า',
                       icon: Icons.speed_outlined,
                     ),
                   ],
@@ -153,7 +202,10 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
               ),
             ),
             const SizedBox(height: 12),
-            Text('ตรวจล่าสุด: ${DateTime.now().toLocal()}', style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              'ตรวจอัตโนมัติทุก 30 วินาที • ล่าสุด: ${_lastCheckedAt?.toLocal() ?? '-'}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ],
       ),
