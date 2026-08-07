@@ -23,6 +23,8 @@ from conversation_store import (
     upsert_session as upsert_cloud_session,
 )
 from github_status import GitHubStatusError, dashboard as github_dashboard
+from google_oauth import GoogleOAuthBroker, GoogleOAuthError
+from google_workspace import GoogleWorkspaceConfig, get_google_workspace_dashboard
 from memory import build_context, search_memory
 from providers import ProviderError, build_provider
 
@@ -50,12 +52,21 @@ def _json_bytes(payload: Any) -> bytes:
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
-    server_version = "ResearchOSAPI/0.5"
+    server_version = "ResearchOSAPI/0.6"
 
     def _send(self, status: int, payload: Any) -> None:
         body = _json_bytes(payload)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_html(self, status: int, html: str) -> None:
+        body = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -116,17 +127,20 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send_static(STATIC_ROUTES[path])
                 return
             if path == "/health":
+                workspace = get_google_workspace_dashboard()
                 self._send(
                     HTTPStatus.OK,
                     {
                         "status": "ok",
                         "service": "research-os-api",
-                        "version": "0.5.0",
+                        "version": "0.6.0",
                         "ui": WEB_DIR.is_dir(),
                         "memory": True,
                         "memory_commit": sync_configured(),
                         "github": True,
                         "cloud_sync": sync_configured(),
+                        "google_workspace": True,
+                        "google_workspace_connected": bool(workspace.get("connected")),
                     },
                 )
                 return
@@ -137,6 +151,32 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                         "providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"],
                         "active": os.getenv("RESEARCH_OS_PROVIDER", "mock"),
                     },
+                )
+                return
+            if path == "/v1/google-workspace/dashboard":
+                self._send(HTTPStatus.OK, get_google_workspace_dashboard())
+                return
+            if path == "/v1/google-workspace/oauth/status":
+                self._send(HTTPStatus.OK, GoogleOAuthBroker().status())
+                return
+            if path == "/v1/google-workspace/oauth/callback":
+                params = parse_qs(parsed.query)
+                error = str(params.get("error", [""])[0]).strip()
+                if error:
+                    self._send_html(
+                        HTTPStatus.BAD_REQUEST,
+                        f"<html><body><h2>Google Workspace connection failed</h2><p>{error}</p><p>You can close this window.</p></body></html>",
+                    )
+                    return
+                code = str(params.get("code", [""])[0]).strip()
+                state = str(params.get("state", [""])[0]).strip()
+                if not code or not state:
+                    raise ValueError("Google OAuth callback requires code and state")
+                result = GoogleOAuthBroker().complete(code=code, state=state)
+                email = ((result.get("account") or {}).get("email") or "Google account")
+                self._send_html(
+                    HTTPStatus.OK,
+                    f"<html><body><h2>Research OS connected to Google Workspace</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>",
                 )
                 return
             if path == "/v1/conversations/cloud":
@@ -187,7 +227,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, github_dashboard(repository))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except ValueError as exc:
+        except (ValueError, GoogleOAuthError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except GitHubStatusError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
@@ -198,6 +238,20 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = self._read_json()
+            if path == "/v1/google-workspace/oauth/start":
+                self._send(HTTPStatus.OK, GoogleOAuthBroker().begin())
+                return
+            if path == "/v1/google-workspace/oauth/disconnect":
+                self._send(HTTPStatus.OK, GoogleOAuthBroker().disconnect())
+                return
+            if path == "/v1/google-workspace/services":
+                services = body.get("enabled_services")
+                if not isinstance(services, list):
+                    raise ValueError("enabled_services must be an array")
+                config = GoogleWorkspaceConfig()
+                config.set_enabled_services(str(item) for item in services)
+                self._send(HTTPStatus.OK, config.dashboard())
+                return
             if path == "/v1/conversations/cloud/sync":
                 if not self._authorize_cloud_sync():
                     return
@@ -278,7 +332,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, self._commit_memory(body))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, GoogleOAuthError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
