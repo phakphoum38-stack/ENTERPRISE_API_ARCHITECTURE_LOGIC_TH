@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api/research_os_api_client.dart';
 import 'features/chat/chat_page.dart';
+import 'features/github/github_dashboard_page.dart';
 import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
 
@@ -32,6 +33,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
       HomePage(apiClient: widget.apiClient),
       ChatPage(apiClient: widget.apiClient),
       LibraryPage(apiClient: widget.apiClient),
+      GitHubDashboardPage(apiClient: widget.apiClient),
     ];
 
     return LayoutBuilder(
@@ -61,6 +63,11 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                       icon: Icon(Icons.local_library_outlined),
                       selectedIcon: Icon(Icons.local_library),
                       label: Text('ห้องสมุด'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.account_tree_outlined),
+                      selectedIcon: Icon(Icons.account_tree),
+                      label: Text('GitHub'),
                     ),
                   ],
                 ),
@@ -95,6 +102,11 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                 icon: Icon(Icons.local_library_outlined),
                 selectedIcon: Icon(Icons.local_library),
                 label: 'ห้องสมุด',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.account_tree_outlined),
+                selectedIcon: Icon(Icons.account_tree),
+                label: 'GitHub',
               ),
             ],
           ),
