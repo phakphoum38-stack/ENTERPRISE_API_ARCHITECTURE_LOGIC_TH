@@ -59,7 +59,7 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  if CurUninstallStep = usPostUninstall then
+  if (CurUninstallStep = usPostUninstall) and (not UninstallSilent) then
   begin
     MsgBox('Research OS was removed. Your local Memory, sessions, backups and other data in ProgramData\ResearchOS were preserved.', mbInformation, MB_OK);
   end;
