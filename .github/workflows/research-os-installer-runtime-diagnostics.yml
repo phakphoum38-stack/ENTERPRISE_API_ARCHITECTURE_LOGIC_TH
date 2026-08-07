@@ -1,0 +1,226 @@
+name: Research OS Installer Runtime Diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/research_os_api/**"
+      - "tools/research_os_service/**"
+      - "scripts/research-os-service.ps1"
+      - "installer/**"
+      - ".github/workflows/research-os-installer-runtime-diagnostics.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-installer-runtime-diagnostics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose-installed-runtime:
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish ServiceHost
+        shell: pwsh
+        run: |
+          dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:PublishTrimmed=false `
+            -o tools/research_os_service/publish
+          if ($LASTEXITCODE -ne 0) { throw "ServiceHost publish failed" }
+
+      - name: Stage installer runtime
+        shell: pwsh
+        run: |
+          $package = Join-Path $PWD "installer\package"
+          if (Test-Path $package) { Remove-Item $package -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+
+          New-Item -ItemType Directory -Force -Path "$package\app" | Out-Null
+          Set-Content -Path "$package\app\runtime-diagnostic.txt" -Value "diagnostic package"
+
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_os_service\publish" | Out-Null
+          Copy-Item "tools\research_os_service\publish\*" "$package\tools\research_os_service\publish" -Recurse -Force
+
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_os_api" | Out-Null
+          Copy-Item "tools\research_os_api\*.py" "$package\tools\research_os_api" -Force
+
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_curator" | Out-Null
+          if (Test-Path "tools\research_curator") {
+            Copy-Item "tools\research_curator\*" "$package\tools\research_curator" -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Force -Path "$package\scripts" | Out-Null
+          Copy-Item "scripts\*research-os*.ps1" "$package\scripts" -Force
+
+          $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim()
+          Write-Host "Source Python root: $pythonRoot"
+          New-Item -ItemType Directory -Force -Path "$package\runtime\python" | Out-Null
+          Copy-Item "$pythonRoot\*" "$package\runtime\python" -Recurse -Force
+
+          $python = "$package\runtime\python\python.exe"
+          if (-not (Test-Path $python)) { throw "Bundled Python runtime missing" }
+          & $python --version
+          if ($LASTEXITCODE -ne 0) { throw "Bundled Python --version failed" }
+          & $python -c "import sys, pathlib; print(sys.executable); print(sys.prefix); print(pathlib.Path(sys.executable).resolve())"
+          if ($LASTEXITCODE -ne 0) { throw "Bundled Python smoke test failed" }
+          & $python -m py_compile "$package\tools\research_os_api\server.py" "$package\tools\research_os_api\render_server.py"
+          if ($LASTEXITCODE -ne 0) { throw "Bundled Python API compile failed" }
+
+      - name: Smoke test staged API with bundled Python
+        shell: pwsh
+        run: |
+          $package = Join-Path $PWD "installer\package"
+          $python = "$package\runtime\python\python.exe"
+          $server = "$package\tools\research_os_api\render_server.py"
+          $data = Join-Path $env:RUNNER_TEMP "ResearchOSStagedData"
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          $env:RESEARCH_OS_PROVIDER = "mock"
+          $env:RESEARCH_OS_DATA_DIR = $data
+          $env:RESEARCH_OS_API_HOST = "127.0.0.1"
+          $env:RESEARCH_OS_API_PORT = "8787"
+          $env:HOST = "127.0.0.1"
+          $env:PORT = "8787"
+
+          $stdout = Join-Path $env:RUNNER_TEMP "staged-api.out.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "staged-api.err.log"
+          $proc = Start-Process -FilePath $python -ArgumentList @($server) -WorkingDirectory "$package\tools\research_os_api" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+                if ($health.status -eq "ok") { $ready = $true; break }
+              } catch {
+                if ($proc.HasExited) { break }
+                Start-Sleep -Milliseconds 500
+              }
+            }
+            if (-not $ready) {
+              Write-Host "=== staged stdout ==="
+              if (Test-Path $stdout) { Get-Content $stdout -ErrorAction SilentlyContinue }
+              Write-Host "=== staged stderr ==="
+              if (Test-Path $stderr) { Get-Content $stderr -ErrorAction SilentlyContinue }
+              Write-Host "Process exited: $($proc.HasExited)"
+              if ($proc.HasExited) { Write-Host "Exit code: $($proc.ExitCode)" }
+              throw "Staged bundled API did not become healthy"
+            }
+          }
+          finally {
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build diagnostic installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "installer\research-os.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+
+      - name: Install and diagnose Service API
+        shell: pwsh
+        run: |
+          function Show-Diagnostics {
+            Write-Host "=== SERVICE CONFIG ==="
+            sc.exe qc ResearchOSService 2>&1 | Out-Host
+            sc.exe queryex ResearchOSService 2>&1 | Out-Host
+
+            Write-Host "=== SERVICE REGISTRY ENVIRONMENT ==="
+            $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\ResearchOSService"
+            if (Test-Path $serviceKey) {
+              Get-ItemProperty -Path $serviceKey -ErrorAction SilentlyContinue | Format-List * | Out-Host
+            }
+
+            Write-Host "=== PORT 8787 ==="
+            Get-NetTCPConnection -LocalPort 8787 -ErrorAction SilentlyContinue | Format-List * | Out-Host
+
+            Write-Host "=== RESEARCH OS PROCESSES ==="
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -match 'ResearchOS|python' -or $_.CommandLine -match 'research_os' } |
+              Select-Object ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine |
+              Format-List | Out-Host
+
+            $appRoot = Join-Path $env:ProgramFiles "Research OS"
+            Write-Host "=== INSTALLED RUNTIME ==="
+            if (Test-Path "$appRoot\runtime\python\python.exe") {
+              & "$appRoot\runtime\python\python.exe" --version 2>&1 | Out-Host
+              & "$appRoot\runtime\python\python.exe" -c "import sys; print(sys.executable); print(sys.prefix)" 2>&1 | Out-Host
+            } else {
+              Write-Host "Installed python.exe is missing"
+            }
+
+            Write-Host "=== PROGRAMDATA LOGS ==="
+            $logs = Join-Path $env:ProgramData "ResearchOS\logs"
+            if (Test-Path $logs) {
+              Get-ChildItem $logs -Force | Format-Table Name, Length, LastWriteTime | Out-Host
+              Get-ChildItem $logs -File -Force | ForEach-Object {
+                Write-Host "--- $($_.FullName) ---"
+                Get-Content $_.FullName -ErrorAction SilentlyContinue | Out-Host
+              }
+            } else {
+              Write-Host "Logs directory missing: $logs"
+            }
+
+            Write-Host "=== RECENT APPLICATION EVENTS ==="
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match 'ResearchOS|Research OS|python|ServiceHost' -or $_.ProviderName -match 'ResearchOS|\.NET Runtime|Application Error' } |
+              Select-Object -First 30 TimeCreated, ProviderName, Id, LevelDisplayName, Message |
+              Format-List | Out-Host
+          }
+
+          $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Installer missing" }
+          $installLog = Join-Path $env:RUNNER_TEMP "research-os-install-diagnostic.log"
+          $process = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$installLog") -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            if (Test-Path $installLog) { Get-Content $installLog | Out-Host }
+            Show-Diagnostics
+            throw "Installer failed with exit code $($process.ExitCode)"
+          }
+
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+                if ($health.status -eq "ok") { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 500 }
+            }
+            if (-not $ready) {
+              Show-Diagnostics
+              throw "Installed Research OS Service API did not become ready"
+            }
+            Write-Host "Installed Service API is healthy."
+            Show-Diagnostics
+          }
+          finally {
+            $appRoot = Join-Path $env:ProgramFiles "Research OS"
+            $uninstaller = Join-Path $appRoot "unins000.exe"
+            if (Test-Path $uninstaller) {
+              Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait | Out-Null
+            } elseif (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+              & "$appRoot\scripts\research-os-service.ps1" -Action uninstall -DataDir "$env:ProgramData\ResearchOS"
+            }
+          }
