@@ -45,6 +45,8 @@ jobs:
           $scripts = @(
             "scripts/setup-research-os-windows.ps1",
             "scripts/start-research-os-local.ps1",
+            "scripts/stop-research-os-local.ps1",
+            "scripts/status-research-os-local.ps1",
             "scripts/backup-research-os.ps1",
             "scripts/restore-research-os.ps1",
             "scripts/enable-research-os-autostart.ps1",
@@ -81,6 +83,27 @@ jobs:
           RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\ResearchOSData
           RESEARCH_OS_CONVERSATION_STORE: ${{ runner.temp }}\ResearchOSData\sessions\conversations.json
         run: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+
+      - name: Test local API start status and stop
+        shell: pwsh
+        env:
+          RESEARCH_OS_SYNC_KEY: windows-ci-test-key
+        run: |
+          ./scripts/start-research-os-local.ps1 -DataDir "$env:RUNNER_TEMP\ResearchOSData" -Provider mock -Port 8787 -Background
+          $ready = $false
+          for ($i = 0; $i -lt 20; $i++) {
+            try {
+              $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+              if ($health.status -eq "ok") { $ready = $true; break }
+            } catch { Start-Sleep -Milliseconds 500 }
+          }
+          if (-not $ready) { throw "Local API did not become ready" }
+          ./scripts/status-research-os-local.ps1 -Port 8787 -HealthUrl "http://127.0.0.1:8787/health"
+          ./scripts/stop-research-os-local.ps1 -Port 8787 -PidFile "$env:RUNNER_TEMP\ResearchOSData\run\research-os-api.pid"
+          Start-Sleep -Milliseconds 500
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) {
+            throw "Local API was still listening after stop"
+          }
 
       - name: Test backup and restore
         shell: pwsh
@@ -156,6 +179,7 @@ jobs:
 
           - Local-first setup: validated
           - Local API tests: validated when job succeeds
+          - Local API start/status/stop: validated when job succeeds
           - Backup/restore: validated when job succeeds
           - Autostart enable/disable: validated when job succeeds
           - Flutter Windows build: validated when job succeeds
