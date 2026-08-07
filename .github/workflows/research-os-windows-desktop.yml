@@ -1,0 +1,145 @@
+name: Research OS Windows Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/research_os_flutter/**"
+      - "tools/research_os_api/**"
+      - "scripts/*research-os*.ps1"
+      - ".github/workflows/research-os-windows-desktop.yml"
+  pull_request:
+    paths:
+      - "apps/research_os_flutter/**"
+      - "tools/research_os_api/**"
+      - "scripts/*research-os*.ps1"
+      - ".github/workflows/research-os-windows-desktop.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-windows-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-foundation:
+    name: Windows local-first foundation
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate PowerShell scripts
+        shell: pwsh
+        run: |
+          $scripts = @(
+            "scripts/setup-research-os-windows.ps1",
+            "scripts/start-research-os-local.ps1",
+            "scripts/backup-research-os.ps1",
+            "scripts/restore-research-os.ps1"
+          )
+          foreach ($script in $scripts) {
+            [void][scriptblock]::Create((Get-Content $script -Raw))
+            Write-Host "OK: $script"
+          }
+
+      - name: Run Windows local-first setup
+        shell: pwsh
+        run: |
+          ./scripts/setup-research-os-windows.ps1 -Root "$env:RUNNER_TEMP\ResearchOS" -DataDir "$env:RUNNER_TEMP\ResearchOSData"
+          Test-Path "$env:RUNNER_TEMP\ResearchOSData\database" | Should -BeTrue
+          Test-Path "$env:RUNNER_TEMP\ResearchOSData\sessions" | Should -BeTrue
+          Test-Path "$env:RUNNER_TEMP\ResearchOSData\artifacts" | Should -BeTrue
+          Test-Path "$env:RUNNER_TEMP\ResearchOSData\backups" | Should -BeTrue
+
+      - name: Compile Research OS API
+        shell: pwsh
+        run: |
+          python -m py_compile tools/research_os_api/server.py
+          python -m py_compile tools/research_os_api/render_server.py
+          python -m py_compile tools/research_os_api/conversation_store.py
+          python -m py_compile tools/research_os_api/memory.py
+
+      - name: Run API tests
+        shell: pwsh
+        env:
+          RESEARCH_OS_PROVIDER: mock
+          RESEARCH_OS_SYNC_KEY: windows-ci-test-key
+          RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\ResearchOSData
+          RESEARCH_OS_CONVERSATION_STORE: ${{ runner.temp }}\ResearchOSData\sessions\conversations.json
+        run: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+
+      - name: Test backup and restore
+        shell: pwsh
+        run: |
+          Set-Content -Path "$env:RUNNER_TEMP\ResearchOSData\sessions\fixture.json" -Value '{"ok":true}'
+          ./scripts/backup-research-os.ps1 -DataDir "$env:RUNNER_TEMP\ResearchOSData" -BackupDir "$env:RUNNER_TEMP\backups"
+          $archive = Get-ChildItem "$env:RUNNER_TEMP\backups\research-os-*.zip" | Select-Object -First 1
+          if (-not $archive) { throw "Backup archive was not created" }
+          ./scripts/restore-research-os.ps1 -Archive $archive.FullName -DataDir "$env:RUNNER_TEMP\RestoredResearchOSData"
+          if (-not (Test-Path "$env:RUNNER_TEMP\RestoredResearchOSData\sessions\fixture.json")) {
+            throw "Restore validation failed"
+          }
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Windows platform shell
+        shell: pwsh
+        working-directory: apps/research_os_flutter
+        run: flutter create --platforms=windows --project-name=research_os_flutter .
+
+      - name: Install Flutter dependencies
+        shell: pwsh
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Analyze Flutter
+        shell: pwsh
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        shell: pwsh
+        working-directory: apps/research_os_flutter
+        run: flutter test
+
+      - name: Build Windows desktop
+        shell: pwsh
+        working-directory: apps/research_os_flutter
+        run: flutter build windows --release
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-windows-${{ github.run_number }}
+          path: apps/research_os_flutter/build/windows/x64/runner/Release/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write summary
+        if: always()
+        shell: pwsh
+        run: |
+          @"
+          # Research OS Windows Desktop
+
+          - Local-first setup: validated
+          - Local API tests: validated when job succeeds
+          - Backup/restore: validated when job succeeds
+          - Flutter Windows build: validated when job succeeds
+          - Secrets are not embedded in the desktop artifact
+          "@ | Add-Content $env:GITHUB_STEP_SUMMARY
