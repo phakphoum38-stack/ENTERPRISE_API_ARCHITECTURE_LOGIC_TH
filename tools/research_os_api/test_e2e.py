@@ -1,13 +1,10 @@
 import json
-import os
 import threading
 import unittest
 import urllib.request
 from http.server import ThreadingHTTPServer
 
-os.environ.setdefault("RESEARCH_OS_PROVIDER", "mock")
-
-from server import ResearchOSHandler  # noqa: E402
+from server import ResearchOSHandler
 
 
 class ResearchOSEndToEndTests(unittest.TestCase):
@@ -48,9 +45,14 @@ class ResearchOSEndToEndTests(unittest.TestCase):
         session_id = "e2e-session"
         status, generated = self.request_json(
             "/v1/ai/generate",
-            {"prompt": "ช่วยสรุปภารกิจของบ้าน", "session_id": session_id},
+            {
+                "provider": "mock",
+                "prompt": "ช่วยสรุปภารกิจของบ้าน",
+                "session_id": session_id,
+            },
         )
         self.assertEqual(status, 200)
+        self.assertEqual(generated["provider"], "mock")
         self.assertEqual(generated["session_id"], session_id)
         self.assertTrue(generated["text"])
 
