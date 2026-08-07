@@ -2,35 +2,32 @@ name: Research OS Agent Platform
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "tools/research_os_api/agent_platform.py"
-      - "tools/research_os_api/agent_runtime.py"
-      - "tools/research_os_api/test_agent_platform.py"
-      - "tools/research_os_api/test_agent_runtime.py"
-      - "apps/research_os_flutter/lib/src/features/agents/**"
-      - "apps/research_os_flutter/lib/src/app_shell.dart"
-      - ".github/workflows/research-os-agent-platform.yml"
-  pull_request:
-    paths:
-      - "tools/research_os_api/agent_platform.py"
-      - "tools/research_os_api/agent_runtime.py"
-      - "tools/research_os_api/test_agent_platform.py"
-      - "tools/research_os_api/test_agent_runtime.py"
-      - "apps/research_os_flutter/lib/src/features/agents/**"
-      - "apps/research_os_flutter/lib/src/app_shell.dart"
-      - ".github/workflows/research-os-agent-platform.yml"
+  workflow_run:
+    workflows:
+      - Research OS Windows Desktop
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read
 
+concurrency:
+  group: research-os-agent-secondary-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate-agent-platform:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -95,34 +92,11 @@ jobs:
               print("Agent Runtime OK")
           PY
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Flutter dependencies
-        working-directory: apps/research_os_flutter
-        run: flutter pub get
-
-      - name: Flutter analyze
-        working-directory: apps/research_os_flutter
-        run: flutter analyze
-
-      - name: Flutter tests
-        working-directory: apps/research_os_flutter
-        run: flutter test
-
       - name: Summary
         if: always()
         run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          # Research OS Agent Platform
-          - Registry: Research, Document, GitHub, Google Workspace, Shift
-          - Router: capability-based with Research fallback
-          - Task Queue: active
-          - Event Bus: active
-          - Shared Context: local persistent
-          - Permissions: explicit per agent
-          - Write actions: confirmation gate enforced
-          - Agent Center: validated when job succeeds
-          EOF
+          {
+            echo "# Research OS Agent Platform — Secondary"
+            echo "- Generic Flutter analyze/test removed; owned by main workflow"
+            echo "- Agent registry/runtime/permission checks remain"
+          } >> "$GITHUB_STEP_SUMMARY"
