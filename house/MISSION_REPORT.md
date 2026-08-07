@@ -4,7 +4,7 @@
 
 **Research OS v0.1 — เปิดได้ แล้วเจอเพื่อน**
 
-- Status: BUILDING
+- Status: VALIDATING
 - Owner: Phakphum
 - Working name: Research OS
 - Source of truth: Repository
@@ -14,53 +14,51 @@
 | ส่วนของบ้าน | สถานะ | รายละเอียด |
 |---|---|---|
 | ฐานราก | ✅ พร้อม | Vision, Constitution, Governance และ Ownership |
-| โครงบ้าน | 🟡 กำลังสร้าง | Core Architecture และ Module boundaries |
-| ประตูบ้าน | 🟡 Prototype | Research OS API และ Provider Adapters |
-| ผู้ดูแลบ้าน | 🟡 Prototype | Research Curator, Knowledge Diff, Graph และ Git Publisher |
-| ห้องรับแขก | ⏳ ยังไม่สร้าง | หน้าแอป “ยินดีต้อนรับกลับครับเพื่อน” |
-| ห้องทำงาน | ⏳ ยังไม่เชื่อมครบ | Session + Chat + AI Runtime |
-| ห้องสมุด | 🟡 เริ่มแล้ว | Research Artifacts และ Knowledge Graph |
-| สมุดบันทึกบ้าน | ✅ เริ่มใช้งาน | `house/HOUSE_LOG.md` |
+| โครงบ้าน | ✅ พร้อมสำหรับ v0.1 | Core Architecture และ Module boundaries |
+| ประตูบ้าน | ✅ พร้อม | Entrance UI เสิร์ฟจาก Research OS API |
+| AI Gateway | ✅ Prototype | Provider-agnostic API และ Mock Provider |
+| House Brain | ✅ v0.1 | `house-status`, health score และ next focus |
+| ห้องทำงาน | ✅ Prototype | Session + Chat + AI Runtime |
+| ห้องสมุด | ✅ Prototype | Preview Knowledge Capture, Artifacts และ Graph |
+| สมุดบันทึกบ้าน | ✅ อัปเดต | `house/HOUSE_LOG.md` |
 
 ## Definition of done for v0.1
 
-- [ ] เปิดแอปได้
-- [ ] แสดงข้อความ “ยินดีต้อนรับกลับครับเพื่อน”
-- [ ] กด “เริ่มงาน” ได้
-- [ ] เริ่ม Session ได้
-- [ ] ส่งข้อความผ่าน Research OS API ได้
-- [ ] รับคำตอบจาก Mock Provider ได้
-- [ ] เปลี่ยนไปใช้ AI Provider ที่ได้รับอนุญาตได้
-- [ ] ปิดแอปโดยไม่พัง
+- [x] เปิดแอปได้
+- [x] แสดงข้อความ “ยินดีต้อนรับกลับครับเพื่อน”
+- [x] กด “เริ่มงาน” ได้
+- [x] เริ่ม Session ได้
+- [x] ส่งข้อความผ่าน Research OS API ได้
+- [x] รับคำตอบจาก Mock Provider ได้
+- [x] วิเคราะห์และ Preview Knowledge Capture ได้
+- [x] End-to-End Test ครอบคลุมเส้นทางหลัก
+- [x] ปิด HTTP server โดยไม่พังในการทดสอบ
+- [ ] GitHub Actions รอบสุดท้ายผ่านบน Pull Request
+- [ ] Merge เข้า `main`
 
-## Core workflow target
+## Core workflow implemented
 
 ```text
 เปิดบ้าน
     ↓
 เริ่ม Session
     ↓
-คุยกับ AI
+คุยกับ AI ผ่าน Gateway
     ↓
-จัดเก็บความรู้
+Preview Knowledge Capture
     ↓
-สร้างเอกสาร
+เจ้าของบ้าน Review
     ↓
-อัปเดต Mission Report
-    ↓
-อัปเดต House Log
-    ↓
-Review และอัปเดต Repository
+Git Workflow จึง Persist ได้
 ```
 
-## Current blocker
+## Security boundary
 
-ยังไม่มี UI application ที่เชื่อม Research OS API แบบ End-to-End และยังต้องยืนยัน CI ล่าสุดให้ผ่าน
+v0.1 เหมาะสำหรับ Localhost และการทดสอบภายในเท่านั้น การเปิดผ่าน Internet ต้องเพิ่ม Authentication, TLS, Rate Limit, Audit Log และ Secret Management
 
-## Next construction work
+## Next construction work after merge
 
-1. ยืนยัน GitHub Actions ของ API และ Curator
-2. สร้าง Minimum UI หน้าเดียว
-3. เชื่อม `GET /health` และ `POST /v1/ai/generate`
-4. ทดสอบด้วย Mock Provider
-5. รัน End-to-End และบันทึกผลใน House Log
+1. Authentication และ Session persistence
+2. Controlled Artifact Approval workflow
+3. Packaging และ Deployment
+4. Provider secret management
