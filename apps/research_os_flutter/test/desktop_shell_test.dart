@@ -10,6 +10,8 @@ class DesktopShellApiClient extends ResearchOSApiClient {
   Future<Map<String, dynamic>> getHealth() async => <String, dynamic>{
         'status': 'ok',
         'memory': true,
+        'google_workspace': true,
+        'version': '0.6.0',
       };
 
   @override
@@ -43,8 +45,7 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 }
 
 void main() {
-  testWidgets('desktop shell shows workspace chrome and collapsible sidebar',
-      (tester) async {
+  testWidgets('desktop shell shows organized enterprise sidebar', (tester) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -59,19 +60,21 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byKey(const Key('desktop-shell-title')), findsOneWidget);
-    expect(find.text('Research OS Desktop'), findsOneWidget);
-    expect(find.byKey(const Key('desktop-workspace-title')), findsOneWidget);
-    expect(find.text('Home Dashboard'), findsOneWidget);
-    expect(find.byKey(const Key('desktop-navigation-rail')), findsOneWidget);
+    expect(find.text('Research OS'), findsWidgets);
+    expect(find.byKey(const Key('enterprise-sidebar')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-navigation-list')), findsOneWidget);
     expect(find.byKey(const Key('desktop-status-bar')), findsOneWidget);
+    expect(find.text('WORKSPACE'), findsWidgets);
+    expect(find.text('KNOWLEDGE'), findsWidgets);
+    expect(find.text('CONNECTIONS'), findsWidgets);
+    expect(find.text('SYSTEM'), findsWidgets);
 
+    final before = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
     await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    final after = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
 
-    final rail = tester.widget<NavigationRail>(
-      find.byKey(const Key('desktop-navigation-rail')),
-    );
-    expect(rail.extended, isFalse);
+    expect(after, lessThan(before));
     expect(tester.takeException(), isNull);
   });
 }
