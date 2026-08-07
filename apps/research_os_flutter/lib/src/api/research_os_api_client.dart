@@ -61,6 +61,29 @@ class ResearchOSApiClient {
     });
   }
 
+  Future<Map<String, dynamic>> commitMemory(
+    String syncKey, {
+    required String title,
+    required List<Map<String, Object?>> conversation,
+  }) async {
+    final response = await _client.post(
+      _uri('/v1/memory/commit'),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'X-Research-OS-Sync-Key': syncKey,
+      },
+      body: jsonEncode(<String, Object?>{
+        'title': title,
+        'conversation': conversation,
+        'status': 'hypothesis',
+        'tags': <String>['research-os', 'chat-session'],
+        'min_quality': 20,
+        'confirm': true,
+      }),
+    );
+    return _decode(response);
+  }
+
   Future<Map<String, dynamic>> getCloudConversations(String syncKey) async {
     final response = await _client.get(
       _uri('/v1/conversations/cloud'),
