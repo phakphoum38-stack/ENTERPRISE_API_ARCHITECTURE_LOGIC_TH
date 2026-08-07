@@ -39,10 +39,12 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final results = await Future.wait<Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
-        widget.apiClient.getHealth(),
-        widget.apiClient.getProviders(),
-      ]);
+      final results = await Future.wait<Map<String, dynamic>>(
+        <Future<Map<String, dynamic>>>[
+          widget.apiClient.getHealth(),
+          widget.apiClient.getProviders(),
+        ],
+      );
       if (!mounted) return;
       setState(() {
         _health = results[0];
@@ -114,30 +116,39 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: MediaQuery.sizeOf(context).width >= 800 ? 3 : 1,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 2.8,
-              children: <Widget>[
-                _StatusCard(
-                  icon: Icons.monitor_heart_outlined,
-                  title: 'API Health',
-                  value: apiStatus,
-                ),
-                _StatusCard(
-                  icon: Icons.smart_toy_outlined,
-                  title: 'Active Provider',
-                  value: activeProvider,
-                ),
-                _StatusCard(
-                  icon: Icons.memory_outlined,
-                  title: 'AI Memory',
-                  value: _health?['memory'] == true ? 'ready' : 'unknown',
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 900
+                    ? 3
+                    : constraints.maxWidth >= 560
+                        ? 2
+                        : 1;
+                return GridView.count(
+                  crossAxisCount: columns,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  mainAxisExtent: 104,
+                  children: <Widget>[
+                    _StatusCard(
+                      icon: Icons.monitor_heart_outlined,
+                      title: 'API Health',
+                      value: apiStatus,
+                    ),
+                    _StatusCard(
+                      icon: Icons.smart_toy_outlined,
+                      title: 'Active Provider',
+                      value: activeProvider,
+                    ),
+                    _StatusCard(
+                      icon: Icons.memory_outlined,
+                      title: 'AI Memory',
+                      value: _health?['memory'] == true ? 'ready' : 'unknown',
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
             Text(
@@ -192,8 +203,19 @@ class _StatusCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(title, style: Theme.of(context).textTheme.labelLarge),
-                  Text(value, style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ],
               ),
             ),
