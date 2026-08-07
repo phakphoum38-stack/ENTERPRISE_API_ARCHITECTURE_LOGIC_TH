@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api/research_os_api_client.dart';
 import 'features/chat/chat_page.dart';
 import 'features/github/github_dashboard_page.dart';
+import 'features/google_workspace/google_workspace_page.dart';
 import 'features/graph/knowledge_graph_page.dart';
 import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
@@ -38,6 +39,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
     'Knowledge Library',
     'Knowledge Graph',
     'GitHub Control Center',
+    'Google Workspace Hub',
     'Local API Control',
     'System Monitor',
     'Settings & Providers',
@@ -51,6 +53,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
       LibraryPage(apiClient: widget.apiClient),
       KnowledgeGraphPage(apiClient: widget.apiClient),
       GitHubDashboardPage(apiClient: widget.apiClient),
+      const GoogleWorkspacePage(),
       const LocalApiControlPage(),
       SystemMonitorPage(apiClient: widget.apiClient),
       SettingsPage(
@@ -63,89 +66,27 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
     ];
 
     const railDestinations = <NavigationRailDestination>[
-      NavigationRailDestination(
-        icon: Icon(Icons.home_outlined),
-        selectedIcon: Icon(Icons.home),
-        label: Text('บ้าน'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.chat_bubble_outline),
-        selectedIcon: Icon(Icons.chat_bubble),
-        label: Text('AI Chat'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.local_library_outlined),
-        selectedIcon: Icon(Icons.local_library),
-        label: Text('ห้องสมุด'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.hub_outlined),
-        selectedIcon: Icon(Icons.hub),
-        label: Text('แผนผัง'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.account_tree_outlined),
-        selectedIcon: Icon(Icons.account_tree),
-        label: Text('GitHub'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.dns_outlined),
-        selectedIcon: Icon(Icons.dns),
-        label: Text('Local API'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.monitor_heart_outlined),
-        selectedIcon: Icon(Icons.monitor_heart),
-        label: Text('ระบบ'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.settings_outlined),
-        selectedIcon: Icon(Icons.settings),
-        label: Text('ตั้งค่า'),
-      ),
+      NavigationRailDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: Text('บ้าน')),
+      NavigationRailDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: Text('AI Chat')),
+      NavigationRailDestination(icon: Icon(Icons.local_library_outlined), selectedIcon: Icon(Icons.local_library), label: Text('ห้องสมุด')),
+      NavigationRailDestination(icon: Icon(Icons.hub_outlined), selectedIcon: Icon(Icons.hub), label: Text('แผนผัง')),
+      NavigationRailDestination(icon: Icon(Icons.account_tree_outlined), selectedIcon: Icon(Icons.account_tree), label: Text('GitHub')),
+      NavigationRailDestination(icon: Icon(Icons.apps_outlined), selectedIcon: Icon(Icons.apps), label: Text('Workspace')),
+      NavigationRailDestination(icon: Icon(Icons.dns_outlined), selectedIcon: Icon(Icons.dns), label: Text('Local API')),
+      NavigationRailDestination(icon: Icon(Icons.monitor_heart_outlined), selectedIcon: Icon(Icons.monitor_heart), label: Text('ระบบ')),
+      NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('ตั้งค่า')),
     ];
 
     const barDestinations = <NavigationDestination>[
-      NavigationDestination(
-        icon: Icon(Icons.home_outlined),
-        selectedIcon: Icon(Icons.home),
-        label: 'บ้าน',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.chat_bubble_outline),
-        selectedIcon: Icon(Icons.chat_bubble),
-        label: 'AI Chat',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.local_library_outlined),
-        selectedIcon: Icon(Icons.local_library),
-        label: 'ห้องสมุด',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.hub_outlined),
-        selectedIcon: Icon(Icons.hub),
-        label: 'แผนผัง',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.account_tree_outlined),
-        selectedIcon: Icon(Icons.account_tree),
-        label: 'GitHub',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.dns_outlined),
-        selectedIcon: Icon(Icons.dns),
-        label: 'API',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.monitor_heart_outlined),
-        selectedIcon: Icon(Icons.monitor_heart),
-        label: 'ระบบ',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.settings_outlined),
-        selectedIcon: Icon(Icons.settings),
-        label: 'ตั้งค่า',
-      ),
+      NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'บ้าน'),
+      NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'AI'),
+      NavigationDestination(icon: Icon(Icons.local_library_outlined), selectedIcon: Icon(Icons.local_library), label: 'Library'),
+      NavigationDestination(icon: Icon(Icons.hub_outlined), selectedIcon: Icon(Icons.hub), label: 'Graph'),
+      NavigationDestination(icon: Icon(Icons.account_tree_outlined), selectedIcon: Icon(Icons.account_tree), label: 'GitHub'),
+      NavigationDestination(icon: Icon(Icons.apps_outlined), selectedIcon: Icon(Icons.apps), label: 'Google'),
+      NavigationDestination(icon: Icon(Icons.dns_outlined), selectedIcon: Icon(Icons.dns), label: 'API'),
+      NavigationDestination(icon: Icon(Icons.monitor_heart_outlined), selectedIcon: Icon(Icons.monitor_heart), label: 'ระบบ'),
+      NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'ตั้งค่า'),
     ];
 
     return LayoutBuilder(
@@ -158,9 +99,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                   _DesktopTopBar(
                     title: _workspaceTitles[_selectedIndex],
                     railExtended: _railExtended,
-                    onToggleRail: () {
-                      setState(() => _railExtended = !_railExtended);
-                    },
+                    onToggleRail: () => setState(() => _railExtended = !_railExtended),
                   ),
                   const Divider(height: 1),
                   Expanded(
@@ -170,28 +109,19 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                           key: const Key('desktop-navigation-rail'),
                           extended: _railExtended,
                           selectedIndex: _selectedIndex,
-                          labelType: _railExtended
-                              ? NavigationRailLabelType.none
-                              : NavigationRailLabelType.all,
+                          labelType: _railExtended ? NavigationRailLabelType.none : NavigationRailLabelType.all,
                           leading: const Padding(
                             padding: EdgeInsets.only(bottom: 8),
                             child: Icon(Icons.auto_awesome, size: 28),
                           ),
-                          onDestinationSelected: (value) {
-                            setState(() => _selectedIndex = value);
-                          },
+                          onDestinationSelected: (value) => setState(() => _selectedIndex = value),
                           destinations: railDestinations,
                         ),
                         const VerticalDivider(width: 1),
                         Expanded(
                           child: Column(
                             children: <Widget>[
-                              Expanded(
-                                child: IndexedStack(
-                                  index: _selectedIndex,
-                                  children: pages,
-                                ),
-                              ),
+                              Expanded(child: IndexedStack(index: _selectedIndex, children: pages)),
                               const _DesktopStatusBar(),
                             ],
                           ),
@@ -211,7 +141,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
             actions: <Widget>[
               IconButton(
                 tooltip: 'System Monitor',
-                onPressed: () => setState(() => _selectedIndex = 6),
+                onPressed: () => setState(() => _selectedIndex = 7),
                 icon: const Icon(Icons.monitor_heart_outlined),
               ),
             ],
@@ -219,9 +149,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
           body: IndexedStack(index: _selectedIndex, children: pages),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (value) {
-              setState(() => _selectedIndex = value);
-            },
+            onDestinationSelected: (value) => setState(() => _selectedIndex = value),
             destinations: barDestinations,
           ),
         );
@@ -231,11 +159,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 }
 
 class _DesktopTopBar extends StatelessWidget {
-  const _DesktopTopBar({
-    required this.title,
-    required this.railExtended,
-    required this.onToggleRail,
-  });
+  const _DesktopTopBar({required this.title, required this.railExtended, required this.onToggleRail});
 
   final String title;
   final bool railExtended;
@@ -258,26 +182,14 @@ class _DesktopTopBar extends StatelessWidget {
             const SizedBox(width: 8),
             const Icon(Icons.hub_outlined),
             const SizedBox(width: 10),
-            const Text(
-              'Research OS Desktop',
-              key: Key('desktop-shell-title'),
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
+            const Text('Research OS Desktop', key: Key('desktop-shell-title'), style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(width: 16),
             Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(
-                title,
-                key: const Key('desktop-workspace-title'),
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              child: Text(title, key: const Key('desktop-workspace-title'), overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
             ),
-            const Tooltip(
-              message: 'Backend secrets stay on the Research OS API',
-              child: Icon(Icons.shield_outlined),
-            ),
+            const Tooltip(message: 'Backend secrets stay on the Research OS API', child: Icon(Icons.shield_outlined)),
           ],
         ),
       ),
@@ -304,6 +216,10 @@ class _DesktopStatusBar extends StatelessWidget {
           SizedBox(width: 6),
           Text('Research OS Workspace'),
           Spacer(),
+          Icon(Icons.apps_outlined, size: 16),
+          SizedBox(width: 4),
+          Text('Google Workspace'),
+          SizedBox(width: 14),
           Icon(Icons.memory, size: 16),
           SizedBox(width: 4),
           Text('Memory'),
