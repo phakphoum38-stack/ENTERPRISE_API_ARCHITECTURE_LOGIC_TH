@@ -1,0 +1,180 @@
+name: Research OS Installer Validation
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Research OS Build Installer"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  installer-validation:
+    name: Install service health uninstall
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      SOURCE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Download installer artifact
+        if: github.event_name == 'workflow_run'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path installer-under-test | Out-Null
+          gh run download "$env:SOURCE_RUN_ID" --repo "${{ github.repository }}" --name "research-os-installer-$env:TARGET_SHA" --dir installer-under-test
+          $setup = Get-ChildItem "installer-under-test\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Installer artifact is missing" }
+
+      - name: Resolve installer for manual run
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runId = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+          if (-not $runId) { throw "No successful installer build found for $env:TARGET_SHA" }
+          New-Item -ItemType Directory -Force -Path installer-under-test | Out-Null
+          gh run download "$runId" --repo "${{ github.repository }}" --name "research-os-installer-$env:TARGET_SHA" --dir installer-under-test
+
+      - name: Prepare clean validation environment
+        shell: pwsh
+        run: |
+          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+            sc.exe stop ResearchOSService | Out-Host
+            Start-Sleep -Seconds 2
+            sc.exe delete ResearchOSService | Out-Host
+            Start-Sleep -Seconds 2
+          }
+          $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
+          foreach ($listener in $listeners) {
+            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+          }
+          Start-Sleep -Seconds 2
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) {
+            throw "Port 8787 still has a listener before installation"
+          }
+
+      - name: Install Setup EXE silently
+        id: install
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem "installer-under-test\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Installer missing" }
+          $log = "$env:RUNNER_TEMP\research-os-install.log"
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 300 }
+            throw "Installer failed with exit code $($p.ExitCode)"
+          }
+          if (Test-Path $log) { Get-Content $log -Tail 80 }
+
+      - name: Verify installed files
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:ProgramFiles 'Research OS'
+          $required = @(
+            "$root\app\research_os_flutter.exe",
+            "$root\runtime\python\python.exe",
+            "$root\tools\research_os_service\publish\ResearchOS.ServiceHost.exe",
+            "$root\scripts\research-os-service.ps1"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) { throw "Installed file missing: $path" }
+          }
+
+      - name: Verify ResearchOSService is running
+        shell: pwsh
+        run: |
+          $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
+          if (-not $service) { throw "ResearchOSService was not installed" }
+          Write-Host "Service state: $($service.State)"
+          Write-Host "Service path: $($service.PathName)"
+          if ($service.State -ne 'Running') {
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue | Select-Object -First 40 | Format-List
+            throw "ResearchOSService is not running"
+          }
+
+      - name: Verify service health endpoint
+        shell: pwsh
+        run: |
+          $ready = $false
+          $lastError = $null
+          for ($i = 0; $i -lt 60; $i++) {
+            try {
+              $response = Invoke-WebRequest -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2 -SkipHttpErrorCheck
+              Write-Host "Health attempt $($i + 1): HTTP $($response.StatusCode) $($response.Content)"
+              if ($response.StatusCode -eq 200 -and $response.Content -match '"status"\s*:\s*"ok"') {
+                $ready = $true
+                break
+              }
+            } catch {
+              $lastError = $_.Exception.Message
+            }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $ready) {
+            Write-Host "Last health error: $lastError"
+            Get-NetTCPConnection -LocalPort 8787 -ErrorAction SilentlyContinue | Format-Table -AutoSize
+            Get-Process ResearchOS.ServiceHost -ErrorAction SilentlyContinue | Format-List *
+            throw "Installed Research OS health endpoint did not become ready"
+          }
+
+      - name: Uninstall Setup EXE silently
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:ProgramFiles 'Research OS'
+          $uninstaller = Get-ChildItem $root -Filter 'unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $uninstaller) { throw "Uninstaller executable was not found" }
+          $log = "$env:RUNNER_TEMP\research-os-uninstall.log"
+          $p = Start-Process -FilePath $uninstaller.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 300 }
+            throw "Uninstaller failed with exit code $($p.ExitCode)"
+          }
+          if (Test-Path $log) { Get-Content $log -Tail 80 }
+
+      - name: Verify service removed after uninstall
+        shell: pwsh
+        run: |
+          for ($i = 0; $i -lt 20; $i++) {
+            if (-not (Get-Service ResearchOSService -ErrorAction SilentlyContinue)) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+            sc.exe query ResearchOSService | Out-Host
+            throw "ResearchOSService still exists after uninstall"
+          }
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) {
+            throw "Port 8787 is still listening after uninstall"
+          }
+
+      - name: Emergency cleanup and diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "=== FINAL SERVICE STATE ==="
+          sc.exe query ResearchOSService 2>&1 | Out-Host
+          Write-Host "=== FINAL PORT STATE ==="
+          Get-NetTCPConnection -LocalPort 8787 -ErrorAction SilentlyContinue | Format-Table -AutoSize
+          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+            sc.exe stop ResearchOSService | Out-Host
+            Start-Sleep -Seconds 1
+            sc.exe delete ResearchOSService | Out-Host
+          }
+          $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
+          foreach ($listener in $listeners) {
+            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+          }
