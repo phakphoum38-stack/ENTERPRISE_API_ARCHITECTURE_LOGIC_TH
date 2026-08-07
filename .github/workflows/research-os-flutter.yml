@@ -1,28 +1,28 @@
 name: Research OS Flutter
 
 on:
-  workflow_dispatch:
-  push:
+  workflow_run:
+    workflows:
+      - Research OS Windows Desktop
+    types:
+      - completed
     branches:
       - main
-    paths:
-      - "apps/research_os_flutter/**"
-      - ".github/workflows/research-os-flutter.yml"
-  pull_request:
-    paths:
-      - "apps/research_os_flutter/**"
-      - ".github/workflows/research-os-flutter.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: research-os-flutter-${{ github.ref }}
+  group: research-os-flutter-secondary-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
+env:
+  RESEARCH_OS_PUBLIC_API_URL: ${{ vars.RESEARCH_OS_PUBLIC_API_URL || 'https://research-os-api-phakphoum.onrender.com' }}
+
 jobs:
-  validate:
-    name: Analyze, test and build web
+  build-web:
+    name: Secondary web build
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -31,8 +31,10 @@ jobs:
         working-directory: apps/research_os_flutter
 
     steps:
-      - name: Checkout repository
+      - name: Checkout validated main commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -46,23 +48,27 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze
-        run: flutter analyze
+      - name: Build Pages-ready web artifact
+        run: >-
+          flutter build web --release
+          --base-href "/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH/"
+          --dart-define=RESEARCH_OS_API_BASE_URL=${RESEARCH_OS_PUBLIC_API_URL}
 
-      - name: Run tests
-        run: flutter test
-
-      - name: Build web
-        run: flutter build web --release
+      - name: Upload web artifact for Pages
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-web-pages
+          path: apps/research_os_flutter/build/web
+          retention-days: 2
 
       - name: Write job summary
         if: always()
         run: |
           {
-            echo "## Research OS Flutter"
+            echo "## Research OS Flutter — Secondary"
             echo
-            echo "- Analyze: completed"
-            echo "- Tests: completed"
-            echo "- Web build: completed when this job succeeds"
-            echo "- Gemini and GitHub secrets remain on the backend"
+            echo "- Parent workflow: Research OS Windows Desktop"
+            echo "- Parent result: ${{ github.event.workflow_run.conclusion }}"
+            echo "- Generic analyze/test are owned by the main workflow"
+            echo "- This workflow only produces the Pages-ready web artifact"
           } >> "$GITHUB_STEP_SUMMARY"
