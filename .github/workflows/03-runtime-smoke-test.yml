@@ -2,53 +2,67 @@ name: Research OS Runtime Smoke Test
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Research OS Build Service Host"]
-    types: [completed]
+    inputs:
+      target_sha:
+        description: Commit SHA to test
+        required: false
+        type: string
+      source_service_run:
+        description: ServiceHost workflow run ID
+        required: false
+        type: string
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 jobs:
   runtime-smoke:
     name: Runtime and service smoke test
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-      SOURCE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+      SOURCE_RUN_ID: ${{ inputs.source_service_run }}
     steps:
       - name: Checkout tested revision
         uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_SHA }}
 
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Download ServiceHost from upstream run
-        if: github.event_name == 'workflow_run'
+      - name: Resolve ServiceHost run
+        id: service-run
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runId = "$env:SOURCE_RUN_ID"
+          if (-not $runId) {
+            $runId = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Service Host" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+          }
+          if (-not $runId) { throw "No successful ServiceHost run found for $env:TARGET_SHA" }
+          "run_id=$runId" >> $env:GITHUB_OUTPUT
+
+      - name: Download ServiceHost artifact
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           New-Item -ItemType Directory -Force -Path tools/research_os_service/publish | Out-Null
-          gh run download "$env:SOURCE_RUN_ID" --repo "${{ github.repository }}" --name "research-os-service-host-$env:TARGET_SHA" --dir tools/research_os_service/publish
+          gh run download "${{ steps.service-run.outputs.run_id }}" --repo "${{ github.repository }}" --name "research-os-service-host-$env:TARGET_SHA" --dir tools/research_os_service/publish
           if (-not (Test-Path "tools/research_os_service/publish/ResearchOS.ServiceHost.exe")) {
             throw "Downloaded ServiceHost executable is missing"
           }
-
-      - name: Build ServiceHost for manual run
-        if: github.event_name == 'workflow_dispatch'
-        shell: pwsh
-        run: |
-          dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o tools/research_os_service/publish
 
       - name: Test local API start status and stop
         shell: pwsh
@@ -96,3 +110,9 @@ jobs:
               ./scripts/research-os-service.ps1 -Action uninstall -DataDir $data
             }
           }
+
+      - name: Dispatch installer build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run 04-build-installer.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA"
