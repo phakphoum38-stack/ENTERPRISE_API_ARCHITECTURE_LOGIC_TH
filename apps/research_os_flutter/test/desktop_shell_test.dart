@@ -57,7 +57,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 150));
 
     expect(find.byKey(const Key('desktop-shell-title')), findsOneWidget);
     expect(find.text('Research OS'), findsWidgets);
@@ -68,13 +68,19 @@ void main() {
     expect(find.text('KNOWLEDGE'), findsWidgets);
     expect(find.text('CONNECTIONS'), findsWidgets);
     expect(find.text('SYSTEM'), findsWidgets);
+    expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
 
     final before = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
     await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
     final after = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
 
     expect(after, lessThan(before));
+    expect(after, 76);
+    expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
