@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Small authenticated conversation store for Research OS cloud sync.
-
-The default JSON backend is intentionally simple and dependency-free. On Render
-free instances it is suitable for cross-device sync while the instance exists,
-but the filesystem is ephemeral across replacement/deploys. The storage API is
-kept isolated so a durable Redis/Postgres adapter can replace it without changing
-Flutter endpoints.
-"""
+"""Authenticated conversation store for Research OS local/cloud sync."""
 
 from __future__ import annotations
 
@@ -17,11 +10,14 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from local_storage import conversation_store_path, ensure_layout
+
 _LOCK = threading.RLock()
 
 
 def _store_path() -> Path:
-    return Path(os.getenv("RESEARCH_OS_CONVERSATION_STORE", "/tmp/research_os_conversations.json"))
+    ensure_layout()
+    return conversation_store_path()
 
 
 def sync_configured() -> bool:
