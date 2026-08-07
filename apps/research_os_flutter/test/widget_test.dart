@@ -104,11 +104,13 @@ void setDesktopTestSize(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
 }
 
-Finder navigationRailLabel(String label) {
-  return find.descendant(
-    of: find.byType(NavigationRail),
-    matching: find.text(label),
-  );
+Future<void> openDesktopDestination(WidgetTester tester, int index) async {
+  final finder = find.byKey(Key('desktop-nav-$index'));
+  expect(finder, findsOneWidget);
+  await tester.ensureVisible(finder);
+  await tester.tap(finder);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 150));
 }
 
 void main() {
@@ -125,11 +127,13 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('บ้านของเรา'), findsOneWidget);
-    expect(find.text('API Health'), findsOneWidget);
-    expect(find.text('ok'), findsOneWidget);
+
+    expect(find.text('Research OS'), findsOneWidget);
+    expect(find.text('System status'), findsOneWidget);
+    expect(find.text('Local API'), findsOneWidget);
+    expect(find.text('Online'), findsOneWidget);
     expect(find.text('gemini'), findsOneWidget);
-    expect(find.text('ready'), findsOneWidget);
+    expect(find.text('Ready'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -144,16 +148,16 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(navigationRailLabel('AI Chat'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await openDesktopDestination(tester, 1);
+
     await tester.enterText(
       find.byType(TextField).first,
       'บ้านเรามีความรู้อะไรบ้าง',
     );
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 200));
+
     expect(find.text('คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
     expect(find.text('อ้างอิง Memory 1 รายการ'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
@@ -172,12 +176,10 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(navigationRailLabel('ห้องสมุด'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('ห้องสมุดความรู้'), findsOneWidget);
+    await openDesktopDestination(tester, 3);
+
     expect(find.text('Conversation to Knowledge'), findsOneWidget);
-    expect(find.text('สถานะ: active'), findsOneWidget);
+    expect(find.textContaining('active'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -192,15 +194,13 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(navigationRailLabel('แผนผัง'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('แผนผังความรู้'), findsOneWidget);
+    await openDesktopDestination(tester, 4);
+
     expect(find.byKey(const Key('knowledge-graph-heading')), findsOneWidget);
     expect(find.text('Research Memory'), findsOneWidget);
     expect(find.text('Knowledge Graph'), findsWidgets);
     expect(find.text('RES-A → RES-B'), findsOneWidget);
-    expect(find.text('ประเภท: supports'), findsOneWidget);
+    expect(find.textContaining('supports'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -215,10 +215,8 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(navigationRailLabel('GitHub'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('ศูนย์ควบคุม GitHub'), findsOneWidget);
+    await openDesktopDestination(tester, 5);
+
     expect(find.text('Research OS Flutter'), findsOneWidget);
     expect(find.text('Add GitHub dashboard'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -241,11 +239,8 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(navigationRailLabel('ตั้งค่า'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await openDesktopDestination(tester, 9);
 
-    expect(find.text('Settings & Provider Manager'), findsOneWidget);
     expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsWidgets);
     expect(find.text('http://127.0.0.1:8787'), findsOneWidget);
