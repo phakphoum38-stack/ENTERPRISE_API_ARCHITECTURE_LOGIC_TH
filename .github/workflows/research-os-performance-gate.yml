@@ -1,0 +1,136 @@
+name: Research OS Performance Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/research_os_flutter/**"
+      - "apps/research_os_web/**"
+      - "tools/research_os_api/**"
+      - ".github/workflows/research-os-performance-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/research_os_flutter/**"
+      - "apps/research_os_web/**"
+      - "tools/research_os_api/**"
+      - ".github/workflows/research-os-performance-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-fast-path:
+    name: Backend fast path
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RESEARCH_OS_PROVIDER: mock
+      RESEARCH_OS_API_HOST: 127.0.0.1
+      RESEARCH_OS_API_PORT: "8787"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run API tests
+        run: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+
+      - name: Start local API
+        shell: bash
+        run: |
+          python tools/research_os_api/server.py --host 127.0.0.1 --port 8787 >/tmp/research-os-performance.log 2>&1 &
+          echo $! >/tmp/research-os-performance.pid
+
+      - name: Measure local health latency
+        run: |
+          python - <<'PY'
+          import json, statistics, time, urllib.request
+          url = "http://127.0.0.1:8787/health"
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen(url, timeout=2) as r:
+                      if json.load(r).get("status") == "ok":
+                          break
+              except Exception:
+                  time.sleep(0.2)
+          else:
+              raise SystemExit("API did not start")
+
+          samples=[]
+          for _ in range(20):
+              started=time.perf_counter()
+              with urllib.request.urlopen(url, timeout=2) as r:
+                  payload=json.load(r)
+              assert payload["status"] == "ok"
+              samples.append((time.perf_counter()-started)*1000)
+          samples.sort()
+          p95=samples[max(0, int(len(samples)*0.95)-1)]
+          avg=statistics.mean(samples)
+          print(f"health avg_ms={avg:.1f} p95_ms={p95:.1f} max_ms={max(samples):.1f}")
+          if p95 > 500:
+              raise SystemExit(f"Local /health p95 too slow: {p95:.1f} ms")
+          PY
+
+      - name: Verify retry policy exists
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text=Path("tools/research_os_api/providers.py").read_text(encoding="utf-8")
+          required=["retryable_statuses", "429", "503", "max_attempts", "time.sleep"]
+          missing=[x for x in required if x not in text]
+          if missing:
+              raise SystemExit(f"Missing resilience markers: {missing}")
+          print("Provider retry policy present.")
+          PY
+
+      - name: Stop local API
+        if: always()
+        run: |
+          if [ -f /tmp/research-os-performance.pid ]; then kill "$(cat /tmp/research-os-performance.pid)" 2>/dev/null || true; fi
+
+  flutter-fast-start:
+    name: Flutter fast-start quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/research_os_flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate web shell
+        run: flutter create --platforms=web --project-name=research_os_flutter .
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test
+      - name: Build release web
+        run: flutter build web --release --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
+      - name: Verify release artifact
+        run: |
+          test -f build/web/index.html
+          test -f build/web/main.dart.js
+
+  summary:
+    name: Performance quality gate
+    runs-on: ubuntu-latest
+    needs: [backend-fast-path, flutter-fast-start]
+    if: always()
+    steps:
+      - name: Write summary
+        run: |
+          echo "# Research OS Performance Gate" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend fast path: ${{ needs.backend-fast-path.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Flutter fast start: ${{ needs.flutter-fast-start.result }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.backend-fast-path.result }}" != "success" ] || [ "${{ needs.flutter-fast-start.result }}" != "success" ]; then exit 1; fi
