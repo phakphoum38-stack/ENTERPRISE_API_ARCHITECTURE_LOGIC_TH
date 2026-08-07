@@ -20,15 +20,26 @@ class AgentCenterPage extends StatelessWidget {
         children: <Widget>[
           Text('Research OS Agent Platform', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
-          const Text('ศูนย์กลางผู้ช่วยเฉพาะทาง ใช้ Registry กลาง, capability routing และ permission policy เดียวกัน'),
+          const Text('ศูนย์กลางผู้ช่วยเฉพาะทาง พร้อม Agent Runtime สำหรับ routing, queue, events, shared context และ confirmation gate'),
           const SizedBox(height: 16),
           const Card(
             child: ListTile(
               leading: Icon(Icons.route_outlined),
-              title: Text('Capability Router'),
-              subtitle: Text('เลือก Agent ตาม objective/capability และ fallback ไป Research Agent เมื่อยังไม่มีผู้เชี่ยวชาญตรงงาน'),
-              trailing: Chip(label: Text('Foundation 1.0')),
+              title: Text('Capability Router + Agent Runtime'),
+              subtitle: Text('รับ objective → เลือก Agent → เข้า Task Queue → Event Bus → Execute และบังคับยืนยันก่อนงานที่มีสิทธิ์เขียน'),
+              trailing: Chip(label: Text('Runtime 1.0')),
             ),
+          ),
+          const SizedBox(height: 12),
+          const Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              Chip(avatar: Icon(Icons.queue_outlined, size: 18), label: Text('Task Queue: Active')),
+              Chip(avatar: Icon(Icons.swap_horiz, size: 18), label: Text('Event Bus: Active')),
+              Chip(avatar: Icon(Icons.memory_outlined, size: 18), label: Text('Shared Context: Local')),
+              Chip(avatar: Icon(Icons.verified_user_outlined, size: 18), label: Text('Confirmation Gate')),
+            ],
           ),
           const SizedBox(height: 16),
           LayoutBuilder(
@@ -69,14 +80,21 @@ class AgentCenterPage extends StatelessWidget {
             child: ListTile(
               leading: Icon(Icons.verified_user_outlined),
               title: Text('Write actions require confirmation'),
-              subtitle: Text('Agent ที่แก้ Calendar/Google Workspace หรือข้อมูลภายนอกจะไม่เขียนเองแบบเงียบ ๆ โดย policy กลางกำหนดให้ยืนยันก่อน'),
+              subtitle: Text('Agent ที่แก้ Calendar/Google Workspace หรือข้อมูลภายนอกจะหยุดที่ awaiting_confirmation จนกว่าผู้ใช้จะยืนยัน'),
             ),
           ),
           const Card(
             child: ListTile(
               leading: Icon(Icons.memory_outlined),
-              title: Text('Shared Context / Shared Memory'),
-              subtitle: Text('Foundation interface พร้อมแล้ว ส่วน Event Bus และ Task Queue จะเป็น phase ถัดไป'),
+              title: Text('Shared Context แบบ Local-first'),
+              subtitle: Text('Context ของ Agent ถูกเตรียมให้เก็บใต้ ResearchOSData/agents เพื่อใช้ต่อเนื่องโดยไม่ต้องพึ่ง Cloud'),
+            ),
+          ),
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.construction_outlined),
+              title: Text('Domain Executors เป็นลำดับถัดไป'),
+              subtitle: Text('Runtime dispatch ทำงานแล้ว ขั้นถัดไปคือผูก executor จริงของ Research, GitHub, Google Workspace, Document และ Shift Agent เข้ากับ Task Queue'),
             ),
           ),
         ],
