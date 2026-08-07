@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_flutter/src/api/research_os_api_client.dart';
 import 'package:research_os_flutter/src/app_shell.dart';
 import 'package:research_os_flutter/src/features/home/home_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeResearchOSApiClient extends ResearchOSApiClient {
   FakeResearchOSApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
@@ -111,6 +112,10 @@ Finder navigationRailLabel(String label) {
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
   testWidgets('home dashboard shows Research OS status', (tester) async {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
@@ -141,15 +146,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(navigationRailLabel('AI Chat'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.enterText(
       find.byType(TextField).first,
       'บ้านเรามีความรู้อะไรบ้าง',
     );
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 150));
     expect(find.text('คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
     expect(find.text('อ้างอิง Memory 1 รายการ'), findsOneWidget);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('research_os_chat_sessions_v1'), isNotNull);
     expect(tester.takeException(), isNull);
   });
 
