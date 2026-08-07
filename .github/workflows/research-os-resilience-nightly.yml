@@ -1,0 +1,111 @@
+name: Research OS Resilience Nightly
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "43 19 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-resilience-nightly
+  cancel-in-progress: true
+
+jobs:
+  resilience:
+    name: Retry, timeout and API resilience
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Research OS API regression tests
+        run: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+
+      - name: Simulate transient Gemini 503 then recovery
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          import io
+          import urllib.error
+          from unittest.mock import patch
+          import providers
+
+          class FakeResponse:
+              def __enter__(self): return self
+              def __exit__(self, *args): return False
+              def read(self): return b'{"ok": true}'
+
+          attempts={'n': 0}
+          def fake_urlopen(request, timeout=60):
+              attempts['n'] += 1
+              if attempts['n'] < 3:
+                  raise urllib.error.HTTPError(
+                      request.full_url, 503, 'busy', {}, io.BytesIO(b'{"error":"busy"}')
+                  )
+              return FakeResponse()
+
+          with patch.object(providers.urllib.request, 'urlopen', side_effect=fake_urlopen), \
+               patch.object(providers.time, 'sleep', return_value=None):
+              payload=providers._post_json('https://example.invalid', {'x': 1}, {'Content-Type':'application/json'})
+
+          assert payload == {'ok': True}, payload
+          assert attempts['n'] == 3, attempts
+          print('503 retry and recovery passed.')
+          PY
+
+      - name: Verify non-retryable provider error fails immediately
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          import io
+          import urllib.error
+          from unittest.mock import patch
+          import providers
+
+          attempts={'n': 0}
+          def fake_urlopen(request, timeout=60):
+              attempts['n'] += 1
+              raise urllib.error.HTTPError(
+                  request.full_url, 400, 'bad request', {}, io.BytesIO(b'{"error":"bad"}')
+              )
+
+          try:
+              with patch.object(providers.urllib.request, 'urlopen', side_effect=fake_urlopen), \
+                   patch.object(providers.time, 'sleep', return_value=None):
+                  providers._post_json('https://example.invalid', {'x': 1}, {})
+          except providers.ProviderError:
+              pass
+          else:
+              raise SystemExit('Expected ProviderError')
+
+          assert attempts['n'] == 1, attempts
+          print('Non-retryable 400 fails immediately.')
+          PY
+
+      - name: Verify retry policy bounds
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text=Path('providers.py').read_text(encoding='utf-8')
+          assert 'max_attempts = 4' in text
+          assert 'min(delay, 8.0)' in text
+          print('Retry attempts and backoff cap are bounded.')
+          PY
+
+      - name: Write resilience summary
+        if: always()
+        run: |
+          {
+            echo "# Research OS Resilience Nightly"
+            echo "- API regression suite: executed"
+            echo "- Gemini transient 503 recovery: tested"
+            echo "- Non-retryable 400 behavior: tested"
+            echo "- Retry/backoff bounds: verified"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
