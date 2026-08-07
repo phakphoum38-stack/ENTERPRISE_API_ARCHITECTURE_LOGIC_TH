@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
@@ -143,20 +144,39 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
     if not url or not url.strip():
         raise ProviderError("provider endpoint is empty")
 
-    try:
-        request = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers=headers,
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise ProviderError(f"provider HTTP {exc.code}: {body[:500]}") from exc
-    except (urllib.error.URLError, json.JSONDecodeError, ValueError) as exc:
-        raise ProviderError(f"provider request failed: {exc}") from exc
+    retryable_statuses = {429, 500, 502, 503, 504}
+    max_attempts = 4
+    last_error: Exception | None = None
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            request = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            last_error = exc
+            if exc.code not in retryable_statuses or attempt == max_attempts:
+                raise ProviderError(f"provider HTTP {exc.code}: {body[:500]}") from exc
+
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            try:
+                delay = float(retry_after) if retry_after else float(2 ** (attempt - 1))
+            except (TypeError, ValueError):
+                delay = float(2 ** (attempt - 1))
+            time.sleep(min(delay, 8.0))
+        except (urllib.error.URLError, json.JSONDecodeError, ValueError) as exc:
+            last_error = exc
+            if attempt == max_attempts:
+                raise ProviderError(f"provider request failed after {max_attempts} attempts: {exc}") from exc
+            time.sleep(float(2 ** (attempt - 1)))
+
+    raise ProviderError(f"provider request failed: {last_error}")
 
 
 def build_provider(name: str | None = None) -> AIProvider:
