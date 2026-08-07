@@ -17,23 +17,38 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: provider-smoke-${{ github.ref }}-${{ inputs.provider }}
+  cancel-in-progress: false
+
 jobs:
   smoke:
+    name: Test ${{ inputs.provider }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
     env:
+      # Provider selected from Run workflow
       RESEARCH_OS_PROVIDER: ${{ inputs.provider }}
-      RESEARCH_OS_OPENAI_ENDPOINT: ${{ vars.RESEARCH_OS_OPENAI_ENDPOINT }}
-      RESEARCH_OS_OPENAI_MODEL: ${{ vars.RESEARCH_OS_OPENAI_MODEL }}
-      RESEARCH_OS_OPENAI_API_KEY: ${{ secrets.RESEARCH_OS_OPENAI_API_KEY }}
-      RESEARCH_OS_ANTHROPIC_API_KEY: ${{ secrets.RESEARCH_OS_ANTHROPIC_API_KEY }}
-      RESEARCH_OS_ANTHROPIC_MODEL: ${{ vars.RESEARCH_OS_ANTHROPIC_MODEL }}
-      RESEARCH_OS_ANTHROPIC_ENDPOINT: ${{ vars.RESEARCH_OS_ANTHROPIC_ENDPOINT }}
-      RESEARCH_OS_GEMINI_API_KEY: ${{ secrets.RESEARCH_OS_GEMINI_API_KEY }}
-      RESEARCH_OS_GEMINI_MODEL: ${{ vars.RESEARCH_OS_GEMINI_MODEL }}
-      RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE: ${{ vars.RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE }}
+
+      # OpenAI / OpenAI-compatible
+      # Uses the GitHub Secret and Variables you already created.
+      RESEARCH_OS_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      RESEARCH_OS_OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      RESEARCH_OS_OPENAI_ENDPOINT: ${{ vars.OPENAI_ENDPOINT }}
+
+      # Anthropic
+      RESEARCH_OS_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      RESEARCH_OS_ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+      RESEARCH_OS_ANTHROPIC_ENDPOINT: ${{ vars.ANTHROPIC_ENDPOINT }}
+
+      # Gemini
+      RESEARCH_OS_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      RESEARCH_OS_GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+      RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE: ${{ vars.GEMINI_ENDPOINT_TEMPLATE }}
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -41,8 +56,27 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile smoke test
-        run: python -m py_compile tools/research_os_api/provider_smoke.py
+      - name: Compile provider tools
+        run: |
+          python -m py_compile tools/research_os_api/providers.py
+          python -m py_compile tools/research_os_api/provider_readiness.py
+          python -m py_compile tools/research_os_api/provider_smoke.py
+
+      - name: Configure OpenAI endpoint
+        if: ${{ inputs.provider == 'openai-compatible' }}
+        shell: bash
+        run: |
+          if [ -z "${RESEARCH_OS_OPENAI_ENDPOINT}" ]; then
+            echo "RESEARCH_OS_OPENAI_ENDPOINT=https://api.openai.com/v1/chat/completions" >> "$GITHUB_ENV"
+          fi
+
+      - name: Configure default OpenAI model
+        if: ${{ inputs.provider == 'openai-compatible' }}
+        shell: bash
+        run: |
+          if [ -z "${RESEARCH_OS_OPENAI_MODEL}" ]; then
+            echo "RESEARCH_OS_OPENAI_MODEL=gpt-4.1-mini" >> "$GITHUB_ENV"
+          fi
 
       - name: Validate provider configuration
         working-directory: tools/research_os_api
@@ -51,3 +85,10 @@ jobs:
       - name: Run live provider smoke test
         working-directory: tools/research_os_api
         run: python provider_smoke.py
+
+      - name: Report success
+        if: success()
+        run: |
+          echo "Provider smoke test passed."
+          echo "Provider: ${{ inputs.provider }}"
+          echo "No API keys, prompts, or full responses were printed."
