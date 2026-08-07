@@ -20,3 +20,5 @@ services:
         value: phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
       - key: GEMINI_API_KEY
         sync: false
+      - key: RESEARCH_OS_SYNC_KEY
+        sync: false
