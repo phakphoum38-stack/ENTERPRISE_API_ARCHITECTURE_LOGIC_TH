@@ -1,0 +1,98 @@
+name: Research OS Agent Platform
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/research_os_api/agent_platform.py"
+      - "tools/research_os_api/test_agent_platform.py"
+      - "apps/research_os_flutter/lib/src/features/agents/**"
+      - "apps/research_os_flutter/lib/src/app_shell.dart"
+      - ".github/workflows/research-os-agent-platform.yml"
+  pull_request:
+    paths:
+      - "tools/research_os_api/agent_platform.py"
+      - "tools/research_os_api/test_agent_platform.py"
+      - "apps/research_os_flutter/lib/src/features/agents/**"
+      - "apps/research_os_flutter/lib/src/app_shell.dart"
+      - ".github/workflows/research-os-agent-platform.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-agent-platform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Agent Platform
+        run: python -m py_compile tools/research_os_api/agent_platform.py
+
+      - name: Test Agent Registry Router and Permissions
+        working-directory: tools/research_os_api
+        run: python -m unittest test_agent_platform.py -v
+
+      - name: Validate initial agent registry
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from agent_platform import AGENTS
+          expected = {"research", "document", "github", "google_workspace", "shift"}
+          actual = {agent.agent_id for agent in AGENTS}
+          if actual != expected:
+              raise SystemExit(f"Agent registry mismatch: {actual}")
+          for agent in AGENTS:
+              if not agent.capabilities or not agent.permissions or not agent.memory_scope:
+                  raise SystemExit(f"Incomplete agent contract: {agent.agent_id}")
+          print("Agent registry OK:", ", ".join(sorted(actual)))
+          PY
+
+      - name: Enforce confirmation policy on write-capable initial agents
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from agent_platform import AgentRouter
+          router = AgentRouter()
+          for agent in ("google_workspace", "shift"):
+              result = router.route("write task", requested_agent=agent)
+              if not result["requires_confirmation_for_writes"]:
+                  raise SystemExit(f"Write confirmation missing for {agent}")
+          print("Write confirmation policy OK")
+          PY
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Flutter tests
+        working-directory: apps/research_os_flutter
+        run: flutter test
+
+      - name: Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          # Research OS Agent Platform
+          - Registry: Research, Document, GitHub, Google Workspace, Shift
+          - Router: capability-based with Research fallback
+          - Permissions: explicit per agent
+          - Write actions: confirmation policy enforced
+          - Shared context/memory: interface-ready
+          - Agent Center: validated when job succeeds
+          EOF
