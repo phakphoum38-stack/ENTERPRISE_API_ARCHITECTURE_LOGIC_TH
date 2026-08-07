@@ -314,21 +314,38 @@ jobs:
           }
 
           $ready = $false
+          $lastHealthError = $null
 
           for ($i = 0; $i -lt 40; $i++) {
             try {
-              $health = Invoke-RestMethod `
+              $response = Invoke-WebRequest `
                 -Uri "http://127.0.0.1:8787/health" `
-                -TimeoutSec 2
+                -TimeoutSec 2 `
+                -SkipHttpErrorCheck
 
-              if ($health.status -eq 'ok') {
-                $ready = $true
-                break
+              Write-Host "=== HEALTH ATTEMPT $($i + 1) ==="
+              Write-Host "HTTP: $($response.StatusCode)"
+              Write-Host "BODY:"
+              Write-Host $response.Content
+
+              if ($response.StatusCode -eq 200) {
+                $health = $response.Content | ConvertFrom-Json
+
+                if ($health.status -eq 'ok') {
+                  $ready = $true
+                  break
+                }
               }
+
+              $lastHealthError = "HTTP $($response.StatusCode): $($response.Content)"
             }
             catch {
-              Start-Sleep -Milliseconds 500
+              $lastHealthError = $_ | Out-String
+              Write-Host "Health attempt $($i + 1) failed:"
+              Write-Host $lastHealthError
             }
+
+            Start-Sleep -Milliseconds 500
           }
 
           if (-not $ready) {
