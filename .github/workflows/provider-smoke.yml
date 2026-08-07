@@ -1,0 +1,53 @@
+name: Provider Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: AI provider to test
+        required: true
+        default: mock
+        type: choice
+        options:
+          - mock
+          - openai-compatible
+          - anthropic
+          - gemini
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RESEARCH_OS_PROVIDER: ${{ inputs.provider }}
+      RESEARCH_OS_OPENAI_ENDPOINT: ${{ vars.RESEARCH_OS_OPENAI_ENDPOINT }}
+      RESEARCH_OS_OPENAI_MODEL: ${{ vars.RESEARCH_OS_OPENAI_MODEL }}
+      RESEARCH_OS_OPENAI_API_KEY: ${{ secrets.RESEARCH_OS_OPENAI_API_KEY }}
+      RESEARCH_OS_ANTHROPIC_API_KEY: ${{ secrets.RESEARCH_OS_ANTHROPIC_API_KEY }}
+      RESEARCH_OS_ANTHROPIC_MODEL: ${{ vars.RESEARCH_OS_ANTHROPIC_MODEL }}
+      RESEARCH_OS_ANTHROPIC_ENDPOINT: ${{ vars.RESEARCH_OS_ANTHROPIC_ENDPOINT }}
+      RESEARCH_OS_GEMINI_API_KEY: ${{ secrets.RESEARCH_OS_GEMINI_API_KEY }}
+      RESEARCH_OS_GEMINI_MODEL: ${{ vars.RESEARCH_OS_GEMINI_MODEL }}
+      RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE: ${{ vars.RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile smoke test
+        run: python -m py_compile tools/research_os_api/provider_smoke.py
+
+      - name: Validate provider configuration
+        working-directory: tools/research_os_api
+        run: python provider_readiness.py
+
+      - name: Run live provider smoke test
+        working-directory: tools/research_os_api
+        run: python provider_smoke.py
