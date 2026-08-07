@@ -1,9 +1,13 @@
 import json
+import os
+import tempfile
 import threading
 import unittest
 import urllib.parse
 import urllib.request
 from http.server import ThreadingHTTPServer
+from pathlib import Path
+from unittest.mock import patch
 
 import server
 
@@ -22,12 +26,15 @@ class ResearchOSAPITests(unittest.TestCase):
         cls.httpd.server_close()
         cls.thread.join(timeout=2)
 
-    def request(self, method: str, path: str, payload=None):
+    def request(self, method: str, path: str, payload=None, headers=None):
         data = None if payload is None else json.dumps(payload).encode("utf-8")
+        request_headers = {"Content-Type": "application/json"}
+        if headers:
+            request_headers.update(headers)
         request = urllib.request.Request(
             f"http://127.0.0.1:{self.port}{path}",
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=request_headers,
             method=method,
         )
         with urllib.request.urlopen(request, timeout=5) as response:
@@ -80,6 +87,49 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertFalse(payload["persisted"])
         self.assertIn("artifact_id", payload["artifact"])
+
+    def test_memory_commit_requires_explicit_confirmation_and_sync_key(self):
+        original_dir = server.ARTIFACT_DIR
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ,
+            {"RESEARCH_OS_SYNC_KEY": "test-sync-key"},
+            clear=False,
+        ):
+            server.ARTIFACT_DIR = Path(tmp)
+            try:
+                status, payload = self.request(
+                    "POST",
+                    "/v1/memory/commit",
+                    {
+                        "confirm": True,
+                        "title": "Memory integration",
+                        "conversation": [
+                            {
+                                "role": "user",
+                                "content": "Research OS ต้องเก็บความรู้จาก Session แบบมีการยืนยันก่อนบันทึก",
+                            },
+                            {
+                                "role": "assistant",
+                                "content": "สรุปว่าควรใช้ explicit commit และค้นคืนผ่าน Memory Search",
+                            },
+                        ],
+                        "tags": ["memory", "session"],
+                        "min_quality": 20,
+                    },
+                    headers={"X-Research-OS-Sync-Key": "test-sync-key"},
+                )
+                self.assertEqual(200, status)
+                self.assertTrue(payload["persisted"])
+                self.assertEqual("runtime-ephemeral", payload["durability"])
+                artifact_id = payload["artifact"]["artifact_id"]
+                self.assertTrue(any(Path(tmp).glob(f"{artifact_id}*.md")))
+
+                query = urllib.parse.quote("explicit commit")
+                status, memory = self.request("GET", f"/v1/memory/search?q={query}")
+                self.assertEqual(200, status)
+                self.assertGreaterEqual(memory["count"], 1)
+            finally:
+                server.ARTIFACT_DIR = original_dir
 
     def test_provider_list(self):
         status, payload = self.request("GET", "/v1/providers")
