@@ -48,10 +48,8 @@ class WorkspaceServiceStatus:
 class GoogleWorkspaceConfig:
     """Local-first Google Workspace configuration surface.
 
-    This module intentionally does not expose client secrets or refresh tokens to
-    the Flutter client. Credentials remain on the backend and are expected to be
-    supplied through environment variables or a local secure store in a later
-    implementation layer.
+    Client secrets and refresh tokens stay on the backend. Flutter receives only
+    capability/status metadata and never the raw credentials.
     """
 
     def __init__(self, data_dir: str | os.PathLike[str] | None = None) -> None:
@@ -59,6 +57,7 @@ class GoogleWorkspaceConfig:
         self.root = root / "google_workspace"
         self.root.mkdir(parents=True, exist_ok=True)
         self.settings_path = self.root / "settings.json"
+        self.token_path = self.root / "oauth_token.json"
 
     @property
     def client_id_configured(self) -> bool:
@@ -71,6 +70,16 @@ class GoogleWorkspaceConfig:
     @property
     def oauth_configured(self) -> bool:
         return self.client_id_configured and self.client_secret_configured
+
+    @property
+    def connected(self) -> bool:
+        if not self.token_path.exists():
+            return False
+        try:
+            payload = json.loads(self.token_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return False
+        return bool(payload.get("access_token") or payload.get("refresh_token"))
 
     def _load_enabled(self) -> set[str]:
         if not self.settings_path.exists():
@@ -88,8 +97,6 @@ class GoogleWorkspaceConfig:
 
     def statuses(self) -> list[WorkspaceServiceStatus]:
         enabled = self._load_enabled()
-        token_marker = self.root / "oauth_connected.marker"
-        connected = token_marker.exists()
         result: list[WorkspaceServiceStatus] = []
         for service in WORKSPACE_SERVICES:
             is_enabled = service in enabled
@@ -99,12 +106,12 @@ class GoogleWorkspaceConfig:
             elif not self.oauth_configured:
                 state = "not_configured"
                 note = "Google OAuth client ID/secret required on backend"
-            elif not connected:
+            elif not self.connected:
                 state = "ready_for_oauth"
                 note = "OAuth credentials configured; user authorization still required"
             else:
                 state = "connected"
-                note = "OAuth connection marker present"
+                note = "Google OAuth token is stored on the backend"
             result.append(WorkspaceServiceStatus(service, is_enabled, state, DEFAULT_SCOPES[service], note))
         return result
 
@@ -115,6 +122,7 @@ class GoogleWorkspaceConfig:
             "oauth_configured": self.oauth_configured,
             "client_id_configured": self.client_id_configured,
             "client_secret_configured": self.client_secret_configured,
+            "connected": self.connected,
             "services": [asdict(item) for item in statuses],
             "connected_count": sum(1 for item in statuses if item.state == "connected"),
             "enabled_count": sum(1 for item in statuses if item.enabled),
