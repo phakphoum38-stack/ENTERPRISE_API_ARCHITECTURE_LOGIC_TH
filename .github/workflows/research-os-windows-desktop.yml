@@ -46,7 +46,9 @@ jobs:
             "scripts/setup-research-os-windows.ps1",
             "scripts/start-research-os-local.ps1",
             "scripts/backup-research-os.ps1",
-            "scripts/restore-research-os.ps1"
+            "scripts/restore-research-os.ps1",
+            "scripts/enable-research-os-autostart.ps1",
+            "scripts/disable-research-os-autostart.ps1"
           )
           foreach ($script in $scripts) {
             [void][scriptblock]::Create((Get-Content $script -Raw))
@@ -90,6 +92,20 @@ jobs:
           ./scripts/restore-research-os.ps1 -Archive $archive.FullName -DataDir "$env:RUNNER_TEMP\RestoredResearchOSData"
           if (-not (Test-Path "$env:RUNNER_TEMP\RestoredResearchOSData\sessions\fixture.json")) {
             throw "Restore validation failed"
+          }
+
+      - name: Test autostart enable and disable
+        shell: pwsh
+        run: |
+          ./scripts/enable-research-os-autostart.ps1 -DataDir "$env:RUNNER_TEMP\ResearchOSData"
+          $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+          $value = (Get-ItemProperty -Path $runKey -Name "ResearchOSLocalAPI").ResearchOSLocalAPI
+          if (-not $value -or $value -notmatch "start-research-os-local.ps1") {
+            throw "Autostart registry value was not configured correctly"
+          }
+          ./scripts/disable-research-os-autostart.ps1
+          if (Get-ItemProperty -Path $runKey -Name "ResearchOSLocalAPI" -ErrorAction SilentlyContinue) {
+            throw "Autostart registry value was not removed"
           }
 
       - name: Set up Flutter
@@ -141,6 +157,7 @@ jobs:
           - Local-first setup: validated
           - Local API tests: validated when job succeeds
           - Backup/restore: validated when job succeeds
+          - Autostart enable/disable: validated when job succeeds
           - Flutter Windows build: validated when job succeeds
           - Secrets are not embedded in the desktop artifact
           "@ | Add-Content $env:GITHUB_STEP_SUMMARY
