@@ -215,4 +215,36 @@ void main() {
     expect(find.text('Add GitHub dashboard'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('settings shows provider and changes theme mode', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    ThemeMode selectedTheme = ThemeMode.system;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(
+          apiClient: FakeResearchOSApiClient(),
+          themeMode: selectedTheme,
+          onThemeModeChanged: (value) => selectedTheme = value,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(navigationRailLabel('ตั้งค่า'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Settings & Provider Manager'), findsOneWidget);
+    expect(find.text('Active Provider'), findsOneWidget);
+    expect(find.text('gemini'), findsOneWidget);
+    expect(find.text('http://127.0.0.1:8787'), findsOneWidget);
+
+    await tester.tap(find.text('Dark'));
+    await tester.pump();
+    expect(selectedTheme, ThemeMode.dark);
+    expect(tester.takeException(), isNull);
+  });
 }
