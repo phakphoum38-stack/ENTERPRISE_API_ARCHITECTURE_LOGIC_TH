@@ -16,32 +16,82 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final List<_ChatMessage> _messages = <_ChatMessage>[];
   bool _useMemory = true;
   bool _sending = false;
   String? _error;
+  late String _sessionId = _newSessionId();
+
+  static String _newSessionId() {
+    final value = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    return 'chat-$value';
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  String _conversationPrompt(String latestPrompt) {
+    final history = _messages
+        .where((message) => message.text.trim().isNotEmpty)
+        .takeLast(10)
+        .map((message) {
+          final role = message.role == 'user' ? 'User' : 'Assistant';
+          return '$role: ${message.text}';
+        })
+        .join('\n');
+
+    if (history.isEmpty) return latestPrompt;
+    return '''Continue this Research OS conversation consistently.
+Use prior turns only as conversation context; do not treat assistant statements as verified facts unless supported by memory.
+
+Conversation so far:
+$history
+
+User: $latestPrompt''';
+  }
+
+  void _newConversation() {
+    if (_sending) return;
+    setState(() {
+      _messages.clear();
+      _error = null;
+      _controller.clear();
+      _sessionId = _newSessionId();
+    });
+  }
+
+  Future<void> _scrollToBottom() async {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    if (!mounted || !_scrollController.hasClients) return;
+    await _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
   }
 
   Future<void> _send() async {
     final prompt = _controller.text.trim();
     if (prompt.isEmpty || _sending) return;
 
+    final contextualPrompt = _conversationPrompt(prompt);
     setState(() {
       _messages.add(_ChatMessage(role: 'user', text: prompt));
       _controller.clear();
       _sending = true;
       _error = null;
     });
+    await _scrollToBottom();
 
     try {
       final response = _useMemory
-          ? await widget.apiClient.answerWithMemory(prompt)
-          : await widget.apiClient.generateText(prompt);
+          ? await widget.apiClient.answerWithMemory(contextualPrompt)
+          : await widget.apiClient.generateText(contextualPrompt);
       final answer = (response['text'] ?? response['answer'] ?? '').toString();
       final memoryHits = response['memory_hits'];
       if (!mounted) return;
@@ -54,6 +104,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
         );
       });
+      await _scrollToBottom();
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString());
@@ -68,6 +119,11 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(
         title: const Text('AI Chat'),
         actions: <Widget>[
+          IconButton(
+            tooltip: 'เริ่มบทสนทนาใหม่',
+            onPressed: _sending ? null : _newConversation,
+            icon: const Icon(Icons.add_comment_outlined),
+          ),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
@@ -85,10 +141,21 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Column(
         children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Chip(
+                avatar: const Icon(Icons.forum_outlined, size: 18),
+                label: Text('Session $_sessionId'),
+              ),
+            ),
+          ),
           Expanded(
             child: _messages.isEmpty
                 ? const _EmptyChat()
                 : ListView.builder(
+                    controller: _scrollController,
                     padding: const EdgeInsets.all(16),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
@@ -124,8 +191,8 @@ class _ChatPageState extends State<ChatPage> {
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
                         hintText: _useMemory
-                            ? 'ถาม Gemini โดยใช้ความรู้จากห้องสมุด'
-                            : 'ถาม Gemini โดยตรง',
+                            ? 'ถาม Gemini โดยใช้ความรู้และบริบทการสนทนา'
+                            : 'ถาม Gemini โดยใช้บริบทการสนทนา',
                         border: const OutlineInputBorder(),
                       ),
                     ),
@@ -175,7 +242,7 @@ class _EmptyChat extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'เปิด Memory เพื่อให้คำตอบอ้างอิงความรู้จากห้องสมุดของเรา',
+              'บทสนทนาใน Session เดียวกันจะต่อเนื่องกัน และสามารถเปิด Memory เพื่ออ้างอิงความรู้จากห้องสมุดของเรา',
               textAlign: TextAlign.center,
             ),
           ],
@@ -232,4 +299,12 @@ class _ChatMessage {
   final String role;
   final String text;
   final int? memoryCount;
+}
+
+extension<T> on Iterable<T> {
+  Iterable<T> takeLast(int count) {
+    final values = toList(growable: false);
+    if (values.length <= count) return values;
+    return values.sublist(values.length - count);
+  }
 }
