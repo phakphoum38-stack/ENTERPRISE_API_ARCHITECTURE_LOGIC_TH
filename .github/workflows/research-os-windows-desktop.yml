@@ -9,14 +9,18 @@ on:
       - "apps/research_os_flutter/**"
       - "tools/research_os_api/**"
       - "tools/research_os_service/**"
+      - "tools/research_curator/**"
       - "scripts/*research-os*.ps1"
+      - "installer/**"
       - ".github/workflows/research-os-windows-desktop.yml"
   pull_request:
     paths:
       - "apps/research_os_flutter/**"
       - "tools/research_os_api/**"
       - "tools/research_os_service/**"
+      - "tools/research_curator/**"
       - "scripts/*research-os*.ps1"
+      - "installer/**"
       - ".github/workflows/research-os-windows-desktop.yml"
 
 permissions:
@@ -30,7 +34,7 @@ jobs:
   windows-foundation:
     name: Windows local-first foundation
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
 
     steps:
       - name: Checkout repository
@@ -82,6 +86,8 @@ jobs:
           python -m py_compile tools/research_os_api/render_server.py
           python -m py_compile tools/research_os_api/conversation_store.py
           python -m py_compile tools/research_os_api/memory.py
+          python -m py_compile tools/research_os_api/google_workspace.py
+          python -m py_compile tools/research_os_api/google_oauth.py
 
       - name: Run API tests
         shell: pwsh
@@ -216,6 +222,97 @@ jobs:
         working-directory: apps/research_os_flutter
         run: flutter build windows --release
 
+      - name: Stage one-click installer package
+        shell: pwsh
+        run: |
+          $package = Join-Path $PWD "installer\package"
+          if (Test-Path $package) { Remove-Item $package -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+
+          New-Item -ItemType Directory -Force -Path "$package\app" | Out-Null
+          Copy-Item "apps\research_os_flutter\build\windows\x64\runner\Release\*" "$package\app" -Recurse -Force
+
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_os_service\publish" | Out-Null
+          Copy-Item "tools\research_os_service\publish\*" "$package\tools\research_os_service\publish" -Recurse -Force
+
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_os_api" | Out-Null
+          Copy-Item "tools\research_os_api\*.py" "$package\tools\research_os_api" -Force
+
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_curator" | Out-Null
+          Copy-Item "tools\research_curator\*" "$package\tools\research_curator" -Recurse -Force
+
+          if (Test-Path "apps\research_os_web") {
+            New-Item -ItemType Directory -Force -Path "$package\apps\research_os_web" | Out-Null
+            Copy-Item "apps\research_os_web\*" "$package\apps\research_os_web" -Recurse -Force
+          }
+          if (Test-Path "research\artifacts") {
+            New-Item -ItemType Directory -Force -Path "$package\research\artifacts" | Out-Null
+            Copy-Item "research\artifacts\*" "$package\research\artifacts" -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Force -Path "$package\scripts" | Out-Null
+          Copy-Item "scripts\*research-os*.ps1" "$package\scripts" -Force
+
+          $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim()
+          if (-not (Test-Path "$pythonRoot\python.exe")) { throw "Python runtime root not found: $pythonRoot" }
+          New-Item -ItemType Directory -Force -Path "$package\runtime\python" | Out-Null
+          Copy-Item "$pythonRoot\*" "$package\runtime\python" -Recurse -Force
+
+          if (-not (Test-Path "$package\runtime\python\python.exe")) { throw "Bundled Python runtime missing" }
+          if (-not (Test-Path "$package\app\research_os_flutter.exe")) { throw "Desktop executable missing from package" }
+          if (-not (Test-Path "$package\tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) { throw "ServiceHost missing from package" }
+
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Research OS Setup EXE
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
+          & $iscc "installer\research-os.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+          $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Research OS Setup EXE was not produced" }
+          Write-Host "Installer: $($setup.FullName)"
+
+      - name: Validate installer install service health and uninstall
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Installer missing" }
+          $installLog = "$env:RUNNER_TEMP\research-os-install.log"
+          $process = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$installLog") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)" }
+
+          $appRoot = Join-Path $env:ProgramFiles 'Research OS'
+          if (-not (Test-Path "$appRoot\app\research_os_flutter.exe")) { throw "Installed desktop app missing" }
+          if (-not (Test-Path "$appRoot\runtime\python\python.exe")) { throw "Installed bundled Python missing" }
+
+          $ready = $false
+          for ($i = 0; $i -lt 40; $i++) {
+            try {
+              $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+              if ($health.status -eq 'ok') { $ready = $true; break }
+            } catch { Start-Sleep -Milliseconds 500 }
+          }
+          if (-not $ready) { throw "Installed Research OS Service API did not become ready" }
+
+          $svc = Get-Service ResearchOSService -ErrorAction Stop
+          if ($svc.Status -ne 'Running') { throw "Installed Research OS Service is not running" }
+
+          $dataRoot = Join-Path $env:ProgramData 'ResearchOS'
+          Set-Content -Path "$dataRoot\installer-preserve-test.txt" -Value 'preserve'
+
+          $uninstaller = Join-Path $appRoot 'unins000.exe'
+          if (-not (Test-Path $uninstaller)) { throw "Uninstaller missing" }
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($uninstall.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { throw "Service remained after uninstall" }
+          if (-not (Test-Path "$dataRoot\installer-preserve-test.txt")) { throw "Local data was removed by uninstall" }
+
       - name: Upload Windows desktop build
         uses: actions/upload-artifact@v4
         with:
@@ -232,6 +329,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload one-click installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-installer-${{ github.run_number }}
+          path: installer/output/Research-OS-Setup-*-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Write summary
         if: always()
         shell: pwsh
@@ -241,12 +346,11 @@ jobs:
 
           - Local-first setup: validated
           - Local API tests: validated when job succeeds
-          - Local API start/status/stop: validated when job succeeds
-          - Native Windows ServiceHost: published when job succeeds
-          - Windows Service install/start/restart/stop/uninstall: validated when job succeeds
-          - Windows Service recovery policy: validated when job succeeds
-          - Backup/restore: validated when job succeeds
-          - Legacy autostart fallback: validated when job succeeds
-          - Flutter Windows build: validated when job succeeds
-          - Secrets are not embedded in the desktop artifact
+          - Native Windows ServiceHost: self-contained build
+          - Windows Service lifecycle + recovery: validated when job succeeds
+          - Flutter Windows desktop: built when job succeeds
+          - Bundled Python runtime: staged inside installer; no separate Python install required
+          - One-click Windows Setup EXE: built and installed end-to-end when job succeeds
+          - Uninstall preserves ProgramData\ResearchOS memory/data
+          - Backend secrets are not embedded into the desktop UI
           "@ | Add-Content $env:GITHUB_STEP_SUMMARY
