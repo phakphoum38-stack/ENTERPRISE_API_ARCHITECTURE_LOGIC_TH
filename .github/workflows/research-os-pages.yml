@@ -7,6 +7,8 @@ on:
       - main
     paths:
       - "apps/research_os_flutter/**"
+      - "tools/research_os_api/**"
+      - "render.yaml"
       - ".github/workflows/research-os-pages.yml"
 
 permissions:
@@ -17,6 +19,9 @@ permissions:
 concurrency:
   group: research-os-pages
   cancel-in-progress: true
+
+env:
+  RESEARCH_OS_PUBLIC_API_URL: ${{ vars.RESEARCH_OS_PUBLIC_API_URL || 'https://research-os-api-phakphoum.onrender.com' }}
 
 jobs:
   build:
@@ -50,7 +55,10 @@ jobs:
         run: flutter test
 
       - name: Build web for GitHub Pages
-        run: flutter build web --release --base-href "/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH/"
+        run: >-
+          flutter build web --release
+          --base-href "/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH/"
+          --dart-define=RESEARCH_OS_API_BASE_URL=${RESEARCH_OS_PUBLIC_API_URL}
 
       - name: Configure and enable Pages
         uses: actions/configure-pages@v5
