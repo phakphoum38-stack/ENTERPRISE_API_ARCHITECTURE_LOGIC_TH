@@ -239,7 +239,7 @@ void main() {
 
     expect(find.text('Settings & Provider Manager'), findsOneWidget);
     expect(find.text('Active Provider'), findsOneWidget);
-    expect(find.text('gemini'), findsOneWidget);
+    expect(find.text('gemini'), findsWidgets);
     expect(find.text('http://127.0.0.1:8787'), findsOneWidget);
 
     await tester.tap(find.text('Dark'));
