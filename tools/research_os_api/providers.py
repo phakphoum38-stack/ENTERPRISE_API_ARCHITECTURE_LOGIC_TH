@@ -130,6 +130,15 @@ def _env_or_default(name: str, default: str) -> str:
     return value.strip() if value and value.strip() else default
 
 
+def _first_env(*names: str) -> str | None:
+    """Return the first non-empty environment variable from ``names``."""
+    for name in names:
+        value = os.getenv(name)
+        if value and value.strip():
+            return value.strip()
+    return None
+
+
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
     if not url or not url.strip():
         raise ProviderError("provider endpoint is empty")
@@ -181,9 +190,11 @@ def build_provider(name: str | None = None) -> AIProvider:
             ),
         )
     if selected == "gemini":
-        key = os.getenv("RESEARCH_OS_GEMINI_API_KEY")
+        key = _first_env("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY")
         if not key:
-            raise ProviderError("missing RESEARCH_OS_GEMINI_API_KEY")
+            raise ProviderError(
+                "missing Gemini API key (set RESEARCH_OS_GEMINI_API_KEY or GEMINI_API_KEY)"
+            )
         return GeminiProvider(
             endpoint_template=_env_or_default(
                 "RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE",
