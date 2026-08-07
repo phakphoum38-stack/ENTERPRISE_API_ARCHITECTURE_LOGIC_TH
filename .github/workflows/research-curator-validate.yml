@@ -11,6 +11,7 @@ on:
       - "tools/house_command/**"
       - ".github/workflows/research-curator-validate.yml"
       - ".github/workflows/house-command.yml"
+      - ".github/workflows/provider-smoke.yml"
   push:
     branches:
       - main
@@ -21,6 +22,7 @@ on:
       - "tools/research_curator/**"
       - "tools/research_os_api/**"
       - "tools/house_command/**"
+      - ".github/workflows/provider-smoke.yml"
 
 permissions:
   contents: read
@@ -44,6 +46,7 @@ jobs:
           python -m py_compile tools/research_curator/git_publisher.py
           python -m py_compile tools/research_os_api/providers.py
           python -m py_compile tools/research_os_api/provider_readiness.py
+          python -m py_compile tools/research_os_api/provider_smoke.py
           python -m py_compile tools/research_os_api/server.py
           python -m py_compile tools/research_os_api/test_e2e.py
           python -m py_compile tools/house_command/house_brain.py
@@ -71,6 +74,11 @@ jobs:
         env:
           RESEARCH_OS_PROVIDER: mock
         run: python tools/research_os_api/provider_readiness.py
+
+      - name: Run provider smoke test with mock
+        env:
+          RESEARCH_OS_PROVIDER: mock
+        run: python tools/research_os_api/provider_smoke.py
 
       - name: Run House Brain tests
         working-directory: tools/house_command
