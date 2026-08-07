@@ -63,14 +63,16 @@ if ($Background) {
     Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
   }
 
-  $process = Start-Process \
-    -FilePath "python" \
-    -ArgumentList "render_server.py" \
-    -WorkingDirectory $ApiDir \
-    -WindowStyle Hidden \
-    -RedirectStandardOutput $OutLog \
-    -RedirectStandardError $ErrLog \
-    -PassThru
+  $startArgs = @{
+    FilePath = "python"
+    ArgumentList = "render_server.py"
+    WorkingDirectory = $ApiDir
+    WindowStyle = "Hidden"
+    RedirectStandardOutput = $OutLog
+    RedirectStandardError = $ErrLog
+    PassThru = $true
+  }
+  $process = Start-Process @startArgs
   Set-Content -Path $PidFile -Value $process.Id -NoNewline
   Write-Host "Research OS Local API started in background (PID $($process.Id))."
   Write-Host "PID file : $PidFile"
