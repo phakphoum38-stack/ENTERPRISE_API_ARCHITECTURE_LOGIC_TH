@@ -22,4 +22,11 @@ class LocalApiManager {
   Future<LocalApiCommandResult> openDataFolder() => impl.openDataFolder();
   Future<LocalApiCommandResult> enableAutostart() => impl.enableAutostart();
   Future<LocalApiCommandResult> disableAutostart() => impl.disableAutostart();
+
+  Future<LocalApiCommandResult> serviceStatus() => impl.serviceStatus();
+  Future<LocalApiCommandResult> installService() => impl.installService();
+  Future<LocalApiCommandResult> uninstallService() => impl.uninstallService();
+  Future<LocalApiCommandResult> startService() => impl.startService();
+  Future<LocalApiCommandResult> stopService() => impl.stopService();
+  Future<LocalApiCommandResult> restartService() => impl.restartService();
 }
