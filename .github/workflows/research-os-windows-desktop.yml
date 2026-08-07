@@ -282,38 +282,142 @@ jobs:
         run: |
           $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
           if (-not $setup) { throw "Installer missing" }
+
           $installLog = "$env:RUNNER_TEMP\research-os-install.log"
-          $process = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$installLog") -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)" }
+          $process = Start-Process `
+            -FilePath $setup.FullName `
+            -ArgumentList @(
+              '/VERYSILENT',
+              '/SUPPRESSMSGBOXES',
+              '/NORESTART',
+              "/LOG=$installLog"
+            ) `
+            -Wait `
+            -PassThru
+
+          if ($process.ExitCode -ne 0) {
+            if (Test-Path $installLog) {
+              Write-Host "=== INSTALL LOG ==="
+              Get-Content $installLog -Tail 300
+            }
+            throw "Installer failed with exit code $($process.ExitCode)"
+          }
 
           $appRoot = Join-Path $env:ProgramFiles 'Research OS'
-          if (-not (Test-Path "$appRoot\app\research_os_flutter.exe")) { throw "Installed desktop app missing" }
-          if (-not (Test-Path "$appRoot\runtime\python\python.exe")) { throw "Installed bundled Python missing" }
+
+          if (-not (Test-Path "$appRoot\app\research_os_flutter.exe")) {
+            throw "Installed desktop app missing"
+          }
+
+          if (-not (Test-Path "$appRoot\runtime\python\python.exe")) {
+            throw "Installed bundled Python missing"
+          }
 
           $ready = $false
+
           for ($i = 0; $i -lt 40; $i++) {
             try {
-              $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
-              if ($health.status -eq 'ok') { $ready = $true; break }
-            } catch { Start-Sleep -Milliseconds 500 }
+              $health = Invoke-RestMethod `
+                -Uri "http://127.0.0.1:8787/health" `
+                -TimeoutSec 2
+
+              if ($health.status -eq 'ok') {
+                $ready = $true
+                break
+              }
+            }
+            catch {
+              Start-Sleep -Milliseconds 500
+            }
           }
-          if (-not $ready) { throw "Installed Research OS Service API did not become ready" }
+
+          if (-not $ready) {
+            Write-Host "=== ResearchOSService ==="
+            Get-Service ResearchOSService -ErrorAction SilentlyContinue |
+              Format-List *
+
+            Write-Host "=== SERVICE QUERY ==="
+            sc.exe query ResearchOSService
+
+            Write-Host "=== PORT 8787 ==="
+            netstat -ano | Select-String ":8787"
+
+            $dataRoot = Join-Path $env:ProgramData 'ResearchOS'
+            $errLog = Join-Path $dataRoot 'logs\service-api.err.log'
+            $outLog = Join-Path $dataRoot 'logs\service-api.out.log'
+
+            if (Test-Path $errLog) {
+              Write-Host "=== API STDERR ==="
+              Get-Content $errLog -Tail 200
+            }
+
+            if (Test-Path $outLog) {
+              Write-Host "=== API STDOUT ==="
+              Get-Content $outLog -Tail 200
+            }
+
+            if (Test-Path $installLog) {
+              Write-Host "=== INSTALL LOG ==="
+              Get-Content $installLog -Tail 300
+            }
+
+            throw "Installed Research OS Service API did not become ready"
+          }
 
           $svc = Get-Service ResearchOSService -ErrorAction Stop
-          if ($svc.Status -ne 'Running') { throw "Installed Research OS Service is not running" }
+
+          if ($svc.Status -ne 'Running') {
+            throw "Installed Research OS Service is not running"
+          }
 
           $dataRoot = Join-Path $env:ProgramData 'ResearchOS'
-          Set-Content -Path "$dataRoot\installer-preserve-test.txt" -Value 'preserve'
+          New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
+          Set-Content `
+            -Path "$dataRoot\installer-preserve-test.txt" `
+            -Value 'preserve'
 
           $uninstaller = Join-Path $appRoot 'unins000.exe'
-          if (-not (Test-Path $uninstaller)) { throw "Uninstaller missing" }
-          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
-          if ($uninstall.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($uninstall.ExitCode)" }
-          Start-Sleep -Seconds 2
-          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { throw "Service remained after uninstall" }
-          if (-not (Test-Path "$dataRoot\installer-preserve-test.txt")) { throw "Local data was removed by uninstall" }
+
+          if (-not (Test-Path $uninstaller)) {
+            throw "Uninstaller missing"
+          }
+
+          $uninstall = Start-Process `
+            -FilePath $uninstaller `
+            -ArgumentList @(
+              '/VERYSILENT',
+              '/SUPPRESSMSGBOXES',
+              '/NORESTART'
+            ) `
+            -Wait `
+            -PassThru
+
+          if ($uninstall.ExitCode -ne 0) {
+            throw "Uninstaller failed with exit code $($uninstall.ExitCode)"
+          }
+
+          $serviceDeleted = $false
+
+          for ($i = 0; $i -lt 40; $i++) {
+            if (-not (Get-Service ResearchOSService -ErrorAction SilentlyContinue)) {
+              $serviceDeleted = $true
+              break
+            }
+
+            Start-Sleep -Milliseconds 500
+          }
+
+          if (-not $serviceDeleted) {
+            sc.exe query ResearchOSService
+            throw "Service remained after uninstall"
+          }
+
+          if (-not (Test-Path "$dataRoot\installer-preserve-test.txt")) {
+            throw "Local data was removed by uninstall"
+          }
 
       - name: Upload Windows desktop build
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: research-os-windows-${{ github.run_number }}
@@ -322,6 +426,7 @@ jobs:
           retention-days: 14
 
       - name: Upload ServiceHost build
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: research-os-service-host-${{ github.run_number }}
@@ -330,6 +435,7 @@ jobs:
           retention-days: 14
 
       - name: Upload one-click installer
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: research-os-installer-${{ github.run_number }}
