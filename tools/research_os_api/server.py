@@ -1,37 +1,28 @@
 #!/usr/bin/env python3
-"""Dependency-free Research OS HTTP API.
-
-Endpoints:
-- GET  /health
-- GET  /v1/providers
-- POST /v1/ai/generate
-- POST /v1/conversations/analyze
-- GET  /v1/knowledge/artifacts
-- GET  /v1/knowledge/graph
-
-The API is intentionally thin: Research Curator and knowledge tools remain the
-canonical implementation, while this module exposes stable transport contracts.
-"""
+"""Dependency-free Research OS HTTP API and Entrance UI server."""
 
 from __future__ import annotations
 
 import argparse
 import importlib.util
 import json
+import mimetypes
 import os
 import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from providers import ProviderError, build_provider
-
 
 ROOT = Path(__file__).resolve().parents[2]
 CURATOR_PATH = ROOT / "tools" / "research_curator" / "curator.py"
 KNOWLEDGE_OPS_PATH = ROOT / "tools" / "research_curator" / "knowledge_ops.py"
 ARTIFACT_DIR = ROOT / "research" / "artifacts"
+WEB_DIR = ROOT / "apps" / "research_os_web"
+STATIC_ROUTES = {"/": "index.html", "/index.html": "index.html", "/app.css": "app.css", "/app.js": "app.js"}
 
 
 def _load_module(name: str, path: Path):
@@ -60,13 +51,28 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_static(self, filename: str) -> None:
+        path = (WEB_DIR / filename).resolve()
+        if WEB_DIR.resolve() not in path.parents or not path.is_file():
+            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return
+        body = path.read_bytes()
+        content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        if content_type.startswith("text/") or content_type == "application/javascript":
+            content_type += "; charset=utf-8"
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0:
             return {}
-        raw = self.rfile.read(length)
         try:
-            value = json.loads(raw.decode("utf-8"))
+            value = json.loads(self.rfile.read(length).decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ValueError(f"invalid JSON: {exc}") from exc
         if not isinstance(value, dict):
@@ -74,56 +80,49 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         return value
 
     def do_GET(self) -> None:  # noqa: N802
+        path = urlsplit(self.path).path
         try:
-            if self.path == "/health":
-                self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-api", "version": "0.1.0"})
+            if path in STATIC_ROUTES:
+                self._send_static(STATIC_ROUTES[path])
                 return
-            if self.path == "/v1/providers":
-                self._send(HTTPStatus.OK, {
-                    "providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"],
-                    "active": os.getenv("RESEARCH_OS_PROVIDER", "mock"),
-                })
+            if path == "/health":
+                self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-api", "version": "0.1.0", "ui": WEB_DIR.is_dir()})
                 return
-            if self.path == "/v1/knowledge/artifacts":
+            if path == "/v1/providers":
+                self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})
+                return
+            if path == "/v1/knowledge/artifacts":
                 self._send(HTTPStatus.OK, {"artifacts": self._artifact_index()})
                 return
-            if self.path == "/v1/knowledge/graph":
+            if path == "/v1/knowledge/graph":
                 knowledge_ops = _load_module("research_os_knowledge_ops", KNOWLEDGE_OPS_PATH)
                 artifacts = knowledge_ops.load_all(ARTIFACT_DIR)
                 self._send(HTTPStatus.OK, knowledge_ops.graph_payload(artifacts))
                 return
-            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": self.path})
-        except Exception as exc:  # boundary guard
+            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+        except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
     def do_POST(self) -> None:  # noqa: N802
+        path = urlsplit(self.path).path
         try:
             body = self._read_json()
-            if self.path == "/v1/ai/generate":
+            if path == "/v1/ai/generate":
                 prompt = str(body.get("prompt", "")).strip()
                 if not prompt:
                     raise ValueError("prompt is required")
-                provider = build_provider(body.get("provider"))
-                result = provider.generate(
-                    prompt,
-                    system=str(body.get("system", "")),
-                    model=body.get("model"),
-                )
-                self._send(HTTPStatus.OK, {
-                    "provider": result.provider,
-                    "model": result.model,
-                    "text": result.text,
-                })
+                result = build_provider(body.get("provider")).generate(prompt, system=str(body.get("system", "")), model=body.get("model"))
+                self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "session_id": body.get("session_id")})
                 return
-            if self.path == "/v1/conversations/analyze":
+            if path == "/v1/conversations/analyze":
                 self._send(HTTPStatus.OK, self._analyze_conversation(body))
                 return
-            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": self.path})
+            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
         except ValueError as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
-        except Exception as exc:  # boundary guard
+        except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
     def _analyze_conversation(self, body: dict[str, Any]) -> dict[str, Any]:
@@ -134,25 +133,11 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             source = conversation
         else:
             raise ValueError("conversation must be a string or message array")
-
         curator = _load_module("research_os_curator", CURATOR_PATH)
         normalized = curator._normalize_source(source)
         relationships = [curator._parse_relationship(item) for item in body.get("relationships", [])]
-        artifact = curator._deterministic_extract(
-            normalized,
-            str(body.get("title", "Research Session")),
-            str(body.get("status", "hypothesis")),
-            [str(x) for x in body.get("tags", [])],
-            [str(x) for x in body.get("evidence", [])],
-            relationships,
-            ARTIFACT_DIR,
-        )
-        return {
-            "artifact": curator.asdict(artifact),
-            "accepted": artifact.quality_score >= int(body.get("min_quality", 20)),
-            "persisted": False,
-            "note": "API analysis is preview-only; persistence requires explicit Git workflow.",
-        }
+        artifact = curator._deterministic_extract(normalized, str(body.get("title", "Research Session")), str(body.get("status", "hypothesis")), [str(x) for x in body.get("tags", [])], [str(x) for x in body.get("evidence", [])], relationships, ARTIFACT_DIR)
+        return {"artifact": curator.asdict(artifact), "accepted": artifact.quality_score >= int(body.get("min_quality", 20)), "persisted": False, "note": "API analysis is preview-only; persistence requires explicit Git workflow."}
 
     @staticmethod
     def _artifact_index() -> list[dict[str, str]]:
@@ -169,12 +154,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                         if ":" in line:
                             key, value = line.split(":", 1)
                             metadata[key.strip()] = value.strip().strip('"')
-            results.append({
-                "artifact_id": metadata.get("artifact_id", path.stem),
-                "title": metadata.get("title", ""),
-                "status": metadata.get("status", ""),
-                "path": str(path.relative_to(ROOT)),
-            })
+            results.append({"artifact_id": metadata.get("artifact_id", path.stem), "title": metadata.get("title", ""), "status": metadata.get("status", ""), "path": str(path.relative_to(ROOT))})
         return results
 
     def log_message(self, fmt: str, *args: Any) -> None:
@@ -187,7 +167,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=int(os.getenv("RESEARCH_OS_API_PORT", "8787")))
     args = parser.parse_args()
     server = ThreadingHTTPServer((args.host, args.port), ResearchOSHandler)
-    print(f"Research OS API listening on http://{args.host}:{args.port}")
+    print(f"Research OS listening on http://{args.host}:{args.port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
