@@ -1,0 +1,114 @@
+name: Focused Installer Health
+
+on:
+  push:
+    branches:
+      - fix/installer-health-only
+    paths:
+      - ".github/workflows/focused-installer-health.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  installer-health-only:
+    name: Installer health failure point only
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout patched source
+        uses: actions/checkout@v4
+
+      - name: Download existing installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: research-os-installer-72
+          path: installer-artifact
+          github-token: ${{ github.token }}
+          run-id: 31205328094
+
+      - name: Validate installer install service health and uninstall only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Get-ChildItem "installer-artifact\Research-OS-Setup-*-x64.exe" -Recurse | Select-Object -First 1
+          if (-not $setup) { throw "Installer artifact missing" }
+
+          $dataRoot = Join-Path $env:ProgramData 'ResearchOS'
+          $appRoot = Join-Path $env:ProgramFiles 'Research OS'
+          $installLog = Join-Path $env:RUNNER_TEMP 'research-os-focused-install.log'
+
+          try {
+            $connections = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
+            foreach ($connection in @($connections)) {
+              Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
+            }
+
+            $process = Start-Process `
+              -FilePath $setup.FullName `
+              -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$installLog") `
+              -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)" }
+
+            if (-not (Test-Path "$appRoot\app\research_os_flutter.exe")) { throw "Installed desktop app missing" }
+            if (-not (Test-Path "$appRoot\runtime\python\python.exe")) { throw "Installed bundled Python missing" }
+
+            Stop-Service ResearchOSService -Force -ErrorAction SilentlyContinue
+            $patchedServer = Join-Path $PWD 'tools\research_os_api\server.py'
+            $installedServer = Join-Path $appRoot 'tools\research_os_api\server.py'
+            Copy-Item $patchedServer $installedServer -Force
+            Start-Service ResearchOSService
+
+            $ready = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              try {
+                $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8787/health' -TimeoutSec 2 -SkipHttpErrorCheck
+                Write-Host "HEALTH $($i + 1): HTTP $($response.StatusCode) $($response.Content)"
+                if ($response.StatusCode -eq 200) {
+                  $health = $response.Content | ConvertFrom-Json
+                  if ($health.status -eq 'ok') { $ready = $true; break }
+                }
+              }
+              catch {
+                Write-Host "HEALTH $($i + 1) ERROR: $($_.Exception.Message)"
+              }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $ready) { throw 'Installed Research OS Service API did not become ready' }
+
+            $service = Get-Service ResearchOSService -ErrorAction Stop
+            if ($service.Status -ne 'Running') { throw 'ResearchOSService is not running' }
+
+            New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
+            $preserve = Join-Path $dataRoot 'preserve-after-uninstall.txt'
+            Set-Content -Path $preserve -Value 'preserve-me'
+
+            & "$appRoot\scripts\research-os-service.ps1" -Action uninstall -DataDir $dataRoot
+
+            for ($i = 0; $i -lt 20; $i++) {
+              if (-not (Get-Service ResearchOSService -ErrorAction SilentlyContinue)) { break }
+              Start-Sleep -Milliseconds 500
+            }
+            if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { throw 'ResearchOSService still exists after uninstall' }
+            if (-not (Test-Path $preserve)) { throw 'Local Research OS data was removed during uninstall' }
+
+            Write-Host 'FOCUSED_INSTALLER_HEALTH_PASS'
+          }
+          finally {
+            if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+              if (Test-Path "$appRoot\scripts\research-os-service.ps1") {
+                & "$appRoot\scripts\research-os-service.ps1" -Action uninstall -DataDir $dataRoot -ErrorAction SilentlyContinue
+              }
+              else {
+                Stop-Service ResearchOSService -Force -ErrorAction SilentlyContinue
+                sc.exe delete ResearchOSService | Out-Null
+              }
+            }
+            if (Test-Path $installLog) {
+              Write-Host '=== FOCUSED INSTALL LOG TAIL ==='
+              Get-Content $installLog -Tail 120
+            }
+          }
