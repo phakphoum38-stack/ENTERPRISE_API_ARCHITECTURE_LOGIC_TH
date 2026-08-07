@@ -68,37 +68,44 @@ class ResearchSidebar extends StatelessWidget {
         children: <Widget>[
           SizedBox(
             height: 72,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: expanded ? 14 : 10),
-              child: Row(
-                children: <Widget>[
-                  const ResearchBrandMark(),
-                  if (expanded) ...<Widget>[
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            'Research OS',
-                            key: Key('desktop-shell-title'),
-                            style: TextStyle(fontWeight: FontWeight.w800),
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Row(
+                      children: <Widget>[
+                        const ResearchBrandMark(),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'Research OS',
+                                key: Key('desktop-shell-title'),
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                              Text('Enterprise Workspace', style: TextStyle(fontSize: 11)),
+                            ],
                           ),
-                          Text('Enterprise Workspace', style: TextStyle(fontSize: 11)),
-                        ],
-                      ),
+                        ),
+                        IconButton(
+                          key: Key('toggle-desktop-sidebar'),
+                          tooltip: 'ย่อ Sidebar',
+                          onPressed: onToggle,
+                          icon: Icon(Icons.chevron_left),
+                        ),
+                      ],
                     ),
-                  ],
-                  IconButton(
-                    key: const Key('toggle-desktop-sidebar'),
-                    tooltip: expanded ? 'ย่อ Sidebar' : 'ขยาย Sidebar',
-                    onPressed: onToggle,
-                    icon: Icon(expanded ? Icons.chevron_left : Icons.chevron_right),
+                  )
+                : Center(
+                    child: IconButton(
+                      key: const Key('toggle-desktop-sidebar'),
+                      tooltip: 'ขยาย Sidebar',
+                      onPressed: onToggle,
+                      icon: const Icon(Icons.chevron_right),
+                    ),
                   ),
-                ],
-              ),
-            ),
           ),
           const Divider(height: 1),
           Expanded(
@@ -117,16 +124,23 @@ class ResearchSidebar extends StatelessWidget {
                 color: scheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
-                  if (expanded) ...<Widget>[
-                    const SizedBox(width: 8),
-                    const Text('Local-first & secure', style: TextStyle(fontSize: 12)),
-                  ],
-                ],
-              ),
+              child: expanded
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
+                        const SizedBox(width: 8),
+                        const Flexible(
+                          child: Text(
+                            'Local-first & secure',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
             ),
           ),
         ],
@@ -157,6 +171,7 @@ class ResearchMobileDrawer extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
           child: ListTile(
+            key: Key('mobile-nav-${item.index}'),
             selected: selectedIndex == item.index,
             leading: Icon(item.icon),
             title: Text(item.label),
@@ -305,6 +320,7 @@ class _SidebarDestination extends StatelessWidget {
           color: selected ? scheme.secondaryContainer : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
+            key: Key('desktop-nav-${item.index}'),
             borderRadius: BorderRadius.circular(12),
             onTap: onTap,
             child: SizedBox(
