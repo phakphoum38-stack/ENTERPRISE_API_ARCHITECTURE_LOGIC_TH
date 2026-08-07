@@ -24,16 +24,26 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
 
 void main() {
   testWidgets('home dashboard shows Research OS status', (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(
       MaterialApp(
         home: HomePage(apiClient: FakeResearchOSApiClient()),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('บ้านของเรา'), findsOneWidget);
+    expect(find.text('API Health'), findsOneWidget);
     expect(find.text('ok'), findsOneWidget);
+    expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsOneWidget);
+    expect(find.text('AI Memory'), findsWidgets);
     expect(find.text('ready'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
