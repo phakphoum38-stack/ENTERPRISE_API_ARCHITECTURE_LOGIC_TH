@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
 
@@ -12,13 +13,45 @@ class ResearchOSApp extends StatefulWidget {
 
 class _ResearchOSAppState extends State<ResearchOSApp> {
   ThemeMode _themeMode = ThemeMode.system;
+  ResearchOSApiClient? _apiClient;
+  String? _apiBaseUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApiEndpoint();
+  }
+
+  Future<void> _loadApiEndpoint() async {
+    final url = await ApiEndpointStore.load();
+    if (!mounted) return;
+    setState(() {
+      _apiBaseUrl = url;
+      _apiClient = ResearchOSApiClient(baseUrl: url);
+    });
+  }
+
+  Future<void> _changeApiEndpoint(String value) async {
+    final normalized = ApiEndpointStore.normalize(value);
+    await ApiEndpointStore.save(normalized);
+    final previous = _apiClient;
+    if (!mounted) return;
+    setState(() {
+      _apiBaseUrl = normalized;
+      _apiClient = ResearchOSApiClient(baseUrl: normalized);
+    });
+    previous?.close();
+  }
+
+  @override
+  void dispose() {
+    _apiClient?.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    const apiBaseUrl = String.fromEnvironment(
-      'RESEARCH_OS_API_BASE_URL',
-      defaultValue: 'http://127.0.0.1:8787',
-    );
+    final apiClient = _apiClient;
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -35,13 +68,19 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
         useMaterial3: true,
       ),
       themeMode: _themeMode,
-      home: ResearchOSAppShell(
-        apiClient: ResearchOSApiClient(baseUrl: apiBaseUrl),
-        themeMode: _themeMode,
-        onThemeModeChanged: (value) {
-          setState(() => _themeMode = value);
-        },
-      ),
+      home: apiClient == null || _apiBaseUrl == null
+          ? const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            )
+          : ResearchOSAppShell(
+              key: ValueKey(_apiBaseUrl),
+              apiClient: apiClient,
+              themeMode: _themeMode,
+              onThemeModeChanged: (value) {
+                setState(() => _themeMode = value);
+              },
+              onApiBaseUrlChanged: _changeApiEndpoint,
+            ),
     );
   }
 }
