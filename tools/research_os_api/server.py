@@ -127,7 +127,14 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send_static(STATIC_ROUTES[path])
                 return
             if path == "/health":
-                workspace = get_google_workspace_dashboard()
+                google_workspace_connected = False
+                try:
+                    workspace = get_google_workspace_dashboard()
+                    google_workspace_connected = bool(workspace.get("connected"))
+                except Exception:
+                    # Google Workspace is optional. Liveness must not fail because
+                    # an optional integration cannot initialize in service context.
+                    pass
                 self._send(
                     HTTPStatus.OK,
                     {
@@ -140,7 +147,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                         "github": True,
                         "cloud_sync": sync_configured(),
                         "google_workspace": True,
-                        "google_workspace_connected": bool(workspace.get("connected")),
+                        "google_workspace_connected": google_workspace_connected,
                     },
                 )
                 return
