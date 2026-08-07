@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api/research_os_api_client.dart';
-import 'features/home/home_page.dart';
+import 'app_shell.dart';
 
 class ResearchOSApp extends StatelessWidget {
   const ResearchOSApp({super.key});
@@ -20,7 +20,15 @@ class ResearchOSApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
       ),
-      home: HomePage(
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: ThemeMode.system,
+      home: ResearchOSAppShell(
         apiClient: ResearchOSApiClient(baseUrl: apiBaseUrl),
       ),
     );
