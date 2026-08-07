@@ -24,10 +24,10 @@ sealed class ResearchOsApiWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var repoRoot = RequirePath("RESEARCH_OS_REPO_ROOT");
+        var repoRoot = ResolveRepoRoot();
         var dataDir = Environment.GetEnvironmentVariable("RESEARCH_OS_DATA_DIR")
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ResearchOS");
-        var pythonExe = Environment.GetEnvironmentVariable("RESEARCH_OS_PYTHON_EXE") ?? "python.exe";
+        var pythonExe = ResolvePython(repoRoot);
         var apiDir = Path.Combine(repoRoot, "tools", "research_os_api");
         var serverPath = Path.Combine(apiDir, "render_server.py");
 
@@ -44,6 +44,10 @@ sealed class ResearchOsApiWorker : BackgroundService
 
         var stdoutPath = Path.Combine(dataDir, "logs", "service-api.out.log");
         var stderrPath = Path.Combine(dataDir, "logs", "service-api.err.log");
+
+        _logger.LogInformation("Research OS root: {RepoRoot}", repoRoot);
+        _logger.LogInformation("Research OS Python: {PythonExe}", pythonExe);
+        _logger.LogInformation("Research OS data: {DataDir}", dataDir);
 
         var startInfo = new ProcessStartInfo
         {
@@ -118,14 +122,44 @@ sealed class ResearchOsApiWorker : BackgroundService
         await base.StopAsync(cancellationToken);
     }
 
-    private static string RequirePath(string name)
+    private static string ResolveRepoRoot()
     {
-        var value = Environment.GetEnvironmentVariable(name);
-        if (string.IsNullOrWhiteSpace(value) || !Directory.Exists(value))
+        var configured = Environment.GetEnvironmentVariable("RESEARCH_OS_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured))
         {
-            throw new InvalidOperationException($"{name} is not configured or points to a missing directory.");
+            return Path.GetFullPath(configured);
         }
-        return Path.GetFullPath(value);
+
+        // Published layout:
+        // <root>\tools\research_os_service\publish\ResearchOS.ServiceHost.exe
+        // The packaged installer keeps this same layout under Program Files.
+        var packagedRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
+        var packagedEntrypoint = Path.Combine(packagedRoot, "tools", "research_os_api", "render_server.py");
+        if (File.Exists(packagedEntrypoint))
+        {
+            return packagedRoot;
+        }
+
+        throw new InvalidOperationException(
+            $"RESEARCH_OS_REPO_ROOT is not configured and packaged root could not be resolved from {AppContext.BaseDirectory}.");
+    }
+
+    private static string ResolvePython(string repoRoot)
+    {
+        var configured = Environment.GetEnvironmentVariable("RESEARCH_OS_PYTHON_EXE");
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
+        {
+            return Path.GetFullPath(configured);
+        }
+
+        var bundled = Path.Combine(repoRoot, "runtime", "python", "python.exe");
+        if (File.Exists(bundled))
+        {
+            return bundled;
+        }
+
+        // Development fallback. Packaged installs are expected to use bundled Python.
+        return "python.exe";
     }
 
     private static string Quote(string value) => $"\"{value.Replace("\"", "\\\"")}\"";
