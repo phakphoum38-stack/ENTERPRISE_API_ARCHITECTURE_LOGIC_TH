@@ -20,7 +20,10 @@ class CloudResearchOSHandler(ResearchOSHandler):
         self.send_header("Access-Control-Allow-Origin", allowed_origin)
         self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization, X-Research-OS-Sync-Key",
+        )
         self.send_header("Access-Control-Max-Age", "86400")
         super().end_headers()
 
