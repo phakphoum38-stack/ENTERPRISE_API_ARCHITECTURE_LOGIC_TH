@@ -1,0 +1,207 @@
+name: Research OS Gemini E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/research_os_api/**"
+      - "tools/research_curator/**"
+      - "apps/research_os_web/**"
+      - ".github/workflows/research-os-gemini-e2e.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-gemini-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gemini-e2e:
+    name: Gemini API end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      RESEARCH_OS_PROVIDER: gemini
+      RESEARCH_OS_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      RESEARCH_OS_GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.6-flash' }}
+      RESEARCH_OS_API_HOST: 127.0.0.1
+      RESEARCH_OS_API_PORT: "8787"
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate required secret
+        shell: bash
+        run: |
+          if [ -z "${RESEARCH_OS_GEMINI_API_KEY}" ]; then
+            echo "::error::Missing repository secret GEMINI_API_KEY"
+            exit 1
+          fi
+
+      - name: Compile Research OS modules
+        run: |
+          python -m py_compile tools/research_os_api/providers.py
+          python -m py_compile tools/research_os_api/provider_readiness.py
+          python -m py_compile tools/research_os_api/provider_smoke.py
+          python -m py_compile tools/research_os_api/server.py
+          python -m py_compile tools/research_curator/curator.py
+          python -m py_compile tools/research_curator/knowledge_ops.py
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+
+      - name: Start Research OS API
+        shell: bash
+        run: |
+          python tools/research_os_api/server.py \
+            --host "${RESEARCH_OS_API_HOST}" \
+            --port "${RESEARCH_OS_API_PORT}" \
+            > /tmp/research-os-api.log 2>&1 &
+          echo $! > /tmp/research-os-api.pid
+
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+
+          url = "http://127.0.0.1:8787/health"
+          last_error = None
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen(url, timeout=2) as response:
+                      payload = json.load(response)
+                  if payload.get("status") == "ok":
+                      print("Research OS API is ready.")
+                      raise SystemExit(0)
+              except Exception as exc:
+                  last_error = exc
+                  time.sleep(1)
+          raise SystemExit(f"API did not become ready: {last_error}")
+          PY
+
+      - name: Verify health endpoint
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          with urllib.request.urlopen("http://127.0.0.1:8787/health", timeout=10) as response:
+              payload = json.load(response)
+          assert payload.get("status") == "ok", payload
+          assert payload.get("service") == "research-os-api", payload
+          print("Health endpoint passed.")
+          PY
+
+      - name: Verify providers endpoint
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          with urllib.request.urlopen("http://127.0.0.1:8787/v1/providers", timeout=10) as response:
+              payload = json.load(response)
+          assert payload.get("active") == "gemini", payload
+          assert "gemini" in payload.get("providers", []), payload
+          print("Providers endpoint passed.")
+          PY
+
+      - name: Verify live Gemini generation
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          request_payload = {
+              "provider": "gemini",
+              "prompt": "Reply with exactly READY.",
+              "system": "This is a connectivity test. Do not include secrets or extra text.",
+              "session_id": "github-actions-gemini-e2e",
+          }
+          request = urllib.request.Request(
+              "http://127.0.0.1:8787/v1/ai/generate",
+              data=json.dumps(request_payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=90) as response:
+              payload = json.load(response)
+
+          assert payload.get("provider") == "gemini", payload
+          assert str(payload.get("model", "")).strip(), payload
+          assert str(payload.get("text", "")).strip(), payload
+          assert payload.get("session_id") == "github-actions-gemini-e2e", payload
+          print("Live Gemini generation passed without printing the provider response.")
+          PY
+
+      - name: Verify conversation analysis preview
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          request_payload = {
+              "title": "Gemini E2E validation",
+              "conversation": "Research OS uses a provider-agnostic API and Gemini as a live provider.",
+              "tags": ["gemini", "e2e", "research-os"],
+              "status": "validated",
+              "min_quality": 0,
+          }
+          request = urllib.request.Request(
+              "http://127.0.0.1:8787/v1/conversations/analyze",
+              data=json.dumps(request_payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              payload = json.load(response)
+
+          assert isinstance(payload.get("artifact"), dict), payload
+          assert payload.get("persisted") is False, payload
+          assert "accepted" in payload, payload
+          print("Conversation analysis preview passed.")
+          PY
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# Research OS Gemini E2E"
+            echo
+            echo "- Provider: \`gemini\`"
+            echo "- Model: \`${RESEARCH_OS_GEMINI_MODEL}\`"
+            echo "- Result: \`${{ job.status }}\`"
+            echo "- Health endpoint: \`/health\`"
+            echo "- Providers endpoint: \`/v1/providers\`"
+            echo "- Live generation endpoint: \`/v1/ai/generate\`"
+            echo "- Conversation preview endpoint: \`/v1/conversations/analyze\`"
+            echo
+            echo "Secrets, prompts, and full provider responses are not printed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show server log on failure
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f /tmp/research-os-api.log ]; then
+            sed -E 's/(key=)[^&[:space:]]+/\1***/g; s/(AIza)[A-Za-z0-9_-]+/\1***/g' /tmp/research-os-api.log | tail -n 200
+          fi
+
+      - name: Stop Research OS API
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/research-os-api.pid ]; then
+            kill "$(cat /tmp/research-os-api.pid)" 2>/dev/null || true
+          fi
