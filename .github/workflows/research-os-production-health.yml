@@ -1,0 +1,89 @@
+name: Research OS Production Health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-production-health
+  cancel-in-progress: true
+
+env:
+  API_URL: https://research-os-api-phakphoum.onrender.com
+  HOME_URL: https://phakphoum38-stack.github.io/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH/
+
+jobs:
+  monitor:
+    name: Pages + Render health
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check GitHub Pages availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl -L -sS -o /tmp/home.html -w "%{http_code}" --max-time 20 "$HOME_URL")
+          echo "GitHub Pages HTTP $code"
+          test "$code" = "200"
+          test -s /tmp/home.html
+
+      - name: Wake Render and measure readiness
+        id: api
+        shell: bash
+        run: |
+          set -euo pipefail
+          started=$(date +%s)
+          ready=0
+          last_code=000
+          for attempt in $(seq 1 18); do
+            last_code=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 12 "$API_URL/health" || true)
+            if [ "$last_code" = "200" ]; then
+              if python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/health.json').read_text())
+          assert p.get('status') == 'ok'
+          assert p.get('service') == 'research-os-api'
+          PY
+              then
+                ready=1
+                break
+              fi
+            fi
+            echo "API not ready yet: attempt=$attempt http=$last_code"
+            sleep 5
+          done
+          elapsed=$(( $(date +%s) - started ))
+          echo "wake_seconds=$elapsed" >> "$GITHUB_OUTPUT"
+          echo "http_code=$last_code" >> "$GITHUB_OUTPUT"
+          if [ "$ready" != "1" ]; then
+            echo "::error::Research OS API did not become healthy within the wake window"
+            exit 1
+          fi
+          echo "Research OS API healthy after ${elapsed}s"
+
+      - name: Check providers endpoint
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          with urllib.request.urlopen('https://research-os-api-phakphoum.onrender.com/v1/providers', timeout=20) as r:
+              p=json.load(r)
+          assert 'gemini' in p.get('providers', []), p
+          assert p.get('active') == 'gemini', p
+          print('Provider endpoint healthy.')
+          PY
+
+      - name: Write production summary
+        if: always()
+        run: |
+          {
+            echo "# Research OS Production Health"
+            echo "- GitHub Pages: checked"
+            echo "- Render health HTTP: ${{ steps.api.outputs.http_code }}"
+            echo "- Render wake/readiness: ${{ steps.api.outputs.wake_seconds }} seconds"
+            echo "- Monitor cadence: every 6 hours (not a keep-alive loop)"
+          } >> "$GITHUB_STEP_SUMMARY"
