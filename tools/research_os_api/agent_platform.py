@@ -119,7 +119,7 @@ class AgentRouter:
             "agent": asdict(agent),
             "reason": reason,
             "score": score,
-            "execution_mode": "plan_only",
+            "execution_mode": "runtime_dispatch",
             "requires_confirmation_for_writes": any(
                 permission.endswith("with_confirmation") for permission in agent.permissions
             ),
@@ -131,14 +131,14 @@ def platform_dashboard() -> dict[str, Any]:
     agents = registry.list()
     return {
         "platform": "research_os_agents",
-        "version": "1.0-foundation",
+        "version": "1.0-runtime",
         "agent_count": len(agents),
         "agents": agents,
         "router": "capability-based",
         "task_contract": ["task_id", "objective", "requested_agent", "context"],
-        "shared_context": "interface-ready",
-        "shared_memory": "interface-ready",
-        "event_bus": "planned",
-        "task_queue": "planned",
+        "shared_context": "local-persistent",
+        "shared_memory": "scope-ready",
+        "event_bus": "active",
+        "task_queue": "active",
         "write_policy": "explicit_confirmation",
     }
