@@ -2,52 +2,56 @@ name: Research OS Installer Validation
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Research OS Build Installer"]
-    types: [completed]
+    inputs:
+      target_sha:
+        description: Commit SHA to validate
+        required: false
+        type: string
+      source_installer_run:
+        description: Installer workflow run ID
+        required: false
+        type: string
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 jobs:
   installer-validation:
     name: Install service health uninstall
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-      SOURCE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+      SOURCE_RUN_ID: ${{ inputs.source_installer_run }}
     steps:
       - name: Checkout tested revision
         uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_SHA }}
 
+      - name: Resolve installer build run
+        id: installer-run
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runId = "$env:SOURCE_RUN_ID"
+          if (-not $runId) {
+            $runId = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+          }
+          if (-not $runId) { throw "No successful installer build found for $env:TARGET_SHA" }
+          "run_id=$runId" >> $env:GITHUB_OUTPUT
+
       - name: Download installer artifact
-        if: github.event_name == 'workflow_run'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           New-Item -ItemType Directory -Force -Path installer-under-test | Out-Null
-          gh run download "$env:SOURCE_RUN_ID" --repo "${{ github.repository }}" --name "research-os-installer-$env:TARGET_SHA" --dir installer-under-test
+          gh run download "${{ steps.installer-run.outputs.run_id }}" --repo "${{ github.repository }}" --name "research-os-installer-$env:TARGET_SHA" --dir installer-under-test
           $setup = Get-ChildItem "installer-under-test\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
           if (-not $setup) { throw "Installer artifact is missing" }
-
-      - name: Resolve installer for manual run
-        if: github.event_name == 'workflow_dispatch'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $runId = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
-          if (-not $runId) { throw "No successful installer build found for $env:TARGET_SHA" }
-          New-Item -ItemType Directory -Force -Path installer-under-test | Out-Null
-          gh run download "$runId" --repo "${{ github.repository }}" --name "research-os-installer-$env:TARGET_SHA" --dir installer-under-test
 
       - name: Prepare clean validation environment
         shell: pwsh
@@ -59,16 +63,11 @@ jobs:
             Start-Sleep -Seconds 2
           }
           $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
-          foreach ($listener in $listeners) {
-            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
-          }
+          foreach ($listener in $listeners) { Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue }
           Start-Sleep -Seconds 2
-          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) {
-            throw "Port 8787 still has a listener before installation"
-          }
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 still has a listener before installation" }
 
       - name: Install Setup EXE silently
-        id: install
         shell: pwsh
         run: |
           $setup = Get-ChildItem "installer-under-test\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
@@ -91,9 +90,7 @@ jobs:
             "$root\tools\research_os_service\publish\ResearchOS.ServiceHost.exe",
             "$root\scripts\research-os-service.ps1"
           )
-          foreach ($path in $required) {
-            if (-not (Test-Path $path)) { throw "Installed file missing: $path" }
-          }
+          foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Installed file missing: $path" } }
 
       - name: Verify ResearchOSService is running
         shell: pwsh
@@ -116,13 +113,8 @@ jobs:
             try {
               $response = Invoke-WebRequest -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2 -SkipHttpErrorCheck
               Write-Host "Health attempt $($i + 1): HTTP $($response.StatusCode) $($response.Content)"
-              if ($response.StatusCode -eq 200 -and $response.Content -match '"status"\s*:\s*"ok"') {
-                $ready = $true
-                break
-              }
-            } catch {
-              $lastError = $_.Exception.Message
-            }
+              if ($response.StatusCode -eq 200 -and $response.Content -match '"status"\s*:\s*"ok"') { $ready = $true; break }
+            } catch { $lastError = $_.Exception.Message }
             Start-Sleep -Seconds 1
           }
           if (-not $ready) {
@@ -157,9 +149,7 @@ jobs:
             sc.exe query ResearchOSService | Out-Host
             throw "ResearchOSService still exists after uninstall"
           }
-          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) {
-            throw "Port 8787 is still listening after uninstall"
-          }
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 is still listening after uninstall" }
 
       - name: Emergency cleanup and diagnostics
         if: always()
@@ -175,6 +165,10 @@ jobs:
             sc.exe delete ResearchOSService | Out-Host
           }
           $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
-          foreach ($listener in $listeners) {
-            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
-          }
+          foreach ($listener in $listeners) { Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue }
+
+      - name: Dispatch release workflow
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run 06-release.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ steps.installer-run.outputs.run_id }}"
