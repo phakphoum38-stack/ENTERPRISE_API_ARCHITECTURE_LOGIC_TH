@@ -124,20 +124,29 @@ class GeminiProvider(AIProvider):
         return ProviderResult(self.name, selected, str(text), raw)
 
 
+def _env_or_default(name: str, default: str) -> str:
+    """Return a trimmed environment value, or the default when unset/blank."""
+    value = os.getenv(name)
+    return value.strip() if value and value.strip() else default
+
+
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
+    if not url or not url.strip():
+        raise ProviderError("provider endpoint is empty")
+
     try:
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
         with urllib.request.urlopen(request, timeout=60) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise ProviderError(f"provider HTTP {exc.code}: {body[:500]}") from exc
-    except (urllib.error.URLError, json.JSONDecodeError) as exc:
+    except (urllib.error.URLError, json.JSONDecodeError, ValueError) as exc:
         raise ProviderError(f"provider request failed: {exc}") from exc
 
 
@@ -146,8 +155,11 @@ def build_provider(name: str | None = None) -> AIProvider:
     if selected == "mock":
         return MockProvider()
     if selected in {"openai", "openai-compatible", "local"}:
-        endpoint = os.getenv("RESEARCH_OS_OPENAI_ENDPOINT", "http://localhost:11434/v1/chat/completions")
-        model = os.getenv("RESEARCH_OS_OPENAI_MODEL", "local-model")
+        endpoint = _env_or_default(
+            "RESEARCH_OS_OPENAI_ENDPOINT",
+            "http://localhost:11434/v1/chat/completions",
+        )
+        model = _env_or_default("RESEARCH_OS_OPENAI_MODEL", "local-model")
         return OpenAICompatibleProvider(
             endpoint=endpoint,
             api_key=os.getenv("RESEARCH_OS_OPENAI_API_KEY"),
@@ -158,20 +170,29 @@ def build_provider(name: str | None = None) -> AIProvider:
         if not key:
             raise ProviderError("missing RESEARCH_OS_ANTHROPIC_API_KEY")
         return AnthropicProvider(
-            endpoint=os.getenv("RESEARCH_OS_ANTHROPIC_ENDPOINT", "https://api.anthropic.com/v1/messages"),
+            endpoint=_env_or_default(
+                "RESEARCH_OS_ANTHROPIC_ENDPOINT",
+                "https://api.anthropic.com/v1/messages",
+            ),
             api_key=key,
-            default_model=os.getenv("RESEARCH_OS_ANTHROPIC_MODEL", "claude-sonnet-4-5"),
+            default_model=_env_or_default(
+                "RESEARCH_OS_ANTHROPIC_MODEL",
+                "claude-sonnet-4-5",
+            ),
         )
     if selected == "gemini":
         key = os.getenv("RESEARCH_OS_GEMINI_API_KEY")
         if not key:
             raise ProviderError("missing RESEARCH_OS_GEMINI_API_KEY")
         return GeminiProvider(
-            endpoint_template=os.getenv(
+            endpoint_template=_env_or_default(
                 "RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE",
                 "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
             ),
             api_key=key,
-            default_model=os.getenv("RESEARCH_OS_GEMINI_MODEL", "gemini-2.5-flash"),
+            default_model=_env_or_default(
+                "RESEARCH_OS_GEMINI_MODEL",
+                "gemini-2.5-flash",
+            ),
         )
     raise ProviderError(f"unsupported provider: {selected}")
