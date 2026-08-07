@@ -12,10 +12,8 @@ class ResearchOSApiException implements Exception {
 }
 
 class ResearchOSApiClient {
-  ResearchOSApiClient({
-    required this.baseUrl,
-    http.Client? client,
-  }) : _client = client ?? http.Client();
+  ResearchOSApiClient({required this.baseUrl, http.Client? client})
+      : _client = client ?? http.Client();
 
   final String baseUrl;
   final http.Client _client;
@@ -23,11 +21,11 @@ class ResearchOSApiClient {
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
-
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
-
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
+  Future<Map<String, dynamic>> getKnowledgeGraph() =>
+      _getJson('/v1/knowledge/graph');
 
   Future<Map<String, dynamic>> getGitHubDashboard({String? repository}) async {
     final query = repository?.trim();
@@ -50,23 +48,17 @@ class ResearchOSApiClient {
   }
 
   Future<Map<String, dynamic>> generateText(String prompt) {
-    return _postJson(
-      '/v1/ai/generate',
-      <String, Object?>{
-        'provider': 'gemini',
-        'prompt': prompt,
-      },
-    );
+    return _postJson('/v1/ai/generate', <String, Object?>{
+      'provider': 'gemini',
+      'prompt': prompt,
+    });
   }
 
   Future<Map<String, dynamic>> answerWithMemory(String question) {
-    return _postJson(
-      '/v1/ai/answer-with-memory',
-      <String, Object?>{
-        'provider': 'gemini',
-        'question': question,
-      },
-    );
+    return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
+      'provider': 'gemini',
+      'question': question,
+    });
   }
 
   Future<Map<String, dynamic>> _getJson(String path) async {
@@ -95,20 +87,17 @@ class ResearchOSApiClient {
         'Research OS API returned invalid JSON (${response.statusCode}).',
       );
     }
-
     if (decoded is! Map<String, dynamic>) {
       throw const ResearchOSApiException(
         'Research OS API returned an unexpected response shape.',
       );
     }
-
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final detail = decoded['detail'] ?? decoded['error'] ?? 'Unknown error';
       throw ResearchOSApiException(
         'Research OS API error ${response.statusCode}: $detail',
       );
     }
-
     return decoded;
   }
 
