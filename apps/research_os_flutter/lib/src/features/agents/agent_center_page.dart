@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/enterprise_components.dart';
+
 class AgentCenterPage extends StatelessWidget {
   const AgentCenterPage({super.key});
 
@@ -13,36 +15,34 @@ class AgentCenterPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Agent Center')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: <Widget>[
-          Text('Research OS Agent Platform', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          const Text('ศูนย์กลางผู้ช่วยเฉพาะทาง พร้อม Agent Runtime สำหรับ routing, queue, events, shared context และ confirmation gate'),
-          const SizedBox(height: 16),
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.route_outlined),
-              title: Text('Capability Router + Agent Runtime'),
-              subtitle: Text('รับ objective → เลือก Agent → เข้า Task Queue → Event Bus → Execute และบังคับยืนยันก่อนงานที่มีสิทธิ์เขียน'),
-              trailing: Chip(label: Text('Runtime 1.0')),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Wrap(
-            spacing: 8,
-            runSpacing: 8,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 32),
+      children: <Widget>[
+        const EnterprisePageHeader(
+          icon: Icons.smart_toy_outlined,
+          title: 'Agent Center',
+          subtitle: 'จัดการผู้ช่วยเฉพาะทาง, routing, task queue, events และสิทธิ์การทำงานจากศูนย์กลางเดียว',
+        ),
+        const SizedBox(height: 24),
+        const EnterpriseSection(
+          title: 'Runtime overview',
+          subtitle: 'สถานะของ Agent Runtime 1.0',
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
             children: <Widget>[
-              Chip(avatar: Icon(Icons.queue_outlined, size: 18), label: Text('Task Queue: Active')),
-              Chip(avatar: Icon(Icons.swap_horiz, size: 18), label: Text('Event Bus: Active')),
-              Chip(avatar: Icon(Icons.memory_outlined, size: 18), label: Text('Shared Context: Local')),
-              Chip(avatar: Icon(Icons.verified_user_outlined, size: 18), label: Text('Confirmation Gate')),
+              SizedBox(width: 230, child: EnterpriseStatusTile(icon: Icons.route_outlined, title: 'Router', value: 'Capability based', caption: 'Research fallback')),
+              SizedBox(width: 230, child: EnterpriseStatusTile(icon: Icons.queue_outlined, title: 'Task Queue', value: 'Active', caption: 'Local runtime')),
+              SizedBox(width: 230, child: EnterpriseStatusTile(icon: Icons.swap_horiz, title: 'Event Bus', value: 'Active', caption: 'Runtime events')),
+              SizedBox(width: 230, child: EnterpriseStatusTile(icon: Icons.memory_outlined, title: 'Shared Context', value: 'Local-first', caption: 'ResearchOSData/agents')),
             ],
           ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
+        ),
+        const SizedBox(height: 28),
+        EnterpriseSection(
+          title: 'Registered agents',
+          subtitle: 'Agent ทุกตัวใช้ permission model และ confirmation policy ชุดเดียวกัน',
+          child: LayoutBuilder(
             builder: (context, constraints) {
               final columns = constraints.maxWidth >= 1050 ? 3 : constraints.maxWidth >= 650 ? 2 : 1;
               final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
@@ -53,20 +53,33 @@ class AgentCenterPage extends StatelessWidget {
                   width: width,
                   child: Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Row(children: <Widget>[
-                            Icon(agent.icon, size: 30),
-                            const SizedBox(width: 10),
-                            Expanded(child: Text(agent.name, style: Theme.of(context).textTheme.titleMedium)),
-                            const Chip(label: Text('Registered')),
+                            Container(
+                              width: 40,
+                              height: 40,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.secondaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(agent.icon),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(agent.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+                            const Chip(label: Text('Ready')),
                           ]),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           Text(agent.capabilities),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
                           const SizedBox(height: 10),
-                          Text('Permissions: ${agent.permissions}', style: Theme.of(context).textTheme.bodySmall),
+                          Text('Permissions', style: Theme.of(context).textTheme.labelMedium),
+                          const SizedBox(height: 3),
+                          Text(agent.permissions, style: Theme.of(context).textTheme.bodySmall),
                         ],
                       ),
                     ),
@@ -75,30 +88,22 @@ class AgentCenterPage extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 20),
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.verified_user_outlined),
-              title: Text('Write actions require confirmation'),
-              subtitle: Text('Agent ที่แก้ Calendar/Google Workspace หรือข้อมูลภายนอกจะหยุดที่ awaiting_confirmation จนกว่าผู้ใช้จะยืนยัน'),
-            ),
+        ),
+        const SizedBox(height: 28),
+        const EnterpriseSection(
+          title: 'Governance',
+          subtitle: 'กติกากลางสำหรับ Agent ทุกตัว',
+          child: Column(
+            children: <Widget>[
+              Card(child: ListTile(leading: Icon(Icons.verified_user_outlined), title: Text('Write actions require confirmation'), subtitle: Text('งานที่แก้ Calendar, Google Workspace หรือข้อมูลภายนอกจะหยุดรอการยืนยันก่อน Execute'))),
+              SizedBox(height: 8),
+              Card(child: ListTile(leading: Icon(Icons.storage_outlined), title: Text('Shared Context แบบ Local-first'), subtitle: Text('Context ของ Agent อยู่ใต้ ResearchOSData/agents และไม่บังคับพึ่ง Cloud'))),
+              SizedBox(height: 8),
+              Card(child: ListTile(leading: Icon(Icons.construction_outlined), title: Text('Domain Executors'), subtitle: Text('ขั้นต่อไปคือผูก executor จริงของ Research, GitHub, Google Workspace, Document และ Shift เข้ากับ Runtime'))),
+            ],
           ),
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.memory_outlined),
-              title: Text('Shared Context แบบ Local-first'),
-              subtitle: Text('Context ของ Agent ถูกเตรียมให้เก็บใต้ ResearchOSData/agents เพื่อใช้ต่อเนื่องโดยไม่ต้องพึ่ง Cloud'),
-            ),
-          ),
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.construction_outlined),
-              title: Text('Domain Executors เป็นลำดับถัดไป'),
-              subtitle: Text('Runtime dispatch ทำงานแล้ว ขั้นถัดไปคือผูก executor จริงของ Research, GitHub, Google Workspace, Document และ Shift Agent เข้ากับ Task Queue'),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
