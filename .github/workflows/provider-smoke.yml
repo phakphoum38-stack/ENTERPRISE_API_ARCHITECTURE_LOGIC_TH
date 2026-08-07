@@ -6,13 +6,13 @@ on:
       provider:
         description: AI provider to test
         required: true
-        default: mock
+        default: gemini
         type: choice
         options:
+          - gemini
           - mock
           - openai-compatible
           - anthropic
-          - gemini
 
 permissions:
   contents: read
@@ -28,11 +28,9 @@ jobs:
     timeout-minutes: 5
 
     env:
-      # Provider selected from Run workflow
       RESEARCH_OS_PROVIDER: ${{ inputs.provider }}
 
       # OpenAI / OpenAI-compatible
-      # Uses the GitHub Secret and Variables you already created.
       RESEARCH_OS_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       RESEARCH_OS_OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       RESEARCH_OS_OPENAI_ENDPOINT: ${{ vars.OPENAI_ENDPOINT }}
@@ -62,20 +60,26 @@ jobs:
           python -m py_compile tools/research_os_api/provider_readiness.py
           python -m py_compile tools/research_os_api/provider_smoke.py
 
-      - name: Configure OpenAI endpoint
+      - name: Configure OpenAI defaults
         if: ${{ inputs.provider == 'openai-compatible' }}
         shell: bash
         run: |
           if [ -z "${RESEARCH_OS_OPENAI_ENDPOINT}" ]; then
             echo "RESEARCH_OS_OPENAI_ENDPOINT=https://api.openai.com/v1/chat/completions" >> "$GITHUB_ENV"
           fi
-
-      - name: Configure default OpenAI model
-        if: ${{ inputs.provider == 'openai-compatible' }}
-        shell: bash
-        run: |
           if [ -z "${RESEARCH_OS_OPENAI_MODEL}" ]; then
             echo "RESEARCH_OS_OPENAI_MODEL=gpt-4.1-mini" >> "$GITHUB_ENV"
+          fi
+
+      - name: Configure Gemini defaults
+        if: ${{ inputs.provider == 'gemini' }}
+        shell: bash
+        run: |
+          if [ -z "${RESEARCH_OS_GEMINI_MODEL}" ]; then
+            echo "RESEARCH_OS_GEMINI_MODEL=gemini-3.6-flash" >> "$GITHUB_ENV"
+          fi
+          if [ -z "${RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE}" ]; then
+            echo 'RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE=https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}' >> "$GITHUB_ENV"
           fi
 
       - name: Validate provider configuration
@@ -86,9 +90,20 @@ jobs:
         working-directory: tools/research_os_api
         run: python provider_smoke.py
 
-      - name: Report success
-        if: success()
+      - name: Write job summary
+        if: always()
+        shell: bash
         run: |
-          echo "Provider smoke test passed."
-          echo "Provider: ${{ inputs.provider }}"
-          echo "No API keys, prompts, or full responses were printed."
+          {
+            echo "## Provider Smoke Test"
+            echo ""
+            echo "- Provider: \`${{ inputs.provider }}\`"
+            echo "- Result: \`${{ job.status }}\`"
+            if [ "${{ inputs.provider }}" = "gemini" ]; then
+              echo "- Gemini model: \`${RESEARCH_OS_GEMINI_MODEL:-gemini-3.6-flash}\`"
+            elif [ "${{ inputs.provider }}" = "openai-compatible" ]; then
+              echo "- OpenAI model: \`${RESEARCH_OS_OPENAI_MODEL:-gpt-4.1-mini}\`"
+            fi
+            echo ""
+            echo "Secrets, prompts, and full provider responses are not printed."
+          } >> "$GITHUB_STEP_SUMMARY"
