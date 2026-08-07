@@ -14,12 +14,14 @@ class ResearchOSAppShell extends StatefulWidget {
     required this.apiClient,
     this.themeMode = ThemeMode.system,
     this.onThemeModeChanged,
+    this.onApiBaseUrlChanged,
     super.key,
   });
 
   final ResearchOSApiClient apiClient;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode>? onThemeModeChanged;
+  final Future<void> Function(String value)? onApiBaseUrlChanged;
 
   @override
   State<ResearchOSAppShell> createState() => _ResearchOSAppShellState();
@@ -40,12 +42,6 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
   ];
 
   @override
-  void dispose() {
-    widget.apiClient.close();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
       HomePage(apiClient: widget.apiClient),
@@ -59,6 +55,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         themeMode: widget.themeMode,
         onThemeModeChanged:
             widget.onThemeModeChanged ?? (ThemeMode value) {},
+        onApiBaseUrlChanged: widget.onApiBaseUrlChanged,
       ),
     ];
 
