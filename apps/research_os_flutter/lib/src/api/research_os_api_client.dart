@@ -29,6 +29,18 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
 
+  Future<Map<String, dynamic>> getGitHubDashboard({String? repository}) async {
+    final query = repository?.trim();
+    if (query == null || query.isEmpty) {
+      return _getJson('/v1/github/dashboard');
+    }
+    final uri = _uri('/v1/github/dashboard').replace(
+      queryParameters: <String, String>{'repository': query},
+    );
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
+
   Future<Map<String, dynamic>> searchMemory(String query) async {
     final uri = _uri('/v1/memory/search').replace(
       queryParameters: <String, String>{'q': query, 'limit': '5'},
