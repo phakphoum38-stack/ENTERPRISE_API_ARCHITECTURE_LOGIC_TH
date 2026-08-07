@@ -6,6 +6,7 @@ import 'features/github/github_dashboard_page.dart';
 import 'features/graph/knowledge_graph_page.dart';
 import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
+import 'features/local_api/local_api_control_page.dart';
 import 'features/monitor/system_monitor_page.dart';
 import 'features/settings/settings_page.dart';
 
@@ -37,6 +38,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
     'Knowledge Library',
     'Knowledge Graph',
     'GitHub Control Center',
+    'Local API Control',
     'System Monitor',
     'Settings & Providers',
   ];
@@ -49,6 +51,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
       LibraryPage(apiClient: widget.apiClient),
       KnowledgeGraphPage(apiClient: widget.apiClient),
       GitHubDashboardPage(apiClient: widget.apiClient),
+      const LocalApiControlPage(),
       SystemMonitorPage(apiClient: widget.apiClient),
       SettingsPage(
         apiClient: widget.apiClient,
@@ -84,6 +87,11 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         icon: Icon(Icons.account_tree_outlined),
         selectedIcon: Icon(Icons.account_tree),
         label: Text('GitHub'),
+      ),
+      NavigationRailDestination(
+        icon: Icon(Icons.dns_outlined),
+        selectedIcon: Icon(Icons.dns),
+        label: Text('Local API'),
       ),
       NavigationRailDestination(
         icon: Icon(Icons.monitor_heart_outlined),
@@ -122,6 +130,11 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         icon: Icon(Icons.account_tree_outlined),
         selectedIcon: Icon(Icons.account_tree),
         label: 'GitHub',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.dns_outlined),
+        selectedIcon: Icon(Icons.dns),
+        label: 'API',
       ),
       NavigationDestination(
         icon: Icon(Icons.monitor_heart_outlined),
@@ -198,7 +211,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
             actions: <Widget>[
               IconButton(
                 tooltip: 'System Monitor',
-                onPressed: () => setState(() => _selectedIndex = 5),
+                onPressed: () => setState(() => _selectedIndex = 6),
                 icon: const Icon(Icons.monitor_heart_outlined),
               ),
             ],
@@ -240,9 +253,7 @@ class _DesktopTopBar extends StatelessWidget {
               key: const Key('toggle-desktop-sidebar'),
               tooltip: railExtended ? 'ย่อ Sidebar' : 'ขยาย Sidebar',
               onPressed: onToggleRail,
-              icon: Icon(
-                railExtended ? Icons.menu_open : Icons.menu,
-              ),
+              icon: Icon(railExtended ? Icons.menu_open : Icons.menu),
             ),
             const SizedBox(width: 8),
             const Icon(Icons.hub_outlined),
@@ -297,9 +308,9 @@ class _DesktopStatusBar extends StatelessWidget {
           SizedBox(width: 4),
           Text('Memory'),
           SizedBox(width: 14),
-          Icon(Icons.cloud_outlined, size: 16),
+          Icon(Icons.dns_outlined, size: 16),
           SizedBox(width: 4),
-          Text('API'),
+          Text('Local API'),
         ],
       ),
     );
