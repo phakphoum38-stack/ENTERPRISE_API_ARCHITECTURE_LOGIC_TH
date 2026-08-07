@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: research-os-api-phakphoum
+    runtime: python
+    plan: free
+    autoDeploy: true
+    buildCommand: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+    startCommand: cd tools/research_os_api && python render_server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: RESEARCH_OS_PROVIDER
+        value: gemini
+      - key: RESEARCH_OS_GEMINI_MODEL
+        value: gemini-3-flash-preview
+      - key: RESEARCH_OS_ALLOWED_ORIGIN
+        value: https://phakphoum38-stack.github.io
+      - key: RESEARCH_OS_GITHUB_REPOSITORY
+        value: phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
+      - key: GEMINI_API_KEY
+        sync: false
