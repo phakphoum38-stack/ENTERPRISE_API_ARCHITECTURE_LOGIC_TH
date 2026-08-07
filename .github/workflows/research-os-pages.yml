@@ -1,17 +1,16 @@
 name: Deploy Research OS Home
 
 on:
-  workflow_dispatch:
-  push:
+  workflow_run:
+    workflows:
+      - Research OS Flutter
+    types:
+      - completed
     branches:
       - main
-    paths:
-      - "apps/research_os_flutter/**"
-      - "tools/research_os_api/**"
-      - "render.yaml"
-      - ".github/workflows/research-os-pages.yml"
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -20,50 +19,29 @@ concurrency:
   group: research-os-pages
   cancel-in-progress: true
 
-env:
-  RESEARCH_OS_PUBLIC_API_URL: ${{ vars.RESEARCH_OS_PUBLIC_API_URL || 'https://research-os-api-phakphoum.onrender.com' }}
-
 jobs:
-  build:
-    name: Build Flutter web
+  deploy:
+    name: Publish validated web artifact
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: apps/research_os_flutter
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - name: Download Pages-ready Flutter artifact
+        uses: actions/download-artifact@v4
         with:
-          channel: stable
-          cache: true
+          name: research-os-web-pages
+          path: site
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
 
-      - name: Generate web platform shell
-        run: flutter create --platforms=web --project-name=research_os_flutter .
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze
-
-      - name: Test
-        run: flutter test
-
-      - name: Verify production API target
+      - name: Verify web artifact
         run: |
-          echo "Research OS public API: ${RESEARCH_OS_PUBLIC_API_URL}"
-          test "${RESEARCH_OS_PUBLIC_API_URL}" = "https://research-os-api-phakphoum.onrender.com"
-
-      - name: Build web for GitHub Pages
-        run: >-
-          flutter build web --release
-          --base-href "/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH/"
-          --dart-define=RESEARCH_OS_API_BASE_URL=${RESEARCH_OS_PUBLIC_API_URL}
+          test -s site/index.html
+          test -s site/main.dart.js
 
       - name: Configure and enable Pages
         uses: actions/configure-pages@v5
@@ -73,17 +51,8 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: apps/research_os_flutter/build/web
+          path: site
 
-  deploy:
-    name: Publish home
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
