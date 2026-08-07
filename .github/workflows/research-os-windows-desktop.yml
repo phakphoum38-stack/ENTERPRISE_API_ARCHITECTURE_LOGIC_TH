@@ -8,12 +8,14 @@ on:
     paths:
       - "apps/research_os_flutter/**"
       - "tools/research_os_api/**"
+      - "tools/research_os_service/**"
       - "scripts/*research-os*.ps1"
       - ".github/workflows/research-os-windows-desktop.yml"
   pull_request:
     paths:
       - "apps/research_os_flutter/**"
       - "tools/research_os_api/**"
+      - "tools/research_os_service/**"
       - "scripts/*research-os*.ps1"
       - ".github/workflows/research-os-windows-desktop.yml"
 
@@ -28,7 +30,7 @@ jobs:
   windows-foundation:
     name: Windows local-first foundation
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout repository
@@ -38,6 +40,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
 
       - name: Validate PowerShell scripts
         shell: pwsh
@@ -50,7 +57,8 @@ jobs:
             "scripts/backup-research-os.ps1",
             "scripts/restore-research-os.ps1",
             "scripts/enable-research-os-autostart.ps1",
-            "scripts/disable-research-os-autostart.ps1"
+            "scripts/disable-research-os-autostart.ps1",
+            "scripts/research-os-service.ps1"
           )
           foreach ($script in $scripts) {
             [void][scriptblock]::Create((Get-Content $script -Raw))
@@ -103,6 +111,52 @@ jobs:
           Start-Sleep -Milliseconds 500
           if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) {
             throw "Local API was still listening after stop"
+          }
+
+      - name: Publish Research OS ServiceHost
+        shell: pwsh
+        run: |
+          dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:PublishTrimmed=false `
+            -o tools/research_os_service/publish
+          if (-not (Test-Path "tools/research_os_service/publish/ResearchOS.ServiceHost.exe")) {
+            throw "ServiceHost executable was not produced"
+          }
+
+      - name: Test Windows Service install recovery start and stop
+        shell: pwsh
+        run: |
+          try {
+            ./scripts/research-os-service.ps1 -Action install -DataDir "$env:RUNNER_TEMP\ResearchOSServiceData"
+            ./scripts/research-os-service.ps1 -Action status -DataDir "$env:RUNNER_TEMP\ResearchOSServiceData"
+
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+                if ($health.status -eq "ok") { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 500 }
+            }
+            if (-not $ready) { throw "Windows Service API did not become ready" }
+
+            $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
+            if (-not $service -or $service.State -ne 'Running') {
+              throw "ResearchOSService is not running"
+            }
+
+            $failure = sc.exe qfailure ResearchOSService | Out-String
+            if ($failure -notmatch 'RESTART') {
+              throw "ResearchOSService recovery restart policy is missing"
+            }
+
+            ./scripts/research-os-service.ps1 -Action restart -DataDir "$env:RUNNER_TEMP\ResearchOSServiceData"
+            ./scripts/research-os-service.ps1 -Action stop -DataDir "$env:RUNNER_TEMP\ResearchOSServiceData"
+          }
+          finally {
+            if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+              ./scripts/research-os-service.ps1 -Action uninstall -DataDir "$env:RUNNER_TEMP\ResearchOSServiceData"
+            }
           }
 
       - name: Test backup and restore
@@ -162,11 +216,19 @@ jobs:
         working-directory: apps/research_os_flutter
         run: flutter build windows --release
 
-      - name: Upload Windows build
+      - name: Upload Windows desktop build
         uses: actions/upload-artifact@v4
         with:
           name: research-os-windows-${{ github.run_number }}
           path: apps/research_os_flutter/build/windows/x64/runner/Release/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload ServiceHost build
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-service-host-${{ github.run_number }}
+          path: tools/research_os_service/publish/
           if-no-files-found: error
           retention-days: 14
 
@@ -180,8 +242,11 @@ jobs:
           - Local-first setup: validated
           - Local API tests: validated when job succeeds
           - Local API start/status/stop: validated when job succeeds
+          - Native Windows ServiceHost: published when job succeeds
+          - Windows Service install/start/restart/stop/uninstall: validated when job succeeds
+          - Windows Service recovery policy: validated when job succeeds
           - Backup/restore: validated when job succeeds
-          - Autostart enable/disable: validated when job succeeds
+          - Legacy autostart fallback: validated when job succeeds
           - Flutter Windows build: validated when job succeeds
           - Secrets are not embedded in the desktop artifact
           "@ | Add-Content $env:GITHUB_STEP_SUMMARY
