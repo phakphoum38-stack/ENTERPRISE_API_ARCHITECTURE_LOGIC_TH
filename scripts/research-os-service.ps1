@@ -38,6 +38,23 @@ function Wait-ServiceState([string]$Desired, [int]$Seconds = 20) {
   throw "Service did not reach state $Desired within $Seconds seconds."
 }
 
+function Set-ServiceEnvironment([string]$PythonPath) {
+  $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
+  if (-not (Test-Path $serviceKey)) {
+    throw "Windows Service registry key was not created: $serviceKey"
+  }
+
+  $values = @(
+    "RESEARCH_OS_REPO_ROOT=$RepoRoot",
+    "RESEARCH_OS_DATA_DIR=$DataDir",
+    "RESEARCH_OS_PYTHON_EXE=$PythonPath",
+    'RESEARCH_OS_API_HOST=0.0.0.0',
+    'RESEARCH_OS_API_PORT=8787'
+  )
+
+  New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $values -Force | Out-Null
+}
+
 switch ($Action) {
   'status' {
     $svc = Get-ServiceSafe
@@ -91,6 +108,9 @@ switch ($Action) {
     New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'artifacts') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'backups') | Out-Null
 
+    # Keep machine-level values for local tools launched outside the service.
+    # The service itself receives a dedicated Environment REG_MULTI_SZ below,
+    # so installer correctness does not depend on services.exe refreshing global environment variables.
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_REPO_ROOT', $RepoRoot, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_DATA_DIR', $DataDir, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_PYTHON_EXE', $python, 'Machine')
@@ -115,6 +135,7 @@ switch ($Action) {
     sc.exe config $ServiceName start= delayed-auto | Out-Null
     sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
     sc.exe failureflag $ServiceName 1 | Out-Null
+    Set-ServiceEnvironment -PythonPath $python
 
     Start-Service -Name $ServiceName
     Wait-ServiceState 'Running' | Out-Null
