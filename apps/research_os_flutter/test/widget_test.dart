@@ -115,7 +115,9 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: HomePage(apiClient: FakeResearchOSApiClient())));
+    await tester.pumpWidget(
+      MaterialApp(home: HomePage(apiClient: FakeResearchOSApiClient())),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('บ้านของเรา'), findsOneWidget);
@@ -130,12 +132,19 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(navigationRailLabel('AI Chat'));
     await tester.pump();
-    await tester.enterText(find.byType(TextField).first, 'บ้านเรามีความรู้อะไรบ้าง');
+    await tester.enterText(
+      find.byType(TextField).first,
+      'บ้านเรามีความรู้อะไรบ้าง',
+    );
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -148,7 +157,11 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(navigationRailLabel('ห้องสมุด'));
@@ -164,15 +177,20 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(navigationRailLabel('แผนผัง'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('แผนผังความรู้'), findsOneWidget);
+    expect(find.byKey(const Key('knowledge-graph-heading')), findsOneWidget);
     expect(find.text('Research Memory'), findsOneWidget);
-    expect(find.text('Knowledge Graph'), findsOneWidget);
+    expect(find.text('Knowledge Graph'), findsWidgets);
     expect(find.text('RES-A → RES-B'), findsOneWidget);
     expect(find.text('ประเภท: supports'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -182,7 +200,11 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(navigationRailLabel('GitHub'));
