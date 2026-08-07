@@ -37,10 +37,7 @@ Future<LocalApiCommandResult> _runScript(
   List<String> args = const <String>[],
 }) async {
   if (!Platform.isWindows) {
-    return const LocalApiCommandResult(
-      ok: false,
-      message: 'รองรับเฉพาะ Windows Desktop',
-    );
+    return const LocalApiCommandResult(ok: false, message: 'รองรับเฉพาะ Windows Desktop');
   }
 
   final root = await _findRepoRoot();
@@ -54,11 +51,7 @@ Future<LocalApiCommandResult> _runScript(
 
   final scriptPath = '${root.path}${Platform.pathSeparator}scripts${Platform.pathSeparator}$script';
   if (!await File(scriptPath).exists()) {
-    return LocalApiCommandResult(
-      ok: false,
-      message: 'ไม่พบ $script',
-      details: scriptPath,
-    );
+    return LocalApiCommandResult(ok: false, message: 'ไม่พบ $script', details: scriptPath);
   }
 
   try {
@@ -79,18 +72,53 @@ Future<LocalApiCommandResult> _runScript(
     );
     final stdoutText = result.stdout.toString().trim();
     final stderrText = result.stderr.toString().trim();
-    final detail = <String>[stdoutText, stderrText]
-        .where((value) => value.isNotEmpty)
-        .join('\n');
+    final detail = <String>[stdoutText, stderrText].where((value) => value.isNotEmpty).join('\n');
     return LocalApiCommandResult(
       ok: result.exitCode == 0,
       message: result.exitCode == 0 ? 'สำเร็จ' : 'คำสั่งไม่สำเร็จ',
       details: detail,
     );
   } on Object catch (error) {
+    return LocalApiCommandResult(ok: false, message: 'เรียก Local API Manager ไม่สำเร็จ', details: error.toString());
+  }
+}
+
+Future<LocalApiCommandResult> _runElevatedServiceAction(String action) async {
+  if (!Platform.isWindows) {
+    return const LocalApiCommandResult(ok: false, message: 'รองรับเฉพาะ Windows Desktop');
+  }
+  final root = await _findRepoRoot();
+  if (root == null) {
+    return const LocalApiCommandResult(ok: false, message: 'หาโฟลเดอร์ Research OS ไม่พบ');
+  }
+  final scriptPath = '${root.path}${Platform.pathSeparator}scripts${Platform.pathSeparator}research-os-service.ps1';
+  if (!await File(scriptPath).exists()) {
+    return LocalApiCommandResult(ok: false, message: 'ไม่พบ Research OS Service Manager', details: scriptPath);
+  }
+
+  final escapedScript = scriptPath.replaceAll("'", "''");
+  final escapedData = _dataDir().replaceAll("'", "''");
+  final argumentList = "'-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File','$escapedScript','-Action','$action','-DataDir','$escapedData'";
+  final command = "Start-Process powershell.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList $argumentList -PassThru | Select-Object -ExpandProperty ExitCode";
+
+  try {
+    final result = await Process.run(
+      'powershell.exe',
+      <String>['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command],
+      workingDirectory: root.path,
+    );
+    final output = result.stdout.toString().trim();
+    final error = result.stderr.toString().trim();
+    final exitCode = int.tryParse(output.split(RegExp(r'\s+')).last) ?? result.exitCode;
+    return LocalApiCommandResult(
+      ok: exitCode == 0,
+      message: exitCode == 0 ? 'Service $action สำเร็จ' : 'Service $action ไม่สำเร็จ',
+      details: <String>[output, error].where((value) => value.isNotEmpty).join('\n'),
+    );
+  } on Object catch (error) {
     return LocalApiCommandResult(
       ok: false,
-      message: 'เรียก Local API Manager ไม่สำเร็จ',
+      message: 'เปิดสิทธิ์ Administrator สำหรับ Service ไม่สำเร็จ',
       details: error.toString(),
     );
   }
@@ -118,6 +146,17 @@ Future<LocalApiCommandResult> enableAutostart() => _runScript(
 Future<LocalApiCommandResult> disableAutostart() =>
     _runScript('disable-research-os-autostart.ps1');
 
+Future<LocalApiCommandResult> serviceStatus() => _runScript(
+      'research-os-service.ps1',
+      args: <String>['-Action', 'status', '-DataDir', _dataDir()],
+    );
+
+Future<LocalApiCommandResult> installService() => _runElevatedServiceAction('install');
+Future<LocalApiCommandResult> uninstallService() => _runElevatedServiceAction('uninstall');
+Future<LocalApiCommandResult> startService() => _runElevatedServiceAction('start');
+Future<LocalApiCommandResult> stopService() => _runElevatedServiceAction('stop');
+Future<LocalApiCommandResult> restartService() => _runElevatedServiceAction('restart');
+
 Future<LocalApiCommandResult> openDataFolder() async {
   if (!Platform.isWindows) {
     return const LocalApiCommandResult(ok: false, message: 'รองรับเฉพาะ Windows Desktop');
@@ -132,10 +171,6 @@ Future<LocalApiCommandResult> openDataFolder() async {
       details: dir.path,
     );
   } on Object catch (error) {
-    return LocalApiCommandResult(
-      ok: false,
-      message: 'เปิดโฟลเดอร์ไม่สำเร็จ',
-      details: error.toString(),
-    );
+    return LocalApiCommandResult(ok: false, message: 'เปิดโฟลเดอร์ไม่สำเร็จ', details: error.toString());
   }
 }
