@@ -13,8 +13,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
+from memory import build_context, search_memory
 from providers import ProviderError, build_provider
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,7 +41,7 @@ def _json_bytes(payload: Any) -> bytes:
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
-    server_version = "ResearchOSAPI/0.1"
+    server_version = "ResearchOSAPI/0.2"
 
     def _send(self, status: int, payload: Any) -> None:
         body = _json_bytes(payload)
@@ -80,16 +81,47 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         return value
 
     def do_GET(self) -> None:  # noqa: N802
-        path = urlsplit(self.path).path
+        parsed = urlsplit(self.path)
+        path = parsed.path
         try:
             if path in STATIC_ROUTES:
                 self._send_static(STATIC_ROUTES[path])
                 return
             if path == "/health":
-                self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-api", "version": "0.1.0", "ui": WEB_DIR.is_dir()})
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "status": "ok",
+                        "service": "research-os-api",
+                        "version": "0.2.0",
+                        "ui": WEB_DIR.is_dir(),
+                        "memory": True,
+                    },
+                )
                 return
             if path == "/v1/providers":
-                self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"],
+                        "active": os.getenv("RESEARCH_OS_PROVIDER", "mock"),
+                    },
+                )
+                return
+            if path == "/v1/memory/search":
+                params = parse_qs(parsed.query)
+                query = str(params.get("q", [""])[0]).strip()
+                if not query:
+                    raise ValueError("q is required")
+                try:
+                    limit = int(params.get("limit", ["5"])[0])
+                except ValueError as exc:
+                    raise ValueError("limit must be an integer") from exc
+                hits = search_memory(ARTIFACT_DIR, query, limit)
+                self._send(
+                    HTTPStatus.OK,
+                    {"query": query, "count": len(hits), "hits": hits, "source": "research/artifacts"},
+                )
                 return
             if path == "/v1/knowledge/artifacts":
                 self._send(HTTPStatus.OK, {"artifacts": self._artifact_index()})
@@ -100,6 +132,8 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, knowledge_ops.graph_payload(artifacts))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+        except ValueError as exc:
+            self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
@@ -111,14 +145,55 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 prompt = str(body.get("prompt", "")).strip()
                 if not prompt:
                     raise ValueError("prompt is required")
-                result = build_provider(body.get("provider")).generate(prompt, system=str(body.get("system", "")), model=body.get("model"))
-                self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "session_id": body.get("session_id")})
+                result = build_provider(body.get("provider")).generate(
+                    prompt,
+                    system=str(body.get("system", "")),
+                    model=body.get("model"),
+                )
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "provider": result.provider,
+                        "model": result.model,
+                        "text": result.text,
+                        "session_id": body.get("session_id"),
+                    },
+                )
+                return
+            if path == "/v1/ai/answer-with-memory":
+                question = str(body.get("question", "")).strip()
+                if not question:
+                    raise ValueError("question is required")
+                limit = int(body.get("limit", 5))
+                hits = search_memory(ARTIFACT_DIR, question, limit)
+                context = build_context(hits)
+                system = (
+                    "Answer using the supplied Research OS memory. Distinguish stored facts from inference. "
+                    "When memory is insufficient, say so. Do not invent artifact contents."
+                )
+                prompt = f"Memory:\n{context or '(no matching memory)'}\n\nQuestion:\n{question}"
+                result = build_provider(body.get("provider")).generate(
+                    prompt,
+                    system=system,
+                    model=body.get("model"),
+                )
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "provider": result.provider,
+                        "model": result.model,
+                        "text": result.text,
+                        "memory_hits": hits,
+                        "memory_count": len(hits),
+                        "session_id": body.get("session_id"),
+                    },
+                )
                 return
             if path == "/v1/conversations/analyze":
                 self._send(HTTPStatus.OK, self._analyze_conversation(body))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
@@ -136,8 +211,21 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         curator = _load_module("research_os_curator", CURATOR_PATH)
         normalized = curator._normalize_source(source)
         relationships = [curator._parse_relationship(item) for item in body.get("relationships", [])]
-        artifact = curator._deterministic_extract(normalized, str(body.get("title", "Research Session")), str(body.get("status", "hypothesis")), [str(x) for x in body.get("tags", [])], [str(x) for x in body.get("evidence", [])], relationships, ARTIFACT_DIR)
-        return {"artifact": curator.asdict(artifact), "accepted": artifact.quality_score >= int(body.get("min_quality", 20)), "persisted": False, "note": "API analysis is preview-only; persistence requires explicit Git workflow."}
+        artifact = curator._deterministic_extract(
+            normalized,
+            str(body.get("title", "Research Session")),
+            str(body.get("status", "hypothesis")),
+            [str(x) for x in body.get("tags", [])],
+            [str(x) for x in body.get("evidence", [])],
+            relationships,
+            ARTIFACT_DIR,
+        )
+        return {
+            "artifact": curator.asdict(artifact),
+            "accepted": artifact.quality_score >= int(body.get("min_quality", 20)),
+            "persisted": False,
+            "note": "API analysis is preview-only; persistence requires explicit Git workflow.",
+        }
 
     @staticmethod
     def _artifact_index() -> list[dict[str, str]]:
@@ -154,7 +242,14 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                         if ":" in line:
                             key, value = line.split(":", 1)
                             metadata[key.strip()] = value.strip().strip('"')
-            results.append({"artifact_id": metadata.get("artifact_id", path.stem), "title": metadata.get("title", ""), "status": metadata.get("status", ""), "path": str(path.relative_to(ROOT))})
+            results.append(
+                {
+                    "artifact_id": metadata.get("artifact_id", path.stem),
+                    "title": metadata.get("title", ""),
+                    "status": metadata.get("status", ""),
+                    "path": str(path.relative_to(ROOT)),
+                }
+            )
         return results
 
     def log_message(self, fmt: str, *args: Any) -> None:
