@@ -283,6 +283,39 @@ jobs:
           $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
           if (-not $setup) { throw "Installer missing" }
 
+          Write-Host "=== PORT 8787 BEFORE INSTALL ==="
+
+          $connections = Get-NetTCPConnection `
+            -LocalPort 8787 `
+            -State Listen `
+            -ErrorAction SilentlyContinue
+
+          if ($connections) {
+            $connections | Format-Table -AutoSize
+
+            foreach ($connection in $connections) {
+              $pidToStop = $connection.OwningProcess
+              Write-Host "Stopping stale port 8787 process PID $pidToStop"
+
+              Stop-Process `
+                -Id $pidToStop `
+                -Force `
+                -ErrorAction SilentlyContinue
+            }
+
+            Start-Sleep -Seconds 2
+          }
+
+          $remaining = Get-NetTCPConnection `
+            -LocalPort 8787 `
+            -State Listen `
+            -ErrorAction SilentlyContinue
+
+          if ($remaining) {
+            $remaining | Format-Table -AutoSize
+            throw "Port 8787 still has stale listeners before installer validation"
+          }
+
           $installLog = "$env:RUNNER_TEMP\research-os-install.log"
           $process = Start-Process `
             -FilePath $setup.FullName `
