@@ -54,6 +54,11 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Verify production API target
+        run: |
+          echo "Research OS public API: ${RESEARCH_OS_PUBLIC_API_URL}"
+          test "${RESEARCH_OS_PUBLIC_API_URL}" = "https://research-os-api-phakphoum.onrender.com"
+
       - name: Build web for GitHub Pages
         run: >-
           flutter build web --release
