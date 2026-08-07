@@ -61,6 +61,44 @@ class ResearchOSApiClient {
     });
   }
 
+  Future<Map<String, dynamic>> getCloudConversations(String syncKey) async {
+    final response = await _client.get(
+      _uri('/v1/conversations/cloud'),
+      headers: <String, String>{'X-Research-OS-Sync-Key': syncKey},
+    );
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> syncCloudConversation(
+    String syncKey,
+    Map<String, Object?> session,
+  ) async {
+    final response = await _client.post(
+      _uri('/v1/conversations/cloud/sync'),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'X-Research-OS-Sync-Key': syncKey,
+      },
+      body: jsonEncode(<String, Object?>{'session': session}),
+    );
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> deleteCloudConversation(
+    String syncKey,
+    String sessionId,
+  ) async {
+    final response = await _client.post(
+      _uri('/v1/conversations/cloud/delete'),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'X-Research-OS-Sync-Key': syncKey,
+      },
+      body: jsonEncode(<String, Object?>{'session_id': sessionId}),
+    );
+    return _decode(response);
+  }
+
   Future<Map<String, dynamic>> _getJson(String path) async {
     final response = await _client.get(_uri(path));
     return _decode(response);
