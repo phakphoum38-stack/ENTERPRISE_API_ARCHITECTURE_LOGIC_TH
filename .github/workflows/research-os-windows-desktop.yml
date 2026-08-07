@@ -57,10 +57,11 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/setup-research-os-windows.ps1 -Root "$env:RUNNER_TEMP\ResearchOS" -DataDir "$env:RUNNER_TEMP\ResearchOSData"
-          Test-Path "$env:RUNNER_TEMP\ResearchOSData\database" | Should -BeTrue
-          Test-Path "$env:RUNNER_TEMP\ResearchOSData\sessions" | Should -BeTrue
-          Test-Path "$env:RUNNER_TEMP\ResearchOSData\artifacts" | Should -BeTrue
-          Test-Path "$env:RUNNER_TEMP\ResearchOSData\backups" | Should -BeTrue
+          $required = @("database", "sessions", "artifacts", "backups")
+          foreach ($name in $required) {
+            $path = Join-Path "$env:RUNNER_TEMP\ResearchOSData" $name
+            if (-not (Test-Path $path)) { throw "Missing local-first directory: $path" }
+          }
 
       - name: Compile Research OS API
         shell: pwsh
