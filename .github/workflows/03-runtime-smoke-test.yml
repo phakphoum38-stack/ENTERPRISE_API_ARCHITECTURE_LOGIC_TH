@@ -1,0 +1,98 @@
+name: Research OS Runtime Smoke Test
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Research OS Build Service Host"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  runtime-smoke:
+    name: Runtime and service smoke test
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      SOURCE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download ServiceHost from upstream run
+        if: github.event_name == 'workflow_run'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path tools/research_os_service/publish | Out-Null
+          gh run download "$env:SOURCE_RUN_ID" --repo "${{ github.repository }}" --name "research-os-service-host-$env:TARGET_SHA" --dir tools/research_os_service/publish
+          if (-not (Test-Path "tools/research_os_service/publish/ResearchOS.ServiceHost.exe")) {
+            throw "Downloaded ServiceHost executable is missing"
+          }
+
+      - name: Build ServiceHost for manual run
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o tools/research_os_service/publish
+
+      - name: Test local API start status and stop
+        shell: pwsh
+        env:
+          RESEARCH_OS_SYNC_KEY: windows-ci-test-key
+        run: |
+          ./scripts/setup-research-os-windows.ps1 -Root "$env:RUNNER_TEMP\ResearchOS" -DataDir "$env:RUNNER_TEMP\ResearchOSData"
+          ./scripts/start-research-os-local.ps1 -DataDir "$env:RUNNER_TEMP\ResearchOSData" -Provider mock -Port 8787 -Background
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+                if ($health.status -eq "ok") { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 500 }
+            }
+            if (-not $ready) { throw "Local API did not become ready" }
+            ./scripts/status-research-os-local.ps1 -Port 8787 -HealthUrl "http://127.0.0.1:8787/health"
+          }
+          finally {
+            ./scripts/stop-research-os-local.ps1 -Port 8787 -PidFile "$env:RUNNER_TEMP\ResearchOSData\run\research-os-api.pid" -ErrorAction SilentlyContinue
+          }
+
+      - name: Test Windows Service install health restart stop and uninstall
+        shell: pwsh
+        run: |
+          $data = "$env:RUNNER_TEMP\ResearchOSServiceData"
+          try {
+            ./scripts/research-os-service.ps1 -Action install -DataDir $data
+            $ready = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+                if ($health.status -eq "ok") { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 500 }
+            }
+            if (-not $ready) { throw "Windows Service API did not become ready" }
+            $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
+            if (-not $service -or $service.State -ne 'Running') { throw "ResearchOSService is not running" }
+            ./scripts/research-os-service.ps1 -Action restart -DataDir $data
+            ./scripts/research-os-service.ps1 -Action stop -DataDir $data
+          }
+          finally {
+            if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+              ./scripts/research-os-service.ps1 -Action uninstall -DataDir $data
+            }
+          }
