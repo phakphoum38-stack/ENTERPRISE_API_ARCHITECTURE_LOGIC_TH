@@ -19,7 +19,11 @@ class ProviderReadiness:
 
 REQUIREMENTS = {
     "mock": (),
-    "openai-compatible": ("RESEARCH_OS_OPENAI_ENDPOINT", "RESEARCH_OS_OPENAI_MODEL"),
+    "openai-compatible": (
+        "RESEARCH_OS_OPENAI_API_KEY",
+        "RESEARCH_OS_OPENAI_ENDPOINT",
+        "RESEARCH_OS_OPENAI_MODEL",
+    ),
     "local": ("RESEARCH_OS_OPENAI_ENDPOINT", "RESEARCH_OS_OPENAI_MODEL"),
     "anthropic": ("RESEARCH_OS_ANTHROPIC_API_KEY", "RESEARCH_OS_ANTHROPIC_MODEL"),
     "gemini": ("RESEARCH_OS_GEMINI_API_KEY", "RESEARCH_OS_GEMINI_MODEL"),
