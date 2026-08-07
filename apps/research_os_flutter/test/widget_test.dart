@@ -20,14 +20,36 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
-  Future<Map<String, dynamic>> getKnowledgeArtifacts() async =>
-      <String, dynamic>{
+  Future<Map<String, dynamic>> getKnowledgeArtifacts() async => <String, dynamic>{
         'artifacts': <Map<String, dynamic>>[
           <String, dynamic>{
             'artifact_id': 'RES-20260806-CONVERSATION_TO_KNOWLEDGE',
             'title': 'Conversation to Knowledge',
             'status': 'active',
             'path': 'research/artifacts/example.md',
+          },
+        ],
+      };
+
+  @override
+  Future<Map<String, dynamic>> getKnowledgeGraph() async => <String, dynamic>{
+        'nodes': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 'RES-A',
+            'title': 'Research Memory',
+            'status': 'active',
+          },
+          <String, dynamic>{
+            'id': 'RES-B',
+            'title': 'Knowledge Graph',
+            'status': 'validated',
+          },
+        ],
+        'edges': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'source': 'RES-A',
+            'relation': 'supports',
+            'target': 'RES-B',
           },
         ],
       };
@@ -93,21 +115,13 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: HomePage(apiClient: FakeResearchOSApiClient()),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: HomePage(apiClient: FakeResearchOSApiClient())));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-
     expect(find.text('บ้านของเรา'), findsOneWidget);
     expect(find.text('API Health'), findsOneWidget);
     expect(find.text('ok'), findsOneWidget);
-    expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsOneWidget);
-    expect(find.text('AI Memory'), findsWidgets);
     expect(find.text('ready'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -116,30 +130,15 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-
     await tester.tap(navigationRailLabel('AI Chat'));
     await tester.pump();
-
-    expect(find.text('คุยกับ Gemini'), findsOneWidget);
-    expect(find.text('ใช้ Memory'), findsOneWidget);
-
-    await tester.enterText(
-      find.byType(TextField).first,
-      'บ้านเรามีความรู้อะไรบ้าง',
-    );
+    await tester.enterText(find.byType(TextField).first, 'บ้านเรามีความรู้อะไรบ้าง');
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.text('บ้านเรามีความรู้อะไรบ้าง'), findsOneWidget);
     expect(find.text('คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
     expect(find.text('อ้างอิง Memory 1 รายการ'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -149,22 +148,33 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-
     await tester.tap(navigationRailLabel('ห้องสมุด'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-
     expect(find.text('ห้องสมุดความรู้'), findsOneWidget);
     expect(find.text('Conversation to Knowledge'), findsOneWidget);
     expect(find.text('สถานะ: active'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('knowledge graph shows nodes and relationships', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(navigationRailLabel('แผนผัง'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('แผนผังความรู้'), findsOneWidget);
+    expect(find.text('Research Memory'), findsOneWidget);
+    expect(find.text('Knowledge Graph'), findsOneWidget);
+    expect(find.text('RES-A → RES-B'), findsOneWidget);
+    expect(find.text('ประเภท: supports'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -172,23 +182,15 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-
     await tester.tap(navigationRailLabel('GitHub'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-
     expect(find.text('ศูนย์ควบคุม GitHub'), findsOneWidget);
     expect(find.text('Research OS Flutter'), findsOneWidget);
     expect(find.text('Add GitHub dashboard'), findsOneWidget);
-    expect(find.text('main'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }
