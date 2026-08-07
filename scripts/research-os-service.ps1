@@ -10,6 +10,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $RepoRoot 'tools\research_os_service\ResearchOS.ServiceHost.csproj'
 $PublishDir = Join-Path $RepoRoot 'tools\research_os_service\publish'
 $ServiceExe = Join-Path $PublishDir 'ResearchOS.ServiceHost.exe'
+$BundledPython = Join-Path $RepoRoot 'runtime\python\python.exe'
 
 function Test-Admin {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -55,14 +56,13 @@ switch ($Action) {
   'install' {
     Require-Admin
 
-    if (-not (Test-Path $Project)) {
-      throw "Service project not found: $Project"
-    }
-
     if (-not (Test-Path $ServiceExe)) {
+      if (-not (Test-Path $Project)) {
+        throw "ServiceHost binary/project not found under: $RepoRoot"
+      }
       $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
       if (-not $dotnet) {
-        throw 'ServiceHost binary is missing and .NET SDK is not installed. Use a packaged Research OS installer or install .NET SDK to build from source.'
+        throw 'ServiceHost binary is missing and .NET SDK is not installed. Use the packaged Research OS installer.'
       }
       New-Item -ItemType Directory -Force -Path $PublishDir | Out-Null
       & $dotnet.Source publish $Project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o $PublishDir
@@ -71,11 +71,25 @@ switch ($Action) {
       }
     }
 
-    $python = (Get-Command python.exe -ErrorAction SilentlyContinue).Source
-    if (-not $python) { throw 'python.exe was not found. Install Python or use the packaged runtime.' }
+    if (Test-Path $BundledPython) {
+      $python = $BundledPython
+      Write-Host "Using bundled Python runtime: $python"
+    }
+    else {
+      $pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
+      if (-not $pythonCommand) {
+        throw 'Python runtime was not found. Install using the packaged Research OS installer or install Python for development mode.'
+      }
+      $python = $pythonCommand.Source
+      Write-Host "Using system Python runtime: $python"
+    }
 
     New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'logs') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'sessions') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'database') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'artifacts') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'backups') | Out-Null
 
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_REPO_ROOT', $RepoRoot, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_DATA_DIR', $DataDir, 'Machine')
@@ -109,6 +123,7 @@ switch ($Action) {
     Write-Host "Service : $ServiceName"
     Write-Host "API     : http://127.0.0.1:8787"
     Write-Host "Data    : $DataDir"
+    Write-Host "Runtime : $python"
     Write-Host 'Recovery: restart after 5s, 10s, then 30s'
   }
 
