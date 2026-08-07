@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api/research_os_api_client.dart';
+import 'features/agents/agent_center_page.dart';
 import 'features/chat/chat_page.dart';
 import 'features/github/github_dashboard_page.dart';
 import 'features/google_workspace/google_workspace_page.dart';
@@ -36,6 +37,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
   static const _workspaceTitles = <String>[
     'Home Dashboard',
     'AI Workspace',
+    'Agent Center',
     'Knowledge Library',
     'Knowledge Graph',
     'GitHub Control Center',
@@ -50,6 +52,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
     final pages = <Widget>[
       HomePage(apiClient: widget.apiClient),
       ChatPage(apiClient: widget.apiClient),
+      const AgentCenterPage(),
       LibraryPage(apiClient: widget.apiClient),
       KnowledgeGraphPage(apiClient: widget.apiClient),
       GitHubDashboardPage(apiClient: widget.apiClient),
@@ -68,6 +71,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
     const railDestinations = <NavigationRailDestination>[
       NavigationRailDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: Text('บ้าน')),
       NavigationRailDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: Text('AI Chat')),
+      NavigationRailDestination(icon: Icon(Icons.smart_toy_outlined), selectedIcon: Icon(Icons.smart_toy), label: Text('Agents')),
       NavigationRailDestination(icon: Icon(Icons.local_library_outlined), selectedIcon: Icon(Icons.local_library), label: Text('ห้องสมุด')),
       NavigationRailDestination(icon: Icon(Icons.hub_outlined), selectedIcon: Icon(Icons.hub), label: Text('แผนผัง')),
       NavigationRailDestination(icon: Icon(Icons.account_tree_outlined), selectedIcon: Icon(Icons.account_tree), label: Text('GitHub')),
@@ -80,6 +84,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
     const barDestinations = <NavigationDestination>[
       NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'บ้าน'),
       NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'AI'),
+      NavigationDestination(icon: Icon(Icons.smart_toy_outlined), selectedIcon: Icon(Icons.smart_toy), label: 'Agents'),
       NavigationDestination(icon: Icon(Icons.local_library_outlined), selectedIcon: Icon(Icons.local_library), label: 'Library'),
       NavigationDestination(icon: Icon(Icons.hub_outlined), selectedIcon: Icon(Icons.hub), label: 'Graph'),
       NavigationDestination(icon: Icon(Icons.account_tree_outlined), selectedIcon: Icon(Icons.account_tree), label: 'GitHub'),
@@ -145,7 +150,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
             actions: <Widget>[
               IconButton(
                 tooltip: 'System Monitor',
-                onPressed: () => setState(() => _selectedIndex = 7),
+                onPressed: () => setState(() => _selectedIndex = 8),
                 icon: const Icon(Icons.monitor_heart_outlined),
               ),
             ],
@@ -236,6 +241,10 @@ class _DesktopStatusBar extends StatelessWidget {
           SizedBox(width: 6),
           Text('Research OS Workspace'),
           Spacer(),
+          Icon(Icons.smart_toy_outlined, size: 16),
+          SizedBox(width: 4),
+          Text('Agents'),
+          SizedBox(width: 14),
           Icon(Icons.memory, size: 16),
           SizedBox(width: 4),
           Text('Memory'),
