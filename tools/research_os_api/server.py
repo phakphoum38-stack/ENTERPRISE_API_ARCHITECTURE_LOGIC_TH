@@ -15,6 +15,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from conversation_store import (
+    authorize as authorize_sync,
+    delete_session as delete_cloud_session,
+    list_sessions as list_cloud_sessions,
+    sync_configured,
+    upsert_session as upsert_cloud_session,
+)
 from github_status import GitHubStatusError, dashboard as github_dashboard
 from memory import build_context, search_memory
 from providers import ProviderError, build_provider
@@ -43,7 +50,7 @@ def _json_bytes(payload: Any) -> bytes:
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
-    server_version = "ResearchOSAPI/0.3"
+    server_version = "ResearchOSAPI/0.4"
 
     def _send(self, status: int, payload: Any) -> None:
         body = _json_bytes(payload)
@@ -82,6 +89,25 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             raise ValueError("JSON body must be an object")
         return value
 
+    def _authorize_cloud_sync(self) -> bool:
+        if not sync_configured():
+            self._send(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "error": "cloud_sync_not_configured",
+                    "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using cloud conversation sync.",
+                },
+            )
+            return False
+        candidate = self.headers.get("X-Research-OS-Sync-Key")
+        if not authorize_sync(candidate):
+            self._send(
+                HTTPStatus.UNAUTHORIZED,
+                {"error": "invalid_sync_key", "detail": "Cloud sync key is missing or invalid."},
+            )
+            return False
+        return True
+
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         path = parsed.path
@@ -95,10 +121,11 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     {
                         "status": "ok",
                         "service": "research-os-api",
-                        "version": "0.3.0",
+                        "version": "0.4.0",
                         "ui": WEB_DIR.is_dir(),
                         "memory": True,
                         "github": True,
+                        "cloud_sync": sync_configured(),
                     },
                 )
                 return
@@ -108,6 +135,20 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     {
                         "providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"],
                         "active": os.getenv("RESEARCH_OS_PROVIDER", "mock"),
+                    },
+                )
+                return
+            if path == "/v1/conversations/cloud":
+                if not self._authorize_cloud_sync():
+                    return
+                sessions = list_cloud_sessions()
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "sessions": sessions,
+                        "count": len(sessions),
+                        "durability": "ephemeral-json",
+                        "knowledge_persisted": False,
                     },
                 )
                 return
@@ -156,6 +197,29 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = self._read_json()
+            if path == "/v1/conversations/cloud/sync":
+                if not self._authorize_cloud_sync():
+                    return
+                session = body.get("session")
+                if not isinstance(session, dict):
+                    raise ValueError("session must be an object")
+                saved = upsert_cloud_session(session)
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "session": saved,
+                        "synced": True,
+                        "knowledge_persisted": False,
+                    },
+                )
+                return
+            if path == "/v1/conversations/cloud/delete":
+                if not self._authorize_cloud_sync():
+                    return
+                session_id = str(body.get("session_id", "")).strip()
+                deleted = delete_cloud_session(session_id)
+                self._send(HTTPStatus.OK, {"session_id": session_id, "deleted": deleted})
+                return
             if path == "/v1/ai/generate":
                 prompt = str(body.get("prompt", "")).strip()
                 if not prompt:
