@@ -1,4 +1,4 @@
-import 'local_api_manager.dart' show LocalApiCommandResult;
+import 'local_api_types.dart';
 
 const bool supported = false;
 
