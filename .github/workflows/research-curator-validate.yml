@@ -1,13 +1,19 @@
 name: Research OS Validate
 
 on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Research OS Windows Desktop
+    types:
+      - completed
+    branches:
+      - main
   pull_request:
     paths:
       - "apps/research_os_web/**"
       - "research/**"
       - "house/**"
-      - "tools/research_curator/**"
-      - "tools/research_os_api/**"
       - "tools/house_command/**"
       - ".github/workflows/research-curator-validate.yml"
       - ".github/workflows/house-command.yml"
@@ -19,36 +25,40 @@ on:
       - "apps/research_os_web/**"
       - "research/**"
       - "house/**"
-      - "tools/research_curator/**"
-      - "tools/research_os_api/**"
       - "tools/house_command/**"
+      - ".github/workflows/research-curator-validate.yml"
+      - ".github/workflows/house-command.yml"
       - ".github/workflows/provider-smoke.yml"
 
 permissions:
   contents: read
 
+concurrency:
+  group: research-os-validate-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - name: Checkout
+      - name: Checkout validated commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Compile Research OS tools
+      - name: Compile Curator and House tools
         run: |
           python -m py_compile tools/research_curator/curator.py
           python -m py_compile tools/research_curator/knowledge_ops.py
           python -m py_compile tools/research_curator/git_publisher.py
-          python -m py_compile tools/research_os_api/providers.py
-          python -m py_compile tools/research_os_api/provider_readiness.py
-          python -m py_compile tools/research_os_api/provider_smoke.py
-          python -m py_compile tools/research_os_api/server.py
-          python -m py_compile tools/research_os_api/test_e2e.py
           python -m py_compile tools/house_command/house_brain.py
           python -m py_compile tools/house_command/dispatcher.py
 
@@ -63,22 +73,6 @@ jobs:
       - name: Run Research Curator tests
         working-directory: tools/research_curator
         run: python -m unittest test_curator.py test_knowledge_ops.py -v
-
-      - name: Run Research OS API, provider readiness, and E2E tests
-        working-directory: tools/research_os_api
-        env:
-          RESEARCH_OS_PROVIDER: mock
-        run: python -m unittest test_api.py test_provider_readiness.py test_e2e.py -v
-
-      - name: Verify active provider readiness
-        env:
-          RESEARCH_OS_PROVIDER: mock
-        run: python tools/research_os_api/provider_readiness.py
-
-      - name: Run provider smoke test with mock
-        env:
-          RESEARCH_OS_PROVIDER: mock
-        run: python tools/research_os_api/provider_smoke.py
 
       - name: Run House Brain tests
         working-directory: tools/house_command
@@ -103,3 +97,12 @@ jobs:
         run: |
           test -s /tmp/knowledge-graph.json
           test -s /tmp/knowledge-graph.mmd
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "# Research OS Validate — Secondary/Domain"
+            echo "- Generic Research OS API tests removed; owned by main workflow"
+            echo "- Curator, House, research artifacts and Entrance UI checks remain"
+          } >> "$GITHUB_STEP_SUMMARY"
