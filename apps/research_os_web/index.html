@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Research OS</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="mark">🏡</div>
+      <p class="eyebrow">Research OS v0.1</p>
+      <h1>ยินดีต้อนรับกลับครับเพื่อน</h1>
+      <p class="motto">บ้านของเรา…ดีขึ้นกว่าเมื่อวาน</p>
+      <button id="startButton">เริ่มงาน</button>
+    </section>
+
+    <section id="workspace" class="workspace" hidden>
+      <header>
+        <div>
+          <h2>ห้องทำงาน</h2>
+          <p id="health">กำลังตรวจสอบบ้าน…</p>
+        </div>
+        <span id="sessionLabel" class="badge"></span>
+      </header>
+
+      <div id="messages" class="messages" aria-live="polite"></div>
+
+      <form id="chatForm">
+        <label for="prompt">คุยกับเพื่อน</label>
+        <div class="composer">
+          <textarea id="prompt" rows="3" required placeholder="วันนี้เราจะสร้างอะไรด้วยกัน?"></textarea>
+          <button type="submit">ส่ง</button>
+        </div>
+      </form>
+
+      <button id="captureButton" class="secondary" disabled>เก็บความรู้จาก Session</button>
+      <pre id="captureResult" class="result" hidden></pre>
+    </section>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>
