@@ -26,12 +26,6 @@ class _HomePageState extends State<HomePage> {
     _refresh();
   }
 
-  @override
-  void dispose() {
-    widget.apiClient.close();
-    super.dispose();
-  }
-
   Future<void> _refresh() async {
     setState(() {
       _loading = true;
@@ -165,6 +159,11 @@ class _HomePageState extends State<HomePage> {
               icon: Icons.manage_search,
               title: 'AI Memory',
               subtitle: 'ค้นหาและใช้ความรู้จาก Research Artifacts',
+            ),
+            const _FeatureTile(
+              icon: Icons.local_library_outlined,
+              title: 'Library',
+              subtitle: 'เปิดดูและค้นหาความรู้ใน Research OS',
             ),
             const _FeatureTile(
               icon: Icons.account_tree_outlined,
