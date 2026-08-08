@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Research OS API
-  version: 0.1.0
-  description: Provider-agnostic API for conversation analysis, knowledge access, and AI generation.
+  version: 0.9.0-dev.1
+  description: Provider-agnostic API for conversation analysis, knowledge access, AI generation, and Multi-Agent orchestration.
 servers:
   - url: http://127.0.0.1:8787
 paths:
@@ -93,3 +93,100 @@ paths:
       responses:
         "200":
           description: Graph nodes and edges
+  /v1/agents/orchestrations:
+    get:
+      summary: List Multi-Agent orchestration runs
+      responses:
+        "200":
+          description: Orchestration run list
+    post:
+      summary: Create a Multi-Agent orchestration run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective, steps]
+              properties:
+                objective:
+                  type: string
+                  minLength: 1
+                steps:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/DelegatedStepInput'
+      responses:
+        "201":
+          description: Orchestration created
+        "400":
+          description: Invalid orchestration request
+  /v1/agents/orchestrations/{run_id}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get one Multi-Agent orchestration run
+      responses:
+        "200":
+          description: Orchestration run
+        "404":
+          description: Orchestration run not found
+  /v1/agents/orchestrations/{run_id}/execute:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      summary: Execute all currently runnable orchestration steps
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmed:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: Updated orchestration run
+        "404":
+          description: Orchestration run not found
+  /v1/agents/orchestrations/{run_id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      summary: Confirm write-capable tasks waiting at the governance gate
+      responses:
+        "200":
+          description: Confirmed and updated orchestration run
+        "404":
+          description: Orchestration run not found
+components:
+  parameters:
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    DelegatedStepInput:
+      type: object
+      required: [objective]
+      properties:
+        step_id:
+          type: string
+        objective:
+          type: string
+          minLength: 1
+        requested_agent:
+          type: string
+          nullable: true
+        depends_on:
+          type: array
+          items:
+            type: string
+        context:
+          type: object
+          additionalProperties: true
