@@ -1,5 +1,6 @@
 name: Research OS Build Windows App
 
+# Dedicated native build gate: no analyze/test work is duplicated here.
 on:
   workflow_dispatch:
   push:
