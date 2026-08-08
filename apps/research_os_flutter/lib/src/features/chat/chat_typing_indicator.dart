@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 class ChatTypingIndicator extends StatefulWidget {
   const ChatTypingIndicator({
     this.label = 'Research OS กำลังคิด…',
+    this.provider,
     super.key,
   });
 
   final String label;
+  final String? provider;
 
   @override
   State<ChatTypingIndicator> createState() => _ChatTypingIndicatorState();
@@ -34,6 +36,7 @@ class _ChatTypingIndicatorState extends State<ChatTypingIndicator>
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final provider = widget.provider?.trim();
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -51,6 +54,14 @@ class _ChatTypingIndicatorState extends State<ChatTypingIndicator>
             const Icon(Icons.auto_awesome_outlined, size: 16),
             const SizedBox(width: 8),
             Text(widget.label),
+            if (provider != null && provider.isNotEmpty) ...<Widget>[
+              const SizedBox(width: 8),
+              Chip(
+                key: const Key('chat-typing-provider'),
+                visualDensity: VisualDensity.compact,
+                label: Text(provider),
+              ),
+            ],
             const SizedBox(width: 10),
             AnimatedBuilder(
               animation: _controller,
