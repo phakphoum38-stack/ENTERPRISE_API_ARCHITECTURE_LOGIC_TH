@@ -103,6 +103,22 @@ jobs:
           if (-not (Test-Path "$package\app\research_os_flutter.exe")) { throw "Desktop executable missing from package" }
           if (-not (Test-Path "$package\tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) { throw "ServiceHost missing from package" }
 
+      - name: Generate branded installer icon
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pillow
+          python scripts/generate-research-os-icon.py installer/research-os.ico
+          if (-not (Test-Path "installer/research-os.ico")) { throw "Installer icon was not generated" }
+
+      - name: Create portable package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/output | Out-Null
+          $portable = "installer/output/Research-OS-Portable-0.6.0-x64.zip"
+          if (Test-Path $portable) { Remove-Item $portable -Force }
+          Compress-Archive -Path "installer/package/*" -DestinationPath $portable -CompressionLevel Optimal
+          if (-not (Test-Path $portable)) { throw "Portable archive was not produced" }
+
       - name: Install Inno Setup compiler
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -117,12 +133,22 @@ jobs:
           $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
           if (-not $setup) { throw "Research OS Setup EXE was not produced" }
           Write-Host "Installer: $($setup.FullName)"
+          Write-Host "Installer ProductName: $($setup.VersionInfo.ProductName)"
+          Write-Host "Installer FileDescription: $($setup.VersionInfo.FileDescription)"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: research-os-installer-${{ env.TARGET_SHA }}
           path: installer/output/Research-OS-Setup-*-x64.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-portable-${{ env.TARGET_SHA }}
+          path: installer/output/Research-OS-Portable-*-x64.zip
           if-no-files-found: error
           retention-days: 14
 

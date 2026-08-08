@@ -38,21 +38,39 @@ jobs:
           test -n "$run_id" || { echo "No successful installer build found for $TARGET_SHA"; exit 1; }
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
-      - name: Download verified Setup EXE
+      - name: Download verified Setup EXE and portable archive
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p verified-installer
           gh run download "${{ steps.installer-run.outputs.run_id }}" --repo "${{ github.repository }}" --name "research-os-installer-$TARGET_SHA" --dir verified-installer
+          gh run download "${{ steps.installer-run.outputs.run_id }}" --repo "${{ github.repository }}" --name "research-os-portable-$TARGET_SHA" --dir verified-installer
           find verified-installer -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit | grep -q . || { echo "Verified Setup EXE missing"; exit 1; }
+          find verified-installer -maxdepth 1 -name 'Research-OS-Portable-*-x64.zip' -print -quit | grep -q . || { echo "Portable archive missing"; exit 1; }
 
-      - name: Create verification manifest
+      - name: Create verification manifest and checksums
         shell: bash
         run: |
           setup="$(find verified-installer -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
-          sha256sum "$setup" | tee verified-installer/SHA256SUMS.txt
-          printf 'commit=%s\ninstaller_run=%s\nvalidation=passed\n' "$TARGET_SHA" "${{ steps.installer-run.outputs.run_id }}" > verified-installer/VERIFIED.txt
+          portable="$(find verified-installer -maxdepth 1 -name 'Research-OS-Portable-*-x64.zip' -print -quit)"
+          (
+            cd verified-installer
+            sha256sum "$(basename "$setup")" "$(basename "$portable")" | tee SHA256SUMS.txt
+          )
+          printf 'commit=%s\ninstaller_run=%s\nvalidation=passed\nversion=0.6.0\n' "$TARGET_SHA" "${{ steps.installer-run.outputs.run_id }}" > verified-installer/VERIFIED.txt
+          cat > verified-installer/RELEASE_NOTES.md <<EOF
+          # Research OS 0.6.0
+
+          - Verified Windows Setup EXE
+          - Portable Windows x64 package
+          - Branded Research OS application and installer icons
+          - Windows product/version metadata
+          - Installer service lifecycle and health validation passed before release
+          - SHA-256 checksums included in SHA256SUMS.txt
+
+          Verified commit: $TARGET_SHA
+          EOF
 
       - name: Upload verified release artifact
         uses: actions/upload-artifact@v4
