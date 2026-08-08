@@ -1,0 +1,74 @@
+name: Research OS Build Linux Isolated
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Git ref to build
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-linux-isolated-${{ inputs.target_ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  build-linux:
+    name: Build Linux desktop bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_ref || 'main' }}
+
+      - name: Install Linux desktop dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Generate Linux platform shell
+        working-directory: apps/research_os_flutter
+        run: flutter create --platforms=linux --project-name=research_os_flutter .
+
+      - name: Install dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/research_os_flutter
+        run: flutter test
+
+      - name: Build Linux release
+        working-directory: apps/research_os_flutter
+        run: flutter build linux --release
+
+      - name: Stage Linux artifact
+        run: |
+          mkdir -p dist/linux
+          tar -C apps/research_os_flutter/build/linux/x64/release/bundle -czf dist/linux/Research-OS-Linux-x64.tar.gz .
+          sha256sum dist/linux/Research-OS-Linux-x64.tar.gz > dist/linux/SHA256SUMS.txt
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-linux-${{ github.run_id }}
+          path: dist/linux/**
+          if-no-files-found: error
+          retention-days: 14
