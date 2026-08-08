@@ -1,0 +1,70 @@
+name: Research OS Build iOS Isolated
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Git ref to build
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-ios-isolated-${{ inputs.target_ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  build-ios:
+    name: Build unsigned iOS app bundle
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_ref || 'main' }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate iOS platform shell
+        working-directory: apps/research_os_flutter
+        run: flutter create --platforms=ios --project-name=research_os_flutter .
+
+      - name: Install dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/research_os_flutter
+        run: flutter test
+
+      - name: Build unsigned iOS release
+        working-directory: apps/research_os_flutter
+        run: flutter build ios --release --no-codesign
+
+      - name: Stage iOS artifact
+        run: |
+          mkdir -p dist/ios
+          APP_PATH="apps/research_os_flutter/build/ios/iphoneos/Runner.app"
+          test -d "$APP_PATH"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" dist/ios/Research-OS-iOS-unsigned.zip
+          shasum -a 256 dist/ios/Research-OS-iOS-unsigned.zip > dist/ios/SHA256SUMS.txt
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-ios-unsigned-${{ github.run_id }}
+          path: dist/ios/**
+          if-no-files-found: error
+          retention-days: 14
