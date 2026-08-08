@@ -321,8 +321,13 @@ User: $latestPrompt''';
 
   Future<void> _stopGeneration() async {
     final handle = _streamHandle;
-    await _streamSubscription?.cancel();
-    if (handle != null) await handle.cancel();
+    if (handle != null) {
+      // Cancelling the underlying response closes the stream controller, which
+      // lets the active listener receive onDone and release the send completer.
+      await handle.cancel();
+    } else {
+      await _streamSubscription?.cancel();
+    }
     if (!mounted) return;
     setState(() {
       _sending = false;
