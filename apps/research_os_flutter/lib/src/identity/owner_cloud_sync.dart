@@ -36,7 +36,7 @@ class OwnerCloudSync {
       final current = await ApiConnectionPreferences.load();
       final heartbeatRaw = preferences['heartbeat_seconds'];
       final heartbeat = heartbeatRaw is num
-          ? heartbeatRaw.toInt().clamp(5, 300)
+          ? heartbeatRaw.toInt().clamp(5, 300).toInt()
           : current.heartbeatSeconds;
       final merged = current.copyWith(
         autoDiscovery: preferences['api_auto_discovery'] is bool
