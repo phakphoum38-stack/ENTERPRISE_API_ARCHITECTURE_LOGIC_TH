@@ -37,7 +37,26 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout into short Windows path
+        uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+
+      - name: Stage Flutter app at short path
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE 'src\apps\research_os_flutter'
+          $short = 'D:\w'
+          if (Test-Path $short) { Remove-Item $short -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $short | Out-Null
+          Copy-Item (Join-Path $source '*') $short -Recurse -Force
+          Write-Host "Flutter source staged at $short"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -46,40 +65,45 @@ jobs:
           cache: true
 
       - name: Generate Windows platform shell
-        working-directory: apps/research_os_flutter
+        working-directory: D:\w
         shell: pwsh
         run: flutter create --platforms=windows --project-name=research_os_flutter .
 
       - name: Install Flutter dependencies
-        working-directory: apps/research_os_flutter
+        working-directory: D:\w
         shell: pwsh
         run: flutter pub get
 
       - name: Analyze Flutter
-        working-directory: apps/research_os_flutter
+        working-directory: D:\w
         shell: pwsh
         run: flutter analyze
 
       - name: Run Flutter tests
-        working-directory: apps/research_os_flutter
+        working-directory: D:\w
         shell: pwsh
         run: flutter test
 
       - name: Build Windows desktop
-        working-directory: apps/research_os_flutter
+        working-directory: D:\w
         shell: pwsh
-        run: flutter build windows --release
+        run: |
+          flutter build windows --release --verbose
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            throw "Flutter Windows native build failed with exit code $code. See MSVC/CMake diagnostics above."
+          }
 
       - name: Verify desktop executable
         shell: pwsh
         run: |
-          $exe = "apps\research_os_flutter\build\windows\x64\runner\Release\research_os_flutter.exe"
+          $exe = "D:\w\build\windows\x64\runner\Release\research_os_flutter.exe"
           if (-not (Test-Path $exe)) { throw "Desktop executable missing: $exe" }
 
       - name: Upload Windows app artifact
         uses: actions/upload-artifact@v4
         with:
           name: research-os-windows-app-${{ github.sha }}
-          path: apps/research_os_flutter/build/windows/x64/runner/Release/**
+          path: D:/w/build/windows/x64/runner/Release/**
           if-no-files-found: error
           retention-days: 14
