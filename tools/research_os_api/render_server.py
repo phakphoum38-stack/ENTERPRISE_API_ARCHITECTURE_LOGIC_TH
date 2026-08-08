@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Cloud entrypoint for Research OS API with browser-safe CORS headers."""
+"""Cloud and service entrypoint for Research OS API with browser-safe CORS headers."""
 
 from __future__ import annotations
 
 import os
 from http.server import ThreadingHTTPServer
 
-from server import ResearchOSHandler
+from agent_server import AgentResearchOSHandler
 
 
-class CloudResearchOSHandler(ResearchOSHandler):
-    """Research OS handler configured for the public Flutter web client."""
+class CloudResearchOSHandler(AgentResearchOSHandler):
+    """Primary Research OS handler with Multi-Agent orchestration and CORS."""
 
     def end_headers(self) -> None:
         allowed_origin = os.getenv(
@@ -36,7 +36,7 @@ def main() -> int:
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8787"))
     server = ThreadingHTTPServer((host, port), CloudResearchOSHandler)
-    print(f"Research OS cloud API listening on http://{host}:{port}")
+    print(f"Research OS primary API listening on http://{host}:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
