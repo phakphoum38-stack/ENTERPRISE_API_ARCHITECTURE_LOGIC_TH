@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../api/api_connection_state.dart';
+
 class ResearchNavItem {
   const ResearchNavItem(this.section, this.label, this.icon, this.index);
 
@@ -10,16 +12,15 @@ class ResearchNavItem {
 }
 
 const researchNavigationItems = <ResearchNavItem>[
-  ResearchNavItem('Workspace', 'Home', Icons.dashboard_outlined, 0),
+  ResearchNavItem('Workspace', 'Dashboard', Icons.dashboard_outlined, 0),
   ResearchNavItem('Workspace', 'AI Chat', Icons.chat_bubble_outline, 1),
   ResearchNavItem('Workspace', 'Agent Center', Icons.smart_toy_outlined, 2),
   ResearchNavItem('Knowledge', 'Library', Icons.local_library_outlined, 3),
   ResearchNavItem('Knowledge', 'Knowledge Graph', Icons.hub_outlined, 4),
   ResearchNavItem('Connections', 'GitHub', Icons.account_tree_outlined, 5),
-  ResearchNavItem('Connections', 'Google Workspace', Icons.apps_outlined, 6),
-  ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7),
-  ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8),
-  ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
+  ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 6),
+  ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 7),
+  ResearchNavItem('System', 'Settings', Icons.settings_outlined, 8),
 ];
 
 class ResearchSidebar extends StatelessWidget {
@@ -85,7 +86,7 @@ class ResearchSidebar extends StatelessWidget {
                                 key: Key('desktop-shell-title'),
                                 style: TextStyle(fontWeight: FontWeight.w800),
                               ),
-                              Text('Enterprise Workspace', style: TextStyle(fontSize: 11)),
+                              Text('AI Desktop Workspace', style: TextStyle(fontSize: 11)),
                             ],
                           ),
                         ),
@@ -252,26 +253,47 @@ class ResearchStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      key: const Key('desktop-status-bar'),
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.circle, size: 8, color: scheme.primary),
-          const SizedBox(width: 6),
-          const Text('Research OS', style: TextStyle(fontSize: 12)),
-          const Spacer(),
-          const _StatusItem(Icons.smart_toy_outlined, 'Agents'),
-          const _StatusItem(Icons.memory_outlined, 'Memory'),
-          const _StatusItem(Icons.apps_outlined, 'Workspace'),
-          const _StatusItem(Icons.dns_outlined, 'Local API'),
-        ],
-      ),
+    return ValueListenableBuilder<ApiConnectionSnapshot>(
+      valueListenable: apiConnectionState,
+      builder: (context, connection, _) {
+        final connected = connection.phase == ApiConnectionPhase.connected;
+        final latency = connection.latency == null
+            ? '—'
+            : '${connection.latency!.inMilliseconds} ms';
+        return Container(
+          key: const Key('desktop-status-bar'),
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                Icons.circle,
+                size: 8,
+                color: connected ? Colors.green : scheme.error,
+              ),
+              const SizedBox(width: 6),
+              Text(connection.label, style: const TextStyle(fontSize: 12)),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  connection.baseUrl ?? 'No API endpoint',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                ),
+              ),
+              const Spacer(),
+              _StatusItem(Icons.speed_outlined, latency),
+              _StatusItem(Icons.smart_toy_outlined, 'AI'),
+              _StatusItem(Icons.memory_outlined, 'Memory'),
+            ],
+          ),
+        );
+      },
     );
   }
 }
