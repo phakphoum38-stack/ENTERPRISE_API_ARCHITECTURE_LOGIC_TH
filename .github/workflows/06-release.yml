@@ -66,4 +66,4 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run research-os-windows-desktop.yml --repo "${{ github.repository }}" --ref main -f target_sha="$TARGET_SHA"
+        run: gh workflow run research-os-windows-desktop.yml --repo "${{ github.repository }}" --ref main -f target_sha="$TARGET_SHA" -f source_release_run="${{ github.run_id }}"
