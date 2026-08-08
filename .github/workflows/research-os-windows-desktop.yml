@@ -10,7 +10,7 @@ on:
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 concurrency:
   group: research-os-windows-desktop-${{ inputs.target_sha || github.ref }}
@@ -38,5 +38,24 @@ jobs:
 
       - name: Publish compatibility success
         run: |
-          echo "Research OS Windows Desktop now represents the successful split pipeline gate."
-          echo "Downstream workflow_run consumers may continue from this workflow name."
+          echo "Research OS Windows Desktop represents the successful split pipeline gate."
+          echo "Secondary validation workflows will be dispatched directly."
+
+      - name: Dispatch secondary validation workflows
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for workflow in \
+            research-os-agent-platform.yml \
+            research-os-google-workspace.yml \
+            research-os-performance-gate.yml \
+            research-curator-validate.yml
+          do
+            gh workflow run "$workflow" --repo "${{ github.repository }}" --ref main
+          done
+
+          gh workflow run research-os-flutter.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f target_sha="$TARGET_SHA"
