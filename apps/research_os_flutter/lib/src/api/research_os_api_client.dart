@@ -39,6 +39,36 @@ class ResearchOSApiClient {
         'enabled_services': services,
       });
 
+  Future<Map<String, dynamic>> getOrchestrations() =>
+      _getJson('/v1/agents/orchestrations');
+
+  Future<Map<String, dynamic>> getOrchestration(String runId) =>
+      _getJson('/v1/agents/orchestrations/${Uri.encodeComponent(runId)}');
+
+  Future<Map<String, dynamic>> createOrchestration({
+    required String objective,
+    required List<Map<String, Object?>> steps,
+  }) =>
+      _postJson('/v1/agents/orchestrations', <String, Object?>{
+        'objective': objective,
+        'steps': steps,
+      });
+
+  Future<Map<String, dynamic>> executeOrchestration(
+    String runId, {
+    bool confirmed = false,
+  }) =>
+      _postJson(
+        '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/execute',
+        <String, Object?>{'confirmed': confirmed},
+      );
+
+  Future<Map<String, dynamic>> confirmOrchestration(String runId) =>
+      _postJson(
+        '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/confirm',
+        const <String, Object?>{},
+      );
+
   Future<Map<String, dynamic>> getGitHubDashboard({String? repository}) async {
     final query = repository?.trim();
     if (query == null || query.isEmpty) {
