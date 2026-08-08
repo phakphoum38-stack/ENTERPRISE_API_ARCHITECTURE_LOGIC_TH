@@ -20,7 +20,7 @@ jobs:
   build-macos:
     name: Build macOS app bundle
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Checkout target
         uses: actions/checkout@v4
@@ -56,13 +56,21 @@ jobs:
         working-directory: apps/research_os_flutter
         run: flutter build macos --release
 
-      - name: Stage macOS artifact
+      - name: Stage ZIP and DMG
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist/macos
           APP_PATH="apps/research_os_flutter/build/macos/Build/Products/Release/research_os_flutter.app"
           test -d "$APP_PATH"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" dist/macos/Research-OS-macOS.zip
-          shasum -a 256 dist/macos/Research-OS-macOS.zip > dist/macos/SHA256SUMS.txt
+
+          DMG_ROOT="$RUNNER_TEMP/research-os-dmg"
+          mkdir -p "$DMG_ROOT"
+          cp -R "$APP_PATH" "$DMG_ROOT/Research OS.app"
+          ln -s /Applications "$DMG_ROOT/Applications"
+          hdiutil create -volname "Research OS" -srcfolder "$DMG_ROOT" -ov -format UDZO dist/macos/Research-OS-macOS.dmg
+          (cd dist/macos && shasum -a 256 Research-OS-macOS.zip Research-OS-macOS.dmg > SHA256SUMS.txt)
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
