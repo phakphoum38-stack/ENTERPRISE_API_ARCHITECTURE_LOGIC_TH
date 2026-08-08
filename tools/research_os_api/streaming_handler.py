@@ -9,26 +9,140 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import asdict
 from http import HTTPStatus
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from memory import build_context, search_memory
+from memory_engine import MemoryEngine
 from provider_readiness import inspect_all
 from providers import ProviderError, build_provider
 from server import ARTIFACT_DIR, ResearchOSHandler
 
 
 class StreamingResearchOSHandler(ResearchOSHandler):
-    """Research OS handler with provider capabilities and NDJSON AI streaming."""
+    """Research OS handler with provider capabilities, runtime memory, and NDJSON streaming."""
 
     def do_GET(self) -> None:  # noqa: N802
-        if urlsplit(self.path).path == "/v1/providers/capabilities":
+        parsed = urlsplit(self.path)
+        path = parsed.path
+        if path == "/v1/providers/capabilities":
             self._send(HTTPStatus.OK, inspect_all())
+            return
+        if path.startswith("/v1/runtime-memory"):
+            try:
+                params = parse_qs(parsed.query)
+                engine = MemoryEngine()
+                if path == "/v1/runtime-memory":
+                    records = engine.store.list()
+                    self._send(
+                        HTTPStatus.OK,
+                        {"count": len(records), "records": [asdict(item) for item in records]},
+                    )
+                    return
+                if path == "/v1/runtime-memory/search":
+                    query = str(params.get("q", [""])[0]).strip()
+                    if not query:
+                        raise ValueError("q is required")
+                    hits = engine.search(
+                        query,
+                        limit=int(params.get("limit", ["10"])[0]),
+                        type=str(params.get("type", [""])[0]).strip() or None,
+                        project_id=str(params.get("project_id", [""])[0]).strip() or None,
+                        session_id=str(params.get("session_id", [""])[0]).strip() or None,
+                        tags=params.get("tag", []),
+                    )
+                    self._send(
+                        HTTPStatus.OK,
+                        {
+                            "query": query,
+                            "count": len(hits),
+                            "hits": [
+                                {
+                                    "record": asdict(hit.record),
+                                    "score": hit.score,
+                                    "matched_terms": hit.matched_terms,
+                                }
+                                for hit in hits
+                            ],
+                        },
+                    )
+                    return
+                if path == "/v1/runtime-memory/timeline":
+                    records = engine.timeline(
+                        project_id=str(params.get("project_id", [""])[0]).strip() or None,
+                        session_id=str(params.get("session_id", [""])[0]).strip() or None,
+                        limit=int(params.get("limit", ["100"])[0]),
+                    )
+                    self._send(
+                        HTTPStatus.OK,
+                        {"count": len(records), "records": [asdict(item) for item in records]},
+                    )
+                    return
+                self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+            except (TypeError, ValueError) as exc:
+                self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+            except Exception as exc:
+                self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
             return
         super().do_GET()
 
+    def do_DELETE(self) -> None:  # noqa: N802
+        path = urlsplit(self.path).path
+        prefix = "/v1/runtime-memory/"
+        if not path.startswith(prefix):
+            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+            return
+        memory_id = path[len(prefix) :].strip()
+        if not memory_id:
+            self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": "memory id is required"})
+            return
+        try:
+            deleted = MemoryEngine().store.delete(memory_id)
+            self._send(HTTPStatus.OK, {"id": memory_id, "deleted": deleted})
+        except Exception as exc:
+            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
+
     def do_POST(self) -> None:  # noqa: N802
-        if urlsplit(self.path).path != "/v1/ai/stream":
+        path = urlsplit(self.path).path
+        if path == "/v1/runtime-memory":
+            try:
+                body = self._read_json()
+                record = MemoryEngine().remember(
+                    type=str(body.get("type", "")),
+                    content=str(body.get("content", "")),
+                    title=str(body.get("title", "")),
+                    source=str(body.get("source", "user")),
+                    project_id=body.get("project_id"),
+                    session_id=body.get("session_id"),
+                    provider=body.get("provider"),
+                    tags=body.get("tags", []),
+                    priority=int(body.get("priority", 0)),
+                    metadata=body.get("metadata") if isinstance(body.get("metadata"), dict) else {},
+                )
+                self._send(HTTPStatus.CREATED, {"record": asdict(record)})
+            except (TypeError, ValueError) as exc:
+                self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+            except Exception as exc:
+                self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
+            return
+
+        prefix = "/v1/runtime-memory/"
+        if path.startswith(prefix) and path.endswith("/update"):
+            memory_id = path[len(prefix) : -len("/update")].strip("/")
+            try:
+                body = self._read_json()
+                record = MemoryEngine().store.update(memory_id, **body)
+                self._send(HTTPStatus.OK, {"record": asdict(record)})
+            except KeyError:
+                self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "id": memory_id})
+            except (TypeError, ValueError) as exc:
+                self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+            except Exception as exc:
+                self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
+            return
+
+        if path != "/v1/ai/stream":
             super().do_POST()
             return
 
@@ -80,11 +194,7 @@ class StreamingResearchOSHandler(ResearchOSHandler):
             ):
                 if chunk.done:
                     elapsed_ms = int((time.perf_counter() - started) * 1000)
-                    first_token_ms = (
-                        None
-                        if first_delta_at is None
-                        else int((first_delta_at - started) * 1000)
-                    )
+                    first_token_ms = None if first_delta_at is None else int((first_delta_at - started) * 1000)
                     self._write_stream_event(
                         {
                             "type": "done",
@@ -112,8 +222,6 @@ class StreamingResearchOSHandler(ResearchOSHandler):
                     }
                 )
         except (BrokenPipeError, ConnectionResetError):
-            # Cancelling the Flutter stream closes the socket, stopping further
-            # writes and allowing native upstream streams to unwind naturally.
             return
         except (TypeError, ValueError) as exc:
             if headers_sent:
