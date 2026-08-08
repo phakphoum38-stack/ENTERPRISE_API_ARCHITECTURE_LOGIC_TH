@@ -4,7 +4,6 @@ import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
 import 'features/chat/chat_page.dart';
 import 'features/github/github_dashboard_page.dart';
-import 'features/google_workspace/google_workspace_page.dart';
 import 'features/graph/knowledge_graph_page.dart';
 import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
@@ -42,7 +41,6 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         LibraryPage(apiClient: widget.apiClient),
         KnowledgeGraphPage(apiClient: widget.apiClient),
         GitHubDashboardPage(apiClient: widget.apiClient),
-        GoogleWorkspacePage(apiClient: widget.apiClient),
         const LocalApiControlPage(),
         SystemMonitorPage(apiClient: widget.apiClient),
         SettingsPage(
@@ -121,7 +119,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
             actions: <Widget>[
               IconButton(
                 tooltip: 'System Monitor',
-                onPressed: () => _select(8),
+                onPressed: () => _select(7),
                 icon: const Icon(Icons.monitor_heart_outlined),
               ),
             ],
