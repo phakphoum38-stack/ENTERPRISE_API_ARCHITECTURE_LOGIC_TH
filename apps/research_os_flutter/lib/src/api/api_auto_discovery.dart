@@ -38,13 +38,14 @@ class ApiAutoDiscovery {
 
     final standard = <String>{
       ApiEndpointStore.buildDefault,
-      ApiEndpointStore.localDefault,
       'http://localhost:$defaultPort',
       'http://[::1]:$defaultPort',
       'http://10.0.2.2:$defaultPort',
       'http://10.0.3.2:$defaultPort',
       ApiEndpointStore.renderDefault,
-    }..removeWhere((value) => preferred != null && value == preferred);
+    }
+      ..add(ApiEndpointStore.localDefault)
+      ..removeWhere((value) => preferred != null && value == preferred);
 
     final standardHit = await _fastestHealthy(
       standard.toList(growable: false),
