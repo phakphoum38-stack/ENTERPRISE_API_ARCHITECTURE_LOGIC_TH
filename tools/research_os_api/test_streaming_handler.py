@@ -95,25 +95,34 @@ class StreamingHandlerTest(unittest.TestCase):
                     thread.join(timeout=2)
 
     def test_provider_capabilities_are_secret_safe(self) -> None:
-        server, thread = self._start_server()
-        try:
-            with urllib.request.urlopen(
-                f"http://127.0.0.1:{server.server_port}/v1/providers/capabilities",
-                timeout=5,
-            ) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+        secret_values = {
+            "RESEARCH_OS_OPENAI_API_KEY": "ci-openai-secret-value",
+            "RESEARCH_OS_ANTHROPIC_API_KEY": "ci-anthropic-secret-value",
+            "RESEARCH_OS_GEMINI_API_KEY": "ci-gemini-secret-value",
+        }
+        with patch.dict(os.environ, secret_values, clear=False):
+            server, thread = self._start_server()
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{server.server_port}/v1/providers/capabilities",
+                    timeout=5,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
 
-            providers = {item["provider"]: item for item in payload["providers"]}
-            self.assertTrue(payload["safe"])
-            self.assertIn("gemini", providers)
-            self.assertTrue(providers["gemini"]["native_streaming"])
-            self.assertIn("ollama", providers)
-            self.assertTrue(providers["ollama"]["local_capable"])
-            self.assertNotIn("api_key", json.dumps(payload).lower())
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join(timeout=2)
+                providers = {item["provider"]: item for item in payload["providers"]}
+                self.assertTrue(payload["safe"])
+                self.assertIn("gemini", providers)
+                self.assertTrue(providers["gemini"]["native_streaming"])
+                self.assertIn("ollama", providers)
+                self.assertTrue(providers["ollama"]["local_capable"])
+
+                serialized = json.dumps(payload).lower()
+                for secret in secret_values.values():
+                    self.assertNotIn(secret.lower(), serialized)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
 
 
 if __name__ == "__main__":
