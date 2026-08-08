@@ -56,18 +56,30 @@ Completed:
 - Keyword ranking foundation
 - Timeline foundation
 - Unit tests for CRUD/search/timeline
+- Runtime Memory HTTP API
+- Runtime Memory API integration test covering create/search/timeline/update/delete
 
 In progress:
-- Memory API endpoints
 - Integration with Chat memory capture
 - Memory Inspector UI
-- Project/session indexes
 - Documentation + ADR
 
 Next:
-- Connect `MemoryEngine` to Research OS HTTP API without breaking legacy artifact retrieval
-- Add API tests
 - Add automatic conversation-memory capture policy
+- Connect Flutter to runtime-memory endpoints
+- Build Memory Inspector UI
+- Add Memory Engine architecture documentation and ADR
+
+## Runtime Memory API
+
+- `GET /v1/runtime-memory`
+- `POST /v1/runtime-memory`
+- `GET /v1/runtime-memory/search?q=...`
+- `GET /v1/runtime-memory/timeline`
+- `POST /v1/runtime-memory/{id}/update`
+- `DELETE /v1/runtime-memory/{id}`
+
+The existing `/v1/memory/search` endpoint remains the curated artifact-memory compatibility API.
 
 ## Risks
 
@@ -79,7 +91,7 @@ Next:
 
 `memory.py` remains the curated artifact retrieval compatibility layer.
 `memory_engine.py` is the new structured runtime-memory core.
-They will coexist until API integration and migration are complete.
+They coexist during the migration so existing Research OS memory behavior remains compatible.
 
 ## Definition of Done: Memory Engine
 
@@ -89,10 +101,10 @@ They will coexist until API integration and migration are complete.
 - [x] Search foundation
 - [x] Timeline foundation
 - [x] Unit tests
-- [ ] HTTP API
+- [x] HTTP API
+- [x] Integration tests
 - [ ] Chat integration
 - [ ] Memory UI / Inspector
-- [ ] Integration tests
 - [ ] Documentation
 - [ ] ADR
 
