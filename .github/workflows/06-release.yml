@@ -1,0 +1,69 @@
+name: Research OS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Verified commit SHA
+        required: false
+        type: string
+      source_installer_run:
+        description: Installer workflow run ID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  release:
+    name: Publish verified installer artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+      SOURCE_INSTALLER_RUN: ${{ inputs.source_installer_run }}
+    steps:
+      - name: Resolve installer build run
+        id: installer-run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id="$SOURCE_INSTALLER_RUN"
+          if [ -z "$run_id" ]; then
+            run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
+          fi
+          test -n "$run_id" || { echo "No successful installer build found for $TARGET_SHA"; exit 1; }
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download verified Setup EXE
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p verified-installer
+          gh run download "${{ steps.installer-run.outputs.run_id }}" --repo "${{ github.repository }}" --name "research-os-installer-$TARGET_SHA" --dir verified-installer
+          find verified-installer -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit | grep -q . || { echo "Verified Setup EXE missing"; exit 1; }
+
+      - name: Create verification manifest
+        shell: bash
+        run: |
+          setup="$(find verified-installer -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
+          sha256sum "$setup" | tee verified-installer/SHA256SUMS.txt
+          printf 'commit=%s\ninstaller_run=%s\nvalidation=passed\n' "$TARGET_SHA" "${{ steps.installer-run.outputs.run_id }}" > verified-installer/VERIFIED.txt
+
+      - name: Upload verified release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-verified-release-${{ env.TARGET_SHA }}
+          path: verified-installer/**
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Dispatch compatibility gate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run research-os-windows-desktop.yml --repo "${{ github.repository }}" --ref main -f target_sha="$TARGET_SHA"

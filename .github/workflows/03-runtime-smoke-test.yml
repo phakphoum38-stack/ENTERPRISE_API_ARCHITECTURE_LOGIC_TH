@@ -1,0 +1,118 @@
+name: Research OS Runtime Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Commit SHA to test
+        required: false
+        type: string
+      source_service_run:
+        description: ServiceHost workflow run ID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  runtime-smoke:
+    name: Runtime and service smoke test
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+      SOURCE_RUN_ID: ${{ inputs.source_service_run }}
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve ServiceHost run
+        id: service-run
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runId = "$env:SOURCE_RUN_ID"
+          if (-not $runId) {
+            $runId = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Service Host" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+          }
+          if (-not $runId) { throw "No successful ServiceHost run found for $env:TARGET_SHA" }
+          "run_id=$runId" >> $env:GITHUB_OUTPUT
+
+      - name: Download ServiceHost artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path tools/research_os_service/publish | Out-Null
+          gh run download "${{ steps.service-run.outputs.run_id }}" --repo "${{ github.repository }}" --name "research-os-service-host-$env:TARGET_SHA" --dir tools/research_os_service/publish
+          if (-not (Test-Path "tools/research_os_service/publish/ResearchOS.ServiceHost.exe")) {
+            throw "Downloaded ServiceHost executable is missing"
+          }
+
+      - name: Test local API start status and stop
+        shell: pwsh
+        env:
+          RESEARCH_OS_SYNC_KEY: windows-ci-test-key
+        run: |
+          ./scripts/setup-research-os-windows.ps1 -Root "$env:RUNNER_TEMP\ResearchOS" -DataDir "$env:RUNNER_TEMP\ResearchOSData"
+          ./scripts/start-research-os-local.ps1 -DataDir "$env:RUNNER_TEMP\ResearchOSData" -Provider mock -Port 8787 -Background
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+                if ($health.status -eq "ok") { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 500 }
+            }
+            if (-not $ready) { throw "Local API did not become ready" }
+            ./scripts/status-research-os-local.ps1 -Port 8787 -HealthUrl "http://127.0.0.1:8787/health"
+          }
+          finally {
+            ./scripts/stop-research-os-local.ps1 -Port 8787 -PidFile "$env:RUNNER_TEMP\ResearchOSData\run\research-os-api.pid" -ErrorAction SilentlyContinue
+          }
+
+      - name: Test Windows Service install health restart stop and uninstall
+        shell: pwsh
+        run: |
+          $data = "$env:RUNNER_TEMP\ResearchOSServiceData"
+          try {
+            ./scripts/research-os-service.ps1 -Action install -DataDir $data
+            $ready = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+                if ($health.status -eq "ok") { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 500 }
+            }
+            if (-not $ready) { throw "Windows Service API did not become ready" }
+            $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
+            if (-not $service -or $service.State -ne 'Running') { throw "ResearchOSService is not running" }
+            ./scripts/research-os-service.ps1 -Action restart -DataDir $data
+            ./scripts/research-os-service.ps1 -Action stop -DataDir $data
+          }
+          finally {
+            if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+              ./scripts/research-os-service.ps1 -Action uninstall -DataDir $data
+            }
+          }
+
+      - name: Dispatch installer build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run 04-build-installer.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA"
