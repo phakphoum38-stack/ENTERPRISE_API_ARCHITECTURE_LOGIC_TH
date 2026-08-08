@@ -89,9 +89,15 @@ class OwnerSessionStore {
         updatedAt: DateTime.now().toUtc(),
       );
       return session;
+    } on IdentityApiException catch (error) {
+      if (error.unauthorized) {
+        await clear();
+        return null;
+      }
+      ownerSessionState.value = session;
+      return session;
     } on Object {
-      // Network failure should not erase a still-valid local identity. The verified
-      // session remains available locally and will be checked again when online.
+      // A network failure should not erase a still-valid verified session.
       ownerSessionState.value = session;
       return session;
     } finally {
