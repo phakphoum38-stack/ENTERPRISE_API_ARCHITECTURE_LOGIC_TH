@@ -34,15 +34,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile Agent Platform Runtime and Orchestrator
+      - name: Compile Agent Platform Runtime Orchestrator and HTTP API
         run: |
           python -m py_compile tools/research_os_api/agent_platform.py
           python -m py_compile tools/research_os_api/agent_runtime.py
           python -m py_compile tools/research_os_api/agent_orchestrator.py
+          python -m py_compile tools/research_os_api/agent_server.py
 
-      - name: Test Agent Registry Router Runtime and Orchestration
+      - name: Test Agent Registry Router Runtime Orchestration and HTTP API
         working-directory: tools/research_os_api
-        run: python -m unittest test_agent_platform.py test_agent_runtime.py test_agent_orchestrator.py -v
+        run: python -m unittest test_agent_platform.py test_agent_runtime.py test_agent_orchestrator.py test_agent_server.py -v
 
       - name: Validate initial agent registry
         working-directory: tools/research_os_api
@@ -137,5 +138,6 @@ jobs:
             echo "# Research OS Agent Platform"
             echo "- Agent registry/runtime/permission checks remain"
             echo "- Multi-Agent orchestrator compile and unit tests enabled"
+            echo "- Orchestrator HTTP create/list/get/execute/confirm contract tested"
             echo "- Dependency delegation and confirmation flow validated"
           } >> "$GITHUB_STEP_SUMMARY"
