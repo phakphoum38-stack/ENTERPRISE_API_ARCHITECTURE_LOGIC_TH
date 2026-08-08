@@ -120,7 +120,11 @@ class _ProviderManagerSectionState extends State<ProviderManagerSection> {
                 return RadioListTile<String>(
                   key: Key('provider-option-$provider'),
                   value: provider,
+                  // TODO(research-os): migrate to RadioGroup when the minimum
+                  // supported Flutter channel exposes a stable grouped API.
+                  // ignore: deprecated_member_use
                   groupValue: selected,
+                  // ignore: deprecated_member_use
                   onChanged: _saving
                       ? null
                       : (value) {
