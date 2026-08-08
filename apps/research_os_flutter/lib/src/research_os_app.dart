@@ -8,6 +8,7 @@ import 'api/api_connection_state.dart';
 import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
+import 'identity/owner_profile_store.dart';
 
 class ResearchOSApp extends StatefulWidget {
   const ResearchOSApp({super.key});
@@ -29,7 +30,12 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   void initState() {
     super.initState();
     apiConnectionPreferences.addListener(_handleConnectionPreferencesChanged);
-    _loadApiEndpoint();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await OwnerProfileStore.loadIntoState();
+    await _loadApiEndpoint();
   }
 
   Future<void> _loadApiEndpoint() async {
