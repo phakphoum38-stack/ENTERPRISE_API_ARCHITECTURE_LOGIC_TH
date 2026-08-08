@@ -1,6 +1,12 @@
 name: Deploy Research OS Home
 
 on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Research OS Flutter run ID containing the Pages artifact
+        required: true
+        type: string
   workflow_run:
     workflows:
       - Research OS Flutter
@@ -22,7 +28,7 @@ concurrency:
 jobs:
   deploy:
     name: Publish validated web artifact
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -35,7 +41,7 @@ jobs:
         with:
           name: research-os-web-pages
           path: site
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ inputs.source_run_id || github.event.workflow_run.id }}
           github-token: ${{ github.token }}
 
       - name: Verify web artifact
