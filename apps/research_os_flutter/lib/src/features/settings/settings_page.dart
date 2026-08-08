@@ -7,6 +7,7 @@ import '../../api/api_endpoint_store.dart';
 import '../../api/research_os_api_client.dart';
 import '../../ui/enterprise_components.dart';
 import 'identity_settings_section.dart';
+import 'provider_manager_section.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -27,12 +28,9 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _loading = true;
   bool _savingEndpoint = false;
   bool _testingConnection = false;
   String? _error;
-  String _activeProvider = 'unknown';
-  List<String> _providers = const <String>[];
   ApiConnectionPreferences _connectionPreferences =
       ApiConnectionPreferences.defaults;
   late final TextEditingController _apiController;
@@ -42,7 +40,6 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     _apiController = TextEditingController(text: widget.apiClient.baseUrl);
     _loadPreferences();
-    _loadProviders();
   }
 
   @override
@@ -60,31 +57,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _savePreferences(ApiConnectionPreferences value) async {
     setState(() => _connectionPreferences = value);
     await value.save();
-  }
-
-  Future<void> _loadProviders() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final payload = await widget.apiClient.getProviders();
-      if (!mounted) return;
-      final rawProviders = payload['providers'];
-      setState(() {
-        _activeProvider = payload['active']?.toString() ?? 'unknown';
-        _providers = rawProviders is List
-            ? rawProviders.map((item) => item.toString()).toList()
-            : const <String>[];
-        _loading = false;
-      });
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = error.toString();
-        _loading = false;
-      });
-    }
   }
 
   Future<void> _saveEndpoint([String? preset]) async {
@@ -154,18 +126,11 @@ class _SettingsPageState extends State<SettingsPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 32),
       children: <Widget>[
-        EnterprisePageHeader(
+        const EnterprisePageHeader(
           icon: Icons.settings_outlined,
           title: 'Settings',
           subtitle:
-              'จัดการ Owner Profile, Appearance, API endpoint และ AI Provider โดยคง Secret ไว้ฝั่ง Backend',
-          actions: <Widget>[
-            IconButton(
-              tooltip: 'รีเฟรช Provider',
-              onPressed: _loading ? null : _loadProviders,
-              icon: const Icon(Icons.refresh),
-            ),
-          ],
+              'จัดการ Owner Profile, Appearance, API และ AI Provider โดยเก็บ Secret ไว้ฝั่ง Backend',
         ),
         const SizedBox(height: 28),
         EnterpriseSection(
@@ -206,7 +171,7 @@ class _SettingsPageState extends State<SettingsPage> {
         const EnterpriseSection(
           title: 'Identity & private profile',
           subtitle:
-              'จำอีเมลของเจ้าของบนอุปกรณ์นี้ โดยไม่เปลี่ยนผู้ใช้ทั่วไปให้เป็นโปรไฟล์ส่วนตัว',
+              'Owner Profile เป็นตัวเลือก ผู้ใช้ทั่วไปยังใช้งาน Research OS แบบ General AI ได้',
           child: IdentitySettingsSection(),
         ),
         const SizedBox(height: 28),
@@ -247,9 +212,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
+                                    child: CircularProgressIndicator(strokeWidth: 2),
                                   )
                                 : const Icon(Icons.save_outlined),
                             label: const Text('บันทึก'),
@@ -261,9 +224,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
+                                    child: CircularProgressIndicator(strokeWidth: 2),
                                   )
                                 : const Icon(Icons.network_ping_outlined),
                             label: const Text('Test Connection'),
@@ -271,18 +232,14 @@ class _SettingsPageState extends State<SettingsPage> {
                           OutlinedButton.icon(
                             onPressed: _savingEndpoint
                                 ? null
-                                : () => _saveEndpoint(
-                                      ApiEndpointStore.localDefault,
-                                    ),
+                                : () => _saveEndpoint(ApiEndpointStore.localDefault),
                             icon: const Icon(Icons.computer_outlined),
                             label: const Text('Local'),
                           ),
                           OutlinedButton.icon(
                             onPressed: _savingEndpoint
                                 ? null
-                                : () => _saveEndpoint(
-                                      ApiEndpointStore.renderDefault,
-                                    ),
+                                : () => _saveEndpoint(ApiEndpointStore.renderDefault),
                             icon: const Icon(Icons.cloud_outlined),
                             label: const Text('Cloud'),
                           ),
@@ -368,9 +325,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     : Icons.cloud_off_outlined,
                       ),
                       title: Text(connection.label),
-                      subtitle: Text(
-                        connection.baseUrl ?? 'ยังไม่มี endpoint',
-                      ),
+                      subtitle: Text(connection.baseUrl ?? 'ยังไม่มี endpoint'),
                       trailing: connection.latency == null
                           ? Chip(label: Text(connection.source ?? 'unknown'))
                           : Chip(
@@ -403,39 +358,8 @@ class _SettingsPageState extends State<SettingsPage> {
         EnterpriseSection(
           title: 'Provider Manager',
           subtitle:
-              'Provider ถูกจัดการจาก Backend; Flutter แสดงเฉพาะสถานะและตัวเลือกที่พร้อมใช้',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              if (_loading) const LinearProgressIndicator(),
-              if (!_loading && _providers.isNotEmpty) ...<Widget>[
-                EnterpriseStatusTile(
-                  icon: Icons.smart_toy_outlined,
-                  title: 'Active Provider',
-                  value: _activeProvider,
-                  caption: 'Backend managed',
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _providers
-                      .map(
-                        (provider) => Chip(
-                          avatar: Icon(
-                            provider == _activeProvider
-                                ? Icons.check_circle
-                                : Icons.circle_outlined,
-                            size: 18,
-                          ),
-                          label: Text(provider),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
-            ],
-          ),
+              'เลือก Provider แล้ว Chat จะเปลี่ยนไปใช้ทันทีโดยไม่ต้อง Restart แอป',
+          child: ProviderManagerSection(apiClient: widget.apiClient),
         ),
         const SizedBox(height: 28),
         const EnterpriseSection(
@@ -448,7 +372,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   leading: Icon(Icons.storage_outlined),
                   title: Text('Local-first storage ready'),
                   subtitle: Text(
-                    'ข้อมูล runtime และ configuration ถูกออกแบบให้แยกจาก Secret',
+                    'runtime configuration และ preference ถูกเก็บแยกจาก Provider secrets',
                   ),
                 ),
               ),
@@ -458,7 +382,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   leading: Icon(Icons.security_outlined),
                   title: Text('Secrets stay on the backend'),
                   subtitle: Text(
-                    'Flutter จะไม่จัดเก็บ API key หรือ token ของ Provider',
+                    'Flutter ไม่จัดเก็บ API key ของ Provider; เก็บเฉพาะ Provider ที่ผู้ใช้เลือก',
                   ),
                   trailing: Chip(label: Text('Protected')),
                 ),
