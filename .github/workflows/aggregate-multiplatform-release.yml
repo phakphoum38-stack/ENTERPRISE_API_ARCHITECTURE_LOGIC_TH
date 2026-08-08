@@ -1,0 +1,99 @@
+name: Research OS Aggregate Multi-platform Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      windows_run:
+        description: Optional Research OS Release run ID
+        required: false
+        type: string
+      android_run:
+        description: Optional isolated Android run ID
+        required: false
+        type: string
+      linux_run:
+        description: Optional isolated Linux run ID
+        required: false
+        type: string
+      macos_run:
+        description: Optional isolated macOS run ID
+        required: false
+        type: string
+      ios_run:
+        description: Optional isolated iOS run ID
+        required: false
+        type: string
+      web_run:
+        description: Optional Research OS Flutter web run ID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  aggregate:
+    name: Aggregate supplied platform artifacts only
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prepare release bundle
+        run: mkdir -p release-bundle
+
+      - name: Download supplied platform artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINDOWS_RUN: ${{ inputs.windows_run }}
+          ANDROID_RUN: ${{ inputs.android_run }}
+          LINUX_RUN: ${{ inputs.linux_run }}
+          MACOS_RUN: ${{ inputs.macos_run }}
+          IOS_RUN: ${{ inputs.ios_run }}
+          WEB_RUN: ${{ inputs.web_run }}
+        run: |
+          set -euo pipefail
+          download_if_set() {
+            local run_id="$1"
+            local platform="$2"
+            if [ -n "$run_id" ]; then
+              mkdir -p "release-bundle/$platform"
+              gh run download "$run_id" --repo "${{ github.repository }}" --dir "release-bundle/$platform"
+            fi
+          }
+          download_if_set "$WINDOWS_RUN" windows
+          download_if_set "$ANDROID_RUN" android
+          download_if_set "$LINUX_RUN" linux
+          download_if_set "$MACOS_RUN" macos
+          download_if_set "$IOS_RUN" ios
+          download_if_set "$WEB_RUN" web
+
+          test -n "$(find release-bundle -type f -print -quit)" || { echo "No run IDs supplied or no artifacts downloaded"; exit 1; }
+
+      - name: Generate aggregate checksums and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          find release-bundle -type f ! -name SHA256SUMS.txt ! -name MULTIPLATFORM_MANIFEST.txt -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > release-bundle/SHA256SUMS.txt
+          {
+            echo "Research OS multi-platform artifact bundle"
+            echo "generated_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "windows_run=${{ inputs.windows_run }}"
+            echo "android_run=${{ inputs.android_run }}"
+            echo "linux_run=${{ inputs.linux_run }}"
+            echo "macos_run=${{ inputs.macos_run }}"
+            echo "ios_run=${{ inputs.ios_run }}"
+            echo "web_run=${{ inputs.web_run }}"
+            echo "orchestration=manual-only"
+            echo "automatic_downstream_dispatch=false"
+          } > release-bundle/MULTIPLATFORM_MANIFEST.txt
+
+      - name: Upload aggregate release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-multiplatform-${{ github.run_id }}
+          path: release-bundle/**
+          if-no-files-found: error
+          retention-days: 30
