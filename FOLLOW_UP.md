@@ -45,7 +45,7 @@ Completed:
 - Secret-safe status responses
 
 ### Memory Engine
-Status: IN PROGRESS
+Status: IMPLEMENTATION COMPLETE — CI VALIDATION PENDING
 
 Completed:
 - Structured `MemoryRecord`
@@ -58,17 +58,20 @@ Completed:
 - Unit tests for CRUD/search/timeline
 - Runtime Memory HTTP API
 - Runtime Memory API integration test covering create/search/timeline/update/delete
+- Privacy-first completed-chat auto-capture policy
+- Local-only conversation capture with session/provider/role metadata
+- Memory Inspector Flutter UI
+- Runtime Memory Flutter API client methods
+- User-controlled Memory search and deletion
+- Memory Inspector widget test
+- Streaming auto-capture integration test
+- `docs/MEMORY_ENGINE.md`
+- `docs/ADR/ADR-0001-runtime-memory-local-first.md`
 
-In progress:
-- Integration with Chat memory capture
-- Memory Inspector UI
-- Documentation + ADR
-
-Next:
-- Add automatic conversation-memory capture policy
-- Connect Flutter to runtime-memory endpoints
-- Build Memory Inspector UI
-- Add Memory Engine architecture documentation and ADR
+Validation pending:
+- Run the Python Memory/Streaming tests in CI or a local checkout
+- Run Flutter analyze/tests including `memory_inspector_test.dart`
+- Confirm Windows packaged app can read/write the configured per-user memory location
 
 ## Runtime Memory API
 
@@ -81,17 +84,26 @@ Next:
 
 The existing `/v1/memory/search` endpoint remains the curated artifact-memory compatibility API.
 
+## Privacy Boundary
+
+- Runtime memory is local application data, not repository knowledge.
+- Runtime memory is not committed to Git automatically.
+- Runtime memory is not synchronized to cloud services automatically.
+- The Memory Inspector makes stored memory visible and explicitly deletable by the user.
+- Memory capture can be disabled through the chat Memory policy.
+
 ## Risks
 
 - Existing `memory.py` is used by curated artifact retrieval. Do not replace it abruptly.
 - Structured runtime memory must remain local-first and must not expose private local context in repository data.
 - Semantic embeddings are intentionally deferred until deterministic storage/search behavior is stable.
+- Memory Engine cannot be marked CI-PASSED until the relevant test suites actually execute successfully.
 
 ## Architecture Decision
 
 `memory.py` remains the curated artifact retrieval compatibility layer.
-`memory_engine.py` is the new structured runtime-memory core.
-They coexist during the migration so existing Research OS memory behavior remains compatible.
+`memory_engine.py` is the structured runtime-memory core.
+They coexist during v1.0 so existing Research OS memory behavior remains compatible.
 
 ## Definition of Done: Memory Engine
 
@@ -100,14 +112,15 @@ They coexist during the migration so existing Research OS memory behavior remain
 - [x] CRUD
 - [x] Search foundation
 - [x] Timeline foundation
-- [x] Unit tests
+- [x] Unit tests added
 - [x] HTTP API
-- [x] Integration tests
-- [ ] Chat integration
-- [ ] Memory UI / Inspector
-- [ ] Documentation
-- [ ] ADR
+- [x] Integration tests added
+- [x] Chat integration
+- [x] Memory UI / Inspector
+- [x] Documentation
+- [x] ADR
+- [ ] CI/local validation passes
 
 ## Next Module
 
-File Intelligence starts only after Memory Engine Definition of Done is complete.
+File Intelligence starts after Memory Engine validation passes. No P1/P2 feature should interrupt this gate.
