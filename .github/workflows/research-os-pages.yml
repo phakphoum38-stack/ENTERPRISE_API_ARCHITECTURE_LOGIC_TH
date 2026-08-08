@@ -59,6 +59,10 @@ jobs:
         with:
           path: site
 
+      - name: Wait for Pages artifact registration
+        shell: bash
+        run: sleep 10
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
