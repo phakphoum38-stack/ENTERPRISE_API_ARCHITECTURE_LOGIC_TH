@@ -24,15 +24,15 @@ Version numbers will only advance when the required gates below are met.
 - [x] Orchestrator HTTP API
 - [x] Flutter API client integration
 - [x] Live Agent Center orchestration dashboard
-- [ ] Create Orchestration UI
-- [ ] Flutter widget tests for Agent Center orchestration flow
+- [x] Create Orchestration UI
+- [x] Flutter widget tests for Agent Center orchestration flow
 
 ### Runtime and API
 - [x] Stable Research OS API base
 - [x] Agent API compatibility layer
-- [ ] Promote Agent API entrypoint into the primary runtime/service path
-- [ ] OpenAPI contract for orchestration endpoints
-- [ ] Runtime smoke test for orchestration endpoints
+- [x] Promote Agent API entrypoint into the primary runtime/service path
+- [x] OpenAPI contract for orchestration endpoints
+- [x] Runtime smoke test for orchestration endpoints
 
 ### Desktop / delivery
 - [x] Windows Flutter release build
