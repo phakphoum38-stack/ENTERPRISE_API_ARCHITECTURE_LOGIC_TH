@@ -2,32 +2,33 @@ name: Research OS Agent Platform
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - Research OS Windows Desktop
-    types:
-      - completed
-    branches:
-      - main
+  push:
+    branches: [main]
+    paths:
+      - "tools/research_os_api/agent_*.py"
+      - "tools/research_os_api/test_agent_*.py"
+      - ".github/workflows/research-os-agent-platform.yml"
+  pull_request:
+    paths:
+      - "tools/research_os_api/agent_*.py"
+      - "tools/research_os_api/test_agent_*.py"
+      - ".github/workflows/research-os-agent-platform.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: research-os-agent-secondary-${{ github.event.workflow_run.head_branch || github.ref }}
+  group: research-os-agent-platform-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate-agent-platform:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
 
     steps:
-      - name: Checkout validated commit
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -133,7 +134,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "# Research OS Agent Platform — Secondary"
+            echo "# Research OS Agent Platform"
             echo "- Agent registry/runtime/permission checks remain"
             echo "- Multi-Agent orchestrator compile and unit tests enabled"
             echo "- Dependency delegation and confirmation flow validated"
