@@ -153,21 +153,36 @@ jobs:
 
       - name: Emergency cleanup and diagnostics
         if: always()
+        continue-on-error: true
         shell: pwsh
         run: |
           Write-Host "=== FINAL SERVICE STATE ==="
-          sc.exe query ResearchOSService 2>&1 | Out-Host
+          & sc.exe query ResearchOSService 2>&1 | Out-Host
+          $global:LASTEXITCODE = 0
+
           Write-Host "=== FINAL PORT STATE ==="
           Get-NetTCPConnection -LocalPort 8787 -ErrorAction SilentlyContinue | Format-Table -AutoSize
+
           if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
-            sc.exe stop ResearchOSService | Out-Host
+            & sc.exe stop ResearchOSService 2>&1 | Out-Host
+            $global:LASTEXITCODE = 0
             Start-Sleep -Seconds 1
-            sc.exe delete ResearchOSService | Out-Host
+            & sc.exe delete ResearchOSService 2>&1 | Out-Host
+            $global:LASTEXITCODE = 0
           }
+
           $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
-          foreach ($listener in $listeners) { Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue }
+          foreach ($listener in $listeners) {
+            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+          }
+
+          # Diagnostics must never determine validation success. The strict
+          # install/service/health/uninstall assertions above are authoritative.
+          $global:LASTEXITCODE = 0
+          exit 0
 
       - name: Dispatch release workflow
+        if: success()
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
