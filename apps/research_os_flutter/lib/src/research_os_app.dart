@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api/api_auto_discovery.dart';
+import 'api/api_connection_state.dart';
 import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
@@ -30,14 +31,32 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   }
 
   Future<void> _loadApiEndpoint() async {
+    apiConnectionState.value = const ApiConnectionSnapshot(
+      phase: ApiConnectionPhase.searching,
+    );
+
     final preferred = await ApiEndpointStore.load();
     final discovered = await ApiAutoDiscovery.discover(preferredUrl: preferred);
     final url = discovered?.baseUrl ?? preferred;
+
     if (discovered != null && discovered.baseUrl != preferred) {
       await ApiEndpointStore.save(discovered.baseUrl);
     }
     if (!mounted) return;
+
     _replaceApiClient(url);
+    apiConnectionState.value = discovered == null
+        ? ApiConnectionSnapshot(
+            phase: ApiConnectionPhase.offline,
+            baseUrl: url,
+            source: 'configured',
+          )
+        : ApiConnectionSnapshot(
+            phase: ApiConnectionPhase.connected,
+            baseUrl: discovered.baseUrl,
+            latency: discovered.latency,
+            source: discovered.source,
+          );
     _startHeartbeat();
   }
 
@@ -62,18 +81,52 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
     if (current == null || _reconnecting) return;
 
     final healthy = await ApiAutoDiscovery.probe(current, source: 'heartbeat');
-    if (healthy != null || !mounted) return;
+    if (healthy != null) {
+      apiConnectionState.value = ApiConnectionSnapshot(
+        phase: ApiConnectionPhase.connected,
+        baseUrl: healthy.baseUrl,
+        latency: healthy.latency,
+        source: healthy.source,
+      );
+      return;
+    }
+    if (!mounted) return;
 
     _reconnecting = true;
+    apiConnectionState.value = ApiConnectionSnapshot(
+      phase: ApiConnectionPhase.reconnecting,
+      baseUrl: current,
+      source: 'heartbeat',
+    );
+
     try {
       final discovered = await ApiAutoDiscovery.discover(
         preferredUrl: current,
         scanLan: true,
       );
-      if (!mounted || discovered == null || discovered.baseUrl == current) return;
-      await ApiEndpointStore.save(discovered.baseUrl);
       if (!mounted) return;
-      _replaceApiClient(discovered.baseUrl);
+
+      if (discovered == null) {
+        apiConnectionState.value = ApiConnectionSnapshot(
+          phase: ApiConnectionPhase.offline,
+          baseUrl: current,
+          source: 'discovery',
+        );
+        return;
+      }
+
+      if (discovered.baseUrl != current) {
+        await ApiEndpointStore.save(discovered.baseUrl);
+        if (!mounted) return;
+        _replaceApiClient(discovered.baseUrl);
+      }
+
+      apiConnectionState.value = ApiConnectionSnapshot(
+        phase: ApiConnectionPhase.connected,
+        baseUrl: discovered.baseUrl,
+        latency: discovered.latency,
+        source: discovered.source,
+      );
     } finally {
       _reconnecting = false;
     }
@@ -83,7 +136,13 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
     final normalized = ApiEndpointStore.normalize(value);
     await ApiEndpointStore.save(normalized);
     if (!mounted) return;
+
     _replaceApiClient(normalized);
+    apiConnectionState.value = ApiConnectionSnapshot(
+      phase: ApiConnectionPhase.searching,
+      baseUrl: normalized,
+      source: 'manual',
+    );
     unawaited(_verifyConnection());
   }
 
