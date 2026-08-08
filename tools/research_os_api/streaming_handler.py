@@ -150,6 +150,7 @@ class StreamingResearchOSHandler(ResearchOSHandler):
         started = time.perf_counter()
         first_delta_at: float | None = None
         output_chars = 0
+        output_parts: list[str] = []
         try:
             body = self._read_json()
             prompt = str(body.get("prompt", body.get("question", ""))).strip()
@@ -157,6 +158,7 @@ class StreamingResearchOSHandler(ResearchOSHandler):
                 raise ValueError("prompt is required")
 
             use_memory = bool(body.get("memory", False))
+            capture_memory = bool(body.get("capture_memory", use_memory))
             memory_hits = []
             system = str(body.get("system", ""))
             provider_prompt = prompt
@@ -183,6 +185,7 @@ class StreamingResearchOSHandler(ResearchOSHandler):
                     "type": "meta",
                     "session_id": body.get("session_id"),
                     "memory_count": len(memory_hits),
+                    "memory_capture": capture_memory,
                 }
             )
 
@@ -195,6 +198,35 @@ class StreamingResearchOSHandler(ResearchOSHandler):
                 if chunk.done:
                     elapsed_ms = int((time.perf_counter() - started) * 1000)
                     first_token_ms = None if first_delta_at is None else int((first_delta_at - started) * 1000)
+                    captured_ids: list[str] = []
+                    if capture_memory and output_parts:
+                        engine = MemoryEngine()
+                        session_id = str(body.get("session_id") or "").strip() or None
+                        user_record = engine.remember(
+                            type="conversation",
+                            content=prompt,
+                            title="User message",
+                            source="chat",
+                            session_id=session_id,
+                            provider=chunk.provider,
+                            tags=("chat", "user"),
+                            metadata={"role": "user", "model": chunk.model},
+                        )
+                        assistant_record = engine.remember(
+                            type="conversation",
+                            content="".join(output_parts),
+                            title="Assistant response",
+                            source="chat",
+                            session_id=session_id,
+                            provider=chunk.provider,
+                            tags=("chat", "assistant"),
+                            metadata={
+                                "role": "assistant",
+                                "model": chunk.model,
+                                "elapsed_ms": elapsed_ms,
+                            },
+                        )
+                        captured_ids = [user_record.id, assistant_record.id]
                     self._write_stream_event(
                         {
                             "type": "done",
@@ -202,6 +234,8 @@ class StreamingResearchOSHandler(ResearchOSHandler):
                             "model": chunk.model,
                             "session_id": body.get("session_id"),
                             "memory_count": len(memory_hits),
+                            "memory_capture": capture_memory,
+                            "captured_memory_ids": captured_ids,
                             "metrics": {
                                 "elapsed_ms": elapsed_ms,
                                 "time_to_first_delta_ms": first_token_ms,
@@ -213,6 +247,7 @@ class StreamingResearchOSHandler(ResearchOSHandler):
                 if first_delta_at is None:
                     first_delta_at = time.perf_counter()
                 output_chars += len(chunk.text)
+                output_parts.append(chunk.text)
                 self._write_stream_event(
                     {
                         "type": "delta",
