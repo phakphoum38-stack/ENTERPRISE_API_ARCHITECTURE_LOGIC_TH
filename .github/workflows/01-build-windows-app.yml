@@ -55,6 +55,15 @@ jobs:
         shell: pwsh
         run: flutter pub get
 
+      - name: Refresh Windows plugin links
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          if (Test-Path "windows\flutter\ephemeral") {
+            Remove-Item "windows\flutter\ephemeral" -Recurse -Force
+          }
+          flutter pub get
+
       - name: Analyze Flutter
         working-directory: apps/research_os_flutter
         shell: pwsh
