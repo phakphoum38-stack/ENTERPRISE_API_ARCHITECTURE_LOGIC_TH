@@ -1,0 +1,79 @@
+name: Research OS Build Android Isolated
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Git ref to build
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-android-isolated-${{ inputs.target_ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  build-android:
+    name: Build Android APK and AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_ref || 'main' }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android platform shell
+        working-directory: apps/research_os_flutter
+        run: flutter create --platforms=android --project-name=research_os_flutter .
+
+      - name: Install dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/research_os_flutter
+        run: flutter test
+
+      - name: Build release APK
+        working-directory: apps/research_os_flutter
+        run: flutter build apk --release
+
+      - name: Build release App Bundle
+        working-directory: apps/research_os_flutter
+        run: flutter build appbundle --release
+
+      - name: Stage Android artifacts
+        run: |
+          mkdir -p dist/android
+          cp apps/research_os_flutter/build/app/outputs/flutter-apk/app-release.apk dist/android/Research-OS-Android.apk
+          cp apps/research_os_flutter/build/app/outputs/bundle/release/app-release.aab dist/android/Research-OS-Android.aab
+          sha256sum dist/android/* > dist/android/SHA256SUMS.txt
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-android-${{ github.run_id }}
+          path: dist/android/**
+          if-no-files-found: error
+          retention-days: 14
