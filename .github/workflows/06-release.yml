@@ -62,8 +62,20 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Dispatch compatibility gate
+      - name: Dispatch secondary validation directly
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run research-os-windows-desktop.yml --repo "${{ github.repository }}" --ref main -f target_sha="$TARGET_SHA"
+        run: |
+          for workflow in \
+            research-os-agent-platform.yml \
+            research-os-performance-gate.yml \
+            research-curator-validate.yml
+          do
+            gh workflow run "$workflow" --repo "${{ github.repository }}" --ref main
+          done
+
+          gh workflow run research-os-flutter.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f target_sha="$TARGET_SHA"

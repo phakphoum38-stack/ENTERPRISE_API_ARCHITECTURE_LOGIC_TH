@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:research_os_flutter/src/api/provider_selection_store.dart';
 import 'package:research_os_flutter/src/api/research_os_api_client.dart';
 import 'package:research_os_flutter/src/app_shell.dart';
 import 'package:research_os_flutter/src/features/home/home_page.dart';
+import 'package:research_os_flutter/src/features/settings/settings_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeResearchOSApiClient extends ResearchOSApiClient {
   FakeResearchOSApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
 
+  String? lastProvider;
+
   @override
   Future<Map<String, dynamic>> getHealth() async => <String, dynamic>{
         'status': 'ok',
         'memory': true,
+        'version': '0.6.0',
       };
 
   @override
@@ -83,17 +88,27 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
-  Future<Map<String, dynamic>> answerWithMemory(String question) async =>
-      <String, dynamic>{
-        'text': 'คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด',
-        'memory_hits': <Map<String, dynamic>>[
-          <String, dynamic>{'artifact_id': 'RES-TEST'},
-        ],
-      };
+  Future<Map<String, dynamic>> answerWithMemory(
+    String question, {
+    String? provider,
+  }) async {
+    lastProvider = provider ?? selectedProviderState.value;
+    return <String, dynamic>{
+      'text': 'คำตอบจาก AI ที่ใช้ความรู้ในห้องสมุด',
+      'memory_hits': <Map<String, dynamic>>[
+        <String, dynamic>{'artifact_id': 'RES-TEST'},
+      ],
+    };
+  }
 
   @override
-  Future<Map<String, dynamic>> generateText(String prompt) async =>
-      <String, dynamic>{'text': 'คำตอบจาก Gemini โดยตรง'};
+  Future<Map<String, dynamic>> generateText(
+    String prompt, {
+    String? provider,
+  }) async {
+    lastProvider = provider ?? selectedProviderState.value;
+    return <String, dynamic>{'text': 'คำตอบจาก AI โดยตรง'};
+  }
 
   @override
   void close() {}
@@ -116,6 +131,7 @@ Future<void> openDesktopDestination(WidgetTester tester, int index) async {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
+    selectedProviderState.value = ProviderSelectionStore.defaultProvider;
   });
 
   testWidgets('home dashboard shows Research OS status', (tester) async {
@@ -134,6 +150,7 @@ void main() {
     expect(find.text('Online'), findsOneWidget);
     expect(find.text('gemini'), findsOneWidget);
     expect(find.text('Ready'), findsOneWidget);
+    expect(find.textContaining('v0.6.0'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -141,10 +158,9 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final client = FakeResearchOSApiClient();
     await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
+      MaterialApp(home: ResearchOSAppShell(apiClient: client)),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -158,10 +174,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
+    expect(find.text('คำตอบจาก AI ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
     expect(find.text('Memory 1 รายการ'), findsOneWidget);
+    expect(client.lastProvider, 'gemini');
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('research_os_chat_sessions_v1'), isNotNull);
+    expect(prefs.getString('research_os_chat_sessions_v2'), isNotNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -222,32 +239,77 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('settings shows provider and changes theme mode', (tester) async {
+  testWidgets('settings changes theme and switches provider live', (tester) async {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     ThemeMode selectedTheme = ThemeMode.system;
+    final client = FakeResearchOSApiClient();
 
     await tester.pumpWidget(
       MaterialApp(
-        home: ResearchOSAppShell(
-          apiClient: FakeResearchOSApiClient(),
+        home: SettingsPage(
+          apiClient: client,
           themeMode: selectedTheme,
           onThemeModeChanged: (value) => selectedTheme = value,
         ),
       ),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await openDesktopDestination(tester, 9);
+    await tester.pump(const Duration(milliseconds: 150));
 
-    expect(find.text('Active Provider'), findsOneWidget);
-    expect(find.text('gemini'), findsWidgets);
+    expect(find.text('Settings'), findsOneWidget);
     expect(find.text('http://127.0.0.1:8787'), findsOneWidget);
 
+    final settingsScrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Provider Manager'),
+      420,
+      scrollable: settingsScrollable,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Selected Provider'), findsOneWidget);
+    expect(find.text('gemini'), findsWidgets);
+
+    await tester.ensureVisible(find.byKey(const Key('provider-option-mock')));
+    await tester.tap(find.byKey(const Key('provider-option-mock')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(selectedProviderState.value, 'mock');
+
+    await tester.scrollUntilVisible(
+      find.text('Dark'),
+      -420,
+      scrollable: settingsScrollable,
+    );
     await tester.tap(find.text('Dark'));
     await tester.pump();
     expect(selectedTheme, ThemeMode.dark);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('chat uses provider selected in settings', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final client = FakeResearchOSApiClient();
+    await ProviderSelectionStore.save('mock');
+
+    await tester.pumpWidget(
+      MaterialApp(home: ResearchOSAppShell(apiClient: client)),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await openDesktopDestination(tester, 1);
+
+    await tester.enterText(find.byType(TextField).first, 'ทดสอบ provider');
+    await tester.tap(find.byTooltip('ส่ง'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(client.lastProvider, 'mock');
     expect(tester.takeException(), isNull);
   });
 }

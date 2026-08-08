@@ -1,28 +1,17 @@
 name: Research OS Build Windows App
 
+# Dedicated native build gate: no analyze/test work is duplicated here.
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - "apps/research_os_flutter/**"
-      - "tools/research_os_api/**"
-      - "tools/research_os_service/**"
-      - "tools/research_curator/**"
-      - "scripts/*research-os*.ps1"
-      - "installer/**"
-      - ".github/workflows/0*-*.yml"
-      - ".github/workflows/research-os-windows-desktop.yml"
+      - ".github/workflows/01-build-windows-app.yml"
   pull_request:
     paths:
       - "apps/research_os_flutter/**"
-      - "tools/research_os_api/**"
-      - "tools/research_os_service/**"
-      - "tools/research_curator/**"
-      - "scripts/*research-os*.ps1"
-      - "installer/**"
-      - ".github/workflows/0*-*.yml"
-      - ".github/workflows/research-os-windows-desktop.yml"
+      - ".github/workflows/01-build-windows-app.yml"
 
 permissions:
   contents: read
@@ -33,7 +22,7 @@ concurrency:
 
 jobs:
   build-app:
-    name: Build Windows app
+    name: Build Windows app only
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
@@ -45,25 +34,57 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Purge cached secure-storage packages
+        shell: pwsh
+        run: |
+          $hosted = Join-Path $env:PUB_CACHE "hosted\pub.dev"
+          if (Test-Path $hosted) {
+            Get-ChildItem $hosted -Directory -Filter "flutter_secure_storage*" -ErrorAction SilentlyContinue |
+              Remove-Item -Recurse -Force
+          }
+
       - name: Generate Windows platform shell
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: flutter create --platforms=windows --project-name=research_os_flutter .
 
-      - name: Install Flutter dependencies
+      - name: Install Flutter dependencies fresh
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: flutter pub get
 
-      - name: Analyze Flutter
+      - name: Verify secure-storage Windows plugin files
         working-directory: apps/research_os_flutter
         shell: pwsh
-        run: flutter analyze
+        run: |
+          $plugin = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows"
+          if (-not (Test-Path $plugin)) {
+            throw "flutter_secure_storage_windows plugin link missing: $plugin"
+          }
+          $publicHeader = Join-Path $plugin "include\flutter_secure_storage_windows\flutter_secure_storage_windows_plugin.h"
+          $sourceHeader = Join-Path $plugin "flutter_secure_storage_windows_plugin.h"
+          if (-not (Test-Path $publicHeader)) {
+            Write-Host "Plugin directory contents:"
+            Get-ChildItem $plugin -Recurse | Select-Object FullName
+            throw "Secure-storage public header missing: $publicHeader"
+          }
+          if (-not (Test-Path $sourceHeader)) {
+            Write-Host "Plugin directory contents:"
+            Get-ChildItem $plugin -Recurse | Select-Object FullName
+            throw "Secure-storage source header missing: $sourceHeader"
+          }
+          Write-Host "Secure-storage Windows headers verified."
 
-      - name: Run Flutter tests
-        working-directory: apps/research_os_flutter
+      - name: Verify Visual Studio ATL is available
         shell: pwsh
-        run: flutter test
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found" }
+          $install = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.ATL -property installationPath
+          if (-not $install) {
+            throw "Visual Studio C++ ATL component is required by flutter_secure_storage_windows but is not installed on this runner."
+          }
+          Write-Host "ATL available at $install"
 
       - name: Build Windows desktop
         working-directory: apps/research_os_flutter

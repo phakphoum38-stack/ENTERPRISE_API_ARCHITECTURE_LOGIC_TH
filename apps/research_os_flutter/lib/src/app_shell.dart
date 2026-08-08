@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
-import 'features/chat/chat_page.dart';
+import 'features/chat/chat_page_v2.dart';
 import 'features/github/github_dashboard_page.dart';
-import 'features/google_workspace/google_workspace_page.dart';
 import 'features/graph/knowledge_graph_page.dart';
 import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
 import 'features/local_api/local_api_control_page.dart';
+import 'features/memory/memory_inspector_page.dart';
 import 'features/monitor/system_monitor_page.dart';
 import 'features/settings/settings_page.dart';
 import 'ui/enterprise_navigation.dart';
@@ -37,12 +37,11 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   List<Widget> get _pages => <Widget>[
         HomePage(apiClient: widget.apiClient),
-        ChatPage(apiClient: widget.apiClient),
+        ChatPageV2(apiClient: widget.apiClient),
         const AgentCenterPage(),
         LibraryPage(apiClient: widget.apiClient),
         KnowledgeGraphPage(apiClient: widget.apiClient),
         GitHubDashboardPage(apiClient: widget.apiClient),
-        GoogleWorkspacePage(apiClient: widget.apiClient),
         const LocalApiControlPage(),
         SystemMonitorPage(apiClient: widget.apiClient),
         SettingsPage(
@@ -56,6 +55,14 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   void _select(int index) => setState(() => _selectedIndex = index);
 
+  Future<void> _openMemoryInspector() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => MemoryInspectorPage(apiClient: widget.apiClient),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = researchNavigationItems
@@ -65,6 +72,13 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
       builder: (context, constraints) {
         if (constraints.maxWidth >= 920) {
           return Scaffold(
+            floatingActionButton: FloatingActionButton.extended(
+              key: const Key('open-memory-inspector'),
+              tooltip: 'Memory Inspector',
+              onPressed: _openMemoryInspector,
+              icon: const Icon(Icons.memory_outlined),
+              label: const Text('Memory'),
+            ),
             body: SafeArea(
               child: Row(
                 children: <Widget>[
@@ -120,8 +134,14 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
             ),
             actions: <Widget>[
               IconButton(
+                key: const Key('open-memory-inspector'),
+                tooltip: 'Memory Inspector',
+                onPressed: _openMemoryInspector,
+                icon: const Icon(Icons.memory_outlined),
+              ),
+              IconButton(
                 tooltip: 'System Monitor',
-                onPressed: () => _select(8),
+                onPressed: () => _select(7),
                 icon: const Icon(Icons.monitor_heart_outlined),
               ),
             ],

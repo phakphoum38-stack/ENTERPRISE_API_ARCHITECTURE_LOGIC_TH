@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterator
 
 
 @dataclass(frozen=True)
@@ -23,6 +23,14 @@ class ProviderResult:
     model: str
     text: str
     raw: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ProviderChunk:
+    provider: str
+    model: str
+    text: str
+    done: bool = False
 
 
 class ProviderError(RuntimeError):
@@ -36,6 +44,37 @@ class AIProvider(ABC):
     def generate(self, prompt: str, *, system: str = "", model: str | None = None) -> ProviderResult:
         raise NotImplementedError
 
+    def stream(
+        self,
+        prompt: str,
+        *,
+        system: str = "",
+        model: str | None = None,
+        chunk_size: int = 48,
+    ) -> Iterator[ProviderChunk]:
+        """Yield a provider-neutral response stream.
+
+        Providers without native streaming fall back to transport streaming:
+        ``generate`` completes first and the final text is exposed as bounded
+        chunks. Native adapters override this method while preserving this
+        provider-neutral contract for the API and Flutter client.
+        """
+        result = self.generate(prompt, system=system, model=model)
+        text = result.text
+        size = max(1, min(int(chunk_size), 512))
+        for offset in range(0, len(text), size):
+            yield ProviderChunk(
+                provider=result.provider,
+                model=result.model,
+                text=text[offset : offset + size],
+            )
+        yield ProviderChunk(
+            provider=result.provider,
+            model=result.model,
+            text="",
+            done=True,
+        )
+
 
 class MockProvider(AIProvider):
     name = "mock"
@@ -47,7 +86,11 @@ class MockProvider(AIProvider):
 
 
 class OpenAICompatibleProvider(AIProvider):
-    """Adapter for OpenAI-compatible chat-completions endpoints."""
+    """Adapter for OpenAI-compatible chat-completions endpoints.
+
+    This also covers Ollama when its OpenAI-compatible ``/v1/chat/completions``
+    endpoint is configured.
+    """
 
     name = "openai-compatible"
 
@@ -56,22 +99,94 @@ class OpenAICompatibleProvider(AIProvider):
         self.api_key = api_key
         self.default_model = default_model
 
-    def generate(self, prompt: str, *, system: str = "", model: str | None = None) -> ProviderResult:
-        selected = model or self.default_model
-        messages = []
+    def _messages(self, prompt: str, system: str) -> list[dict[str, str]]:
+        messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        payload = {"model": selected, "messages": messages, "temperature": 0.1}
+        return messages
+
+    def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        raw = _post_json(self.endpoint, payload, headers)
+        return headers
+
+    def generate(self, prompt: str, *, system: str = "", model: str | None = None) -> ProviderResult:
+        selected = model or self.default_model
+        payload = {
+            "model": selected,
+            "messages": self._messages(prompt, system),
+            "temperature": 0.1,
+        }
+        raw = _post_json(self.endpoint, payload, self._headers())
         try:
             text = raw["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise ProviderError(f"invalid OpenAI-compatible response: {exc}") from exc
         return ProviderResult(self.name, selected, str(text), raw)
+
+    def stream(
+        self,
+        prompt: str,
+        *,
+        system: str = "",
+        model: str | None = None,
+        chunk_size: int = 48,
+    ) -> Iterator[ProviderChunk]:
+        selected = model or self.default_model
+        payload = {
+            "model": selected,
+            "messages": self._messages(prompt, system),
+            "temperature": 0.1,
+            "stream": True,
+        }
+        request = urllib.request.Request(
+            self.endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=self._headers(),
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line or line.startswith(":"):
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    try:
+                        delta = event["choices"][0].get("delta", {})
+                        text = delta.get("content") or ""
+                    except (KeyError, IndexError, TypeError, AttributeError):
+                        text = ""
+                    event_model = str(event.get("model") or selected)
+                    if text:
+                        yield ProviderChunk(self.name, event_model, str(text))
+                yield ProviderChunk(self.name, selected, "", done=True)
+                return
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+            # Some OpenAI-compatible servers do not implement SSE. Preserve
+            # compatibility by falling back to the non-streaming contract.
+            try:
+                yield from super().stream(
+                    prompt,
+                    system=system,
+                    model=selected,
+                    chunk_size=chunk_size,
+                )
+                return
+            except Exception as fallback_exc:
+                raise ProviderError(
+                    f"OpenAI-compatible streaming failed: {exc}; fallback failed: {fallback_exc}"
+                ) from fallback_exc
 
 
 class AnthropicProvider(AIProvider):
@@ -112,17 +227,83 @@ class GeminiProvider(AIProvider):
         self.api_key = api_key
         self.default_model = default_model
 
+    def _payload(self, prompt: str, system: str) -> dict[str, Any]:
+        combined = f"{system}\n\n{prompt}".strip() if system else prompt
+        return {"contents": [{"parts": [{"text": combined}]}]}
+
     def generate(self, prompt: str, *, system: str = "", model: str | None = None) -> ProviderResult:
         selected = model or self.default_model
         endpoint = self.endpoint_template.format(model=selected, api_key=self.api_key)
-        combined = f"{system}\n\n{prompt}".strip() if system else prompt
-        payload = {"contents": [{"parts": [{"text": combined}]}]}
-        raw = _post_json(endpoint, payload, {"Content-Type": "application/json"})
+        raw = _post_json(
+            endpoint,
+            self._payload(prompt, system),
+            {"Content-Type": "application/json"},
+        )
         try:
             text = raw["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError, TypeError) as exc:
             raise ProviderError(f"invalid Gemini response: {exc}") from exc
         return ProviderResult(self.name, selected, str(text), raw)
+
+    def stream(
+        self,
+        prompt: str,
+        *,
+        system: str = "",
+        model: str | None = None,
+        chunk_size: int = 48,
+    ) -> Iterator[ProviderChunk]:
+        selected = model or self.default_model
+        endpoint = self.endpoint_template.format(model=selected, api_key=self.api_key)
+        if ":generateContent" in endpoint:
+            endpoint = endpoint.replace(":generateContent", ":streamGenerateContent")
+        separator = "&" if "?" in endpoint else "?"
+        if "alt=sse" not in endpoint:
+            endpoint = f"{endpoint}{separator}alt=sse"
+
+        request = urllib.request.Request(
+            endpoint,
+            data=json.dumps(self._payload(prompt, system)).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if not data:
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    try:
+                        parts = event["candidates"][0]["content"]["parts"]
+                    except (KeyError, IndexError, TypeError):
+                        parts = []
+                    for part in parts if isinstance(parts, list) else []:
+                        if isinstance(part, dict):
+                            text = part.get("text")
+                            if text:
+                                yield ProviderChunk(self.name, selected, str(text))
+                yield ProviderChunk(self.name, selected, "", done=True)
+                return
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+            try:
+                yield from super().stream(
+                    prompt,
+                    system=system,
+                    model=selected,
+                    chunk_size=chunk_size,
+                )
+                return
+            except Exception as fallback_exc:
+                raise ProviderError(
+                    f"Gemini streaming failed: {exc}; fallback failed: {fallback_exc}"
+                ) from fallback_exc
 
 
 def _env_or_default(name: str, default: str) -> str:
@@ -183,7 +364,7 @@ def build_provider(name: str | None = None) -> AIProvider:
     selected = (name or os.getenv("RESEARCH_OS_PROVIDER", "mock")).lower()
     if selected == "mock":
         return MockProvider()
-    if selected in {"openai", "openai-compatible", "local"}:
+    if selected in {"openai", "openai-compatible", "local", "ollama"}:
         endpoint = _env_or_default(
             "RESEARCH_OS_OPENAI_ENDPOINT",
             "http://localhost:11434/v1/chat/completions",
