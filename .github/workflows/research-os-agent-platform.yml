@@ -33,14 +33,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile Agent Platform and Runtime
+      - name: Compile Agent Platform Runtime and Orchestrator
         run: |
           python -m py_compile tools/research_os_api/agent_platform.py
           python -m py_compile tools/research_os_api/agent_runtime.py
+          python -m py_compile tools/research_os_api/agent_orchestrator.py
 
-      - name: Test Agent Registry Router Permissions and Runtime
+      - name: Test Agent Registry Router Runtime and Orchestration
         working-directory: tools/research_os_api
-        run: python -m unittest test_agent_platform.py test_agent_runtime.py -v
+        run: python -m unittest test_agent_platform.py test_agent_runtime.py test_agent_orchestrator.py -v
 
       - name: Validate initial agent registry
         working-directory: tools/research_os_api
@@ -92,11 +93,48 @@ jobs:
               print("Agent Runtime OK")
           PY
 
+      - name: Validate Multi-Agent dependency and confirmation flow
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          import tempfile
+          from agent_orchestrator import AgentOrchestrator
+          from agent_runtime import AgentEventBus, AgentTaskQueue, SharedContextStore
+
+          with tempfile.TemporaryDirectory() as tmp:
+              runtime = AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp))
+              orchestrator = AgentOrchestrator(runtime=runtime)
+              run = orchestrator.create_run(
+                  "Research then prepare shift calendar sync",
+                  [
+                      {
+                          "step_id": "research",
+                          "objective": "research roster evidence",
+                          "requested_agent": "research",
+                      },
+                      {
+                          "step_id": "shift",
+                          "objective": "analyze shift roster and calendar_sync",
+                          "requested_agent": "shift",
+                          "depends_on": ["research"],
+                      },
+                  ],
+              )
+              waiting = orchestrator.execute(run["run_id"])
+              if waiting["status"] != "awaiting_confirmation":
+                  raise SystemExit(f"Expected orchestration confirmation gate, got {waiting['status']}")
+              completed = orchestrator.confirm(run["run_id"])
+              if completed["status"] != "completed":
+                  raise SystemExit(f"Orchestration did not complete: {completed['status']}")
+              print("Multi-Agent orchestration OK")
+          PY
+
       - name: Summary
         if: always()
         run: |
           {
             echo "# Research OS Agent Platform — Secondary"
-            echo "- Generic Flutter analyze/test removed; owned by main workflow"
             echo "- Agent registry/runtime/permission checks remain"
+            echo "- Multi-Agent orchestrator compile and unit tests enabled"
+            echo "- Dependency delegation and confirmation flow validated"
           } >> "$GITHUB_STEP_SUMMARY"
