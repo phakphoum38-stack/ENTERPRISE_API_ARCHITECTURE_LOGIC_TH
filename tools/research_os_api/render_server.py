@@ -15,10 +15,10 @@ from email_identity import (
     update_preferences,
     verify_code,
 )
-from server import ResearchOSHandler
+from streaming_handler import StreamingResearchOSHandler
 
 
-class CloudResearchOSHandler(ResearchOSHandler):
+class CloudResearchOSHandler(StreamingResearchOSHandler):
     """Research OS handler configured for the public Flutter web client."""
 
     def end_headers(self) -> None:
@@ -33,6 +33,7 @@ class CloudResearchOSHandler(ResearchOSHandler):
             "Access-Control-Allow-Headers",
             "Content-Type, Authorization, X-Research-OS-Sync-Key",
         )
+        self.send_header("Access-Control-Expose-Headers", "Content-Type")
         self.send_header("Access-Control-Max-Age", "86400")
         super().end_headers()
 
