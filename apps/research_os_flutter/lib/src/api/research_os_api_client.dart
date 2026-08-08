@@ -49,6 +49,66 @@ class ResearchOSApiClient {
     return _decode(response);
   }
 
+  Future<Map<String, dynamic>> getRuntimeMemory({String? sessionId}) async {
+    if (sessionId == null || sessionId.trim().isEmpty) {
+      return _getJson('/v1/runtime-memory');
+    }
+    final uri = _uri('/v1/runtime-memory/timeline').replace(
+      queryParameters: <String, String>{
+        'session_id': sessionId.trim(),
+        'limit': '200',
+      },
+    );
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> searchRuntimeMemory(
+    String query, {
+    String? sessionId,
+  }) async {
+    final params = <String, String>{'q': query, 'limit': '50'};
+    if (sessionId != null && sessionId.trim().isNotEmpty) {
+      params['session_id'] = sessionId.trim();
+    }
+    final uri = _uri('/v1/runtime-memory/search').replace(
+      queryParameters: params,
+    );
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> createRuntimeMemory({
+    required String type,
+    required String content,
+    String title = '',
+    String source = 'user',
+    String? sessionId,
+    String? projectId,
+    String? provider,
+    List<String> tags = const <String>[],
+    int priority = 0,
+  }) {
+    return _postJson('/v1/runtime-memory', <String, Object?>{
+      'type': type,
+      'content': content,
+      'title': title,
+      'source': source,
+      if (sessionId != null) 'session_id': sessionId,
+      if (projectId != null) 'project_id': projectId,
+      if (provider != null) 'provider': provider,
+      'tags': tags,
+      'priority': priority,
+    });
+  }
+
+  Future<Map<String, dynamic>> deleteRuntimeMemory(String memoryId) async {
+    final response = await _client.delete(
+      _uri('/v1/runtime-memory/${Uri.encodeComponent(memoryId)}'),
+    );
+    return _decode(response);
+  }
+
   Future<Map<String, dynamic>> generateText(
     String prompt, {
     String? provider,
