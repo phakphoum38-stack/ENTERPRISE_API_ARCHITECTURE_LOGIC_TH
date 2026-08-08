@@ -1,0 +1,10 @@
+private/
+*.pfx
+*.p12
+*.pvk
+*.snk
+*.key
+*.pem
+*.cer
+*.crt
+*.base64.txt
