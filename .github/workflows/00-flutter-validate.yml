@@ -1,5 +1,6 @@
 name: Research OS Flutter Validate
 
+# Dedicated gate: dependency resolution, static analysis, and widget/unit tests only.
 on:
   workflow_dispatch:
   push:
