@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api/api_auto_discovery.dart';
+import 'api/api_connection_preferences.dart';
 import 'api/api_connection_state.dart';
 import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
@@ -16,48 +17,70 @@ class ResearchOSApp extends StatefulWidget {
 }
 
 class _ResearchOSAppState extends State<ResearchOSApp> {
-  static const _heartbeatInterval = Duration(seconds: 20);
-
   ThemeMode _themeMode = ThemeMode.system;
   ResearchOSApiClient? _apiClient;
   String? _apiBaseUrl;
   Timer? _heartbeatTimer;
   bool _reconnecting = false;
+  ApiConnectionPreferences _connectionPreferences =
+      ApiConnectionPreferences.defaults;
 
   @override
   void initState() {
     super.initState();
+    apiConnectionPreferences.addListener(_handleConnectionPreferencesChanged);
     _loadApiEndpoint();
   }
 
   Future<void> _loadApiEndpoint() async {
-    apiConnectionState.value = const ApiConnectionSnapshot(
-      phase: ApiConnectionPhase.searching,
-    );
+    final preferences = await ApiConnectionPreferences.load();
+    _connectionPreferences = preferences;
+    apiConnectionPreferences.value = preferences;
 
     final preferred = await ApiEndpointStore.load();
-    final discovered = await ApiAutoDiscovery.discover(preferredUrl: preferred);
-    final url = discovered?.baseUrl ?? preferred;
+    apiConnectionState.value = ApiConnectionSnapshot(
+      phase: preferences.autoDiscovery
+          ? ApiConnectionPhase.searching
+          : ApiConnectionPhase.offline,
+      baseUrl: preferred,
+      source: preferences.autoDiscovery ? 'startup' : 'manual',
+    );
 
+    ApiDiscoveryResult? discovered;
+    if (preferences.autoDiscovery) {
+      discovered = await ApiAutoDiscovery.discover(
+        preferredUrl: preferred,
+        scanLan: preferences.scanLan,
+      );
+    } else {
+      discovered = await ApiAutoDiscovery.probe(preferred, source: 'manual');
+    }
+
+    final url = discovered?.baseUrl ?? preferred;
     if (discovered != null && discovered.baseUrl != preferred) {
       await ApiEndpointStore.save(discovered.baseUrl);
     }
     if (!mounted) return;
 
     _replaceApiClient(url);
-    apiConnectionState.value = discovered == null
-        ? ApiConnectionSnapshot(
-            phase: ApiConnectionPhase.offline,
-            baseUrl: url,
-            source: 'configured',
-          )
-        : ApiConnectionSnapshot(
-            phase: ApiConnectionPhase.connected,
-            baseUrl: discovered.baseUrl,
-            latency: discovered.latency,
-            source: discovered.source,
-          );
+    apiConnectionState.value = ApiConnectionSnapshot(
+      phase: discovered == null
+          ? ApiConnectionPhase.offline
+          : ApiConnectionPhase.connected,
+      baseUrl: url,
+      latency: discovered?.latency,
+      source: discovered?.source ?? 'saved',
+    );
     _startHeartbeat();
+  }
+
+  void _handleConnectionPreferencesChanged() {
+    final next = apiConnectionPreferences.value;
+    _connectionPreferences = next;
+    _startHeartbeat();
+    if (next.autoDiscovery) {
+      unawaited(_verifyConnection(forceDiscovery: true));
+    }
   }
 
   void _replaceApiClient(String url) {
@@ -71,17 +94,18 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
 
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
-      unawaited(_verifyConnection());
-    });
+    _heartbeatTimer = Timer.periodic(
+      _connectionPreferences.heartbeatInterval,
+      (_) => unawaited(_verifyConnection()),
+    );
   }
 
-  Future<void> _verifyConnection() async {
+  Future<void> _verifyConnection({bool forceDiscovery = false}) async {
     final current = _apiBaseUrl;
     if (current == null || _reconnecting) return;
 
     final healthy = await ApiAutoDiscovery.probe(current, source: 'heartbeat');
-    if (healthy != null) {
+    if (healthy != null && !forceDiscovery) {
       apiConnectionState.value = ApiConnectionSnapshot(
         phase: ApiConnectionPhase.connected,
         baseUrl: healthy.baseUrl,
@@ -90,27 +114,37 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
       );
       return;
     }
-    if (!mounted) return;
 
+    if (!_connectionPreferences.autoDiscovery) {
+      apiConnectionState.value = ApiConnectionSnapshot(
+        phase: healthy == null
+            ? ApiConnectionPhase.offline
+            : ApiConnectionPhase.connected,
+        baseUrl: current,
+        latency: healthy?.latency,
+        source: 'manual',
+      );
+      return;
+    }
+
+    if (!mounted) return;
     _reconnecting = true;
     apiConnectionState.value = ApiConnectionSnapshot(
       phase: ApiConnectionPhase.reconnecting,
       baseUrl: current,
       source: 'heartbeat',
     );
-
     try {
       final discovered = await ApiAutoDiscovery.discover(
         preferredUrl: current,
-        scanLan: true,
+        scanLan: _connectionPreferences.scanLan,
       );
       if (!mounted) return;
-
       if (discovered == null) {
         apiConnectionState.value = ApiConnectionSnapshot(
           phase: ApiConnectionPhase.offline,
           baseUrl: current,
-          source: 'discovery',
+          source: 'none',
         );
         return;
       }
@@ -120,7 +154,6 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
         if (!mounted) return;
         _replaceApiClient(discovered.baseUrl);
       }
-
       apiConnectionState.value = ApiConnectionSnapshot(
         phase: ApiConnectionPhase.connected,
         baseUrl: discovered.baseUrl,
@@ -136,7 +169,6 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
     final normalized = ApiEndpointStore.normalize(value);
     await ApiEndpointStore.save(normalized);
     if (!mounted) return;
-
     _replaceApiClient(normalized);
     apiConnectionState.value = ApiConnectionSnapshot(
       phase: ApiConnectionPhase.searching,
@@ -233,6 +265,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
 
   @override
   void dispose() {
+    apiConnectionPreferences.removeListener(_handleConnectionPreferencesChanged);
     _heartbeatTimer?.cancel();
     _apiClient?.close();
     super.dispose();
