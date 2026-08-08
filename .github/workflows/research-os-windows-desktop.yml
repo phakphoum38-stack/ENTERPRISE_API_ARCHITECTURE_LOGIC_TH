@@ -7,6 +7,10 @@ on:
         description: Commit SHA that completed the split Windows release pipeline
         required: true
         type: string
+      source_release_run:
+        description: Research OS Release workflow run ID
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -23,17 +27,40 @@ jobs:
     timeout-minutes: 5
     env:
       TARGET_SHA: ${{ inputs.target_sha }}
+      SOURCE_RELEASE_RUN: ${{ inputs.source_release_run }}
     steps:
       - name: Confirm verified release artifact exists
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Release" --commit "$TARGET_SHA" --limit 20 --json databaseId,status,conclusion --jq '[.[] | select((.status == "completed" and .conclusion == "success") or .status == "in_progress")][0].databaseId')"
-          if [ -z "$run_id" ]; then
-            echo "No release run found for $TARGET_SHA"
-            exit 1
+          run_id="$SOURCE_RELEASE_RUN"
+
+          if [ -n "$run_id" ]; then
+            workflow_name="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+            status="$(gh run view "$run_id" --repo "${{ github.repository }}" --json status --jq '.status')"
+            conclusion="$(gh run view "$run_id" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+
+            if [ "$workflow_name" != "Research OS Release" ]; then
+              echo "Run $run_id is not a Research OS Release run: $workflow_name"
+              exit 1
+            fi
+            if [ "$status" = "completed" ] && [ "$conclusion" != "success" ]; then
+              echo "Release run $run_id completed with conclusion: $conclusion"
+              exit 1
+            fi
+            if [ "$status" != "in_progress" ] && [ "$status" != "completed" ]; then
+              echo "Release run $run_id has unexpected status: $status"
+              exit 1
+            fi
+          else
+            run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Release" --commit "$TARGET_SHA" --limit 20 --json databaseId,status,conclusion --jq '[.[] | select((.status == "completed" and .conclusion == "success") or .status == "in_progress")][0].databaseId')"
+            if [ -z "$run_id" ]; then
+              echo "No release run found for $TARGET_SHA. For workflow-dispatch releases, pass source_release_run."
+              exit 1
+            fi
           fi
+
           echo "Split Windows pipeline reached release stage for $TARGET_SHA (run $run_id)."
 
       - name: Publish compatibility success
