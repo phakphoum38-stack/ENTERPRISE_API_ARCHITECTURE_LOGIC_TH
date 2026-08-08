@@ -1,6 +1,12 @@
 name: Research OS Flutter
 
 on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Commit SHA validated by the Windows release pipeline
+        required: false
+        type: string
   workflow_run:
     workflows:
       - Research OS Windows Desktop
@@ -11,9 +17,10 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
-  group: research-os-flutter-secondary-${{ github.event.workflow_run.head_branch }}
+  group: research-os-flutter-secondary-${{ inputs.target_sha || github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -22,7 +29,7 @@ env:
 jobs:
   build-web:
     name: Secondary web build
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -34,7 +41,7 @@ jobs:
       - name: Checkout validated main commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.target_sha || github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -61,6 +68,16 @@ jobs:
           path: apps/research_os_flutter/build/web
           retention-days: 2
 
+      - name: Dispatch Pages deployment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run research-os-pages.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f source_run_id="${{ github.run_id }}"
+
       - name: Write job summary
         if: always()
         run: |
@@ -68,7 +85,7 @@ jobs:
             echo "## Research OS Flutter — Secondary"
             echo
             echo "- Parent workflow: Research OS Windows Desktop"
-            echo "- Parent result: ${{ github.event.workflow_run.conclusion }}"
+            echo "- Trigger: ${{ github.event_name }}"
             echo "- Generic analyze/test are owned by the main workflow"
-            echo "- This workflow only produces the Pages-ready web artifact"
+            echo "- This workflow produces the Pages-ready web artifact and dispatches deployment"
           } >> "$GITHUB_STEP_SUMMARY"
