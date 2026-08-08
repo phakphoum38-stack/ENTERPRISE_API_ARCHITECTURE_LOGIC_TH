@@ -38,7 +38,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
   List<Widget> get _pages => <Widget>[
         HomePage(apiClient: widget.apiClient),
         ChatPage(apiClient: widget.apiClient),
-        const AgentCenterPage(),
+        AgentCenterPage(apiClient: widget.apiClient),
         LibraryPage(apiClient: widget.apiClient),
         KnowledgeGraphPage(apiClient: widget.apiClient),
         GitHubDashboardPage(apiClient: widget.apiClient),
