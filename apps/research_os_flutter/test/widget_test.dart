@@ -149,7 +149,7 @@ void main() {
     expect(find.text('Online'), findsOneWidget);
     expect(find.text('gemini'), findsOneWidget);
     expect(find.text('Ready'), findsOneWidget);
-    expect(find.text('0.6.0'), findsWidgets);
+    expect(find.textContaining('v0.6.0'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -177,7 +177,7 @@ void main() {
     expect(find.text('Memory 1 รายการ'), findsOneWidget);
     expect(client.lastProvider, 'gemini');
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('research_os_chat_sessions_v1'), isNotNull);
+    expect(prefs.getString('research_os_chat_sessions_v2'), isNotNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -257,9 +257,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 150));
     await openDesktopDestination(tester, 8);
 
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('http://127.0.0.1:8787'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Provider Manager'),
+      420,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
     expect(find.text('Selected Provider'), findsOneWidget);
     expect(find.text('gemini'), findsWidgets);
-    expect(find.text('http://127.0.0.1:8787'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('provider-option-mock')));
     await tester.tap(find.byKey(const Key('provider-option-mock')));
@@ -267,6 +277,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(selectedProviderState.value, 'mock');
 
+    await tester.scrollUntilVisible(
+      find.text('Dark'),
+      -420,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('Dark'));
     await tester.pump();
     expect(selectedTheme, ThemeMode.dark);
