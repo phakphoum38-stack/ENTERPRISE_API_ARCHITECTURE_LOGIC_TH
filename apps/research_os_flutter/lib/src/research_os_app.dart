@@ -9,6 +9,7 @@ import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
 import 'identity/owner_profile_store.dart';
+import 'identity/owner_session_store.dart';
 
 class ResearchOSApp extends StatefulWidget {
   const ResearchOSApp({super.key});
@@ -35,6 +36,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
 
   Future<void> _initializeApp() async {
     await OwnerProfileStore.loadIntoState();
+    await OwnerSessionStore.restore();
     await _loadApiEndpoint();
   }
 
