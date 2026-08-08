@@ -11,6 +11,7 @@ $Project = Join-Path $RepoRoot 'tools\research_os_service\ResearchOS.ServiceHost
 $PublishDir = Join-Path $RepoRoot 'tools\research_os_service\publish'
 $ServiceExe = Join-Path $PublishDir 'ResearchOS.ServiceHost.exe'
 $BundledPython = Join-Path $RepoRoot 'runtime\python\python.exe'
+$ApiPort = 8787
 
 function Test-Admin {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -38,6 +39,102 @@ function Wait-ServiceState([string]$Desired, [int]$Seconds = 20) {
   throw "Service did not reach state $Desired within $Seconds seconds."
 }
 
+function Get-PortListeners([int]$Port = $ApiPort) {
+  return @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+}
+
+function Test-ResearchOsApiProcess([int]$ProcessId) {
+  $process = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
+  if (-not $process) { return $false }
+
+  $commandLine = [string]$process.CommandLine
+  $executablePath = [string]$process.ExecutablePath
+  $normalizedRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
+  $normalizedBundledRoot = [IO.Path]::GetFullPath((Join-Path $RepoRoot 'runtime\python')).TrimEnd('\')
+
+  $isBundledPython = $false
+  if ($executablePath) {
+    try {
+      $normalizedExe = [IO.Path]::GetFullPath($executablePath)
+      $isBundledPython = $normalizedExe.StartsWith(
+        $normalizedBundledRoot + '\',
+        [StringComparison]::OrdinalIgnoreCase
+      )
+    }
+    catch {
+      $isBundledPython = $false
+    }
+  }
+
+  $isRepoRenderServer = $false
+  if ($commandLine -and $commandLine -match '(?i)render_server\.py') {
+    $isRepoRenderServer = $commandLine.IndexOf(
+      $normalizedRoot,
+      [StringComparison]::OrdinalIgnoreCase
+    ) -ge 0
+  }
+
+  if ($isBundledPython -or $isRepoRenderServer) {
+    Write-Host "Research OS API listener PID $ProcessId identified."
+    Write-Host "Executable : $executablePath"
+    Write-Host "CommandLine: $commandLine"
+    return $true
+  }
+
+  Write-Warning "PID $ProcessId is listening on port $ApiPort but does not look like a Research OS API process. It will not be terminated."
+  Write-Warning "Executable : $executablePath"
+  Write-Warning "CommandLine: $commandLine"
+  return $false
+}
+
+function Stop-ResearchOsApiListener([int]$Seconds = 15) {
+  $listeners = Get-PortListeners
+  if (-not $listeners) { return }
+
+  foreach ($listener in $listeners) {
+    $pidToStop = [int]$listener.OwningProcess
+    if ($pidToStop -le 0) { continue }
+
+    if (Test-ResearchOsApiProcess -ProcessId $pidToStop) {
+      Write-Host "Stopping orphan Research OS API process tree PID $pidToStop..."
+      & taskkill.exe /PID $pidToStop /T /F | Out-Host
+      if ($LASTEXITCODE -ne 0) {
+        Stop-Process -Id $pidToStop -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
+
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  do {
+    $remaining = Get-PortListeners
+    if (-not $remaining) {
+      Write-Host "Research OS API port $ApiPort is free."
+      return
+    }
+    Start-Sleep -Milliseconds 500
+  } while ((Get-Date) -lt $deadline)
+
+  $remaining = Get-PortListeners
+  foreach ($listener in $remaining) {
+    $pidRemaining = [int]$listener.OwningProcess
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$pidRemaining" -ErrorAction SilentlyContinue
+    Write-Warning "Port $ApiPort listener remains: PID=$pidRemaining Executable=$($process.ExecutablePath) CommandLine=$($process.CommandLine)"
+  }
+  throw "Port $ApiPort still has a listener after Research OS service shutdown."
+}
+
+function Stop-ResearchOsServiceAndApi {
+  $svc = Get-ServiceSafe
+  if ($svc -and $svc.Status -ne 'Stopped') {
+    Stop-Service -Name $ServiceName -Force
+    Wait-ServiceState 'Stopped' | Out-Null
+  }
+
+  # A service can report Stopped before a spawned Python process has fully exited.
+  # Only terminate listeners that can be positively identified as Research OS.
+  Stop-ResearchOsApiListener
+}
+
 function Set-ServiceEnvironment([string]$PythonPath) {
   $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
   if (-not (Test-Path $serviceKey)) {
@@ -49,7 +146,7 @@ function Set-ServiceEnvironment([string]$PythonPath) {
     "RESEARCH_OS_DATA_DIR=$DataDir",
     "RESEARCH_OS_PYTHON_EXE=$PythonPath",
     'RESEARCH_OS_API_HOST=0.0.0.0',
-    'RESEARCH_OS_API_PORT=8787'
+    "RESEARCH_OS_API_PORT=$ApiPort"
   )
 
   New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $values -Force | Out-Null
@@ -66,7 +163,7 @@ switch ($Action) {
     Write-Host "Research OS Service: $($svc.Status)"
     Write-Host "Service name       : $ServiceName"
     Write-Host "Startup            : $startMode"
-    Write-Host "Local API          : http://127.0.0.1:8787"
+    Write-Host "Local API          : http://127.0.0.1:$ApiPort"
     exit 0
   }
 
@@ -108,21 +205,15 @@ switch ($Action) {
     New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'artifacts') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'backups') | Out-Null
 
-    # Keep machine-level values for local tools launched outside the service.
-    # The service itself receives a dedicated Environment REG_MULTI_SZ below,
-    # so installer correctness does not depend on services.exe refreshing global environment variables.
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_REPO_ROOT', $RepoRoot, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_DATA_DIR', $DataDir, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_PYTHON_EXE', $python, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', '0.0.0.0', 'Machine')
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_PORT', '8787', 'Machine')
+    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_PORT', "$ApiPort", 'Machine')
 
     $existing = Get-ServiceSafe
     if ($existing) {
-      if ($existing.Status -ne 'Stopped') {
-        Stop-Service -Name $ServiceName -Force
-        Wait-ServiceState 'Stopped' | Out-Null
-      }
+      Stop-ResearchOsServiceAndApi
       sc.exe delete $ServiceName | Out-Null
       Start-Sleep -Seconds 1
     }
@@ -142,7 +233,7 @@ switch ($Action) {
 
     Write-Host 'Research OS Service installed and started.'
     Write-Host "Service : $ServiceName"
-    Write-Host "API     : http://127.0.0.1:8787"
+    Write-Host "API     : http://127.0.0.1:$ApiPort"
     Write-Host "Data    : $DataDir"
     Write-Host "Runtime : $python"
     Write-Host 'Recovery: restart after 5s, 10s, then 30s'
@@ -152,15 +243,28 @@ switch ($Action) {
     Require-Admin
     $svc = Get-ServiceSafe
     if (-not $svc) {
+      # The service may already be gone while a child process from a previous
+      # shutdown is still alive. Clean only positively identified Research OS listeners.
+      Stop-ResearchOsApiListener
       Write-Host 'Research OS Service is not installed.'
       exit 0
     }
-    if ($svc.Status -ne 'Stopped') {
-      Stop-Service -Name $ServiceName -Force
-      Wait-ServiceState 'Stopped' | Out-Null
-    }
+
+    Stop-ResearchOsServiceAndApi
     sc.exe delete $ServiceName | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Failed to delete Research OS Service.' }
+
+    $deadline = (Get-Date).AddSeconds(15)
+    do {
+      if (-not (Get-ServiceSafe)) { break }
+      Start-Sleep -Milliseconds 500
+    } while ((Get-Date) -lt $deadline)
+
+    if (Get-ServiceSafe) {
+      throw 'Research OS Service is still registered after delete.'
+    }
+
+    Stop-ResearchOsApiListener
     Write-Host 'Research OS Service uninstalled. Local data was preserved.'
   }
 
@@ -175,15 +279,15 @@ switch ($Action) {
   'stop' {
     Require-Admin
     if (-not (Get-ServiceSafe)) { throw 'Research OS Service is not installed.' }
-    Stop-Service -Name $ServiceName -Force
-    Wait-ServiceState 'Stopped' | Out-Null
-    Write-Host 'Research OS Service stopped.'
+    Stop-ResearchOsServiceAndApi
+    Write-Host 'Research OS Service stopped and API listener released.'
   }
 
   'restart' {
     Require-Admin
     if (-not (Get-ServiceSafe)) { throw 'Research OS Service is not installed.' }
-    Restart-Service -Name $ServiceName -Force
+    Stop-ResearchOsServiceAndApi
+    Start-Service -Name $ServiceName
     Wait-ServiceState 'Running' | Out-Null
     Write-Host 'Research OS Service restarted.'
   }

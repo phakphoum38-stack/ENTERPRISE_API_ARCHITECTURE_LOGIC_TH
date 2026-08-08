@@ -15,6 +15,7 @@ await host.RunAsync();
 sealed class ResearchOsApiWorker : BackgroundService
 {
     private readonly ILogger<ResearchOsApiWorker> _logger;
+    private readonly SemaphoreSlim _processStopLock = new(1, 1);
     private Process? _process;
 
     public ResearchOsApiWorker(ILogger<ResearchOsApiWorker> logger)
@@ -85,41 +86,105 @@ sealed class ResearchOsApiWorker : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
+            await StopChildProcessAsync(CancellationToken.None);
             return;
         }
         finally
         {
+            if (stoppingToken.IsCancellationRequested)
+            {
+                await StopChildProcessAsync(CancellationToken.None);
+            }
+
             await Task.WhenAll(IgnoreCancellation(stdoutTask), IgnoreCancellation(stderrTask));
         }
 
         if (!stoppingToken.IsCancellationRequested)
         {
-            throw new InvalidOperationException($"Research OS API exited unexpectedly with code {_process.ExitCode}.");
+            throw new InvalidOperationException($"Research OS API exited unexpectedly with code {_process?.ExitCode}.");
         }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        await StopChildProcessAsync(cancellationToken);
+        await base.StopAsync(cancellationToken);
+        await StopChildProcessAsync(CancellationToken.None);
+    }
+
+    public override void Dispose()
+    {
         try
         {
-            if (_process is { HasExited: false })
-            {
-                _logger.LogInformation("Stopping Research OS API PID {Pid}", _process.Id);
-                _process.Kill(entireProcessTree: true);
-                await _process.WaitForExitAsync(cancellationToken);
-            }
+            StopChildProcessAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to stop Research OS API child process cleanly");
+            _logger.LogWarning(ex, "Failed to terminate Research OS API during worker disposal");
         }
         finally
         {
-            _process?.Dispose();
-            _process = null;
+            _processStopLock.Dispose();
+            base.Dispose();
         }
+    }
 
-        await base.StopAsync(cancellationToken);
+    private async Task StopChildProcessAsync(CancellationToken cancellationToken)
+    {
+        await _processStopLock.WaitAsync(cancellationToken);
+        try
+        {
+            var process = _process;
+            if (process is null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!process.HasExited)
+                {
+                    _logger.LogInformation("Stopping Research OS API PID {Pid} and its process tree", process.Id);
+                    process.Kill(entireProcessTree: true);
+
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                    await process.WaitForExitAsync(timeout.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Timed out waiting for Research OS API PID {Pid} to exit", SafePid(process));
+                try { process.Kill(entireProcessTree: true); } catch { }
+            }
+            catch (InvalidOperationException)
+            {
+                // The process already exited between HasExited and Kill/WaitForExitAsync.
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to stop Research OS API child process cleanly");
+                try { process.Kill(entireProcessTree: true); } catch { }
+            }
+            finally
+            {
+                try { process.Dispose(); } catch { }
+                if (ReferenceEquals(_process, process))
+                {
+                    _process = null;
+                }
+            }
+        }
+        finally
+        {
+            _processStopLock.Release();
+        }
+    }
+
+    private static int SafePid(Process process)
+    {
+        try { return process.Id; }
+        catch { return -1; }
     }
 
     private static string ResolveRepoRoot()
@@ -130,9 +195,6 @@ sealed class ResearchOsApiWorker : BackgroundService
             return Path.GetFullPath(configured);
         }
 
-        // Published layout:
-        // <root>\tools\research_os_service\publish\ResearchOS.ServiceHost.exe
-        // The packaged installer keeps this same layout under Program Files.
         var packagedRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
         var packagedEntrypoint = Path.Combine(packagedRoot, "tools", "research_os_api", "render_server.py");
         if (File.Exists(packagedEntrypoint))
@@ -158,7 +220,6 @@ sealed class ResearchOsApiWorker : BackgroundService
             return bundled;
         }
 
-        // Development fallback. Packaged installs are expected to use bundled Python.
         return "python.exe";
     }
 
@@ -182,5 +243,6 @@ sealed class ResearchOsApiWorker : BackgroundService
     {
         try { await task; }
         catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
     }
 }
