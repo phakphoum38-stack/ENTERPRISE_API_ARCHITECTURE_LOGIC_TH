@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'provider_selection_store.dart';
+
 class ResearchOSApiException implements Exception {
   const ResearchOSApiException(this.message);
 
@@ -26,18 +28,6 @@ class ResearchOSApiClient {
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
       _getJson('/v1/knowledge/graph');
-  Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() =>
-      _getJson('/v1/google-workspace/dashboard');
-  Future<Map<String, dynamic>> getGoogleWorkspaceOAuthStatus() =>
-      _getJson('/v1/google-workspace/oauth/status');
-  Future<Map<String, dynamic>> startGoogleWorkspaceOAuth() =>
-      _postJson('/v1/google-workspace/oauth/start', const <String, Object?>{});
-  Future<Map<String, dynamic>> disconnectGoogleWorkspace() =>
-      _postJson('/v1/google-workspace/oauth/disconnect', const <String, Object?>{});
-  Future<Map<String, dynamic>> setGoogleWorkspaceServices(List<String> services) =>
-      _postJson('/v1/google-workspace/services', <String, Object?>{
-        'enabled_services': services,
-      });
 
   Future<Map<String, dynamic>> getGitHubDashboard({String? repository}) async {
     final query = repository?.trim();
@@ -59,16 +49,22 @@ class ResearchOSApiClient {
     return _decode(response);
   }
 
-  Future<Map<String, dynamic>> generateText(String prompt) {
+  Future<Map<String, dynamic>> generateText(
+    String prompt, {
+    String? provider,
+  }) {
     return _postJson('/v1/ai/generate', <String, Object?>{
-      'provider': 'gemini',
+      'provider': provider ?? selectedProviderState.value,
       'prompt': prompt,
     });
   }
 
-  Future<Map<String, dynamic>> answerWithMemory(String question) {
+  Future<Map<String, dynamic>> answerWithMemory(
+    String question, {
+    String? provider,
+  }) {
     return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
-      'provider': 'gemini',
+      'provider': provider ?? selectedProviderState.value,
       'question': question,
     });
   }
