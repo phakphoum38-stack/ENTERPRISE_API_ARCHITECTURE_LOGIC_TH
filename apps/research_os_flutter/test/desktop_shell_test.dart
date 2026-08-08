@@ -69,7 +69,7 @@ void main() {
     expect(find.text('CONNECTIONS'), findsWidgets);
     expect(find.text('SYSTEM'), findsWidgets);
     expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-nav-8')), findsOneWidget);
 
     final before = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
     await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
@@ -80,7 +80,7 @@ void main() {
     expect(after, lessThan(before));
     expect(after, 76);
     expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-nav-8')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
