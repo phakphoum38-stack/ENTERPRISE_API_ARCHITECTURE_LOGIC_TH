@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build-ios:
-    name: Build unsigned iOS app bundle
+    name: Build unsigned iOS IPA
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -53,13 +53,25 @@ jobs:
         working-directory: apps/research_os_flutter
         run: flutter build ios --release --no-codesign
 
-      - name: Stage iOS artifact
+      - name: Stage unsigned IPA
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist/ios
           APP_PATH="apps/research_os_flutter/build/ios/iphoneos/Runner.app"
           test -d "$APP_PATH"
-          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" dist/ios/Research-OS-iOS-unsigned.zip
-          shasum -a 256 dist/ios/Research-OS-iOS-unsigned.zip > dist/ios/SHA256SUMS.txt
+
+          PAYLOAD="$RUNNER_TEMP/ipa/Payload"
+          mkdir -p "$PAYLOAD"
+          cp -R "$APP_PATH" "$PAYLOAD/ResearchOS.app"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/dist/ios/Research-OS-iOS-unsigned.ipa" Payload)
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" dist/ios/Research-OS-iOS-unsigned-app.zip
+          (cd dist/ios && shasum -a 256 Research-OS-iOS-unsigned.ipa Research-OS-iOS-unsigned-app.zip > SHA256SUMS.txt)
+
+          cat > dist/ios/INSTALLATION.txt <<'EOF'
+          Research-OS-iOS-unsigned.ipa is intentionally unsigned.
+          Import it into a compatible sideload installer/signing app and sign it with your own Apple ID or developer certificate before installation.
+          EOF
 
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
