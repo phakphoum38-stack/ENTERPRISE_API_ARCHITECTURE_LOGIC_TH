@@ -4,6 +4,7 @@ import 'package:research_os_flutter/src/api/provider_selection_store.dart';
 import 'package:research_os_flutter/src/api/research_os_api_client.dart';
 import 'package:research_os_flutter/src/app_shell.dart';
 import 'package:research_os_flutter/src/features/home/home_page.dart';
+import 'package:research_os_flutter/src/features/settings/settings_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeResearchOSApiClient extends ResearchOSApiClient {
@@ -243,11 +244,12 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     ThemeMode selectedTheme = ThemeMode.system;
+    final client = FakeResearchOSApiClient();
 
     await tester.pumpWidget(
       MaterialApp(
-        home: ResearchOSAppShell(
-          apiClient: FakeResearchOSApiClient(),
+        home: SettingsPage(
+          apiClient: client,
           themeMode: selectedTheme,
           onThemeModeChanged: (value) => selectedTheme = value,
         ),
@@ -255,15 +257,15 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
-    await openDesktopDestination(tester, 8);
 
-    expect(find.text('Settings'), findsWidgets);
+    expect(find.text('Settings'), findsOneWidget);
     expect(find.text('http://127.0.0.1:8787'), findsOneWidget);
 
+    final settingsScrollable = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
       find.text('Provider Manager'),
       420,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: settingsScrollable,
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -280,7 +282,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Dark'),
       -420,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: settingsScrollable,
     );
     await tester.tap(find.text('Dark'));
     await tester.pump();
