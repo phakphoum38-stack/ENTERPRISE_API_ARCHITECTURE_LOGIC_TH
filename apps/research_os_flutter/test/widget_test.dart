@@ -12,6 +12,7 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
   Future<Map<String, dynamic>> getHealth() async => <String, dynamic>{
         'status': 'ok',
         'memory': true,
+        'version': '0.6.0',
       };
 
   @override
@@ -35,23 +36,11 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
   @override
   Future<Map<String, dynamic>> getKnowledgeGraph() async => <String, dynamic>{
         'nodes': <Map<String, dynamic>>[
-          <String, dynamic>{
-            'id': 'RES-A',
-            'title': 'Research Memory',
-            'status': 'active',
-          },
-          <String, dynamic>{
-            'id': 'RES-B',
-            'title': 'Knowledge Graph',
-            'status': 'validated',
-          },
+          <String, dynamic>{'id': 'RES-A', 'title': 'Research Memory', 'status': 'active'},
+          <String, dynamic>{'id': 'RES-B', 'title': 'Knowledge Graph', 'status': 'validated'},
         ],
         'edges': <Map<String, dynamic>>[
-          <String, dynamic>{
-            'source': 'RES-A',
-            'relation': 'supports',
-            'target': 'RES-B',
-          },
+          <String, dynamic>{'source': 'RES-A', 'relation': 'supports', 'target': 'RES-B'},
         ],
       };
 
@@ -73,11 +62,7 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
           },
         ],
         'commits': <Map<String, dynamic>>[
-          <String, dynamic>{
-            'sha': 'abc1234',
-            'message': 'Add GitHub dashboard',
-            'author': 'Phakphum',
-          },
+          <String, dynamic>{'sha': 'abc1234', 'message': 'Add GitHub dashboard', 'author': 'Phakphum'},
         ],
         'pull_requests': <Map<String, dynamic>>[],
       };
@@ -86,9 +71,7 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
   Future<Map<String, dynamic>> answerWithMemory(String question) async =>
       <String, dynamic>{
         'text': 'คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด',
-        'memory_hits': <Map<String, dynamic>>[
-          <String, dynamic>{'artifact_id': 'RES-TEST'},
-        ],
+        'memory_hits': <Map<String, dynamic>>[<String, dynamic>{'artifact_id': 'RES-TEST'}],
       };
 
   @override
@@ -134,6 +117,7 @@ void main() {
     expect(find.text('Online'), findsOneWidget);
     expect(find.text('gemini'), findsOneWidget);
     expect(find.text('Ready'), findsOneWidget);
+    expect(find.text('0.6.0'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -142,18 +126,13 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
+      MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await openDesktopDestination(tester, 1);
 
-    await tester.enterText(
-      find.byType(TextField).first,
-      'บ้านเรามีความรู้อะไรบ้าง',
-    );
+    await tester.enterText(find.byType(TextField).first, 'บ้านเรามีความรู้อะไรบ้าง');
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
@@ -170,9 +149,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
+      MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -188,9 +165,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
+      MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -209,9 +184,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
+      MaterialApp(home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient())),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -239,7 +212,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    await openDesktopDestination(tester, 9);
+    await openDesktopDestination(tester, 8);
 
     expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsWidgets);
