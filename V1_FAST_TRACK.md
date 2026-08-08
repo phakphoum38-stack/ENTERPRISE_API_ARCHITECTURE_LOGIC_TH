@@ -1,17 +1,19 @@
 # Research OS v1.0.0 Fast-Track Plan
 
-Status: IN PROGRESS
+Status: RELEASE CANDIDATE — `0.9.0-rc.1`
 
 ## Source-of-truth version
 
-The Flutter application currently declares `0.1.0+1` in `apps/research_os_flutter/pubspec.yaml`.
-Version numbers will only advance when the required gates below are met.
+The Flutter application declares `0.9.0-rc.1+1` in `apps/research_os_flutter/pubspec.yaml`.
+The API contract declares `0.9.0-rc.1` in `tools/research_os_api/openapi.yaml`.
+
+RC evidence candidate SHA: `1ad63b10aa0fac3aa98173334c4394fc43487eab`.
 
 ## Fast-track sequence
 
 1. `0.9.0-dev.1` — feature-complete candidate
 2. `0.9.0-rc.1` — release candidate after full regression gates
-3. `1.0.0` — stable release after installer/release/health gates pass
+3. `1.0.0` — stable release after final stable-release checks
 
 ## v1 scope — must complete
 
@@ -43,17 +45,33 @@ Version numbers will only advance when the required gates below are met.
 - [x] Installer validation
 - [x] Release artifact pipeline
 - [x] Release compatibility gate using source run ID
-- [ ] Full v1 candidate pipeline on the same target SHA
+- [x] Full v1 candidate pipeline on the same target SHA
 
 ### Quality gates
-- [ ] `flutter analyze` clean
-- [ ] Flutter tests pass
-- [ ] Agent Platform tests pass
-- [ ] API tests pass
-- [ ] Windows release build pass
-- [ ] Installer validation pass
-- [ ] Release artifact pass
-- [ ] Production Health pass
+- [x] `flutter analyze` clean
+- [x] Flutter tests pass
+- [x] Agent Platform tests pass
+- [x] API tests pass
+- [x] Windows release build pass
+- [x] Installer validation pass
+- [x] Release artifact pass
+- [x] Production Health pass
+
+## RC evidence
+
+Candidate SHA: `1ad63b10aa0fac3aa98173334c4394fc43487eab`
+
+Validated on the same candidate chain:
+- Windows App and Service Host build
+- Runtime Smoke
+- Installer Build
+- Installer Validation
+- Research OS Release
+- Windows compatibility gate
+- Agent Platform validation
+- Flutter secondary validation
+- GitHub Pages deployment
+- Production Health
 
 ## Promotion rules
 
@@ -66,10 +84,14 @@ Version numbers will only advance when the required gates below are met.
 - Windows app, service host, runtime smoke, installer, installer validation, and release pipeline all pass against one candidate SHA.
 - No known release-blocking defects remain.
 
+Status: satisfied by candidate SHA `1ad63b10aa0fac3aa98173334c4394fc43487eab`.
+
 ### Promote to 1.0.0 when
 - RC passes production health and secondary web/Pages validation.
 - Release artifact and verification manifest are reproducible.
-- Baseline/rollback reference is recorded.
+- Baseline reference is recorded.
+
+Production health and secondary validation are green for the RC candidate. Reproducibility and baseline evidence remain the final stable-release checks.
 
 ## Fast-track working rule
 
