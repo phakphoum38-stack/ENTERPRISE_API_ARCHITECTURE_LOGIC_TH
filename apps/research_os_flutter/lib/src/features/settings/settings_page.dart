@@ -6,6 +6,7 @@ import '../../api/api_connection_state.dart';
 import '../../api/api_endpoint_store.dart';
 import '../../api/research_os_api_client.dart';
 import '../../ui/enterprise_components.dart';
+import 'identity_settings_section.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -157,7 +158,7 @@ class _SettingsPageState extends State<SettingsPage> {
           icon: Icons.settings_outlined,
           title: 'Settings',
           subtitle:
-              'จัดการ Appearance, API endpoint และ AI Provider โดยคง Secret ไว้ฝั่ง Backend',
+              'จัดการ Owner Profile, Appearance, API endpoint และ AI Provider โดยคง Secret ไว้ฝั่ง Backend',
           actions: <Widget>[
             IconButton(
               tooltip: 'รีเฟรช Provider',
@@ -200,6 +201,13 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           ),
+        ),
+        const SizedBox(height: 28),
+        const EnterpriseSection(
+          title: 'Identity & private profile',
+          subtitle:
+              'จำอีเมลของเจ้าของบนอุปกรณ์นี้ โดยไม่เปลี่ยนผู้ใช้ทั่วไปให้เป็นโปรไฟล์ส่วนตัว',
+          child: IdentitySettingsSection(),
         ),
         const SizedBox(height: 28),
         EnterpriseSection(
