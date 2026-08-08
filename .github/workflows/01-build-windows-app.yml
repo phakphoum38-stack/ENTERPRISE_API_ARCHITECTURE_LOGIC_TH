@@ -34,6 +34,12 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Enable long paths
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1
+
       - name: Purge cached secure-storage packages
         shell: pwsh
         run: |
@@ -48,32 +54,88 @@ jobs:
         shell: pwsh
         run: flutter create --platforms=windows --project-name=research_os_flutter .
 
+      - name: Clean Flutter build state
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: flutter clean
+
       - name: Install Flutter dependencies fresh
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: flutter pub get
 
-      - name: Verify secure-storage Windows plugin files
+      - name: Verify Flutter plugin registration
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: |
+          $cmake = "windows\flutter\generated_plugins.cmake"
+          $registrant = "windows\flutter\generated_plugin_registrant.cc"
           $plugin = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows"
-          if (-not (Test-Path $plugin)) {
-            throw "flutter_secure_storage_windows plugin link missing: $plugin"
-          }
           $publicHeader = Join-Path $plugin "include\flutter_secure_storage_windows\flutter_secure_storage_windows_plugin.h"
           $sourceHeader = Join-Path $plugin "flutter_secure_storage_windows_plugin.h"
-          if (-not (Test-Path $publicHeader)) {
-            Write-Host "Plugin directory contents:"
-            Get-ChildItem $plugin -Recurse | Select-Object FullName
+
+          $cmakeExists = Test-Path $cmake
+          $registrantExists = Test-Path $registrant
+          $pluginExists = Test-Path $plugin
+          $publicHeaderExists = Test-Path $publicHeader
+          $sourceHeaderExists = Test-Path $sourceHeader
+
+          "cmake_exists=$cmakeExists" >> $env:GITHUB_OUTPUT
+          "registrant_exists=$registrantExists" >> $env:GITHUB_OUTPUT
+          "plugin_exists=$pluginExists" >> $env:GITHUB_OUTPUT
+          "public_header_exists=$publicHeaderExists" >> $env:GITHUB_OUTPUT
+          "source_header_exists=$sourceHeaderExists" >> $env:GITHUB_OUTPUT
+
+          Write-Host "=== generated_plugins.cmake ==="
+          if ($cmakeExists) {
+            Get-Content $cmake
+            if (-not (Select-String -Path $cmake -Pattern "flutter_secure_storage_windows" -Quiet)) {
+              throw "flutter_secure_storage_windows missing from generated_plugins.cmake"
+            }
+          } else {
+            throw "generated_plugins.cmake missing"
+          }
+
+          Write-Host "=== generated_plugin_registrant.cc ==="
+          if ($registrantExists) {
+            Get-Content $registrant
+            if (-not (Select-String -Path $registrant -Pattern "flutter_secure_storage_windows" -Quiet)) {
+              throw "flutter_secure_storage_windows missing from generated_plugin_registrant.cc"
+            }
+          } else {
+            throw "generated_plugin_registrant.cc missing"
+          }
+
+          Write-Host "=== secure-storage plugin files ==="
+          if (-not $pluginExists) {
+            throw "flutter_secure_storage_windows plugin link missing: $plugin"
+          }
+          Get-ChildItem $plugin -Recurse | Select-Object FullName
+
+          if (-not $publicHeaderExists) {
             throw "Secure-storage public header missing: $publicHeader"
           }
-          if (-not (Test-Path $sourceHeader)) {
-            Write-Host "Plugin directory contents:"
-            Get-ChildItem $plugin -Recurse | Select-Object FullName
+          if (-not $sourceHeaderExists) {
             throw "Secure-storage source header missing: $sourceHeader"
           }
-          Write-Host "Secure-storage Windows headers verified."
+
+          Write-Host "Secure-storage registration and headers verified."
+        id: plugin-check
+
+      - name: Record plugin diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          @"
+          # Windows Plugin Diagnostics
+          - commit: ${{ github.sha }}
+          - flutter: $(flutter --version | Select-Object -First 1)
+          - generated_plugins.cmake: ${{ steps.plugin-check.outputs.cmake_exists }}
+          - generated_plugin_registrant.cc: ${{ steps.plugin-check.outputs.registrant_exists }}
+          - plugin symlink: ${{ steps.plugin-check.outputs.plugin_exists }}
+          - public header: ${{ steps.plugin-check.outputs.public_header_exists }}
+          - source header: ${{ steps.plugin-check.outputs.source_header_exists }}
+          "@ >> $env:GITHUB_STEP_SUMMARY
 
       - name: Verify Visual Studio ATL is available
         shell: pwsh
