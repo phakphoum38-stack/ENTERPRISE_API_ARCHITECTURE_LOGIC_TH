@@ -5,9 +5,12 @@ import 'package:http/http.dart' as http;
 import '../api/api_endpoint_store.dart';
 
 class IdentityApiException implements Exception {
-  const IdentityApiException(this.message);
+  const IdentityApiException(this.message, {this.statusCode});
 
   final String message;
+  final int? statusCode;
+
+  bool get unauthorized => statusCode == 401 || statusCode == 403;
 
   @override
   String toString() => message;
@@ -76,14 +79,21 @@ class IdentityApiClient {
     } on FormatException {
       throw IdentityApiException(
         'Identity service returned invalid JSON (${response.statusCode}).',
+        statusCode: response.statusCode,
       );
     }
     if (decoded is! Map<String, dynamic>) {
-      throw const IdentityApiException('Identity service returned an invalid response.');
+      throw IdentityApiException(
+        'Identity service returned an invalid response.',
+        statusCode: response.statusCode,
+      );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final detail = decoded['detail'] ?? decoded['error'] ?? 'Unknown error';
-      throw IdentityApiException('Identity error ${response.statusCode}: $detail');
+      throw IdentityApiException(
+        'Identity error ${response.statusCode}: $detail',
+        statusCode: response.statusCode,
+      );
     }
     return decoded;
   }
