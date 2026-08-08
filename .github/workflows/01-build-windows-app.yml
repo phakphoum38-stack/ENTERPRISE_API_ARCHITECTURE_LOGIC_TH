@@ -10,6 +10,7 @@ on:
       - "tools/research_os_service/**"
       - "tools/research_curator/**"
       - "scripts/*research-os*.ps1"
+      - "scripts/generate-research-os-icon.py"
       - "installer/**"
       - ".github/workflows/0*-*.yml"
       - ".github/workflows/research-os-windows-desktop.yml"
@@ -20,6 +21,7 @@ on:
       - "tools/research_os_service/**"
       - "tools/research_curator/**"
       - "scripts/*research-os*.ps1"
+      - "scripts/generate-research-os-icon.py"
       - "installer/**"
       - ".github/workflows/0*-*.yml"
       - ".github/workflows/research-os-windows-desktop.yml"
@@ -50,6 +52,29 @@ jobs:
         shell: pwsh
         run: flutter create --platforms=windows --project-name=research_os_flutter .
 
+      - name: Apply Research OS Windows branding
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pillow
+          python scripts/generate-research-os-icon.py apps/research_os_flutter/windows/runner/resources/app_icon.ico
+
+          $rcPath = "apps/research_os_flutter/windows/runner/Runner.rc"
+          $rc = Get-Content $rcPath -Raw
+          $rc = $rc -replace '(?m)^\s*VALUE "CompanyName".*$', '            VALUE "CompanyName", "Research OS" "\0"'
+          $rc = $rc -replace '(?m)^\s*VALUE "FileDescription".*$', '            VALUE "FileDescription", "Research OS Desktop" "\0"'
+          $rc = $rc -replace '(?m)^\s*VALUE "InternalName".*$', '            VALUE "InternalName", "ResearchOS" "\0"'
+          $rc = $rc -replace '(?m)^\s*VALUE "LegalCopyright".*$', '            VALUE "LegalCopyright", "Copyright (C) Research OS. All rights reserved." "\0"'
+          $rc = $rc -replace '(?m)^\s*VALUE "OriginalFilename".*$', '            VALUE "OriginalFilename", "research_os_flutter.exe" "\0"'
+          $rc = $rc -replace '(?m)^\s*VALUE "ProductName".*$', '            VALUE "ProductName", "Research OS" "\0"'
+          Set-Content -Path $rcPath -Value $rc -Encoding utf8
+
+          if (-not (Test-Path "apps/research_os_flutter/windows/runner/resources/app_icon.ico")) {
+            throw "Research OS app icon was not generated"
+          }
+          Select-String -Path $rcPath -Pattern 'ProductName.*Research OS' -Quiet | ForEach-Object {
+            if (-not $_) { throw "Research OS version metadata was not applied" }
+          }
+
       - name: Install Flutter dependencies
         working-directory: apps/research_os_flutter
         shell: pwsh
@@ -75,6 +100,12 @@ jobs:
         run: |
           $exe = "apps\research_os_flutter\build\windows\x64\runner\Release\research_os_flutter.exe"
           if (-not (Test-Path $exe)) { throw "Desktop executable missing: $exe" }
+          $version = (Get-Item $exe).VersionInfo
+          Write-Host "ProductName=$($version.ProductName)"
+          Write-Host "FileDescription=$($version.FileDescription)"
+          Write-Host "FileVersion=$($version.FileVersion)"
+          Write-Host "ProductVersion=$($version.ProductVersion)"
+          if ($version.ProductName -ne "Research OS") { throw "Research OS product metadata missing from EXE" }
 
       - name: Upload Windows app artifact
         uses: actions/upload-artifact@v4
