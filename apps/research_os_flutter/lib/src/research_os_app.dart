@@ -8,6 +8,7 @@ import 'api/api_connection_state.dart';
 import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
+import 'identity/owner_cloud_sync.dart';
 import 'identity/owner_profile_store.dart';
 import 'identity/owner_session_store.dart';
 
@@ -37,6 +38,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   Future<void> _initializeApp() async {
     await OwnerProfileStore.loadIntoState();
     await OwnerSessionStore.restore();
+    await OwnerCloudSync.pullConnectionPreferences();
     await _loadApiEndpoint();
   }
 
@@ -86,6 +88,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
     final next = apiConnectionPreferences.value;
     _connectionPreferences = next;
     _startHeartbeat();
+    unawaited(OwnerCloudSync.pushConnectionPreferences(next));
     if (next.autoDiscovery) {
       unawaited(_verifyConnection(forceDiscovery: true));
     }
