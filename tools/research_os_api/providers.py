@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterator
 
 
 @dataclass(frozen=True)
@@ -23,6 +23,14 @@ class ProviderResult:
     model: str
     text: str
     raw: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ProviderChunk:
+    provider: str
+    model: str
+    text: str
+    done: bool = False
 
 
 class ProviderError(RuntimeError):
@@ -35,6 +43,37 @@ class AIProvider(ABC):
     @abstractmethod
     def generate(self, prompt: str, *, system: str = "", model: str | None = None) -> ProviderResult:
         raise NotImplementedError
+
+    def stream(
+        self,
+        prompt: str,
+        *,
+        system: str = "",
+        model: str | None = None,
+        chunk_size: int = 48,
+    ) -> Iterator[ProviderChunk]:
+        """Yield a provider-neutral response stream.
+
+        Streaming v1 is transport streaming: providers without a native streaming
+        adapter first complete ``generate`` and then expose the result as bounded
+        chunks. Native token streaming adapters can override this method later
+        without changing the Research OS API or Flutter chat contract.
+        """
+        result = self.generate(prompt, system=system, model=model)
+        text = result.text
+        size = max(1, min(int(chunk_size), 512))
+        for offset in range(0, len(text), size):
+            yield ProviderChunk(
+                provider=result.provider,
+                model=result.model,
+                text=text[offset : offset + size],
+            )
+        yield ProviderChunk(
+            provider=result.provider,
+            model=result.model,
+            text="",
+            done=True,
+        )
 
 
 class MockProvider(AIProvider):
