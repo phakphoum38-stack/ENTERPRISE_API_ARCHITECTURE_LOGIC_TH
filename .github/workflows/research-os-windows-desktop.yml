@@ -86,3 +86,14 @@ jobs:
             --repo "${{ github.repository }}" \
             --ref main \
             -f target_sha="$TARGET_SHA"
+
+      - name: Dispatch candidate-bound production health
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run research-os-production-health.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f target_sha="$TARGET_SHA" \
+            -f source_release_run="$SOURCE_RELEASE_RUN"
