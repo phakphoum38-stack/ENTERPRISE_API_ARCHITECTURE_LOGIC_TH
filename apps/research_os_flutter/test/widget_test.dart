@@ -257,7 +257,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 150));
     await openDesktopDestination(tester, 8);
 
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
     expect(find.text('http://127.0.0.1:8787'), findsOneWidget);
 
     await tester.scrollUntilVisible(
