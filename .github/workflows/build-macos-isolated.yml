@@ -1,0 +1,73 @@
+name: Research OS Build macOS Isolated
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Git ref to build
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-macos-isolated-${{ inputs.target_ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  build-macos:
+    name: Build macOS app bundle
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_ref || 'main' }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable macOS desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Generate macOS platform shell
+        working-directory: apps/research_os_flutter
+        run: flutter create --platforms=macos --project-name=research_os_flutter .
+
+      - name: Install dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/research_os_flutter
+        run: flutter test
+
+      - name: Build macOS release
+        working-directory: apps/research_os_flutter
+        run: flutter build macos --release
+
+      - name: Stage macOS artifact
+        run: |
+          mkdir -p dist/macos
+          APP_PATH="apps/research_os_flutter/build/macos/Build/Products/Release/research_os_flutter.app"
+          test -d "$APP_PATH"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" dist/macos/Research-OS-macOS.zip
+          shasum -a 256 dist/macos/Research-OS-macOS.zip > dist/macos/SHA256SUMS.txt
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-macos-${{ github.run_id }}
+          path: dist/macos/**
+          if-no-files-found: error
+          retention-days: 14
