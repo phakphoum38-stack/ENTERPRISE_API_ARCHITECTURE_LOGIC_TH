@@ -6,6 +6,7 @@ import 'api/api_auto_discovery.dart';
 import 'api/api_connection_preferences.dart';
 import 'api/api_connection_state.dart';
 import 'api/api_endpoint_store.dart';
+import 'api/provider_selection_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
 import 'identity/owner_cloud_sync.dart';
@@ -36,6 +37,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   }
 
   Future<void> _initializeApp() async {
+    await ProviderSelectionStore.loadIntoState();
     await OwnerProfileStore.loadIntoState();
     await OwnerSessionStore.restore();
     await OwnerCloudSync.pullConnectionPreferences();
