@@ -2,19 +2,31 @@ name: Research OS Production Health
 
 on:
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Candidate commit SHA to associate with this production health gate
+        required: false
+        type: string
+      source_release_run:
+        description: Research OS Release workflow run ID for candidate validation
+        required: false
+        type: string
   schedule:
     - cron: "17 */6 * * *"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: research-os-production-health
+  group: research-os-production-health-${{ inputs.target_sha || 'scheduled' }}
   cancel-in-progress: true
 
 env:
   API_URL: https://research-os-api-phakphoum.onrender.com
   HOME_URL: https://phakphoum38-stack.github.io/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH/
+  TARGET_SHA: ${{ inputs.target_sha }}
+  SOURCE_RELEASE_RUN: ${{ inputs.source_release_run }}
 
 jobs:
   monitor:
@@ -22,6 +34,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
+      - name: Validate candidate release source
+        if: ${{ inputs.target_sha != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id="$SOURCE_RELEASE_RUN"
+          if [ -n "$run_id" ]; then
+            workflow_name="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+            status="$(gh run view "$run_id" --repo "${{ github.repository }}" --json status --jq '.status')"
+            conclusion="$(gh run view "$run_id" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+            head_sha="$(gh run view "$run_id" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+            test "$workflow_name" = "Research OS Release" || { echo "Run $run_id is not Research OS Release"; exit 1; }
+            test "$head_sha" = "$TARGET_SHA" || { echo "Release run SHA $head_sha does not match candidate $TARGET_SHA"; exit 1; }
+            if [ "$status" = "completed" ]; then
+              test "$conclusion" = "success" || { echo "Release run concluded $conclusion"; exit 1; }
+            else
+              test "$status" = "in_progress" || { echo "Unexpected release status: $status"; exit 1; }
+            fi
+          else
+            run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Release" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
+            test -n "$run_id" || { echo "No successful Research OS Release run found for $TARGET_SHA"; exit 1; }
+          fi
+          echo "Production health candidate validated: $TARGET_SHA (release run $run_id)"
+
       - name: Check GitHub Pages availability
         shell: bash
         run: |
@@ -82,6 +120,7 @@ jobs:
         run: |
           {
             echo "# Research OS Production Health"
+            echo "- Candidate SHA: ${TARGET_SHA:-scheduled-monitor}"
             echo "- GitHub Pages: checked"
             echo "- Render health HTTP: ${{ steps.api.outputs.http_code }}"
             echo "- Render wake/readiness: ${{ steps.api.outputs.wake_seconds }} seconds"
