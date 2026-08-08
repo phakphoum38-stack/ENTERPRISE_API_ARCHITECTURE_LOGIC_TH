@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'api/api_auto_discovery.dart';
 import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
@@ -12,9 +15,13 @@ class ResearchOSApp extends StatefulWidget {
 }
 
 class _ResearchOSAppState extends State<ResearchOSApp> {
+  static const _heartbeatInterval = Duration(seconds: 20);
+
   ThemeMode _themeMode = ThemeMode.system;
   ResearchOSApiClient? _apiClient;
   String? _apiBaseUrl;
+  Timer? _heartbeatTimer;
+  bool _reconnecting = false;
 
   @override
   void initState() {
@@ -23,24 +30,61 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   }
 
   Future<void> _loadApiEndpoint() async {
-    final url = await ApiEndpointStore.load();
+    final preferred = await ApiEndpointStore.load();
+    final discovered = await ApiAutoDiscovery.discover(preferredUrl: preferred);
+    final url = discovered?.baseUrl ?? preferred;
+    if (discovered != null && discovered.baseUrl != preferred) {
+      await ApiEndpointStore.save(discovered.baseUrl);
+    }
     if (!mounted) return;
+    _replaceApiClient(url);
+    _startHeartbeat();
+  }
+
+  void _replaceApiClient(String url) {
+    final previous = _apiClient;
     setState(() {
       _apiBaseUrl = url;
       _apiClient = ResearchOSApiClient(baseUrl: url);
     });
+    previous?.close();
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+      unawaited(_verifyConnection());
+    });
+  }
+
+  Future<void> _verifyConnection() async {
+    final current = _apiBaseUrl;
+    if (current == null || _reconnecting) return;
+
+    final healthy = await ApiAutoDiscovery.probe(current, source: 'heartbeat');
+    if (healthy != null || !mounted) return;
+
+    _reconnecting = true;
+    try {
+      final discovered = await ApiAutoDiscovery.discover(
+        preferredUrl: current,
+        scanLan: true,
+      );
+      if (!mounted || discovered == null || discovered.baseUrl == current) return;
+      await ApiEndpointStore.save(discovered.baseUrl);
+      if (!mounted) return;
+      _replaceApiClient(discovered.baseUrl);
+    } finally {
+      _reconnecting = false;
+    }
   }
 
   Future<void> _changeApiEndpoint(String value) async {
     final normalized = ApiEndpointStore.normalize(value);
     await ApiEndpointStore.save(normalized);
-    final previous = _apiClient;
     if (!mounted) return;
-    setState(() {
-      _apiBaseUrl = normalized;
-      _apiClient = ResearchOSApiClient(baseUrl: normalized);
-    });
-    previous?.close();
+    _replaceApiClient(normalized);
+    unawaited(_verifyConnection());
   }
 
   ThemeData _buildTheme(Brightness brightness) {
@@ -130,6 +174,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
 
   @override
   void dispose() {
+    _heartbeatTimer?.cancel();
     _apiClient?.close();
     super.dispose();
   }
