@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../identity/owner_profile.dart';
@@ -22,6 +24,7 @@ class _IdentitySettingsSectionState extends State<IdentitySettingsSection> {
       text: ownerProfileState.value?.email ?? '',
     );
     ownerProfileState.addListener(_syncFromState);
+    unawaited(OwnerProfileStore.loadIntoState());
   }
 
   void _syncFromState() {
