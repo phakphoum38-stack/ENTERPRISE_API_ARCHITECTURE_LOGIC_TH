@@ -7,6 +7,10 @@ on:
         description: Commit SHA that completed the split Windows release pipeline
         required: true
         type: string
+      source_release_run:
+        description: Release workflow run ID
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -23,17 +27,30 @@ jobs:
     timeout-minutes: 5
     env:
       TARGET_SHA: ${{ inputs.target_sha }}
+      SOURCE_RELEASE_RUN: ${{ inputs.source_release_run }}
     steps:
       - name: Confirm verified release artifact exists
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Release" --commit "$TARGET_SHA" --limit 20 --json databaseId,status,conclusion --jq '[.[] | select((.status == "completed" and .conclusion == "success") or .status == "in_progress")][0].databaseId')"
+          run_id="$SOURCE_RELEASE_RUN"
+          if [ -z "$run_id" ]; then
+            run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Release" --commit "$TARGET_SHA" --limit 20 --json databaseId,status,conclusion --jq '[.[] | select((.status == "completed" and .conclusion == "success") or .status == "in_progress")][0].databaseId')"
+          fi
           if [ -z "$run_id" ]; then
             echo "No release run found for $TARGET_SHA"
             exit 1
           fi
+          run_state="$(gh run view "$run_id" --repo "${{ github.repository }}" --json status,conclusion --jq '.status + ":" + (.conclusion // "")')"
+          case "$run_state" in
+            completed:success|in_progress:*)
+              ;;
+            *)
+              echo "Release run $run_id is not ready for compatibility validation: $run_state"
+              exit 1
+              ;;
+          esac
           echo "Split Windows pipeline reached release stage for $TARGET_SHA (run $run_id)."
 
       - name: Publish compatibility success
