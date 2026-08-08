@@ -64,7 +64,7 @@ jobs:
             throw "Downloaded ServiceHost executable is missing"
           }
 
-      - name: Test local API start status and stop
+      - name: Test local API start status orchestration and stop
         shell: pwsh
         env:
           RESEARCH_OS_SYNC_KEY: windows-ci-test-key
@@ -81,12 +81,35 @@ jobs:
             }
             if (-not $ready) { throw "Local API did not become ready" }
             ./scripts/status-research-os-local.ps1 -Port 8787 -HealthUrl "http://127.0.0.1:8787/health"
+
+            $payload = @{
+              objective = "Validate primary runtime orchestration"
+              steps = @(
+                @{
+                  step_id = "smoke-step-1"
+                  objective = "Summarize runtime smoke validation"
+                  requested_agent = "research"
+                }
+              )
+            } | ConvertTo-Json -Depth 8
+            $created = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v1/agents/orchestrations" -Method Post -ContentType "application/json" -Body $payload -TimeoutSec 5
+            $runId = "$($created.run.run_id)"
+            if (-not $runId) { throw "Primary runtime did not create an orchestration run" }
+
+            $fetched = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v1/agents/orchestrations/$runId" -TimeoutSec 5
+            if ("$($fetched.run.run_id)" -ne $runId) { throw "Primary runtime orchestration GET returned the wrong run" }
+
+            $executed = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v1/agents/orchestrations/$runId/execute" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 5
+            if ("$($executed.run.status)" -ne "completed") { throw "Primary runtime orchestration did not complete: $($executed.run.status)" }
+
+            $listed = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v1/agents/orchestrations" -TimeoutSec 5
+            if ([int]$listed.count -lt 1) { throw "Primary runtime orchestration list is empty after create" }
           }
           finally {
             ./scripts/stop-research-os-local.ps1 -Port 8787 -PidFile "$env:RUNNER_TEMP\ResearchOSData\run\research-os-api.pid" -ErrorAction SilentlyContinue
           }
 
-      - name: Test Windows Service install health restart stop and uninstall
+      - name: Test Windows Service install health orchestration restart stop and uninstall
         shell: pwsh
         run: |
           $data = "$env:RUNNER_TEMP\ResearchOSServiceData"
@@ -102,6 +125,20 @@ jobs:
             if (-not $ready) { throw "Windows Service API did not become ready" }
             $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
             if (-not $service -or $service.State -ne 'Running') { throw "ResearchOSService is not running" }
+
+            $payload = @{
+              objective = "Validate service orchestration route"
+              steps = @(
+                @{
+                  step_id = "service-smoke-step-1"
+                  objective = "Summarize service runtime validation"
+                  requested_agent = "research"
+                }
+              )
+            } | ConvertTo-Json -Depth 8
+            $created = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v1/agents/orchestrations" -Method Post -ContentType "application/json" -Body $payload -TimeoutSec 5
+            if (-not "$($created.run.run_id)") { throw "Windows Service primary runtime did not expose orchestration API" }
+
             ./scripts/research-os-service.ps1 -Action restart -DataDir $data
             ./scripts/research-os-service.ps1 -Action stop -DataDir $data
           }
