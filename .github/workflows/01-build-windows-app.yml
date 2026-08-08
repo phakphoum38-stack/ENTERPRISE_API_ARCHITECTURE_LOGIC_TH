@@ -24,7 +24,7 @@ jobs:
   build-app:
     name: Build Windows app only
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -122,6 +122,25 @@ jobs:
           Write-Host "Secure-storage registration and headers verified."
         id: plugin-check
 
+      - name: Inspect secure-storage CMake target
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          $pluginCmake = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows\CMakeLists.txt"
+          if (-not (Test-Path $pluginCmake)) {
+            throw "Secure-storage CMakeLists.txt missing: $pluginCmake"
+          }
+          Write-Host "=== flutter_secure_storage_windows CMakeLists.txt ==="
+          Get-Content $pluginCmake
+
+          $includeLines = Select-String -Path $pluginCmake -Pattern "target_include_directories|INTERFACE_INCLUDE_DIRECTORIES|include" -CaseSensitive:$false
+          Write-Host "=== CMake include-related lines ==="
+          if ($includeLines) {
+            $includeLines | ForEach-Object { Write-Host $_.Line }
+          } else {
+            Write-Host "No explicit include-directory directive found in plugin CMakeLists.txt."
+          }
+
       - name: Record plugin diagnostics
         if: always()
         shell: pwsh
@@ -148,10 +167,62 @@ jobs:
           }
           Write-Host "ATL available at $install"
 
-      - name: Build Windows desktop
+      - name: Build Windows desktop with verbose diagnostics
+        id: native-build
         working-directory: apps/research_os_flutter
         shell: pwsh
-        run: flutter build windows --release
+        continue-on-error: true
+        run: |
+          $ErrorActionPreference = "Continue"
+          flutter build windows --release -v 2>&1 | Tee-Object -FilePath windows-build-verbose.log
+          $code = $LASTEXITCODE
+          "exit_code=$code" >> $env:GITHUB_OUTPUT
+          Write-Host "Flutter Windows build exit code: $code"
+          exit $code
+
+      - name: Inspect generated MSVC include directories
+        if: always()
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          Write-Host "=== Generated VCXPROJ files ==="
+          $projects = Get-ChildItem "build\windows" -Recurse -Filter "*.vcxproj" -ErrorAction SilentlyContinue
+          $projects | Select-Object FullName
+
+          $runnerProject = $projects | Where-Object { $_.Name -eq "research_os_flutter.vcxproj" } | Select-Object -First 1
+          $pluginProject = $projects | Where-Object { $_.Name -eq "flutter_secure_storage_windows_plugin.vcxproj" } | Select-Object -First 1
+
+          foreach ($project in @($runnerProject, $pluginProject)) {
+            if ($null -ne $project) {
+              Write-Host "=== $($project.FullName) include directories ==="
+              Select-String -Path $project.FullName -Pattern "AdditionalIncludeDirectories|flutter_secure_storage_windows" -CaseSensitive:$false |
+                ForEach-Object { Write-Host $_.Line }
+            }
+          }
+
+          Write-Host "=== CMake cache secure-storage entries ==="
+          $cache = Get-ChildItem "build\windows" -Recurse -Filter "CMakeCache.txt" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($cache) {
+            Select-String -Path $cache.FullName -Pattern "flutter_secure_storage|CMAKE_CXX_COMPILER|CMAKE_GENERATOR" -CaseSensitive:$false |
+              ForEach-Object { Write-Host $_.Line }
+          }
+
+          Write-Host "=== Verbose build tail ==="
+          if (Test-Path "windows-build-verbose.log") {
+            Get-Content "windows-build-verbose.log" -Tail 250
+          }
+
+      - name: Fail if native build failed
+        if: always()
+        shell: pwsh
+        run: |
+          $code = "${{ steps.native-build.outputs.exit_code }}"
+          if ([string]::IsNullOrWhiteSpace($code)) {
+            throw "Native build did not report an exit code."
+          }
+          if ($code -ne "0") {
+            throw "Flutter Windows native build failed with exit code $code. See MSVC/CMake diagnostics above."
+          }
 
       - name: Verify desktop executable
         shell: pwsh
