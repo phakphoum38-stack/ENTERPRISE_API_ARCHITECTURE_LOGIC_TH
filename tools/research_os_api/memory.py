@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -87,6 +88,24 @@ def search_memory(directory: Path, query: str, limit: int = 5) -> list[dict[str,
     return [asdict(item) for item in hits[: max(1, min(limit, 20))]]
 
 
+def _local_private_context(max_chars: int = 3000) -> str:
+    """Load optional per-machine context without putting its contents in the repository.
+
+    Default installs have no local private context and therefore behave as the generic
+    Research OS assistant. A machine owner may opt in by creating a local file under
+    ~/.research_os/private_context.md or by setting RESEARCH_OS_LOCAL_CONTEXT_FILE.
+    """
+    configured = os.getenv("RESEARCH_OS_LOCAL_CONTEXT_FILE", "").strip()
+    path = Path(configured).expanduser() if configured else Path.home() / ".research_os" / "private_context.md"
+    try:
+        if not path.is_file():
+            return ""
+        text = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return ""
+    return text[:max_chars]
+
+
 def build_context(hits: list[dict[str, object]], max_chars: int = 4000) -> str:
     parts: list[str] = []
     for hit in hits:
@@ -100,4 +119,15 @@ def build_context(hits: list[dict[str, object]], max_chars: int = 4000) -> str:
                 ]
             )
         )
-    return "\n\n".join(parts)[:max_chars]
+
+    public_context = "\n\n".join(parts)
+    local_context = _local_private_context()
+    if local_context:
+        combined = (
+            f"{public_context}\n\n"
+            "Local user context (private to this machine; do not claim it is public project knowledge):\n"
+            f"{local_context}"
+        ).strip()
+    else:
+        combined = public_context
+    return combined[:max_chars]
