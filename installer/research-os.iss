@@ -18,7 +18,14 @@ SolidCompression=yes
 WizardStyle=modern
 OutputDir=output
 OutputBaseFilename=Research-OS-Setup-{#MyAppVersion}-x64
+SetupIconFile=research-os.ico
 UninstallDisplayName=Research OS
+UninstallDisplayIcon={app}\app\{#MyAppExeName}
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=Research OS Windows Installer
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoVersion=0.6.0.6
 SetupLogging=yes
 ChangesEnvironment=yes
 
@@ -34,8 +41,8 @@ Name: "{commonappdata}\ResearchOS\backups"
 Name: "{commonappdata}\ResearchOS\logs"
 
 [Icons]
-Name: "{group}\Research OS"; Filename: "{app}\app\{#MyAppExeName}"; WorkingDir: "{app}\app"
-Name: "{autodesktop}\Research OS"; Filename: "{app}\app\{#MyAppExeName}"; WorkingDir: "{app}\app"; Tasks: desktopicon
+Name: "{group}\Research OS"; Filename: "{app}\app\{#MyAppExeName}"; WorkingDir: "{app}\app"; IconFilename: "{app}\app\{#MyAppExeName}"
+Name: "{autodesktop}\Research OS"; Filename: "{app}\app\{#MyAppExeName}"; WorkingDir: "{app}\app"; IconFilename: "{app}\app\{#MyAppExeName}"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: checkedonce
