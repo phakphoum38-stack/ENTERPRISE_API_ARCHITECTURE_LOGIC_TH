@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -11,13 +12,15 @@ from pathlib import Path
 
 import agent_server
 from agent_orchestrator import AgentOrchestrator
-from v2_server import V2ResearchOSHandler
+from v2_server import Provenance, V2ResearchOSHandler, WorkspaceKnowledgeEngine
 
 
 class V2CompatibilityTests(unittest.TestCase):
     def setUp(self) -> None:
         self.original = agent_server.ORCHESTRATOR
+        self.original_data_dir = os.environ.get("RESEARCH_OS_DATA_DIR")
         self.temp = tempfile.TemporaryDirectory()
+        os.environ["RESEARCH_OS_DATA_DIR"] = self.temp.name
         agent_server.ORCHESTRATOR = AgentOrchestrator(
             storage_path=Path(self.temp.name) / "agents" / "orchestrations.json"
         )
@@ -31,6 +34,10 @@ class V2CompatibilityTests(unittest.TestCase):
         self.server.server_close()
         self.thread.join(timeout=2)
         agent_server.ORCHESTRATOR = self.original
+        if self.original_data_dir is None:
+            os.environ.pop("RESEARCH_OS_DATA_DIR", None)
+        else:
+            os.environ["RESEARCH_OS_DATA_DIR"] = self.original_data_dir
         self.temp.cleanup()
 
     def request(self, path: str, *, method: str = "GET", body=None):
@@ -118,6 +125,49 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertIsNone(second["page"]["next_cursor"])
         returned = {item["run_id"] for item in first["items"] + second["items"]}
         self.assertEqual(returned, set(ids))
+
+    def test_v2_workspace_catalog_and_knowledge_search_use_existing_index(self) -> None:
+        engine = WorkspaceKnowledgeEngine(self.temp.name)
+        engine.create_workspace("Research", workspace_id="research")
+        for index in range(2):
+            engine.upsert_record(
+                "research",
+                kind="research_artifact",
+                title=f"Evidence {index}",
+                content=f"durable workspace evidence record {index}",
+                provenance=Provenance(
+                    source_type="research_artifact",
+                    source_id=f"artifact-{index}",
+                    evidence=[f"source-{index}"],
+                ),
+            )
+
+        status, catalog = self.request("/v2/workspaces")
+        self.assertEqual(status, 200)
+        self.assertEqual(catalog["api_version"], "v2")
+        self.assertEqual(catalog["count"], 1)
+        self.assertEqual(catalog["workspaces"][0]["workspace_id"], "research")
+
+        status, first = self.request(
+            "/v2/workspaces/research/knowledge?q=evidence&page_size=1"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(first["workspace_id"], "research")
+        self.assertEqual(len(first["items"]), 1)
+        self.assertEqual(first["items"][0]["provenance"]["source_type"], "research_artifact")
+        cursor = first["page"]["next_cursor"]
+        self.assertIsInstance(cursor, str)
+
+        status, second = self.request(
+            f"/v2/workspaces/research/knowledge?q=evidence&page_size=1&cursor={cursor}"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(len(second["items"]), 1)
+        self.assertIsNone(second["page"]["next_cursor"])
+
+        status, missing = self.request("/v2/workspaces/missing/knowledge?q=x")
+        self.assertEqual(status, 404)
+        self.assertEqual(missing["error"]["code"], "workspace_not_found")
 
     def test_v2_errors_have_machine_readable_envelope(self) -> None:
         status, payload = self.request("/v2/orchestrations?page_size=101")
