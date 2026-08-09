@@ -84,8 +84,7 @@ jobs:
 
       - name: Seed representative V1 local data
         shell: pwsh
-        run: |
-          .\scripts\v2-data-preservation.ps1 -Action Seed -DataDir "$env:ProgramData\ResearchOS"
+        run: .\scripts\v2-data-preservation.ps1 -Action Seed -DataDir "$env:ProgramData\ResearchOS"
 
       - name: Install V2 Setup EXE silently
         shell: pwsh
@@ -118,8 +117,7 @@ jobs:
 
       - name: Verify V1 data survived V2 installation
         shell: pwsh
-        run: |
-          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+        run: .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
 
       - name: Verify ResearchOSService is running
         shell: pwsh
@@ -128,10 +126,7 @@ jobs:
           if (-not $service) { throw "ResearchOSService was not installed" }
           Write-Host "Service state: $($service.State)"
           Write-Host "Service path: $($service.PathName)"
-          if ($service.State -ne 'Running') {
-            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue | Select-Object -First 40 | Format-List
-            throw "ResearchOSService is not running"
-          }
+          if ($service.State -ne 'Running') { throw "ResearchOSService is not running" }
 
       - name: Verify service V1 health and V2 readiness endpoints
         shell: pwsh
@@ -148,8 +143,6 @@ jobs:
           }
           if (-not $ready) {
             Write-Host "Last health error: $lastError"
-            Get-NetTCPConnection -LocalPort 8787 -ErrorAction SilentlyContinue | Format-Table -AutoSize
-            Get-Process ResearchOS.ServiceHost -ErrorAction SilentlyContinue | Format-List *
             throw "Installed Research OS health endpoint did not become ready"
           }
           $v2 = Invoke-WebRequest -Uri "http://127.0.0.1:8787/v2/health/readiness" -TimeoutSec 5 -SkipHttpErrorCheck
@@ -158,6 +151,34 @@ jobs:
           $payload = $v2.Content | ConvertFrom-Json
           if (-not $payload.ready) { throw "V2 readiness reported not ready" }
           if (-not $payload.storage.writable) { throw "V2 storage readiness reported not writable" }
+
+      - name: Quiesce V2 runtime before in-place upgrade
+        shell: pwsh
+        run: |
+          $service = Get-Service ResearchOSService -ErrorAction SilentlyContinue
+          if ($service) {
+            Write-Host "Stopping ResearchOSService before replacing bundled runtime files."
+            Stop-Service ResearchOSService -Force -ErrorAction Stop
+            $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
+          }
+          for ($i = 0; $i -lt 40; $i++) {
+            $listener = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
+            $hostProcess = Get-Process 'ResearchOS.ServiceHost' -ErrorAction SilentlyContinue
+            if (-not $listener -and -not $hostProcess) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
+          foreach ($listener in $listeners) {
+            Write-Host "Stopping lingering listener PID $($listener.OwningProcess)."
+            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+          }
+          Get-Process 'ResearchOS.ServiceHost' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 1
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 still listening before upgrade" }
+          if (Get-Process 'ResearchOS.ServiceHost' -ErrorAction SilentlyContinue) { throw "ServiceHost still running before upgrade" }
+          $python = Join-Path $env:ProgramFiles 'Research OS\runtime\python\python.exe'
+          if (-not (Test-Path $python)) { throw "Bundled Python runtime missing before upgrade" }
+          Write-Host "Runtime quiesced; installer may safely replace bundled Python and service files."
 
       - name: Reinstall V2 in-place to exercise upgrade path
         shell: pwsh
@@ -169,6 +190,26 @@ jobs:
             if (Test-Path $log) { Get-Content $log -Tail 300 }
             throw "In-place upgrade simulation failed with exit code $($p.ExitCode)"
           }
+          if (Test-Path $log) {
+            $tail = Get-Content $log -Tail 300
+            $tail | Out-Host
+            if ($tail -match 'User canceled the installation process|DeleteFile failed; code 5') { throw "Upgrade log contains file-lock cancellation" }
+          }
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+
+      - name: Verify service restarted after V2 upgrade
+        shell: pwsh
+        run: |
+          $ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            try {
+              $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
+              $response = Invoke-WebRequest -Uri "http://127.0.0.1:8787/v2/health/readiness" -TimeoutSec 2 -SkipHttpErrorCheck
+              if ($service.State -eq 'Running' -and $response.StatusCode -eq 200 -and ($response.Content | ConvertFrom-Json).ready) { $ready = $true; break }
+            } catch { }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $ready) { throw "V2 service/readiness did not recover after in-place upgrade" }
           .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
 
       - name: Uninstall V2 Setup EXE silently
@@ -293,5 +334,4 @@ jobs:
       - name: Record validation-only mode
         if: ${{ success() && inputs.dispatch_release != true }}
         shell: pwsh
-        run: |
-          Write-Host "Installer validation completed in validation-only mode. Downstream release was not dispatched."
+        run: Write-Host "Installer validation completed in validation-only mode. Downstream release was not dispatched."
