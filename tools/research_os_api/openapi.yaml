@@ -201,6 +201,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/providers:
+    get:
+      summary: Return the secret-safe AI Gateway provider discovery and active selection report
+      responses:
+        "200":
+          description: Versioned provider gateway report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [api_version, gateway]
+                properties:
+                  api_version:
+                    const: v2
+                  gateway:
+                    type: object
+                    additionalProperties: true
   /v2/agents:
     get:
       summary: V2 agent catalog backed by the same dynamic registry as V1
@@ -412,6 +429,143 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/intelligence:
+    get:
+      summary: Return the read-only Research OS AI Brain System Introspection manifest
+      responses:
+        "200":
+          description: Introspection manifest with source-of-truth and safety metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+  /v2/intelligence/capabilities:
+    get:
+      summary: Return capability graph state derived from canonical agent, skill, and tool registries
+      responses:
+        "200":
+          description: Known, routable, skill-supported, and executable capability states
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+  /v2/intelligence/agents:
+    get:
+      summary: Inspect operational agents and isolated Brain Team agents without changing readiness or permissions
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, operational, brain]
+            default: all
+        - $ref: '#/components/parameters/CapabilityFilter'
+        - $ref: '#/components/parameters/PermissionFilter'
+        - $ref: '#/components/parameters/ReadyOnlyFilter'
+      responses:
+        "200":
+          description: Filtered agent introspection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+        "400":
+          description: Invalid introspection filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/intelligence/skills:
+    get:
+      summary: Inspect registered skill contracts and readiness
+      parameters:
+        - $ref: '#/components/parameters/CapabilityFilter'
+        - $ref: '#/components/parameters/PermissionFilter'
+        - $ref: '#/components/parameters/ReadyOnlyFilter'
+      responses:
+        "200":
+          description: Filtered skill introspection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+  /v2/intelligence/tools:
+    get:
+      summary: Inspect tool metadata and real adapter readiness without invoking adapters
+      parameters:
+        - $ref: '#/components/parameters/CapabilityFilter'
+        - $ref: '#/components/parameters/PermissionFilter'
+        - $ref: '#/components/parameters/ReadyOnlyFilter'
+      responses:
+        "200":
+          description: Filtered tool introspection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+  /v2/intelligence/permissions:
+    get:
+      summary: Inspect descriptive permission requirements without granting permissions
+      responses:
+        "200":
+          description: Permission catalog and consumers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+  /v2/intelligence/architecture:
+    get:
+      summary: Return the model-independent Research OS intelligence architecture graph and invariants
+      responses:
+        "200":
+          description: Architecture nodes, edges, and invariants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+  /v2/intelligence/project-state:
+    get:
+      summary: Return whitelisted local runtime project state without exposing private storage paths
+      responses:
+        "200":
+          description: Non-authoritative release-safe runtime project state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+  /v2/intelligence/health:
+    get:
+      summary: Return readiness of introspection dependencies and governance boundaries
+      responses:
+        "200":
+          description: System Introspection readiness
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+  /v2/intelligence/plan:
+    post:
+      summary: Build a secret-safe read-only Brain plan without executing tools or granting permissions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/V2IntelligencePlanRequest'
+      responses:
+        "200":
+          description: Read-only plan, context snapshot, and capability matches
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2IntelligenceEnvelope'
+        "400":
+          description: Invalid or oversized planning request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
 
 components:
   parameters:
@@ -447,6 +601,25 @@ components:
       required: false
       schema:
         type: string
+    CapabilityFilter:
+      name: capability
+      in: query
+      required: false
+      schema:
+        type: string
+    PermissionFilter:
+      name: permission
+      in: query
+      required: false
+      schema:
+        type: string
+    ReadyOnlyFilter:
+      name: ready_only
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: true
   pathItems:
     CreateOrchestration:
       summary: Create a Multi-Agent orchestration run
@@ -736,6 +909,28 @@ components:
           additionalProperties: true
         checked_at:
           type: number
+    V2IntelligencePlanRequest:
+      type: object
+      required: [objective]
+      properties:
+        objective:
+          type: string
+          minLength: 1
+          maxLength: 8000
+        session_id:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+    V2IntelligenceEnvelope:
+      type: object
+      required: [api_version, contract]
+      properties:
+        api_version:
+          const: v2
+        contract:
+          const: brain-system-introspection-phase-7
+      additionalProperties: true
     V2ErrorEnvelope:
       type: object
       required: [api_version, error]
