@@ -1,9 +1,15 @@
+# Research OS V2 isolated staging deployment blueprint.
+# This deployment branch is pinned to the verified V2 candidate lineage and is
+# intentionally separate from main/production. Auto deploy remains disabled.
 services:
   - type: web
-    name: research-os-api-phakphoum
+    name: research-os-api-v2-staging
     runtime: python
     plan: free
-    autoDeploy: true
+    region: singapore
+    repo: https://github.com/phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
+    branch: deploy/v2-staging-4e25c05
+    autoDeploy: false
     buildCommand: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
     startCommand: cd tools/research_os_api && python render_server.py
     healthCheckPath: /health
@@ -11,14 +17,35 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.8
       - key: RESEARCH_OS_PROVIDER
-        value: gemini
-      - key: RESEARCH_OS_GEMINI_MODEL
-        value: gemini-3-flash-preview
+        value: mock
       - key: RESEARCH_OS_ALLOWED_ORIGIN
         value: https://phakphoum38-stack.github.io
-      - key: RESEARCH_OS_GITHUB_REPOSITORY
-        value: phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: RESEARCH_OS_SYNC_KEY
-        sync: false
+      - key: RESEARCH_OS_DATA_DIR
+        value: /tmp/ResearchOSData
+
+  - type: web
+    name: research-os-developer-v2-staging
+    runtime: python
+    plan: free
+    region: singapore
+    repo: https://github.com/phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
+    branch: deploy/v2-staging-4e25c05
+    autoDeploy: false
+    buildCommand: python -m unittest tools.research_os_api.test_developer_identity tools.research_os_api.test_developer_access tools.research_os_api.test_developer_server -v
+    startCommand: cd tools/research_os_api && RESEARCH_OS_DEVELOPER_PORT=$PORT python developer_server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: RESEARCH_OS_DEVELOPER_HOST
+        value: 0.0.0.0
+      - key: RESEARCH_OS_IDENTITY_ASSERTION_MAX_AGE
+        value: "120"
+      - key: RESEARCH_OS_IDENTITY_PROXY_SECRET
+        generateValue: true
+      - key: RESEARCH_OS_DEVELOPER_LOGIN_URL
+        value: /identity/login
+      - key: RESEARCH_OS_DATA_DIR
+        value: /tmp/ResearchOSData
+      # RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS is intentionally absent.
+      # Signed HMAC identity assertions are required by default.
