@@ -13,6 +13,7 @@ class ToolRegistryTests(unittest.TestCase):
         self.assertEqual("brain-tools-phase-3", TOOL_REGISTRY_CONTRACT)
         self.assertEqual(TOOL_REGISTRY_CONTRACT, report["contract"])
         self.assertEqual(3, report["tool_count"])
+        self.assertEqual(3, report["enabled_count"])
         self.assertEqual(0, report["ready_count"])
         self.assertEqual(0, report["mutating_count"])
         self.assertEqual("permissioned_execution_controller_only", report["execution_boundary"])
