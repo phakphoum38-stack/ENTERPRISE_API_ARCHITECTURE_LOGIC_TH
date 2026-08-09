@@ -1,0 +1,38 @@
+name: Adaptive Software Factory
+
+on:
+  pull_request:
+    paths:
+      - "software_factory/**"
+      - "tests/test_adaptive_software_factory.py"
+      - ".github/workflows/adaptive-software-factory.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "software_factory/**"
+      - "tests/test_adaptive_software_factory.py"
+      - ".github/workflows/adaptive-software-factory.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile factory package
+        run: python -m compileall -q software_factory
+
+      - name: Run adaptive factory tests
+        run: python -m unittest -v tests/test_adaptive_software_factory.py
