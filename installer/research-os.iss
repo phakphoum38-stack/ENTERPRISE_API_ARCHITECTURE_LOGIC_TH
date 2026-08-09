@@ -1,5 +1,5 @@
 #define MyAppName "Research OS"
-#define MyAppVersion "0.6.0"
+#define MyAppVersion "2.0.0-dev.1"
 #define MyAppPublisher "Research OS"
 #define MyAppExeName "research_os_flutter.exe"
 
@@ -10,6 +10,7 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\Research OS
 DefaultGroupName=Research OS
+UsePreviousAppDir=yes
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -23,6 +24,8 @@ UninstallDisplayName=Research OS
 UninstallDisplayIcon={app}\app\{#MyAppExeName}
 SetupLogging=yes
 ChangesEnvironment=yes
+CloseApplications=yes
+RestartApplications=no
 
 [Files]
 Source: "package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -34,6 +37,7 @@ Name: "{commonappdata}\ResearchOS\sessions"
 Name: "{commonappdata}\ResearchOS\artifacts"
 Name: "{commonappdata}\ResearchOS\backups"
 Name: "{commonappdata}\ResearchOS\logs"
+Name: "{commonappdata}\ResearchOS\workspaces"
 
 [Icons]
 Name: "{group}\Research OS"; Filename: "{app}\app\{#MyAppExeName}"; WorkingDir: "{app}\app"
@@ -53,6 +57,10 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPo
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssInstall then
+  begin
+    Log('Research OS upgrade/install is preserving ProgramData\ResearchOS as the local data boundary.');
+  end;
   if CurStep = ssPostInstall then
   begin
     Log('Research OS installation completed. User data is stored under ProgramData\ResearchOS.');
@@ -63,6 +71,6 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if (CurUninstallStep = usPostUninstall) and (not UninstallSilent) then
   begin
-    MsgBox('Research OS was removed. Your local Memory, sessions, backups and other data in ProgramData\ResearchOS were preserved.', mbInformation, MB_OK);
+    MsgBox('Research OS was removed. Your local Memory, sessions, workspaces, backups and other data in ProgramData\ResearchOS were preserved.', mbInformation, MB_OK);
   end;
 end;
