@@ -7,6 +7,9 @@ import unittest
 import test_v2_brain_context
 import test_v2_brain_decision
 import test_v2_execution_controller
+import test_v2_execution_hardening
+import test_v2_secret_redactor
+import test_v2_skill_executor
 import test_v2_skill_registry
 import test_v2_tool_registry
 from agent_platform import AgentRegistry
@@ -49,17 +52,20 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertIn("v2_brain_architect", matches["architecture"])
             self.assertEqual(12, result["team"]["ready_count"])
 
-    def test_phase_three_introspection_exposes_permissioned_execution(self) -> None:
+    def test_phase_four_introspection_exposes_secret_aware_skill_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             report = self.make_runtime(tmp).introspect()
-            self.assertEqual("brain_core_phase_3", report["phase"])
+            self.assertEqual("brain_core_phase_4", report["phase"])
             self.assertGreaterEqual(report["skills"]["ready_count"], 3)
             self.assertEqual(3, report["tools"]["ready_count"])
             self.assertTrue(report["context"]["secret_redaction"])
             self.assertFalse(report["decision_policy"]["hidden_chain_of_thought"])
-            self.assertEqual("permissioned_controller_enabled", report["tool_execution"])
+            self.assertEqual("secret_aware_permissioned_controller_enabled", report["tool_execution"])
             self.assertFalse(report["direct_adapter_access"])
             self.assertEqual("explicit_approval", report["execution"]["write_policy"])
+            self.assertTrue(report["secret_redaction"]["value_aware"])
+            self.assertTrue(report["post_execution_verification"])
+            self.assertEqual("brain-skill-tool-execution-phase-4", report["skill_execution"]["contract"])
 
     def test_plan_returns_context_snapshot_without_secret_leak(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -100,7 +106,7 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertGreaterEqual(completed["output"]["count"], 3)
             self.assertEqual(1, completed["attempts"])
 
-    def test_context_tool_routes_through_execution_controller(self) -> None:
+    def test_context_tool_routes_through_hardened_execution_controller(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.make_runtime(tmp)
             completed = runtime.execute_tool(
@@ -116,6 +122,43 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertEqual("completed", completed["status"])
             self.assertNotIn("do-not-expose", repr(completed))
             self.assertEqual("[REDACTED]", completed["output"]["values"]["api_key"])
+
+    def test_core_goal_analysis_skill_matches_context_tool_and_verifies(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.make_runtime(tmp)
+            match = runtime.match_tools(("context_engine",))
+            self.assertTrue(match["matched"])
+            self.assertEqual("brain.context.inspect", match["selected_tool_id"])
+
+            result = runtime.execute_skill(
+                "brain.goal-analysis",
+                "build",
+                session_id="goal-skill",
+                payload={"objective": "understand Research OS architecture"},
+                granted_permissions=("memory.read", "runtime.read"),
+            )
+            self.assertEqual("verified", result["status"])
+            self.assertEqual("brain.context.inspect", result["selected_tool_id"])
+            self.assertTrue(result["verification"]["verified"])
+
+    def test_runtime_secret_values_do_not_escape_tool_result(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.make_runtime(tmp)
+            secret = "runtime-explicit-secret-123456789"
+            result = runtime.execute_tool(
+                "brain.context.inspect",
+                "build",
+                session_id="runtime-secret",
+                payload={
+                    "objective": "inspect secret handling",
+                    "context": {"note": f"contains {secret}"},
+                },
+                granted_permissions=("runtime.read",),
+                secret_values=(secret,),
+            )
+            self.assertEqual("completed", result["status"])
+            self.assertNotIn(secret, repr(result))
+            self.assertIn("[REDACTED]", repr(result))
 
     def test_action_evaluation_requires_permission_and_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -160,6 +203,9 @@ def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite, pattern: 
     suite.addTests(loader.loadTestsFromModule(test_v2_skill_registry))
     suite.addTests(loader.loadTestsFromModule(test_v2_tool_registry))
     suite.addTests(loader.loadTestsFromModule(test_v2_execution_controller))
+    suite.addTests(loader.loadTestsFromModule(test_v2_secret_redactor))
+    suite.addTests(loader.loadTestsFromModule(test_v2_execution_hardening))
+    suite.addTests(loader.loadTestsFromModule(test_v2_skill_executor))
     return suite
 
 
