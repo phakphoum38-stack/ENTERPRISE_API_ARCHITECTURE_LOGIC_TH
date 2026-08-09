@@ -1,6 +1,7 @@
 # Research OS V2 isolated staging deployment blueprint.
-# This deployment branch is pinned to the verified V2 candidate lineage and is
-# intentionally separate from main/production. Auto deploy remains disabled.
+# Blueprint configuration lives on this deploy branch, while both services build
+# from candidate/v2-staging-4e25c05 which points exactly at verified candidate
+# 4e25c05c9c14a857a21fc639d0bb3467015a1974.
 services:
   - type: web
     name: research-os-api-v2-staging
@@ -8,7 +9,7 @@ services:
     plan: free
     region: singapore
     repo: https://github.com/phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
-    branch: deploy/v2-staging-4e25c05
+    branch: candidate/v2-staging-4e25c05
     autoDeploy: false
     buildCommand: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
     startCommand: cd tools/research_os_api && python render_server.py
@@ -29,7 +30,7 @@ services:
     plan: free
     region: singapore
     repo: https://github.com/phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
-    branch: deploy/v2-staging-4e25c05
+    branch: candidate/v2-staging-4e25c05
     autoDeploy: false
     buildCommand: python -m unittest tools.research_os_api.test_developer_identity tools.research_os_api.test_developer_access tools.research_os_api.test_developer_server -v
     startCommand: cd tools/research_os_api && RESEARCH_OS_DEVELOPER_PORT=$PORT python developer_server.py
