@@ -73,6 +73,24 @@ class AgentRuntimeTest(unittest.TestCase):
             reloaded = SharedContextStore(tmp)
             self.assertEqual(reloaded.get("shared:research")["project"], "Research OS")
 
+    def test_runtime_attaches_adaptive_brain_plan_without_external_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self._runtime(tmp, AgentRouter(AgentRegistry()))
+            task = runtime.submit(
+                "research evidence with agent tools",
+                context={
+                    "brain_complexity_level": 6,
+                    "brain_requested_workers": 46656,
+                    "brain_budget_workers": 12,
+                    "brain_ready_workers": 8,
+                },
+            )
+            plan = task["result"]["brain_plan"]
+            self.assertEqual(plan["hierarchy"]["max_leaf_capacity"], 6**6)
+            self.assertEqual(plan["hierarchy"]["active_workers"], 8)
+            self.assertTrue(plan["hierarchy"]["backpressure_applied"])
+            self.assertFalse(plan["requires_external_api_key"])
+
     def test_runtime_dashboard_reports_active_components(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self._runtime(tmp, AgentRouter(AgentRegistry()))
@@ -83,6 +101,8 @@ class AgentRuntimeTest(unittest.TestCase):
             self.assertEqual(dashboard["shared_context"], "local_persistent")
             self.assertTrue(dashboard["agent_readiness"]["ready"])
             self.assertEqual(dashboard["agent_readiness"]["ready_count"], 6)
+            self.assertEqual(dashboard["brain"]["capacity"]["max_leaf_capacity"], 6**6)
+            self.assertEqual(dashboard["brain"]["skills"]["skill_count"], 10)
 
 
 if __name__ == "__main__":
