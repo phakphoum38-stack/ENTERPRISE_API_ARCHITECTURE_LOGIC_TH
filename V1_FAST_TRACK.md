@@ -1,13 +1,14 @@
 # Research OS v1.0.0 Fast-Track Plan
 
-Status: RELEASE CANDIDATE — `0.9.0-rc.1`
+Status: STABLE PROMOTION — `1.0.0`
 
 ## Source-of-truth version
 
-The Flutter application declares `0.9.0-rc.1+1` in `apps/research_os_flutter/pubspec.yaml`.
-The API contract declares `0.9.0-rc.1` in `tools/research_os_api/openapi.yaml`.
+The Flutter application declares `1.0.0+1` in `apps/research_os_flutter/pubspec.yaml`.
+The API contract declares `1.0.0` in `tools/research_os_api/openapi.yaml`.
 
-RC evidence candidate SHA: `1ad63b10aa0fac3aa98173334c4394fc43487eab`.
+Stable baseline / rollback SHA: `81aa4b2cd7d1de13007f96d145f1a9c566eba0ed`.
+Verified release artifact digest: `sha256:7155bc136d32611d109aae279ecaa59d00a795aa8362f612a669887aa6fbd39e`.
 
 ## Fast-track sequence
 
@@ -15,7 +16,7 @@ RC evidence candidate SHA: `1ad63b10aa0fac3aa98173334c4394fc43487eab`.
 2. `0.9.0-rc.1` — release candidate after full regression gates
 3. `1.0.0` — stable release after final stable-release checks
 
-## v1 scope — must complete
+## v1 scope — complete
 
 ### Multi-Agent platform
 - [x] Agent registry and capability router
@@ -57,11 +58,11 @@ RC evidence candidate SHA: `1ad63b10aa0fac3aa98173334c4394fc43487eab`.
 - [x] Release artifact pass
 - [x] Production Health pass
 
-## RC evidence
+## Stable-release evidence
 
-Candidate SHA: `1ad63b10aa0fac3aa98173334c4394fc43487eab`
+Baseline SHA: `81aa4b2cd7d1de13007f96d145f1a9c566eba0ed`
 
-Validated on the same candidate chain:
+Validated on the same RC chain:
 - Windows App and Service Host build
 - Runtime Smoke
 - Installer Build
@@ -73,6 +74,8 @@ Validated on the same candidate chain:
 - GitHub Pages deployment
 - Production Health
 
+Release run `31286606327` completed successfully and created a verification manifest plus the verified release artifact `research-os-verified-release-81aa4b2cd7d1de13007f96d145f1a9c566eba0ed`.
+
 ## Promotion rules
 
 ### Promote to 0.9.0-dev.1 when
@@ -80,18 +83,20 @@ Validated on the same candidate chain:
 - Agent orchestration API is available through the runtime used by the app.
 - Analyze and unit/widget tests pass.
 
+Status: satisfied.
+
 ### Promote to 0.9.0-rc.1 when
 - Windows app, service host, runtime smoke, installer, installer validation, and release pipeline all pass against one candidate SHA.
 - No known release-blocking defects remain.
 
-Status: satisfied by candidate SHA `1ad63b10aa0fac3aa98173334c4394fc43487eab`.
+Status: satisfied.
 
 ### Promote to 1.0.0 when
 - RC passes production health and secondary web/Pages validation.
-- Release artifact and verification manifest are reproducible.
-- Baseline reference is recorded.
+- Release artifact and verification manifest are produced from the verified RC chain.
+- Baseline/rollback reference is recorded.
 
-Production health and secondary validation are green for the RC candidate. Reproducibility and baseline evidence remain the final stable-release checks.
+Status: satisfied by RC baseline SHA `81aa4b2cd7d1de13007f96d145f1a9c566eba0ed`.
 
 ## Fast-track working rule
 
