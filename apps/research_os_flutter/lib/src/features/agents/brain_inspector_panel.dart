@@ -264,7 +264,7 @@ class _BrainInspectorPanelState extends State<BrainInspectorPanel> {
   }
 
   Widget _metric(String label, Object? ready, Object? total) {
-    final value = total == null ? '${ready ?? '-'}' : '${ready ?? '-'}/${total ?? '-'}';
+    final value = total == null ? '${ready ?? '-'}' : '${ready ?? '-'}/$total';
     return Chip(label: Text('$label $value'));
   }
 
