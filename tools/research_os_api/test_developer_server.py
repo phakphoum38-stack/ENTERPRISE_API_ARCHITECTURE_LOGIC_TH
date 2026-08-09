@@ -50,6 +50,61 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         conn.close()
         return status, data
 
+    def test_trial_mode_requires_no_registration_or_identity(self) -> None:
+        status, payload = self.request("GET", "/v2/developer/trial", None)
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["mode"], "trial")
+        self.assertFalse(payload["registration_required"])
+        self.assertFalse(payload["persistent_account"])
+        self.assertEqual(payload["data_source"], "synthetic_demo_only")
+        self.assertIn("write", payload["restricted"])
+        self.assertIn("real_file_access", payload["restricted"])
+
+    def test_trial_resources_are_synthetic_and_read_only(self) -> None:
+        status, listing = self.request("GET", "/v2/developer/trial/resources?q=python", None)
+        self.assertEqual(status, 200)
+        self.assertGreaterEqual(listing["count"], 1)
+        resource_id = listing["items"][0]["resource_id"]
+        self.assertNotIn("content", listing["items"][0])
+
+        status, resource = self.request("GET", f"/v2/developer/trial/resources/{resource_id}", None)
+        self.assertEqual(status, 200)
+        self.assertTrue(resource["read_only"])
+        self.assertEqual(resource["resource"]["workspace_id"], "trial-workspace")
+        self.assertIn("content", resource["resource"])
+
+        status, authorization = self.request(
+            "POST",
+            "/v2/developer/trial/authorize",
+            None,
+            {"resource_id": resource_id, "scope": "read"},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(authorization["authorization"]["allowed"])
+        self.assertFalse(authorization["authorization"]["persistent"])
+        self.assertFalse(authorization["authorization"]["real_resource"])
+
+    def test_trial_mode_rejects_write_and_management_actions(self) -> None:
+        for path, body in (
+            ("/v2/developer/trial/authorize", {"resource_id": "demo-api-client", "scope": "write"}),
+            ("/v2/developer/trial/commit", {"message": "change"}),
+            ("/v2/developer/trial/approve", {"request_id": "anything"}),
+        ):
+            status, payload = self.request("POST", path, None, body)
+            self.assertEqual(status, 403)
+            self.assertEqual(payload["error"]["code"], "trial_restricted")
+
+    def test_trial_mode_does_not_create_access_metadata(self) -> None:
+        self.request("GET", "/v2/developer/trial/resources", None)
+        self.request(
+            "POST",
+            "/v2/developer/trial/authorize",
+            None,
+            {"resource_id": "demo-api-client", "scope": "read"},
+        )
+        developer_dir = os.path.join(self.temp.name, "developer-access")
+        self.assertFalse(os.path.exists(developer_dir))
+
     def test_untrusted_identity_is_rejected(self) -> None:
         status, payload = self.request("GET", "/v2/developer/grants", "dev:alice", secret="wrong")
         self.assertEqual(status, 401)
