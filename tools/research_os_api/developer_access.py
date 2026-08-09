@@ -279,6 +279,14 @@ class DeveloperAccessStore:
             items.sort(key=lambda item: item.created_at, reverse=True)
             return [self._grant_payload(item) for item in items]
 
+    def list_owner_grants(self, owner_id: str, *, active_only: bool = True) -> list[dict[str, Any]]:
+        with self._lock:
+            items = [item for item in self._grants.values() if item.owner_id == owner_id]
+            if active_only:
+                items = [item for item in items if item.active]
+            items.sort(key=lambda item: item.created_at, reverse=True)
+            return [self._grant_payload(item) for item in items]
+
     def _require_request(self, request_id: str) -> DeveloperAccessRequest:
         try:
             return self._requests[request_id]
