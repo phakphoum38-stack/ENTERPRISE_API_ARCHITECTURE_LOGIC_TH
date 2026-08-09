@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, unquote, urlsplit, urlunsplit
 
 import agent_server
 from agent_server import AgentResearchOSHandler
+from ai_gateway import gateway_report
 from v2_observability import readiness_snapshot
 
 _CURATOR_DIR = Path(__file__).resolve().parents[1] / "research_curator"
@@ -45,6 +46,10 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
                 HTTPStatus.OK if payload["ready"] else HTTPStatus.SERVICE_UNAVAILABLE,
                 payload,
             )
+            return
+
+        if parsed.path == "/v2/providers":
+            self._send(HTTPStatus.OK, {"gateway": gateway_report()})
             return
 
         if parsed.path == "/v2/orchestrations":
