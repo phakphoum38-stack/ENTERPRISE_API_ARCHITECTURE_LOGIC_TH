@@ -44,17 +44,29 @@ jobs:
           $appRun = $null
           $serviceRun = $null
           for ($i = 0; $i -lt 30; $i++) {
+            $runsJson = gh api "repos/${{ github.repository }}/actions/runs?head_sha=$env:TARGET_SHA&per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to query workflow runs for $env:TARGET_SHA" }
+            $runs = $runsJson | ConvertFrom-Json
+
             if (-not $appRun) {
-              $appRun = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Windows App" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+              $appRun = $runs.workflow_runs |
+                Where-Object { $_.path -eq '.github/workflows/01-build-windows-app.yml' -and $_.conclusion -eq 'success' } |
+                Sort-Object id -Descending |
+                Select-Object -First 1 -ExpandProperty id
             }
             if (-not $serviceRun) {
-              $serviceRun = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Service Host" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+              $serviceRun = $runs.workflow_runs |
+                Where-Object { $_.path -eq '.github/workflows/02-build-service-host.yml' -and $_.conclusion -eq 'success' } |
+                Sort-Object id -Descending |
+                Select-Object -First 1 -ExpandProperty id
             }
             if ($appRun -and $serviceRun) { break }
             Start-Sleep -Seconds 10
           }
-          if (-not $appRun) { throw "No successful Windows app run found for $env:TARGET_SHA" }
-          if (-not $serviceRun) { throw "No successful ServiceHost run found for $env:TARGET_SHA" }
+          if (-not $appRun) { throw "No successful Windows app run found for exact SHA $env:TARGET_SHA" }
+          if (-not $serviceRun) { throw "No successful ServiceHost run found for exact SHA $env:TARGET_SHA" }
+          Write-Host "Resolved Windows app run: $appRun"
+          Write-Host "Resolved ServiceHost run: $serviceRun"
           "app_run=$appRun" >> $env:GITHUB_OUTPUT
           "service_run=$serviceRun" >> $env:GITHUB_OUTPUT
 
