@@ -38,6 +38,13 @@ class DeveloperAccessApiClient {
     return _decode(await _client.get(uri));
   }
 
+  Future<Map<String, dynamic>> getOwnerGrants() async {
+    final uri = _uri('/v2/developer/grants').replace(
+      queryParameters: const <String, String>{'view': 'owner'},
+    );
+    return _decode(await _client.get(uri));
+  }
+
   Future<Map<String, dynamic>> approveRequest(
     String requestId, {
     required List<String> scopes,
@@ -57,6 +64,15 @@ class DeveloperAccessApiClient {
   }) =>
       _post(
         '/v2/developer/access-requests/${Uri.encodeComponent(requestId)}/reject',
+        <String, Object?>{'reason': reason},
+      );
+
+  Future<Map<String, dynamic>> revokeGrant(
+    String grantId, {
+    String reason = '',
+  }) =>
+      _post(
+        '/v2/developer/grants/${Uri.encodeComponent(grantId)}/revoke',
         <String, Object?>{'reason': reason},
       );
 
