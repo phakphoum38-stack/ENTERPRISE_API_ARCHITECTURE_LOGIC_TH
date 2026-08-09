@@ -273,7 +273,7 @@ Widget testApp(ResearchOSApiClient api) => MaterialApp(
     );
 
 void main() {
-  testWidgets('Agent Center creates executes and confirms orchestration',
+  testWidgets('Agent Center V2 squared creates executes and confirms orchestration',
       (tester) async {
     final api = FakeAgentApiClient();
     configureView(tester);
@@ -281,11 +281,12 @@ void main() {
     await tester.pumpWidget(testApp(api));
     await tester.pumpAndSettle();
 
+    expect(find.text('Agent Center V2²'), findsOneWidget);
     expect(find.text('No orchestration runs yet'), findsOneWidget);
     await tester.tap(find.byKey(const Key('create-orchestration-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Create orchestration • V2 helpers'), findsOneWidget);
+    expect(find.text('Create orchestration • V2² helpers'), findsOneWidget);
     expect(find.text('v2_brain_coordinator'), findsOneWidget);
     expect(find.text('v2_brain_reviewer'), findsOneWidget);
 
@@ -388,7 +389,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Agent Center V2 exposes V2 Brain Team health and cancellation controls',
+  testWidgets('Agent Center V2 squared exposes Brain Team health and cancellation controls',
       (tester) async {
     final api = FakeAgentApiClient();
     api.runs.add(<String, dynamic>{
