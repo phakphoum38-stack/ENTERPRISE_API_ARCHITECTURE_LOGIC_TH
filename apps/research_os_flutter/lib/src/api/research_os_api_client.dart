@@ -55,6 +55,27 @@ class ResearchOSApiClient {
     return _decode(response);
   }
 
+  Future<Map<String, dynamic>> getV2Workspaces() =>
+      _getJson('/v2/workspaces');
+
+  Future<Map<String, dynamic>> searchWorkspaceKnowledge(
+    String workspaceId, {
+    String query = '',
+    int pageSize = 25,
+    String? cursor,
+  }) async {
+    final params = <String, String>{
+      'q': query.trim(),
+      'page_size': '$pageSize',
+      if (cursor != null && cursor.trim().isNotEmpty) 'cursor': cursor.trim(),
+    };
+    final uri = _uri(
+      '/v2/workspaces/${Uri.encodeComponent(workspaceId)}/knowledge',
+    ).replace(queryParameters: params);
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
+
   Future<Map<String, dynamic>> getOrchestrations({
     String? status,
     String? query,
@@ -62,7 +83,9 @@ class ResearchOSApiClient {
     int? limit,
   }) async {
     final params = <String, String>{};
-    if (status != null && status.trim().isNotEmpty) params['status'] = status.trim();
+    if (status != null && status.trim().isNotEmpty) {
+      params['status'] = status.trim();
+    }
     if (query != null && query.trim().isNotEmpty) params['q'] = query.trim();
     if (agent != null && agent.trim().isNotEmpty) params['agent'] = agent.trim();
     if (limit != null) params['limit'] = '$limit';
@@ -112,7 +135,8 @@ class ResearchOSApiClient {
       _postJson(
         '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/retry',
         <String, Object?>{
-          if (stepId != null && stepId.trim().isNotEmpty) 'step_id': stepId.trim(),
+          if (stepId != null && stepId.trim().isNotEmpty)
+            'step_id': stepId.trim(),
         },
       );
 
@@ -249,7 +273,10 @@ class ResearchOSApiClient {
       );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final detail = decoded['detail'] ?? decoded['error'] ?? 'Unknown error';
+      final rawError = decoded['error'];
+      final detail = rawError is Map
+          ? rawError['message'] ?? rawError['code'] ?? 'Unknown error'
+          : decoded['detail'] ?? rawError ?? 'Unknown error';
       throw ResearchOSApiException(
         'Research OS API error ${response.statusCode}: $detail',
       );
