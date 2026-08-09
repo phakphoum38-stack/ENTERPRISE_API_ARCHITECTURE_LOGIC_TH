@@ -161,16 +161,24 @@ class FakeAgentApiClient extends ResearchOSApiClient {
   }
 
   @override
-  Future<Map<String, dynamic>> getAgents() async => <String, dynamic>{
-        'agents': <Map<String, dynamic>>[
+  Future<Map<String, dynamic>> getV2BrainAgents({bool readyOnly = true}) async =>
+      <String, dynamic>{
+        'api_version': 'v2',
+        'brain_team': <Map<String, dynamic>>[
           <String, dynamic>{
-            'agent_id': 'v2_agent_center_engineer',
-            'name': 'V2 Agent Center Engineer',
-            'permission_profile': 'write_confirmed',
+            'agent_id': 'v2_brain_coordinator',
+            'name': 'AI Brain Coordinator',
+            'permission_profile': 'standard',
+            'health': <String, dynamic>{'status': 'ready', 'ready': true},
+          },
+          <String, dynamic>{
+            'agent_id': 'v2_brain_reviewer',
+            'name': 'Independent AI Brain Reviewer',
+            'permission_profile': 'read_only',
             'health': <String, dynamic>{'status': 'ready', 'ready': true},
           },
         ],
-        'count': 1,
+        'count': 2,
       };
 
   @override
@@ -277,6 +285,10 @@ void main() {
     await tester.tap(find.byKey(const Key('create-orchestration-button')));
     await tester.pumpAndSettle();
 
+    expect(find.text('Create orchestration • V2 helpers'), findsOneWidget);
+    expect(find.text('v2_brain_coordinator'), findsOneWidget);
+    expect(find.text('v2_brain_reviewer'), findsOneWidget);
+
     await tester.enterText(
       find.byKey(const Key('orchestration-objective')),
       'Build a research summary',
@@ -296,6 +308,9 @@ void main() {
     expect(find.byKey(const Key('orchestration-dependency-graph')), findsOneWidget);
     expect(find.text('planned'), findsWidgets);
     expect(api.runs.single['steps'], hasLength(2));
+    final createdSteps = api.runs.single['steps'] as List<dynamic>;
+    expect(createdSteps.first['requested_agent'], 'v2_brain_coordinator');
+    expect(createdSteps.last['requested_agent'], 'v2_brain_reviewer');
 
     await tester.ensureVisible(find.byKey(const Key('execute-run-12345678')));
     await tester.tap(find.byKey(const Key('execute-run-12345678')));
@@ -373,7 +388,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Agent Center V2 exposes timeline health and cancellation controls',
+  testWidgets('Agent Center V2 exposes V2 Brain Team health and cancellation controls',
       (tester) async {
     final api = FakeAgentApiClient();
     api.runs.add(<String, dynamic>{
@@ -383,7 +398,7 @@ void main() {
       'steps': <Map<String, dynamic>>[
         <String, dynamic>{
           'step_id': 'step-1',
-          'requested_agent': 'v2_agent_center_engineer',
+          'requested_agent': 'v2_brain_coordinator',
           'status': 'planned',
           'depends_on': <String>[],
         },
@@ -400,7 +415,8 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('load-agent-health')));
     await tester.tap(find.byKey(const Key('load-agent-health')));
     await tester.pumpAndSettle();
-    expect(find.text('V2 Agent Center Engineer'), findsOneWidget);
+    expect(find.text('AI Brain Coordinator'), findsOneWidget);
+    expect(find.text('Independent AI Brain Reviewer'), findsOneWidget);
     expect(find.text('ready'), findsWidgets);
 
     await tester.ensureVisible(find.byKey(const Key('timeline-run-v2controls')));
