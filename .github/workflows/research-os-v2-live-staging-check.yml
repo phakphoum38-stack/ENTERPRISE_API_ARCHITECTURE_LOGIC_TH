@@ -1,0 +1,113 @@
+name: Research OS V2 Live Staging Check
+
+on:
+  push:
+    branches:
+      - validate/v2-staging-4e25c05
+
+permissions:
+  contents: read
+
+jobs:
+  live-staging-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TARGET_SHA: 4e25c05c9c14a857a21fc639d0bb3467015a1974
+      API_BASE_URL: https://research-os-api-v2-staging.onrender.com
+      DEVELOPER_BASE_URL: https://research-os-developer-v2-staging.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify V2 API staging health and readiness
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request
+          base=os.environ['API_BASE_URL'].rstrip('/')
+          def get(path):
+              last=None
+              for _ in range(8):
+                  try:
+                      req=urllib.request.Request(base+path, headers={'User-Agent':'ResearchOS-Live-Staging-Check/2'})
+                      with urllib.request.urlopen(req, timeout=25) as r:
+                          return r.status, json.load(r)
+                  except Exception as exc:
+                      last=exc
+                      time.sleep(8)
+              raise last
+          status, health=get('/health')
+          assert status == 200, status
+          assert health.get('status') == 'ok', health
+          status, ready=get('/v2/health/readiness')
+          assert status == 200, status
+          assert ready.get('ready') is True, ready
+          storage=ready.get('storage') or {}
+          assert storage.get('writable') is True, ready
+          print('V2 API live staging passed.')
+          PY
+
+      - name: Verify Developer staging public and security boundary
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.error, urllib.request
+          base=os.environ['DEVELOPER_BASE_URL'].rstrip('/')
+          def request(path):
+              last=None
+              for _ in range(8):
+                  try:
+                      req=urllib.request.Request(base+path, headers={'User-Agent':'ResearchOS-Live-Staging-Check/2'})
+                      return urllib.request.urlopen(req, timeout=25)
+                  except urllib.error.HTTPError as exc:
+                      return exc
+                  except Exception as exc:
+                      last=exc
+                      time.sleep(8)
+              raise last
+          with request('/health') as r:
+              assert r.status == 200, r.status
+              health=json.load(r)
+              assert health.get('status') == 'ok', health
+              assert health.get('identity_assertions') == 'signed_hmac_sha256', health
+          with request('/v2/developer/auth/config') as r:
+              assert r.status == 200, r.status
+              config=json.load(r)
+              assert config.get('assertion_mode') == 'signed_hmac_sha256', config
+              assert config.get('legacy_identity_headers') is False, config
+          with request('/v2/developer/trial') as r:
+              assert r.status == 200, r.status
+              trial=json.load(r)
+              assert trial.get('registration_required') is False, trial
+              assert trial.get('data_source') == 'synthetic_demo_only', trial
+              assert 'real_file_access' in trial.get('restricted', []), trial
+          with request('/v2/developer/session') as r:
+              assert r.status == 401, r.status
+              denied=json.load(r)
+              assert denied.get('error', {}).get('code') == 'identity_required', denied
+          with request('/app') as r:
+              assert r.status == 200, r.status
+              body=r.read().decode('utf-8', errors='replace')
+              csp=r.headers.get('Content-Security-Policy','')
+              assert "frame-ancestors 'none'" in csp, csp
+              assert "base-uri 'none'" in csp, csp
+              assert r.headers.get('X-Frame-Options') == 'DENY', dict(r.headers)
+              assert r.headers.get('Cache-Control') == 'no-store', dict(r.headers)
+              assert 'Developer Access Center' in body, body[:300]
+          print('Developer live staging boundary passed.')
+          PY
+
+      - name: Record exact candidate evidence
+        if: always()
+        run: |
+          {
+            echo '# Research OS V2 Live Staging Check'
+            echo '- Candidate: `4e25c05c9c14a857a21fc639d0bb3467015a1974`'
+            echo '- API: `https://research-os-api-v2-staging.onrender.com`'
+            echo '- Developer: `https://research-os-developer-v2-staging.onrender.com`'
+            echo '- Staging validation only; no production deploy, merge, tag, or release.'
+          } >> "$GITHUB_STEP_SUMMARY"
