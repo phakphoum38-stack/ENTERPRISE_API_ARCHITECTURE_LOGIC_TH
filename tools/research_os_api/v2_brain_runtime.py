@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Research OS AI Brain runtime composition.
 
-Phase 4 composes the provider-neutral Brain Core with context assembly, the
+Phase 8 composes the provider-neutral Brain Core with context assembly, the
 versioned Skill Registry, deterministic decision/risk policy, Tool Registry,
 secret-aware permissioned execution, Skill -> Tool execution, post-execution
-verification, durable checkpoints and the isolated 12-agent Brain engineering
-team. The Brain never calls adapters directly.
+verification, durable checkpoints, canonical AgentOrchestrator task graphs and
+the isolated 12-agent Brain engineering team. The Brain never calls adapters
+directly.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from v2_execution_hardening import (
     SecretAwareCheckpointStore,
     SecretAwareExecutionRequest,
 )
+from v2_governed_task_runner import GovernedTaskBinding, GovernedTaskRunner
 from v2_secret_redactor import redaction_status
 from v2_skill_executor import SkillExecutionRequest, SkillExecutor
 from v2_skill_registry import SkillRegistry
@@ -42,6 +44,7 @@ class BrainRuntime:
         tool_registry: ToolRegistry | None = None,
         checkpoint_store: SecretAwareCheckpointStore | None = None,
         execution_controller: HardenedExecutionController | None = None,
+        task_runner: GovernedTaskRunner | None = None,
     ) -> None:
         self.registry = registry or AgentRegistry()
         register_brain_team(self.registry)
@@ -73,6 +76,12 @@ class BrainRuntime:
             tools=self.tools,
             execution=self.execution,
             brain=self.brain,
+        )
+        self.tasks = task_runner or GovernedTaskRunner(
+            brain=self.brain,
+            skills=self.skills,
+            skill_execution=self.skill_execution,
+            ledger=self.brain.ledger,
         )
 
     def _attach_internal_tool_adapters(self) -> None:
@@ -145,11 +154,14 @@ class BrainRuntime:
             "decision_policy": self.decisions.policy(),
             "execution": self.execution.dashboard(),
             "skill_execution": self.skill_execution.dashboard(),
+            "task_runner": self.tasks.dashboard(),
             "secret_redaction": redaction_status(),
             "phase": "brain_core_phase_4",
+            "task_runner_phase": "brain_core_phase_8",
             "tool_execution": "secret_aware_permissioned_controller_enabled",
             "direct_adapter_access": False,
             "post_execution_verification": True,
+            "canonical_dependency_graph": "AgentOrchestrator",
         }
 
     def build_context(
@@ -327,6 +339,53 @@ class BrainRuntime:
             )
         )
         return asdict(result)
+
+    def prepare_task(
+        self,
+        objective: str,
+        *,
+        session_id: str,
+        bindings: Iterable[GovernedTaskBinding | Mapping[str, Any]],
+        context: Mapping[str, Any] | None = None,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self.tasks.prepare(
+            objective,
+            session_id=session_id,
+            bindings=bindings,
+            context=context,
+            task_id=task_id,
+        )
+
+    def start_task(
+        self,
+        task_id: str,
+        *,
+        ephemeral_inputs: Mapping[str, Mapping[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        return self.tasks.start(task_id, ephemeral_inputs=ephemeral_inputs)
+
+    def approve_task_step(
+        self,
+        task_id: str,
+        step_id: str,
+        *,
+        ephemeral_input: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self.tasks.approve_step(
+            task_id,
+            step_id,
+            ephemeral_input=ephemeral_input,
+        )
+
+    def get_task(self, task_id: str) -> dict[str, Any]:
+        return self.tasks.get(task_id)
+
+    def task_timeline(self, task_id: str) -> dict[str, Any]:
+        return self.tasks.timeline(task_id)
+
+    def cancel_task(self, task_id: str) -> dict[str, Any]:
+        return self.tasks.cancel(task_id)
 
 
 BRAIN_RUNTIME = BrainRuntime()
