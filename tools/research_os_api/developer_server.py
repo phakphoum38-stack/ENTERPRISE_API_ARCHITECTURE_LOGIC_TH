@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """Separate Research OS Developer Platform API.
 
-Authenticated Developer access is delegated to a trusted identity gateway and
-requires owner approval for real resources. A registration-free Trial Mode is
-also available, but it is isolated to synthetic demo resources and cannot read
-or mutate canonical user files, access grants, ownership, or source control.
+Real Developer access is authenticated by a trusted external identity gateway,
+then constrained by owner-approved grants. Trial Mode remains registration-free
+and isolated to synthetic read-only resources.
 """
-
 from __future__ import annotations
 
 import hmac
 import json
 import os
+import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,38 +18,13 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from developer_access import DeveloperAccessStore
-
+from developer_identity import IdentityAssertionError, IdentityAssertionVerifier
 
 TRIAL_RESOURCES: tuple[dict[str, Any], ...] = (
-    {
-        "resource_id": "demo-api-client",
-        "workspace_id": "trial-workspace",
-        "kind": "code",
-        "name": "api_client.py",
-        "language": "python",
-        "summary": "Synthetic read-only API client example.",
-        "content": "def get_health(client):\n    return client.get('/health')\n",
-    },
-    {
-        "resource_id": "demo-openapi",
-        "workspace_id": "trial-workspace",
-        "kind": "api",
-        "name": "openapi-demo.yaml",
-        "language": "yaml",
-        "summary": "Synthetic API contract example for Developer Trial Mode.",
-        "content": "openapi: 3.1.0\ninfo:\n  title: Trial API\n  version: demo\n",
-    },
-    {
-        "resource_id": "demo-readme",
-        "workspace_id": "trial-workspace",
-        "kind": "document",
-        "name": "README.md",
-        "language": "markdown",
-        "summary": "Trial workspace guide. No owner files are exposed.",
-        "content": "# Developer Trial\nRead-only synthetic workspace.\n",
-    },
+    {"resource_id":"demo-api-client","workspace_id":"trial-workspace","kind":"code","name":"api_client.py","language":"python","summary":"Synthetic read-only API client example.","content":"def get_health(client):\n    return client.get('/health')\n"},
+    {"resource_id":"demo-openapi","workspace_id":"trial-workspace","kind":"api","name":"openapi-demo.yaml","language":"yaml","summary":"Synthetic API contract example for Developer Trial Mode.","content":"openapi: 3.1.0\ninfo:\n  title: Trial API\n  version: demo\n"},
+    {"resource_id":"demo-readme","workspace_id":"trial-workspace","kind":"document","name":"README.md","language":"markdown","summary":"Trial workspace guide. No owner files are exposed.","content":"# Developer Trial\nRead-only synthetic workspace.\n"},
 )
-
 TRIAL_CAPABILITIES = {
     "registration_required": False,
     "persistent_account": False,
@@ -61,8 +35,15 @@ TRIAL_CAPABILITIES = {
 }
 
 
+def _truthy(name: str) -> bool:
+    return (os.environ.get(name) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 class DeveloperPlatformHandler(BaseHTTPRequestHandler):
     server_version = "ResearchOSDeveloper/2.0"
+    _identity_lock = threading.RLock()
+    _identity_verifier: IdentityAssertionVerifier | None = None
+    _identity_config: tuple[str, int] | None = None
 
     def _store(self) -> DeveloperAccessStore:
         data_dir = os.environ.get("RESEARCH_OS_DATA_DIR") or str(Path.home() / "ResearchOSData")
@@ -70,19 +51,40 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _app_dir() -> Path:
-        return Path(__file__).resolve().parents[2] / "apps" / "research_os_developer"
+        configured = (os.environ.get("RESEARCH_OS_DEVELOPER_UI_DIR") or "").strip()
+        candidates = []
+        if configured:
+            candidates.append(Path(configured))
+        candidates.extend([
+            Path(__file__).resolve().parent / "developer_ui",
+            Path(__file__).resolve().parents[2] / "apps" / "research_os_developer",
+        ])
+        return next((path for path in candidates if path.is_dir()), candidates[0])
+
+    @classmethod
+    def _verifier(cls) -> IdentityAssertionVerifier:
+        secret = (os.environ.get("RESEARCH_OS_IDENTITY_PROXY_SECRET") or "").strip()
+        max_age = int((os.environ.get("RESEARCH_OS_IDENTITY_ASSERTION_MAX_AGE") or "120").strip())
+        config = (secret, max_age)
+        with cls._identity_lock:
+            if cls._identity_verifier is None or cls._identity_config != config:
+                cls._identity_verifier = IdentityAssertionVerifier(secret, max_age_seconds=max_age)
+                cls._identity_config = config
+            return cls._identity_verifier
 
     def _principal(self) -> str:
-        configured = (os.environ.get("RESEARCH_OS_IDENTITY_PROXY_SECRET") or "").strip()
-        if not configured:
-            raise PermissionError("trusted identity gateway is not configured")
-        supplied = (self.headers.get("X-ResearchOS-Identity-Secret") or "").strip()
-        if not supplied or not hmac.compare_digest(configured, supplied):
-            raise PermissionError("trusted identity gateway verification failed")
-        principal = (self.headers.get("X-ResearchOS-Principal") or "").strip()
-        if not principal:
-            raise PermissionError("authenticated principal is missing")
-        return principal
+        headers = {name: value for name, value in self.headers.items()}
+        signature = (self.headers.get("X-ResearchOS-Identity-Signature") or "").strip()
+        if signature:
+            return self._verifier().verify(headers).principal
+
+        if _truthy("RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS"):
+            configured = (os.environ.get("RESEARCH_OS_IDENTITY_PROXY_SECRET") or "").strip()
+            supplied = (self.headers.get("X-ResearchOS-Identity-Secret") or "").strip()
+            principal = (self.headers.get("X-ResearchOS-Principal") or "").strip()
+            if configured and supplied and hmac.compare_digest(configured, supplied) and principal:
+                return principal
+        raise IdentityAssertionError("signed trusted identity assertion is required")
 
     def _read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0") or "0")
@@ -90,19 +92,24 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
             return {}
         if length > 1024 * 1024:
             raise ValueError("request body is too large")
-        raw = self.rfile.read(length)
-        payload = json.loads(raw.decode("utf-8"))
+        payload = json.loads(self.rfile.read(length).decode("utf-8"))
         if not isinstance(payload, dict):
             raise ValueError("JSON body must be an object")
         return payload
+
+    def _common_headers(self) -> None:
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 
     def _send(self, status: HTTPStatus | int, payload: dict[str, Any]) -> None:
         body = json.dumps({"api_version": "v2", **payload}, ensure_ascii=False).encode("utf-8")
         self.send_response(int(status))
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
+        self._common_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -115,13 +122,8 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header(
-            "Content-Security-Policy",
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'",
-        )
+        self._common_headers()
+        self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         self.end_headers()
         self.wfile.write(body)
 
@@ -135,18 +137,15 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
     def _trial_get(self, parsed) -> bool:
         path = parsed.path
         if path == "/v2/developer/trial":
-            self._send(HTTPStatus.OK, {"mode": "trial", **TRIAL_CAPABILITIES})
+            self._send(HTTPStatus.OK, {"mode":"trial", **TRIAL_CAPABILITIES})
             return True
         if path == "/v2/developer/trial/resources":
             query = (parse_qs(parsed.query).get("q") or [""])[0].strip().casefold()
             items = [dict(item) for item in TRIAL_RESOURCES]
             if query:
-                items = [
-                    item for item in items
-                    if query in " ".join((item["name"], item["kind"], item["language"], item["summary"])).casefold()
-                ]
-            summaries = [{key: value for key, value in item.items() if key != "content"} for item in items]
-            self._send(HTTPStatus.OK, {"mode": "trial", "items": summaries, "count": len(summaries), "query": query})
+                items = [item for item in items if query in " ".join((item["name"], item["kind"], item["language"], item["summary"])).casefold()]
+            summaries = [{key:value for key,value in item.items() if key != "content"} for item in items]
+            self._send(HTTPStatus.OK, {"mode":"trial","items":summaries,"count":len(summaries),"query":query})
             return True
         prefix = "/v2/developer/trial/resources/"
         if path.startswith(prefix):
@@ -155,14 +154,14 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
             if item is None:
                 self._error(HTTPStatus.NOT_FOUND, "trial_resource_not_found", resource_id)
             else:
-                self._send(HTTPStatus.OK, {"mode": "trial", "resource": item, "read_only": True})
+                self._send(HTTPStatus.OK, {"mode":"trial","resource":item,"read_only":True})
             return True
         return False
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         if parsed.path == "/health":
-            self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-developer-api"})
+            self._send(HTTPStatus.OK, {"status":"ok","service":"research-os-developer-api","identity_assertions":"signed_hmac_sha256"})
             return
         if parsed.path in {"/trial", "/trial/"}:
             self._send_html(self._app_dir() / "index.html")
@@ -171,14 +170,13 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
             self._send_html(self._app_dir() / "app.html")
             return
         if parsed.path == "/v2/developer/auth/config":
-            self._send(
-                HTTPStatus.OK,
-                {
-                    "login_url": (os.environ.get("RESEARCH_OS_DEVELOPER_LOGIN_URL") or "/app").strip(),
-                    "identity_provider": "trusted_gateway",
-                    "registration_required": True,
-                },
-            )
+            self._send(HTTPStatus.OK, {
+                "login_url": (os.environ.get("RESEARCH_OS_DEVELOPER_LOGIN_URL") or "/app").strip(),
+                "identity_provider": "trusted_gateway",
+                "assertion_mode": "signed_hmac_sha256",
+                "registration_required": True,
+                "legacy_identity_headers": _truthy("RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS"),
+            })
             return
         if self._trial_get(parsed):
             return
@@ -186,14 +184,7 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
             principal = self._principal()
             query = parse_qs(parsed.query)
             if parsed.path == "/v2/developer/session":
-                self._send(
-                    HTTPStatus.OK,
-                    {
-                        "authenticated": True,
-                        "principal": principal,
-                        "identity_provider": "trusted_gateway",
-                    },
-                )
+                self._send(HTTPStatus.OK, {"authenticated":True,"principal":principal,"identity_provider":"trusted_gateway","assertion_mode":"signed_hmac_sha256"})
                 return
             if parsed.path == "/v2/developer/access-requests":
                 view = (query.get("view") or ["developer"])[0].strip().lower()
@@ -204,7 +195,7 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
                     items = self._store().list_developer_requests(principal)
                 else:
                     raise ValueError("view must be owner or developer")
-                self._send(HTTPStatus.OK, {"items": items, "count": len(items), "view": view})
+                self._send(HTTPStatus.OK, {"items":items,"count":len(items),"view":view})
                 return
             if parsed.path == "/v2/developer/grants":
                 view = (query.get("view") or ["developer"])[0].strip().lower()
@@ -214,10 +205,10 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
                     items = self._store().list_developer_grants(principal, active_only=True)
                 else:
                     raise ValueError("view must be owner or developer")
-                self._send(HTTPStatus.OK, {"items": items, "count": len(items), "view": view})
+                self._send(HTTPStatus.OK, {"items":items,"count":len(items),"view":view})
                 return
             self._error(HTTPStatus.NOT_FOUND, "not_found", parsed.path)
-        except PermissionError as exc:
+        except IdentityAssertionError as exc:
             self._error(HTTPStatus.UNAUTHORIZED, "identity_required", str(exc))
         except (TypeError, ValueError) as exc:
             self._error(HTTPStatus.BAD_REQUEST, "bad_request", str(exc))
@@ -236,31 +227,14 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
                 if item is None:
                     self._error(HTTPStatus.NOT_FOUND, "trial_resource_not_found", resource_id)
                     return
-                self._send(
-                    HTTPStatus.OK,
-                    {
-                        "mode": "trial",
-                        "authorization": {
-                            "allowed": True,
-                            "scope": "read",
-                            "resource_id": resource_id,
-                            "persistent": False,
-                            "real_resource": False,
-                        },
-                    },
-                )
+                self._send(HTTPStatus.OK, {"mode":"trial","authorization":{"allowed":True,"scope":"read","resource_id":resource_id,"persistent":False,"real_resource":False}})
                 return
             if parsed.path.startswith("/v2/developer/trial/"):
-                self._error(
-                    HTTPStatus.FORBIDDEN,
-                    "trial_restricted",
-                    "Trial Mode cannot write, delete, commit, approve, or manage grants",
-                )
+                self._error(HTTPStatus.FORBIDDEN, "trial_restricted", "Trial Mode cannot write, delete, commit, approve, or manage grants")
                 return
 
             principal = self._principal()
             store = self._store()
-
             if parsed.path == "/v2/developer/access-requests":
                 item = store.request_access(
                     developer_id=principal,
@@ -271,59 +245,37 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
                     requested_scopes=list(body.get("scopes") or []),
                     purpose=str(body.get("purpose") or ""),
                 )
-                self._send(HTTPStatus.CREATED, {"request": item, "access_active": False})
+                self._send(HTTPStatus.CREATED, {"request":item,"access_active":False})
                 return
 
-            request_prefix = "/v2/developer/access-requests/"
-            if parsed.path.startswith(request_prefix):
-                relative = parsed.path[len(request_prefix):].strip("/")
-                parts = relative.split("/") if relative else []
-                if len(parts) == 2 and parts[1] in {"approve", "reject", "cancel"}:
+            prefix = "/v2/developer/access-requests/"
+            if parsed.path.startswith(prefix):
+                parts = parsed.path[len(prefix):].strip("/").split("/")
+                if len(parts) == 2 and parts[1] in {"approve","reject","cancel"}:
                     request_id, action = parts
                     if action == "approve":
                         expires = body.get("expires_in_seconds")
-                        grant = store.approve_request(
-                            owner_id=principal,
-                            request_id=request_id,
-                            scopes=list(body.get("scopes") or []) or None,
-                            expires_in_seconds=int(expires) if expires is not None else None,
-                        )
-                        self._send(HTTPStatus.OK, {"grant": grant})
+                        grant = store.approve_request(owner_id=principal, request_id=request_id, scopes=list(body.get("scopes") or []) or None, expires_in_seconds=int(expires) if expires is not None else None)
+                        self._send(HTTPStatus.OK, {"grant":grant})
                     elif action == "reject":
-                        item = store.reject_request(
-                            owner_id=principal,
-                            request_id=request_id,
-                            reason=str(body.get("reason") or ""),
-                        )
-                        self._send(HTTPStatus.OK, {"request": item})
+                        self._send(HTTPStatus.OK, {"request":store.reject_request(owner_id=principal, request_id=request_id, reason=str(body.get("reason") or ""))})
                     else:
-                        item = store.cancel_request(developer_id=principal, request_id=request_id)
-                        self._send(HTTPStatus.OK, {"request": item})
+                        self._send(HTTPStatus.OK, {"request":store.cancel_request(developer_id=principal, request_id=request_id)})
                     return
 
-            grant_prefix = "/v2/developer/grants/"
-            if parsed.path.startswith(grant_prefix) and parsed.path.endswith("/revoke"):
-                grant_id = parsed.path[len(grant_prefix):-len("/revoke")].strip("/")
-                item = store.revoke_grant(
-                    owner_id=principal,
-                    grant_id=grant_id,
-                    reason=str(body.get("reason") or ""),
-                )
-                self._send(HTTPStatus.OK, {"grant": item})
+            prefix = "/v2/developer/grants/"
+            if parsed.path.startswith(prefix) and parsed.path.endswith("/revoke"):
+                grant_id = parsed.path[len(prefix):-len("/revoke")].strip("/")
+                self._send(HTTPStatus.OK, {"grant":store.revoke_grant(owner_id=principal, grant_id=grant_id, reason=str(body.get("reason") or ""))})
                 return
 
             if parsed.path == "/v2/developer/authorize":
-                decision = store.authorize(
-                    principal_id=principal,
-                    owner_id=str(body.get("owner_id") or ""),
-                    workspace_id=str(body.get("workspace_id") or ""),
-                    resource_id=str(body.get("resource_id") or ""),
-                    scope=str(body.get("scope") or "read"),
-                )
-                self._send(HTTPStatus.OK, {"authorization": decision})
+                decision = store.authorize(principal_id=principal, owner_id=str(body.get("owner_id") or ""), workspace_id=str(body.get("workspace_id") or ""), resource_id=str(body.get("resource_id") or ""), scope=str(body.get("scope") or "read"))
+                self._send(HTTPStatus.OK, {"authorization":decision})
                 return
-
             self._error(HTTPStatus.NOT_FOUND, "not_found", parsed.path)
+        except IdentityAssertionError as exc:
+            self._error(HTTPStatus.UNAUTHORIZED, "identity_required", str(exc))
         except PermissionError as exc:
             self._error(HTTPStatus.FORBIDDEN, "permission_denied", str(exc))
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
