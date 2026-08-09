@@ -44,22 +44,23 @@ jobs:
       - name: Start primary V2-compatible API
         shell: bash
         run: |
+          date +%s%3N >/tmp/research-os-start-ms
           python tools/research_os_api/render_server.py >/tmp/research-os-performance.log 2>&1 &
           echo $! >/tmp/research-os-performance.pid
 
-      - name: Measure health and V2 readiness latency
+      - name: Measure V2 startup health orchestration and memory baseline
         run: |
           python - <<'PY'
-          import json, statistics, time, urllib.request
+          import json, os, statistics, subprocess, time, urllib.request
 
-          endpoints = {
-              "health": "http://127.0.0.1:8787/health",
-              "v2_readiness": "http://127.0.0.1:8787/v2/health/readiness",
-          }
+          base="http://127.0.0.1:8787"
+          health=f"{base}/health"
+          readiness=f"{base}/v2/health/readiness"
+          start_ms=int(open('/tmp/research-os-start-ms', encoding='utf-8').read().strip())
 
-          for _ in range(30):
+          for _ in range(50):
               try:
-                  with urllib.request.urlopen(endpoints["health"], timeout=2) as r:
+                  with urllib.request.urlopen(health, timeout=2) as r:
                       if json.load(r).get("status") == "ok":
                           break
               except Exception:
@@ -67,16 +68,19 @@ jobs:
           else:
               raise SystemExit("API did not start")
 
+          startup_ms=int(time.time()*1000)-start_ms
+          print(f"startup_ready_ms={startup_ms}")
+          if startup_ms > 10000:
+              raise SystemExit(f"Startup readiness too slow: {startup_ms} ms")
+
+          endpoints={"health":health,"v2_readiness":readiness}
           for name, url in endpoints.items():
               samples=[]
               for _ in range(20):
                   started=time.perf_counter()
                   with urllib.request.urlopen(url, timeout=2) as r:
                       payload=json.load(r)
-                  if name == "health":
-                      assert payload["status"] == "ok", payload
-                  else:
-                      assert payload["ready"] is True, payload
+                  assert payload.get("status") == "ok" if name == "health" else payload.get("ready") is True, payload
                   samples.append((time.perf_counter()-started)*1000)
               samples.sort()
               p95=samples[max(0, int(len(samples)*0.95)-1)]
@@ -84,6 +88,50 @@ jobs:
               print(f"{name} avg_ms={avg:.1f} p95_ms={p95:.1f} max_ms={max(samples):.1f}")
               if p95 > 500:
                   raise SystemExit(f"{name} p95 too slow: {p95:.1f} ms")
+
+          orchestration_samples=[]
+          for index in range(15):
+              create_body=json.dumps({
+                  "objective":f"performance baseline {index}",
+                  "steps":[{
+                      "step_id":"research",
+                      "objective":f"research performance baseline {index}",
+                      "requested_agent":"research",
+                  }],
+              }).encode('utf-8')
+              request=urllib.request.Request(
+                  f"{base}/v2/orchestrations",
+                  data=create_body,
+                  headers={"Content-Type":"application/json"},
+                  method="POST",
+              )
+              with urllib.request.urlopen(request, timeout=3) as r:
+                  created=json.load(r)
+              run_id=created["run"]["run_id"]
+              execute=urllib.request.Request(
+                  f"{base}/v2/orchestrations/{run_id}/execute",
+                  data=b'{}',
+                  headers={"Content-Type":"application/json"},
+                  method="POST",
+              )
+              started=time.perf_counter()
+              with urllib.request.urlopen(execute, timeout=3) as r:
+                  completed=json.load(r)
+              assert completed["run"]["status"] == "completed", completed
+              orchestration_samples.append((time.perf_counter()-started)*1000)
+
+          orchestration_samples.sort()
+          p95=orchestration_samples[max(0, int(len(orchestration_samples)*0.95)-1)]
+          avg=statistics.mean(orchestration_samples)
+          print(f"orchestration_execute avg_ms={avg:.1f} p95_ms={p95:.1f} max_ms={max(orchestration_samples):.1f}")
+          if p95 > 1000:
+              raise SystemExit(f"Orchestration execute p95 too slow: {p95:.1f} ms")
+
+          pid=open('/tmp/research-os-performance.pid', encoding='utf-8').read().strip()
+          rss_kb=int(subprocess.check_output(['ps','-o','rss=','-p',pid], text=True).strip())
+          print(f"api_rss_kb={rss_kb}")
+          if rss_kb > 300000:
+              raise SystemExit(f"API RSS exceeds V2 baseline: {rss_kb} KB")
           PY
 
       - name: Verify retry policy exists
@@ -109,7 +157,9 @@ jobs:
           {
             echo "# Research OS Performance Gate — V2 Secondary"
             echo "- Primary V2-compatible API used"
-            echo "- /health latency measured"
-            echo "- /v2/health/readiness latency measured"
+            echo "- Startup readiness baseline: <= 10s"
+            echo "- /health and /v2/health/readiness p95 baseline: <= 500ms"
+            echo "- Orchestration execute p95 baseline: <= 1000ms"
+            echo "- API RSS baseline: <= 300000 KB"
             echo "- Provider retry policy remains bounded"
           } >> "$GITHUB_STEP_SUMMARY"
