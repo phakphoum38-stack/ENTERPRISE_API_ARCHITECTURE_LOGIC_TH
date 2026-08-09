@@ -256,7 +256,7 @@ class _SettingsPageState extends State<SettingsPage> {
               if (!_loading && _error == null) ...<Widget>[
                 EnterpriseStatusTile(
                   icon: Icons.smart_toy_outlined,
-                  title: 'Selected Provider',
+                  title: 'Active Provider',
                   value: _activeProvider,
                   caption: 'Source: $_activeSource${_activeReason.isEmpty ? '' : ' • $_activeReason'}',
                 ),
