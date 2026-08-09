@@ -20,6 +20,8 @@ class AgentEvent:
     task_id: str
     agent_id: str | None
     timestamp: float
+    correlation_id: str | None = None
+    run_id: str | None = None
     payload: dict[str, Any] = field(default_factory=dict)
 
 
@@ -34,6 +36,8 @@ class RuntimeTask:
     route_reason: str | None = None
     requires_confirmation: bool = False
     confirmed: bool = False
+    correlation_id: str | None = None
+    run_id: str | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
     created_at: float = field(default_factory=time.time)
@@ -46,8 +50,26 @@ class AgentEventBus:
         self._events: list[AgentEvent] = []
         self._lock = threading.RLock()
 
-    def publish(self, event_type: str, task_id: str, agent_id: str | None = None, **payload: Any) -> AgentEvent:
-        event = AgentEvent(str(uuid.uuid4()), event_type, task_id, agent_id, time.time(), payload)
+    def publish(
+        self,
+        event_type: str,
+        task_id: str,
+        agent_id: str | None = None,
+        *,
+        correlation_id: str | None = None,
+        run_id: str | None = None,
+        **payload: Any,
+    ) -> AgentEvent:
+        event = AgentEvent(
+            str(uuid.uuid4()),
+            event_type,
+            task_id,
+            agent_id,
+            time.time(),
+            correlation_id,
+            run_id,
+            payload,
+        )
         with self._lock:
             self._events.append(event)
             if len(self._events) > self._max_events:
@@ -110,27 +132,33 @@ class AgentTaskQueue:
             raise ValueError("objective is required")
         route = self.router.route(objective, requested_agent=requested_agent)
         agent = route["agent"]
+        task_id = str(uuid.uuid4())
+        task_context = dict(context or {})
+        run_id = self._text(task_context.get("orchestration_run_id"))
+        correlation = self._text(task_context.get("correlation_id")) or run_id or task_id
         task = RuntimeTask(
-            task_id=str(uuid.uuid4()),
+            task_id=task_id,
             objective=objective,
             requested_agent=requested_agent,
-            context=dict(context or {}),
+            context=task_context,
             status="queued",
             selected_agent=str(agent["agent_id"]),
             route_reason=str(route["reason"]),
             requires_confirmation=bool(route["requires_confirmation_for_writes"]),
             confirmed=confirmed,
+            correlation_id=correlation,
+            run_id=run_id,
         )
         with self._lock:
             self._tasks[task.task_id] = task
-        self.events.publish("task.queued", task.task_id, task.selected_agent, objective=objective)
+        self._publish(task, "task.queued", objective=objective)
         return self.execute(task.task_id)
 
     def confirm(self, task_id: str) -> dict[str, Any]:
         task = self._require(task_id)
         task.confirmed = True
         task.updated_at = time.time()
-        self.events.publish("task.confirmed", task.task_id, task.selected_agent)
+        self._publish(task, "task.confirmed")
         return self.execute(task_id)
 
     def execute(self, task_id: str) -> dict[str, Any]:
@@ -138,12 +166,12 @@ class AgentTaskQueue:
         if task.requires_confirmation and not task.confirmed:
             task.status = "awaiting_confirmation"
             task.updated_at = time.time()
-            self.events.publish("task.awaiting_confirmation", task.task_id, task.selected_agent)
+            self._publish(task, "task.awaiting_confirmation")
             return self._task_payload(task)
 
         task.status = "running"
         task.updated_at = time.time()
-        self.events.publish("task.started", task.task_id, task.selected_agent)
+        self._publish(task, "task.started")
         try:
             shared = self.context_store.get(f"shared:{task.selected_agent}")
             merged_context = {**shared, **task.context}
@@ -152,17 +180,27 @@ class AgentTaskQueue:
                 "objective": task.objective,
                 "context": merged_context,
                 "execution": "runtime_ready",
+                "correlation_id": task.correlation_id,
+                "run_id": task.run_id,
                 "note": "Agent Runtime 2.0 dispatch is active with shared dynamic registry and readiness-aware routing.",
             }
             task.status = "completed"
             task.updated_at = time.time()
-            self.context_store.merge(f"shared:{task.selected_agent}", {"last_task_id": task.task_id, "last_objective": task.objective})
-            self.events.publish("task.completed", task.task_id, task.selected_agent)
+            self.context_store.merge(
+                f"shared:{task.selected_agent}",
+                {
+                    "last_task_id": task.task_id,
+                    "last_objective": task.objective,
+                    "last_correlation_id": task.correlation_id,
+                    "last_run_id": task.run_id,
+                },
+            )
+            self._publish(task, "task.completed")
         except Exception as exc:
             task.status = "failed"
             task.error = str(exc)
             task.updated_at = time.time()
-            self.events.publish("task.failed", task.task_id, task.selected_agent, error=str(exc))
+            self._publish(task, "task.failed", error=str(exc))
         return self._task_payload(task)
 
     def get(self, task_id: str) -> dict[str, Any]:
@@ -196,6 +234,23 @@ class AgentTaskQueue:
                 return self._tasks[task_id]
             except KeyError as exc:
                 raise ValueError(f"unknown task: {task_id}") from exc
+
+    def _publish(self, task: RuntimeTask, event_type: str, **payload: Any) -> AgentEvent:
+        return self.events.publish(
+            event_type,
+            task.task_id,
+            task.selected_agent,
+            correlation_id=task.correlation_id,
+            run_id=task.run_id,
+            **payload,
+        )
+
+    @staticmethod
+    def _text(value: Any) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
 
     @staticmethod
     def _task_payload(task: RuntimeTask) -> dict[str, Any]:
