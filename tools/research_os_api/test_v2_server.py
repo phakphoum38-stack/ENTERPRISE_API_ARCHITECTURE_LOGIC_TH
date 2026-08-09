@@ -169,6 +169,43 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(missing["error"]["code"], "workspace_not_found")
 
+    def test_v2_brain_skills_and_adaptive_capacity_are_additive(self) -> None:
+        status, capacity = self.request("/v2/brain/capacity")
+        self.assertEqual(status, 200)
+        self.assertEqual(capacity["api_version"], "v2")
+        self.assertEqual(capacity["capacity"]["branch_factor"], 6)
+        self.assertEqual(capacity["capacity"]["elastic_tiers"], 6)
+        self.assertEqual(capacity["capacity"]["max_leaf_capacity"], 6**6)
+        self.assertFalse(capacity["capacity"]["all_workers_started_by_default"])
+
+        status, skills = self.request("/v2/brain/skills")
+        self.assertEqual(status, 200)
+        self.assertEqual(skills["brain"]["skill_count"], 10)
+
+        status, planned = self.request(
+            "/v2/brain/plans",
+            method="POST",
+            body={
+                "objective": "research evidence with agent tools",
+                "complexity_level": 6,
+                "requested_workers": 46656,
+                "budget_workers": 12,
+                "ready_workers": 8,
+            },
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(planned["plan"]["hierarchy"]["active_workers"], 8)
+        self.assertTrue(planned["plan"]["hierarchy"]["backpressure_applied"])
+        self.assertFalse(planned["plan"]["requires_external_api_key"])
+
+        status, invalid = self.request(
+            "/v2/brain/plans",
+            method="POST",
+            body={"objective": "invalid", "complexity_level": 7},
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(invalid["error"]["code"], "invalid_brain_plan")
+
     def test_v2_errors_have_machine_readable_envelope(self) -> None:
         status, payload = self.request("/v2/orchestrations?page_size=101")
         self.assertEqual(status, 400)
