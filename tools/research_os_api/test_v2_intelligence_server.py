@@ -8,8 +8,10 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+import uuid
 from http.server import ThreadingHTTPServer
 
+from v2_brain_runtime import BRAIN_RUNTIME
 from v2_server import V2ResearchOSHandler
 from v2_system_introspection import SYSTEM_INTROSPECTION_CONTRACT
 
@@ -107,15 +109,20 @@ class V2IntelligenceServerPhase7Tests(unittest.TestCase):
         self.assertNotIn(private_path, repr(state))
         self.assertFalse(state["authority"]["production_state_authoritative"])
 
-    def test_plan_endpoint_is_read_only_and_secret_safe(self) -> None:
+    def test_plan_endpoint_sanitizes_before_response_and_brain_persistence(self) -> None:
         secret = "sk-phase7httpsecret123456789"
+        session_id = f"phase7-http-{uuid.uuid4().hex}"
         status, payload = self.request(
             "/v2/intelligence/plan",
             method="POST",
             body={
                 "objective": f"analyze API architecture using {secret}",
-                "session_id": "phase7-http",
-                "context": {"workspace": "Research OS"},
+                "session_id": session_id,
+                "context": {
+                    "workspace": "Research OS",
+                    "api_key": secret,
+                    "note": f"provider returned {secret}",
+                },
             },
         )
         self.assertEqual(200, status)
@@ -125,6 +132,23 @@ class V2IntelligenceServerPhase7Tests(unittest.TestCase):
         self.assertIsInstance(payload["result"]["plan"], dict)
         self.assertNotIn(secret, repr(payload))
         self.assertIn("[REDACTED]", repr(payload))
+
+        persisted = BRAIN_RUNTIME.brain.session(session_id)
+        self.assertNotIn(secret, repr(persisted))
+        self.assertIn("[REDACTED]", repr(persisted))
+
+    def test_plan_rejects_credential_shaped_session_id(self) -> None:
+        status, payload = self.request(
+            "/v2/intelligence/plan",
+            method="POST",
+            body={
+                "objective": "review architecture",
+                "session_id": "sk-phase7sessionsecret123456789",
+            },
+        )
+        self.assertEqual(400, status)
+        self.assertEqual("invalid_intelligence_plan", payload["error"]["code"])
+        self.assertIn("sensitive credential", payload["error"]["message"])
 
     def test_invalid_scope_and_non_plan_post_fail_with_v2_error_envelope(self) -> None:
         status, invalid = self.request("/v2/intelligence/agents?scope=unknown")
