@@ -19,6 +19,7 @@ from typing import Any
 _TOOL_ID_RE = re.compile(r"^[a-z][a-z0-9_.-]{2,95}$")
 _VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9_.-]+)?$")
 TOOL_REGISTRY_CONTRACT = "brain-tools-phase-3"
+TOOL_MATCHING_CONTRACT = "brain-tool-matching-phase-4"
 ToolAdapter = Callable[[str, Mapping[str, Any], bool], Mapping[str, Any]]
 
 
@@ -180,6 +181,45 @@ class ToolRegistry:
             matches.append(item)
         return matches
 
+    def match_capabilities(
+        self,
+        capabilities: Iterable[str],
+        *,
+        ready_only: bool = True,
+    ) -> dict[str, Any]:
+        """Resolve one tool that satisfies all requested capabilities.
+
+        Matching is deterministic: ready tools are preferred, then stable tool_id
+        ordering. The result keeps per-capability candidates for auditability.
+        """
+
+        required = tuple(dict.fromkeys(item.strip() for item in capabilities if item.strip()))
+        per_capability: dict[str, list[str]] = {}
+        candidate_sets: list[set[str]] = []
+        for capability in required:
+            matches = self.discover(capability=capability, ready_only=ready_only)
+            ids = [str(item["tool_id"]) for item in matches]
+            per_capability[capability] = ids
+            candidate_sets.append(set(ids))
+
+        if not required:
+            candidates: list[str] = []
+        elif candidate_sets:
+            candidates = sorted(set.intersection(*candidate_sets))
+        else:
+            candidates = []
+
+        missing = tuple(cap for cap, ids in per_capability.items() if not ids)
+        return {
+            "contract": TOOL_MATCHING_CONTRACT,
+            "required_capabilities": required,
+            "per_capability": per_capability,
+            "candidates": candidates,
+            "selected_tool_id": candidates[0] if candidates else None,
+            "missing_capabilities": missing,
+            "matched": bool(candidates) if required else False,
+        }
+
     def invoke(
         self,
         tool_id: str,
@@ -217,6 +257,7 @@ class ToolRegistry:
         return {
             "registry": "research_os_tools",
             "contract": TOOL_REGISTRY_CONTRACT,
+            "matching_contract": TOOL_MATCHING_CONTRACT,
             "tool_count": len(tools),
             "enabled_count": sum(1 for item in tools if item["enabled"]),
             "ready_count": sum(1 for item in tools if item["ready"]),
