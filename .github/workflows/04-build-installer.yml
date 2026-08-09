@@ -103,6 +103,15 @@ jobs:
           if (-not (Test-Path "$package\app\research_os_flutter.exe")) { throw "Desktop executable missing from package" }
           if (-not (Test-Path "$package\tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) { throw "ServiceHost missing from package" }
 
+      - name: Generate installer branding assets
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/apply-research-os-branding.py --app-root apps/research_os_flutter --platform windows
+          if (-not (Test-Path "apps\research_os_flutter\assets\branding\research_os.ico")) {
+            throw "Research OS installer icon was not generated"
+          }
+
       - name: Install Inno Setup compiler
         shell: pwsh
         run: choco install innosetup --no-progress -y
