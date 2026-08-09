@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, unquote, urlsplit, urlunsplit
 
 import agent_server
 from agent_server import AgentResearchOSHandler
+from brain_skills import BRAIN
 from v2_observability import readiness_snapshot
 
 _CURATOR_DIR = Path(__file__).resolve().parents[1] / "research_curator"
@@ -47,6 +48,14 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
             )
             return
 
+        if parsed.path == "/v2/brain/skills":
+            self._send(HTTPStatus.OK, {"brain": BRAIN.catalog()})
+            return
+
+        if parsed.path == "/v2/brain/capacity":
+            self._send(HTTPStatus.OK, {"capacity": BRAIN.capacity_snapshot()})
+            return
+
         if parsed.path == "/v2/orchestrations":
             self._send_v2_orchestration_page(parsed.query)
             return
@@ -66,6 +75,34 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         self._v2_request = parsed.path.startswith("/v2/")
+
+        if parsed.path == "/v2/brain/plans":
+            try:
+                body = self._read_json()
+                plan = BRAIN.plan(
+                    str(body.get("objective") or ""),
+                    complexity_level=int(body.get("complexity_level", 1)),
+                    requested_workers=self._optional_int(
+                        body.get("requested_workers"),
+                        "requested_workers",
+                    ),
+                    budget_workers=self._optional_int(
+                        body.get("budget_workers"),
+                        "budget_workers",
+                    ),
+                    ready_workers=self._optional_int(
+                        body.get("ready_workers"),
+                        "ready_workers",
+                    ),
+                )
+                self._send(HTTPStatus.CREATED, {"plan": plan})
+            except (TypeError, ValueError) as exc:
+                self._send(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "invalid_brain_plan", "detail": str(exc)},
+                )
+            return
+
         self._rewrite_v2_path()
         super().do_POST()
 
@@ -207,6 +244,15 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
         self.path = urlunsplit(
             (parsed.scheme, parsed.netloc, rewritten, parsed.query, parsed.fragment)
         )
+
+    @staticmethod
+    def _optional_int(value: Any, name: str) -> int | None:
+        if value is None or value == "":
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be an integer") from exc
 
     @staticmethod
     def _first(query: dict[str, list[str]], key: str) -> str | None:
