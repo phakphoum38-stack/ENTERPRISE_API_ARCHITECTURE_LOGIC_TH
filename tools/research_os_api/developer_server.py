@@ -68,6 +68,10 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
         data_dir = os.environ.get("RESEARCH_OS_DATA_DIR") or str(Path.home() / "ResearchOSData")
         return DeveloperAccessStore(data_dir)
 
+    @staticmethod
+    def _trial_page_path() -> Path:
+        return Path(__file__).resolve().parents[2] / "apps" / "research_os_developer" / "index.html"
+
     def _principal(self) -> str:
         configured = (os.environ.get("RESEARCH_OS_IDENTITY_PROXY_SECRET") or "").strip()
         if not configured:
@@ -101,6 +105,18 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_html(self, status: HTTPStatus | int, html: str) -> None:
+        body = html.encode("utf-8")
+        self.send_response(int(status))
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _error(self, status: HTTPStatus | int, code: str, message: str) -> None:
         self._send(status, {"error": {"code": code, "message": message, "status": int(status)}})
 
@@ -110,6 +126,13 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
 
     def _trial_get(self, parsed) -> bool:
         path = parsed.path
+        if path in {"/trial", "/trial/"}:
+            page = self._trial_page_path()
+            if not page.exists():
+                self._error(HTTPStatus.NOT_FOUND, "trial_ui_missing", "Developer Trial UI is unavailable")
+            else:
+                self._send_html(HTTPStatus.OK, page.read_text(encoding="utf-8"))
+            return True
         if path == "/v2/developer/trial":
             self._send(HTTPStatus.OK, {"mode": "trial", **TRIAL_CAPABILITIES})
             return True
@@ -284,6 +307,7 @@ def main() -> int:
     port = int(os.environ.get("RESEARCH_OS_DEVELOPER_PORT", "8790"))
     server = ThreadingHTTPServer((host, port), DeveloperPlatformHandler)
     print(f"Research OS Developer Platform API listening on http://{host}:{port}")
+    print(f"Registration-free trial UI: http://{host}:{port}/trial")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
