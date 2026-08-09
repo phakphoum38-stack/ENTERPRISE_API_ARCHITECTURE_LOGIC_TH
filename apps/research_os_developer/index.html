@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Research OS Developer Trial</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background:#07111f; color:#eaf2ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at top,#102a46,#07111f 55%); }
+    main { width:min(1040px,92vw); margin:0 auto; padding:56px 0 72px; }
+    .badge { display:inline-block; padding:7px 12px; border:1px solid #345b7d; border-radius:999px; color:#9fd2ff; font-size:13px; }
+    h1 { font-size:clamp(36px,6vw,70px); margin:18px 0 12px; letter-spacing:-.04em; }
+    .lead { max-width:760px; color:#b9cce0; font-size:18px; line-height:1.7; }
+    .actions { display:flex; flex-wrap:wrap; gap:12px; margin:28px 0 42px; }
+    button,a.button { appearance:none; border:0; border-radius:12px; padding:13px 18px; font-weight:700; cursor:pointer; text-decoration:none; }
+    .primary { background:#eaf2ff; color:#07111f; }
+    .secondary { background:#102238; color:#d9ebff; border:1px solid #2b4967; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:16px; }
+    .card { background:rgba(11,28,47,.85); border:1px solid #24435f; border-radius:18px; padding:20px; }
+    .card h2 { margin-top:0; font-size:18px; }
+    .yes { color:#8df0ba; } .no { color:#ffb5ad; }
+    ul { padding-left:20px; line-height:1.8; color:#c9d9e8; }
+    .workspace { margin-top:26px; }
+    .resource { display:flex; justify-content:space-between; gap:14px; padding:14px 0; border-top:1px solid #203b54; }
+    .resource:first-child { border-top:0; }
+    code { color:#9fd2ff; }
+    .status { margin-top:18px; color:#9fb5c8; min-height:24px; }
+  </style>
+</head>
+<body>
+<main>
+  <span class="badge">Developer Trial · ไม่ต้องลงทะเบียน</span>
+  <h1>ทดลองก่อน<br>โดยไม่แตะไฟล์จริง</h1>
+  <p class="lead">Trial Mode ใช้เฉพาะ workspace และไฟล์ตัวอย่างที่สร้างขึ้นสำหรับการทดลอง ไม่มีการสร้างบัญชี ไม่มีสิทธิ์ถาวร และไม่มีการเข้าถึงไฟล์ส่วนตัวของเจ้าของไฟล์</p>
+  <div class="actions">
+    <button class="primary" id="try">เริ่มทดลอง</button>
+    <a class="button secondary" href="#full">Developer แบบเต็มต้องลงชื่อเข้าใช้</a>
+  </div>
+
+  <section class="grid">
+    <article class="card">
+      <h2 class="yes">ทดลองได้</h2>
+      <ul>
+        <li>ดูไฟล์ตัวอย่าง</li>
+        <li>ค้นหา demo workspace</li>
+        <li>ดูตัวอย่าง Code / API</li>
+        <li>จำลองสิทธิ์ Read-only</li>
+      </ul>
+    </article>
+    <article class="card" id="full">
+      <h2 class="no">จำกัดใน Trial</h2>
+      <ul>
+        <li>แก้ไขหรือลบไฟล์</li>
+        <li>Commit / Push</li>
+        <li>เปิดไฟล์จริงหรือ private workspace</li>
+        <li>อนุมัติหรือจัดการ Grant</li>
+      </ul>
+    </article>
+    <article class="card">
+      <h2>Developer แบบเต็ม</h2>
+      <p>ต้องลงชื่อเข้า Developer Platform และขอสิทธิ์จากเจ้าของไฟล์ก่อน เจ้าของไฟล์ยังใช้ไฟล์เดิมและเป็นเจ้าของเหมือนเดิมทุกประการ</p>
+    </article>
+  </section>
+
+  <section class="card workspace">
+    <h2>Trial Workspace</h2>
+    <div id="resources"><p>กด “เริ่มทดลอง” เพื่อโหลดตัวอย่าง</p></div>
+    <div class="status" id="status"></div>
+  </section>
+</main>
+<script>
+  const API = window.RESEARCH_OS_DEVELOPER_API || 'http://127.0.0.1:8790';
+  const resources = document.getElementById('resources');
+  const status = document.getElementById('status');
+  document.getElementById('try').addEventListener('click', async () => {
+    status.textContent = 'กำลังโหลด Trial Mode…';
+    try {
+      const response = await fetch(`${API}/v2/developer/trial/resources`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      resources.innerHTML = data.items.map(item => `
+        <div class="resource">
+          <div><strong>${item.name}</strong><br><small>${item.summary}</small></div>
+          <code>${item.kind}</code>
+        </div>`).join('');
+      status.textContent = `พร้อมทดลอง ${data.count} รายการ · Synthetic demo only · Read-only`;
+    } catch (error) {
+      status.textContent = `ยังเชื่อม Developer Trial API ไม่ได้: ${error.message}`;
+    }
+  });
+</script>
+</body>
+</html>
