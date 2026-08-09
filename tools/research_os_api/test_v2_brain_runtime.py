@@ -6,7 +6,9 @@ import unittest
 
 import test_v2_brain_context
 import test_v2_brain_decision
+import test_v2_execution_controller
 import test_v2_skill_registry
+import test_v2_tool_registry
 from agent_platform import AgentRegistry
 from v2_brain_core import ActivityLedger, WorkingMemory
 from v2_brain_decision import ActionCandidate
@@ -47,14 +49,17 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertIn("v2_brain_architect", matches["architecture"])
             self.assertEqual(12, result["team"]["ready_count"])
 
-    def test_phase_two_introspection_exposes_context_skills_and_decision_policy(self) -> None:
+    def test_phase_three_introspection_exposes_permissioned_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             report = self.make_runtime(tmp).introspect()
-            self.assertEqual("brain_core_phase_2", report["phase"])
+            self.assertEqual("brain_core_phase_3", report["phase"])
             self.assertGreaterEqual(report["skills"]["ready_count"], 3)
+            self.assertEqual(3, report["tools"]["ready_count"])
             self.assertTrue(report["context"]["secret_redaction"])
             self.assertFalse(report["decision_policy"]["hidden_chain_of_thought"])
-            self.assertEqual("disabled_until_permissioned_execution_port", report["tool_execution"])
+            self.assertEqual("permissioned_controller_enabled", report["tool_execution"])
+            self.assertFalse(report["direct_adapter_access"])
+            self.assertEqual("explicit_approval", report["execution"]["write_policy"])
 
     def test_plan_returns_context_snapshot_without_secret_leak(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -73,6 +78,44 @@ class BrainRuntimeTests(unittest.TestCase):
             runtime = self.make_runtime(tmp)
             matches = runtime.discover_skills("verification")
             self.assertEqual(["brain.evidence-verification"], [item["skill_id"] for item in matches])
+
+    def test_internal_skill_tool_runs_only_with_required_permission(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.make_runtime(tmp)
+            blocked = runtime.execute_tool(
+                "brain.skills.inspect",
+                "list",
+                session_id="tool-runtime",
+            )
+            self.assertEqual("blocked", blocked["status"])
+
+            completed = runtime.execute_tool(
+                "brain.skills.inspect",
+                "list",
+                session_id="tool-runtime",
+                granted_permissions=("runtime.read",),
+                idempotency_key="skills-list-once",
+            )
+            self.assertEqual("completed", completed["status"])
+            self.assertGreaterEqual(completed["output"]["count"], 3)
+            self.assertEqual(1, completed["attempts"])
+
+    def test_context_tool_routes_through_execution_controller(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.make_runtime(tmp)
+            completed = runtime.execute_tool(
+                "brain.context.inspect",
+                "build",
+                session_id="context-tool",
+                payload={
+                    "objective": "inspect architecture",
+                    "context": {"api_key": "do-not-expose"},
+                },
+                granted_permissions=("runtime.read",),
+            )
+            self.assertEqual("completed", completed["status"])
+            self.assertNotIn("do-not-expose", repr(completed))
+            self.assertEqual("[REDACTED]", completed["output"]["values"]["api_key"])
 
     def test_action_evaluation_requires_permission_and_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -108,13 +151,15 @@ class BrainRuntimeTests(unittest.TestCase):
 
 
 def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite, pattern: str | None) -> unittest.TestSuite:
-    """Keep Phase 2 tests inside the existing consolidated Agent Platform gate."""
+    """Keep Brain phase suites inside the existing consolidated Agent Platform gate."""
     del pattern
     suite = unittest.TestSuite()
     suite.addTests(tests)
     suite.addTests(loader.loadTestsFromModule(test_v2_brain_context))
     suite.addTests(loader.loadTestsFromModule(test_v2_brain_decision))
     suite.addTests(loader.loadTestsFromModule(test_v2_skill_registry))
+    suite.addTests(loader.loadTestsFromModule(test_v2_tool_registry))
+    suite.addTests(loader.loadTestsFromModule(test_v2_execution_controller))
     return suite
 
 
