@@ -12,6 +12,7 @@ class FakeAgentApiClient extends ResearchOSApiClient {
   bool cancelled = false;
   bool retried = false;
   bool knowledgeSearched = false;
+  bool brainPlanPreviewed = false;
 
   @override
   Future<Map<String, dynamic>> getOrchestrations({
@@ -57,6 +58,104 @@ class FakeAgentApiClient extends ResearchOSApiClient {
         'page_size': pageSize,
         'returned': 1,
         'next_cursor': null,
+      },
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> getIntelligenceHealth() async =>
+      <String, dynamic>{
+        'api_version': 'v2',
+        'ready': true,
+        'counts': <String, dynamic>{
+          'operational_agents': 6,
+          'operational_agents_ready': 6,
+          'brain_agents': 12,
+          'brain_agents_ready': 12,
+          'skills': 34,
+          'skills_ready': 34,
+          'tools': 8,
+          'tools_ready': 5,
+          'mutating_tools_ready': 0,
+        },
+      };
+
+  @override
+  Future<Map<String, dynamic>> getIntelligenceCapabilities() async =>
+      <String, dynamic>{
+        'api_version': 'v2',
+        'capabilities': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'capability': 'debug',
+            'known': true,
+            'routable': true,
+            'skill_supported': true,
+            'executable': false,
+          },
+          <String, dynamic>{
+            'capability': 'code_search',
+            'known': true,
+            'routable': true,
+            'skill_supported': true,
+            'executable': true,
+          },
+        ],
+        'count': 2,
+      };
+
+  @override
+  Future<Map<String, dynamic>> getIntelligenceSkills({
+    String? capability,
+    String? permission,
+    bool readyOnly = true,
+  }) async => <String, dynamic>{
+        'api_version': 'v2',
+        'skills': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'skill_id': 'software.debug-diagnosis',
+            'ready': true,
+          },
+          <String, dynamic>{
+            'skill_id': 'github.ci-diagnosis',
+            'ready': true,
+          },
+        ],
+        'count': 2,
+      };
+
+  @override
+  Future<Map<String, dynamic>> getIntelligenceTools({
+    String? capability,
+    String? permission,
+    bool readyOnly = true,
+  }) async => <String, dynamic>{
+        'api_version': 'v2',
+        'tools': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'tool_id': 'workspace.code.search',
+            'ready': true,
+          },
+        ],
+        'count': 1,
+      };
+
+  @override
+  Future<Map<String, dynamic>> planIntelligence(
+    String objective, {
+    String? sessionId,
+    Map<String, Object?> context = const <String, Object?>{},
+  }) async {
+    brainPlanPreviewed = true;
+    return <String, dynamic>{
+      'api_version': 'v2',
+      'read_only': true,
+      'execution_performed': false,
+      'result': <String, dynamic>{
+        'plan': <String, dynamic>{
+          'goal': objective,
+          'required_capabilities': <String>['debug', 'code'],
+          'blocked_reasons': <String>[],
+        },
       },
     };
   }
@@ -243,6 +342,37 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('Agent Center exposes read-only AI Brain Inspector and plan preview',
+      (tester) async {
+    final api = FakeAgentApiClient();
+    configureView(tester, height: 1600);
+
+    await tester.pumpWidget(testApp(api));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('brain-inspector')), findsOneWidget);
+    expect(find.byKey(const Key('brain-ready-state')), findsOneWidget);
+    expect(find.text('Brain runtime ready'), findsOneWidget);
+    expect(find.byKey(const Key('brain-capability-debug')), findsOneWidget);
+    expect(find.text('software.debug-diagnosis'), findsOneWidget);
+    expect(find.text('workspace.code.search'), findsOneWidget);
+    expect(find.byKey(const Key('brain-inspector-safety')), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('brain-plan-objective')));
+    await tester.enterText(
+      find.byKey(const Key('brain-plan-objective')),
+      'debug code failure',
+    );
+    await tester.tap(find.byKey(const Key('brain-plan-preview')));
+    await tester.pumpAndSettle();
+
+    expect(api.brainPlanPreviewed, isTrue);
+    expect(find.byKey(const Key('brain-plan-result')), findsOneWidget);
+    expect(find.text('Required capabilities: debug, code'), findsOneWidget);
+    expect(find.text('No execution performed by this preview.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Agent Center V2 exposes timeline health and cancellation controls',
       (tester) async {
     final api = FakeAgentApiClient();
@@ -271,7 +401,7 @@ void main() {
     await tester.tap(find.byKey(const Key('load-agent-health')));
     await tester.pumpAndSettle();
     expect(find.text('V2 Agent Center Engineer'), findsOneWidget);
-    expect(find.text('ready'), findsOneWidget);
+    expect(find.text('ready'), findsWidgets);
 
     await tester.ensureVisible(find.byKey(const Key('timeline-run-v2controls')));
     await tester.tap(find.byKey(const Key('timeline-run-v2controls')));
