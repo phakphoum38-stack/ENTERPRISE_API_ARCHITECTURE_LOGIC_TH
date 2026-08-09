@@ -20,6 +20,7 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7),
   ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8),
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
+  ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
 ];
 
 class ResearchSidebar extends StatelessWidget {
