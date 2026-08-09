@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+# This suite intentionally lives in the consolidated Agent Platform gate so the
+# final Phase 8 code/documentation SHA is validated without adding a workflow.
 import tempfile
 import unittest
 from pathlib import Path
