@@ -8,6 +8,7 @@ import test_v2_brain_context
 import test_v2_brain_decision
 import test_v2_execution_controller
 import test_v2_execution_hardening
+import test_v2_governed_task_runner
 import test_v2_secret_redactor
 import test_v2_skill_executor
 import test_v2_skill_registry
@@ -56,6 +57,7 @@ class BrainRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             report = self.make_runtime(tmp).introspect()
             self.assertEqual("brain_core_phase_4", report["phase"])
+            self.assertEqual("brain_core_phase_8", report["task_runner_phase"])
             self.assertGreaterEqual(report["skills"]["ready_count"], 3)
             self.assertEqual(3, report["tools"]["ready_count"])
             self.assertTrue(report["context"]["secret_redaction"])
@@ -66,6 +68,9 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertTrue(report["secret_redaction"]["value_aware"])
             self.assertTrue(report["post_execution_verification"])
             self.assertEqual("brain-skill-tool-execution-phase-4", report["skill_execution"]["contract"])
+            self.assertEqual("brain-governed-task-runner-phase-8", report["task_runner"]["contract"])
+            self.assertEqual("AgentOrchestrator", report["canonical_dependency_graph"])
+            self.assertFalse(report["task_runner"]["unrestricted_shell"])
 
     def test_plan_returns_context_snapshot_without_secret_leak(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -206,6 +211,7 @@ def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite, pattern: 
     suite.addTests(loader.loadTestsFromModule(test_v2_secret_redactor))
     suite.addTests(loader.loadTestsFromModule(test_v2_execution_hardening))
     suite.addTests(loader.loadTestsFromModule(test_v2_skill_executor))
+    suite.addTests(loader.loadTestsFromModule(test_v2_governed_task_runner))
     return suite
 
 
