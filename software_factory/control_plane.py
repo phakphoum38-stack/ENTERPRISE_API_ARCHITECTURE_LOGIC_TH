@@ -108,8 +108,7 @@ class AdaptiveControlPlane:
         return self.master.get_factory(version)
 
     def begin_write(self, version: str, target: Path) -> None:
-        factory = self.factory_for(version)
-        factory.assert_isolated_target(version, target)
+        self.master.assert_isolated_target(version, target)
         self.conflicts.acquire(version, target)
         self.ledger.append(version, "write_lease_acquired", str(target.resolve()))
 
