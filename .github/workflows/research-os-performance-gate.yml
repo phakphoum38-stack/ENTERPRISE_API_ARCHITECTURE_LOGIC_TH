@@ -2,6 +2,13 @@ name: Research OS Performance Gate
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/research_os_api/**"
+      - "tools/research_curator/**"
+      - ".github/workflows/research-os-performance-gate.yml"
   workflow_run:
     workflows:
       - Research OS Windows Desktop
@@ -14,13 +21,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: research-os-performance-secondary-${{ github.event.workflow_run.head_branch || github.ref }}
+  group: research-os-performance-secondary-${{ github.event.workflow_run.head_branch || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
   backend-fast-path:
     name: Backend performance-only checks
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -35,7 +42,7 @@ jobs:
       - name: Checkout validated commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
