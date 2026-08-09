@@ -159,13 +159,19 @@ void configureView(WidgetTester tester, {double height = 1200}) {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
+Widget testApp(ResearchOSApiClient api) => MaterialApp(
+      home: Scaffold(
+        body: AgentCenterPage(apiClient: api),
+      ),
+    );
+
 void main() {
   testWidgets('Agent Center creates executes and confirms orchestration',
       (tester) async {
     final api = FakeAgentApiClient();
     configureView(tester);
 
-    await tester.pumpWidget(MaterialApp(home: AgentCenterPage(apiClient: api)));
+    await tester.pumpWidget(testApp(api));
     await tester.pumpAndSettle();
 
     expect(find.text('No orchestration runs yet'), findsOneWidget);
@@ -214,7 +220,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     addTearDown(semantics.dispose);
 
-    await tester.pumpWidget(MaterialApp(home: AgentCenterPage(apiClient: api)));
+    await tester.pumpWidget(testApp(api));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('workspace-selector')), findsOneWidget);
@@ -255,7 +261,7 @@ void main() {
     });
     configureView(tester, height: 1400);
 
-    await tester.pumpWidget(MaterialApp(home: AgentCenterPage(apiClient: api)));
+    await tester.pumpWidget(testApp(api));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('orchestration-dependency-graph')), findsOneWidget);
