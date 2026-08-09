@@ -39,11 +39,46 @@ class DurableOrchestrationTests(unittest.TestCase):
             self.assertEqual(restored["objective"], "research durable orchestration")
             self.assertEqual(restored["status"], "planned")
             self.assertEqual(len(restarted.list()), 1)
+            self.assertEqual(restored["events"][0]["event_type"], "run.created")
 
             payload = json.loads(
                 (root / "agents" / "orchestrations.json").read_text(encoding="utf-8")
             )
             self.assertEqual(payload["schema_version"], 1)
+
+    def test_audit_timeline_survives_restart_and_history_is_filterable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = self._orchestrator(root)
+            created = first.create_run(
+                "research audit history",
+                [
+                    {
+                        "step_id": "research",
+                        "objective": "inspect durable audit state",
+                        "requested_agent": "research",
+                    }
+                ],
+            )
+            completed = first.execute(created["run_id"])
+            self.assertEqual(completed["status"], "completed")
+
+            restarted = self._orchestrator(root)
+            filtered = restarted.list(
+                status="completed",
+                query="audit",
+                agent="research",
+                limit=10,
+            )
+            self.assertEqual(len(filtered), 1)
+            self.assertEqual(filtered[0]["run_id"], created["run_id"])
+
+            timeline = restarted.timeline(created["run_id"])
+            event_types = [event["event_type"] for event in timeline]
+            self.assertIn("run.created", event_types)
+            self.assertIn("run.execution_started", event_types)
+            self.assertIn("step.completed", event_types)
+            self.assertIn("run.status_changed", event_types)
 
     def test_interrupted_run_is_recovered_and_can_resume(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -69,6 +104,10 @@ class DurableOrchestrationTests(unittest.TestCase):
             restored = restarted.get(created["run_id"])
             self.assertEqual(restored["status"], "interrupted")
             self.assertEqual(restored["steps"][0]["status"], "interrupted")
+            self.assertIn(
+                "run.recovered_after_restart",
+                [event["event_type"] for event in restarted.timeline(created["run_id"])],
+            )
 
             resumed = restarted.execute(created["run_id"])
             self.assertEqual(resumed["status"], "completed")
