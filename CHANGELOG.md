@@ -4,6 +4,21 @@
 
 รูปแบบเวอร์ชันใช้ Semantic Versioning และเก็บ Snapshot ทุกเวอร์ชันไว้ใน `versions/`
 
+## [2.0.0-rc.1] — 2026-08-09
+
+### Changed
+
+- เลื่อน Research OS V2 จาก `2.0.0-dev.1` เป็น `2.0.0-rc.1` สำหรับรอบ Release Candidate
+- เปลี่ยน Windows installer metadata และชื่อไฟล์ติดตั้งให้ใช้เวอร์ชัน `2.0.0-rc.1`
+- ยึด verified development candidate `4e25c05c9c14a857a21fc639d0bb3467015a1974` เป็นฐานของ RC branch
+- RC ต้องผ่าน exact-SHA CI, Runtime Smoke, Build Installer, Installer Validation, verified candidate และ live staging gate อีกครั้งก่อนพิจารณา merge
+
+### Safety
+
+- ยังไม่ merge `main`
+- ยังไม่สร้าง GitHub Release หรือ tag
+- ยังไม่ deploy V2 ทับ production V1
+
 ## [v1.0.0-draft] — 2026-08-06
 
 ### Added
