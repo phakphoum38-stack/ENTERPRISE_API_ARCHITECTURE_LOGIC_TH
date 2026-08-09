@@ -42,7 +42,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile Agent Platform Runtime Orchestrator and HTTP API
+      - name: Compile Agent Platform Brain Runtime Orchestrator and HTTP API
         run: |
           python -m py_compile tools/research_os_api/agent_platform.py
           python -m py_compile tools/research_os_api/agent_runtime.py
@@ -50,10 +50,13 @@ jobs:
           python -m py_compile tools/research_os_api/agent_server.py
           python -m py_compile tools/research_os_api/v2_server.py
           python -m py_compile tools/research_os_api/v2_completion_crew.py
+          python -m py_compile tools/research_os_api/v2_brain_core.py
+          python -m py_compile tools/research_os_api/v2_brain_team.py
+          python -m py_compile tools/research_os_api/v2_brain_runtime.py
           python -m py_compile tools/research_os_api/v2_observability.py
           python -m py_compile tools/research_os_api/v2_quality_gate.py
 
-      - name: Test Agent Registry Router Runtime Orchestration and HTTP API
+      - name: Test Agent Registry Brain Runtime Orchestration and HTTP API
         working-directory: tools/research_os_api
         run: >-
           python -m unittest
@@ -63,6 +66,8 @@ jobs:
           test_agent_orchestrator_persistence.py
           test_agent_server.py
           test_v2_completion_crew.py
+          test_v2_brain_core.py
+          test_v2_brain_team.py
           test_v2_server.py
           test_v2_openapi.py
           test_v2_observability.py
@@ -103,6 +108,24 @@ jobs:
           if any(agent.fallback_agents for agent in COMPLETION_CREW):
               raise SystemExit("Completion crew must not fallback to active core agents")
           print("V2 Completion Crew isolated:", ", ".join(sorted(crew)))
+          PY
+
+      - name: Validate 12-agent AI Brain engineering team
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from agent_platform import AgentRegistry
+          from v2_brain_team import BRAIN_TEAM, brain_team_dashboard, register_brain_team
+          registry = AgentRegistry()
+          register_brain_team(registry)
+          dashboard = brain_team_dashboard(registry)
+          if len(BRAIN_TEAM) < 10:
+              raise SystemExit(f"Brain team below minimum: {len(BRAIN_TEAM)}")
+          if not dashboard["minimum_satisfied"]:
+              raise SystemExit(f"Brain team readiness below minimum: {dashboard}")
+          if dashboard["ready_count"] != len(BRAIN_TEAM):
+              raise SystemExit(f"Brain team is not fully ready: {dashboard}")
+          print("AI Brain engineering team ready:", dashboard["ready_count"], "agents")
           PY
 
       - name: Validate dynamic capability discovery and readiness routing
@@ -226,6 +249,7 @@ jobs:
           {
             echo "# Research OS Agent Platform V2"
             echo "- Core agents and isolated Completion Crew validated"
+            echo "- AI Brain Core and 12-agent engineering team validated"
             echo "- Dynamic registry/provider fallback/permission checks validated"
             echo "- Durable orchestration and V1/V2 compatibility tests enabled"
             echo "- Workspace/evidence OpenAPI contract enforced"
