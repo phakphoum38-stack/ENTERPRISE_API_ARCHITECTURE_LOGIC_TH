@@ -23,7 +23,7 @@ from v2_observability import readiness_snapshot
 _CURATOR_DIR = Path(__file__).resolve().parents[1] / "research_curator"
 if str(_CURATOR_DIR) not in sys.path:
     sys.path.insert(0, str(_CURATOR_DIR))
-from workspace_engine import WorkspaceKnowledgeEngine  # noqa: E402
+from workspace_engine import Provenance, WorkspaceKnowledgeEngine  # noqa: E402
 
 
 class V2ResearchOSHandler(AgentResearchOSHandler):
@@ -235,4 +235,4 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
         return offset
 
 
-__all__ = ["V2ResearchOSHandler"]
+__all__ = ["Provenance", "V2ResearchOSHandler", "WorkspaceKnowledgeEngine"]
