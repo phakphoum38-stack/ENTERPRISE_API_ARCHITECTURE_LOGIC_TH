@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import unittest
 
-from v2_tool_registry import TOOL_REGISTRY_CONTRACT, ToolDefinition, ToolRegistry
+from v2_tool_registry import (
+    TOOL_MATCHING_CONTRACT,
+    TOOL_REGISTRY_CONTRACT,
+    ToolDefinition,
+    ToolRegistry,
+)
 
 
 class ToolRegistryTests(unittest.TestCase):
@@ -12,6 +17,7 @@ class ToolRegistryTests(unittest.TestCase):
         report = registry.dashboard()
         self.assertEqual("brain-tools-phase-3", TOOL_REGISTRY_CONTRACT)
         self.assertEqual(TOOL_REGISTRY_CONTRACT, report["contract"])
+        self.assertEqual(TOOL_MATCHING_CONTRACT, report["matching_contract"])
         self.assertEqual(3, report["tool_count"])
         self.assertEqual(3, report["enabled_count"])
         self.assertEqual(0, report["ready_count"])
@@ -91,6 +97,41 @@ class ToolRegistryTests(unittest.TestCase):
         )
         matches = registry.discover(capability="skill_registry", ready_only=True)
         self.assertEqual(["brain.skills.inspect"], [item["tool_id"] for item in matches])
+
+    def test_capability_match_requires_one_ready_tool_to_satisfy_all_capabilities(self) -> None:
+        registry = ToolRegistry(())
+        registry.register(
+            ToolDefinition(
+                "test.multi",
+                "1.0.0",
+                "Multi",
+                "Satisfies two capabilities.",
+                ("cap_a", "cap_b"),
+            )
+        )
+        registry.register(
+            ToolDefinition(
+                "test.partial",
+                "1.0.0",
+                "Partial",
+                "Satisfies only one capability.",
+                ("cap_a",),
+            )
+        )
+        registry.register_adapter("test.multi", lambda action, payload, dry_run: {"ok": True})
+        registry.register_adapter("test.partial", lambda action, payload, dry_run: {"ok": True})
+        match = registry.match_capabilities(("cap_a", "cap_b"), ready_only=True)
+        self.assertEqual(TOOL_MATCHING_CONTRACT, match["contract"])
+        self.assertTrue(match["matched"])
+        self.assertEqual(["test.multi"], match["candidates"])
+        self.assertEqual("test.multi", match["selected_tool_id"])
+
+    def test_capability_match_reports_missing_without_guessing(self) -> None:
+        registry = ToolRegistry(())
+        match = registry.match_capabilities(("unknown_capability",), ready_only=True)
+        self.assertFalse(match["matched"])
+        self.assertIsNone(match["selected_tool_id"])
+        self.assertEqual(("unknown_capability",), match["missing_capabilities"])
 
 
 if __name__ == "__main__":
