@@ -191,6 +191,7 @@ class GovernedTaskRunnerTests(unittest.TestCase):
             report = runner.dashboard()
             self.assertEqual("AgentOrchestrator", report["canonical_dependency_graph"])
             self.assertEqual("HardenedExecutionController only", report["tool_execution"])
+            self.assertEqual("one pending skill step at a time", report["approval_scope"])
             self.assertFalse(report["unrestricted_shell"])
             self.assertFalse(report["raw_secret_persistence"])
 
