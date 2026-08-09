@@ -54,6 +54,14 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> getV2BrainAgents({bool readyOnly = true}) =>
       getIntelligenceAgents(scope: 'brain', readyOnly: readyOnly);
 
+  // V2² is a compatibility-safe helper mode layered on the canonical V2 Brain
+  // Team. Agent IDs remain v2_* so orchestration, permissions and persisted runs
+  // do not fork into a second source of truth.
+  Future<Map<String, dynamic>> getV2SquaredBrainAgents({
+    bool readyOnly = true,
+  }) =>
+      getV2BrainAgents(readyOnly: readyOnly);
+
   Future<Map<String, dynamic>> getIntelligenceSkills({
     String? capability,
     String? permission,
@@ -317,8 +325,7 @@ class ResearchOSApiClient {
       _uri('/v1/conversations/cloud/delete'),
       headers: <String, String>{
         'Content-Type': 'application/json',
-        'X-Research-OS-Sync-Key': syncKey,
-      },
+        'X-Research-OS-Sync-Key': syncKey},
       body: jsonEncode(<String, Object?>{'session_id': sessionId}),
     );
     return _decode(response);
