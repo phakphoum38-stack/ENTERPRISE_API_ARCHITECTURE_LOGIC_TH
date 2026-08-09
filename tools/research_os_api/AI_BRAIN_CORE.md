@@ -81,7 +81,7 @@ Implemented:
 
 ## Phase 5 — Real read-only developer adapters
 
-Phase 5 adds the first adapters that read real project and GitHub state while preserving the Phase 3/4 permission, secret and evidence boundaries. These adapters are opt-in per Brain Tool Registry; they are not globally trusted merely because the code exists.
+Phase 5 adds adapters that read real project and GitHub state while preserving the Phase 3/4 permission, secret and evidence boundaries. These adapters are opt-in per Brain Tool Registry; they are not globally trusted merely because the code exists.
 
 ### Sandboxed workspace pack
 
@@ -97,20 +97,19 @@ Implemented tools:
 
 Workspace safeguards:
 
-- an explicit workspace root is required at adapter installation time
-- absolute paths and `..` traversal are rejected
+- explicit workspace root required at adapter installation time
+- absolute paths and `..` traversal rejected
 - resolved targets must remain inside the configured workspace
 - returned paths are workspace-relative rather than absolute host paths
-- common VCS, dependency, build-output and cache directories are excluded from broad scans
-- common credential directories and credential-file names are blocked
-- `.env` variants are blocked except `.env.example`
-- binary / non-UTF-8 content and oversized file reads are rejected
-- read, search, map and scan counts are bounded
-- adapters do not execute shell commands
-- adapters do not use the network
-- every call still requires `workspace.read` through the existing Execution Controller
+- common VCS, dependency, build-output and cache directories excluded from broad scans
+- common credential directories and credential-file names blocked
+- `.env` variants blocked except `.env.example`
+- binary / non-UTF-8 content and oversized file reads rejected
+- read, search, map and scan counts bounded
+- no shell execution and no network access
+- every call still requires `workspace.read`
 
-The path denylist is a defense-in-depth boundary, not a claim that every safe-looking source/config file can never contain sensitive text. Phase 4 reflected-secret redaction still applies to adapter results, and additional domain-specific secret rules can be added as adapters expand.
+The path denylist is defense in depth, not a claim that every safe-looking source/config file can never contain sensitive text. Phase 4 reflected-secret redaction still applies to adapter results.
 
 ### Governed GitHub read pack
 
@@ -118,21 +117,79 @@ Contract: `brain-github-read-tools-phase-5`
 
 Implemented tool:
 
-- `github.repository.dashboard` — compact repository metadata, recent commits, open pull requests and workflow-run status using the existing read-only GitHub dashboard provider
+- `github.repository.dashboard` — compact repository metadata, recent commits, open pull requests and workflow-run status
 
 GitHub safeguards:
 
-- input is restricted to `owner/name`; arbitrary URLs are not accepted by the Phase 5 adapter
-- the ToolDefinition is read-only (`mutating=false`, `destructive=false`)
-- network access and possible API-side credential use are declared explicitly (`network=true`, `secret_access=true`)
+- input restricted to `owner/name`; arbitrary URLs are not accepted
+- read-only ToolDefinition (`mutating=false`, `destructive=false`)
+- network access and possible API-side credential use declared explicitly
 - every call requires `github.read`
-- no merge, workflow dispatch, commit, release, tag or deployment actions are exposed
-- adapter output and exceptions remain inside the Phase 4 secret-aware execution boundary
-- CI uses an injected deterministic provider rather than live GitHub credentials/network calls
+- no merge, workflow dispatch, commit, release, tag or deployment actions
+- adapter output and exceptions stay inside the Phase 4 secret-aware execution boundary
+- CI uses an injected deterministic provider instead of live credentials/network calls
 
-### Skill integration
+## Phase 6 — Approval-gated developer actions
 
-Both Phase 5 packs participate in the existing Skill -> Tool path. A skill may declare a required capability such as `workspace_file_read` or `github_repository_read`; the Tool Registry resolves a ready matching adapter, the controller enforces permissions, and the Brain verifies required evidence after execution before reporting the skill as verified.
+Phase 6 adds narrowly scoped mutation tools without relaxing the Phase 3/4 execution boundary. The adapters remain opt-in and every real mutation is stopped at `awaiting_approval` until an explicit approval is supplied.
+
+### Workspace developer action pack
+
+Contract: `brain-developer-actions-phase-6`
+
+Implemented tools:
+
+- `workspace.file.change` — preview then write/replace one bounded UTF-8 file inside the workspace sandbox
+- `workspace.command.run` — run one trusted host-defined test/build/analyze/verify command profile
+
+File-change safeguards:
+
+- dry-run produces a unified diff and an `approval_fingerprint`
+- the fingerprint binds `path + action + before_sha256 + after_sha256`
+- the fingerprint is an integrity value, not a credential, and is intentionally not named `token`
+- actual apply requires both `workspace.read` + `workspace.write`, explicit approval, and the matching fresh fingerprint
+- stale workspace state changes the fingerprint and fails closed
+- target remains under the Phase 5 workspace/secret-path sandbox
+- symlink mutation, binary files, non-UTF-8 files, and oversized files are rejected
+- write uses a same-directory temporary file plus atomic `os.replace`
+- post-write SHA-256 verification is required
+- rollback is a new reverse preview followed by a separate explicit approval; rollback is not silently automatic
+
+Controlled-command safeguards:
+
+- payload selects only a pre-registered `CommandProfile`; payload cannot provide arbitrary shell text or argv
+- `shell=False`
+- categories are limited to test/build/analyze/verify
+- working directory must remain inside the workspace
+- command timeout is bounded
+- credential-like environment variables are not inherited; only a small runtime environment allowlist is passed
+- real execution requires `workspace.execute` plus explicit approval
+- Phase 6 does not expose a general terminal/shell adapter
+
+### GitHub write pack
+
+Contract: `brain-github-write-tools-phase-6`
+
+Implemented tools:
+
+- `github.branch.file.upsert` — create or update one UTF-8 file on an explicitly non-protected branch
+- `github.pull_request.comment` — add one PR conversation comment without changing code or PR state
+
+GitHub mutation safeguards:
+
+- every real call requires `github.write` and explicit controller approval
+- dry-run returns an `approval_fingerprint`; apply requires the same fingerprint
+- update requires the expected Git blob SHA; create and update semantics are explicit
+- `main`, `master`, `stable`, `production`, `prod` and `release/` / `deploy/` branches are blocked by default
+- common secret-bearing repository paths are blocked
+- network and credential access are declared explicitly and remain inside the Phase 4 secret-aware boundary
+- provider errors do not echo Authorization headers or credentials
+- tests inject deterministic mutation providers; CI does not need a live GitHub write credential
+- no delete, merge, workflow dispatch, tag, GitHub Release or deployment action exists in this pack
+
+## Skill integration
+
+Phase 5/6 packs participate in the existing Skill -> Tool path. Skills declare required capabilities and permissions; the Tool Registry resolves a matching ready adapter, the controller enforces permissions and approval, and the Brain verifies declared evidence before a skill can be reported as verified.
 
 ## Execution contract
 
@@ -146,7 +203,9 @@ Goal
   -> Decision + Risk
   -> Skill permission check
   -> Tool permission check
-  -> Approval gate when mutating
+  -> Dry-run / preview when state may change
+  -> Approval fingerprint binding
+  -> Explicit approval gate
   -> Secret-aware execution scope
   -> Tool adapter
   -> Observation
@@ -167,11 +226,11 @@ A process restart converts a checkpoint left in `running` state to `interrupted`
 
 Phase 4 protects persisted and returned Brain execution records against secrets reflected by adapters under neutral field names or embedded in exception strings. Secret values discovered or supplied for one execution live only in an ephemeral context-local scope and are not included in checkpoints, activity records or diagnostics.
 
-This does not make arbitrary external adapters automatically trusted. Credential-bearing adapters still require explicit registration, least-privilege permissions, provider-specific tests, and production trust-boundary review before promotion.
+This does not make arbitrary external adapters automatically trusted. Credential-bearing adapters still require explicit registration, least-privilege permissions, provider-specific tests and production trust-boundary review before promotion.
 
 ## Current development boundary
 
-Brain Phase 5 now has governed read-only workspace and GitHub status adapters. It still does not add unrestricted filesystem access, terminal execution, filesystem write, GitHub write, Google Workspace write or production deployment adapters. Those integrations must arrive as separate permissioned slices with explicit mutation metadata, approval, evidence, recovery and rollback contracts.
+Brain Phase 6 now has governed workspace edits, trusted-profile test/build execution, non-protected-branch GitHub file upsert and PR comments. It still does **not** expose an unrestricted terminal, arbitrary shell execution, arbitrary filesystem access, file deletion, GitHub merge, workflow dispatch, tag/release creation, Google Workspace writes, installer mutation, release promotion or production deployment.
 
 ## Release boundary
 
