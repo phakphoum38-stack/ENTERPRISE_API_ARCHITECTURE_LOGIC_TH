@@ -100,8 +100,8 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
   Future<void> _loadHealth() async {
     setState(() => _loadingHealth = true);
     try {
-      final payload = await widget.apiClient.getAgents();
-      final raw = payload['agents'];
+      final payload = await widget.apiClient.getV2BrainAgents();
+      final raw = payload['brain_team'];
       final agents = raw is List ? raw.whereType<Map>().map(_map).toList() : <Map<String, dynamic>>[];
       if (mounted) setState(() => _agents = agents);
     } catch (error) {
@@ -187,7 +187,7 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
         const EnterprisePageHeader(
           icon: Icons.smart_toy_outlined,
           title: 'Agent Center V2',
-          subtitle: 'Orchestration graph, timeline, approvals, retry/cancel/resume, health และ workspace knowledge',
+          subtitle: 'V2 Brain Team helpers, orchestration graph, approvals, timeline และ workspace knowledge',
         ),
         const SizedBox(height: 18),
         EnterpriseSection(
@@ -289,7 +289,7 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
         const SizedBox(height: 18),
         EnterpriseSection(
           title: 'Multi-Agent orchestration',
-          subtitle: 'Visual dependency graph, status และ run controls',
+          subtitle: 'V2 helper selection, dependency graph, status และ run controls',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
               Expanded(child: Text(_loading ? 'กำลังโหลด orchestration...' : '${_runs.length} orchestration run(s)')),
@@ -318,8 +318,8 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
         ),
         const SizedBox(height: 18),
         EnterpriseSection(
-          title: 'Agent health & capabilities',
-          subtitle: 'Core agents และ V2 Completion Crew',
+          title: 'V2 Brain Team helpers',
+          subtitle: 'โหลดสถานะตัวช่วยจาก System Introspection ของ Brain Runtime โดยตรง',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Align(
               alignment: Alignment.centerRight,
@@ -327,17 +327,17 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
                 key: const Key('load-agent-health'),
                 onPressed: _loadingHealth ? null : _loadHealth,
                 icon: const Icon(Icons.monitor_heart_outlined),
-                label: const Text('Refresh health'),
+                label: const Text('Refresh V2 helpers'),
               ),
             ),
             if (_loadingHealth) const LinearProgressIndicator(),
-            if (_agents.isEmpty && !_loadingHealth) const ListTile(title: Text('Health data not loaded')),
+            if (_agents.isEmpty && !_loadingHealth) const ListTile(title: Text('V2 helper health not loaded')),
             ..._agents.map((agent) {
               final health = agent['health'] is Map ? _map(agent['health'] as Map) : <String, dynamic>{};
               return ListTile(
                 leading: Icon(health['ready'] == true ? Icons.check_circle_outline : Icons.error_outline),
-                title: Text('${agent['name'] ?? agent['agent_id'] ?? 'Agent'}'),
-                subtitle: Text('${agent['permission_profile'] ?? 'standard'}'),
+                title: Text('${agent['name'] ?? agent['agent_id'] ?? 'V2 Helper'}'),
+                subtitle: Text('${agent['agent_id'] ?? '-'} • ${agent['permission_profile'] ?? 'standard'}'),
                 trailing: Chip(label: Text('${health['status'] ?? 'unknown'}')),
               );
             }),
@@ -440,11 +440,21 @@ class _CreateDialogState extends State<_CreateDialog> {
   final objective = TextEditingController();
   final first = TextEditingController();
   final second = TextEditingController();
-  String firstAgent = 'research';
-  String secondAgent = 'document';
+  String firstAgent = 'v2_brain_coordinator';
+  String secondAgent = 'v2_brain_reviewer';
   static const agents = [
-    'research', 'developer', 'document', 'github', 'google_workspace', 'shift',
-    'v2_workspace_engineer', 'v2_agent_center_engineer', 'v2_api_compat_engineer', 'v2_reliability_release_engineer',
+    'v2_brain_coordinator',
+    'v2_brain_architect',
+    'v2_context_engineer',
+    'v2_reasoning_planner',
+    'v2_capability_skill_engineer',
+    'v2_memory_knowledge_engineer',
+    'v2_tool_execution_engineer',
+    'v2_security_policy_engineer',
+    'v2_verification_evidence_engineer',
+    'v2_reliability_recovery_engineer',
+    'v2_developer_intelligence_engineer',
+    'v2_brain_reviewer',
   ];
 
   @override
@@ -452,13 +462,13 @@ class _CreateDialogState extends State<_CreateDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Create orchestration'),
+    title: const Text('Create orchestration • V2 helpers'),
     content: SizedBox(width: 560, child: Column(mainAxisSize: MainAxisSize.min, children: [
       TextField(key: const Key('orchestration-objective'), controller: objective, decoration: const InputDecoration(labelText: 'Objective')),
       const SizedBox(height: 10),
-      _step(first, const Key('orchestration-step-1'), firstAgent, (v) => setState(() => firstAgent = v ?? 'research')),
+      _step(first, const Key('orchestration-step-1'), firstAgent, (v) => setState(() => firstAgent = v ?? 'v2_brain_coordinator')),
       const SizedBox(height: 10),
-      _step(second, const Key('orchestration-step-2'), secondAgent, (v) => setState(() => secondAgent = v ?? 'document')),
+      _step(second, const Key('orchestration-step-2'), secondAgent, (v) => setState(() => secondAgent = v ?? 'v2_brain_reviewer')),
     ])),
     actions: [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
