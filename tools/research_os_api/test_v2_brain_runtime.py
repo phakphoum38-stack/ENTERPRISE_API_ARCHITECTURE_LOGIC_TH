@@ -6,6 +6,7 @@ import unittest
 
 import test_v2_brain_context
 import test_v2_brain_decision
+import test_v2_capability_graph
 import test_v2_domain_skills
 import test_v2_execution_controller
 import test_v2_execution_hardening
@@ -54,6 +55,10 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertIn("v2_developer_intelligence_engineer", matches["test"])
             self.assertIn("v2_brain_architect", matches["architecture"])
             self.assertEqual(12, result["team"]["ready_count"])
+            self.assertEqual(
+                "brain-capability-graph-phase-10",
+                result["capability_graph"]["contract"],
+            )
 
     def test_runtime_introspection_exposes_complete_brain_layers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -62,6 +67,7 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertEqual("brain_core_phase_8", report["task_runner_phase"])
             self.assertEqual("brain_core_phase_9", report["learning_phase"])
             self.assertEqual("brain_core_phase_10", report["domain_skills_phase"])
+            self.assertEqual("brain_core_phase_10", report["capability_graph_phase"])
             self.assertGreaterEqual(report["skills"]["ready_count"], 30)
             self.assertGreaterEqual(report["skills"]["operational_contract_count"], 30)
             self.assertEqual(3, report["tools"]["ready_count"])
@@ -76,6 +82,9 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertEqual("brain-governed-task-runner-phase-8", report["task_runner"]["contract"])
             self.assertEqual("brain-learning-experience-phase-9", report["learning"]["contract"])
             self.assertEqual("brain-domain-skills-phase-10", report["domain_skills"]["contract"])
+            self.assertEqual("brain-capability-graph-phase-10", report["capability_graph"]["contract"])
+            self.assertFalse(report["capability_graph"]["persisted"])
+            self.assertFalse(report["capability_graph"]["duplicate_registry"])
             self.assertEqual("AgentOrchestrator", report["canonical_dependency_graph"])
             self.assertFalse(report["task_runner"]["unrestricted_shell"])
             self.assertFalse(report["self_modification"])
@@ -229,6 +238,7 @@ def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite, pattern: 
     suite.addTests(loader.loadTestsFromModule(test_v2_brain_decision))
     suite.addTests(loader.loadTestsFromModule(test_v2_skill_registry))
     suite.addTests(loader.loadTestsFromModule(test_v2_domain_skills))
+    suite.addTests(loader.loadTestsFromModule(test_v2_capability_graph))
     suite.addTests(loader.loadTestsFromModule(test_v2_tool_registry))
     suite.addTests(loader.loadTestsFromModule(test_v2_execution_controller))
     suite.addTests(loader.loadTestsFromModule(test_v2_secret_redactor))
