@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Research OS API
-  version: 0.9.0-rc.1
+  version: 1.0.0
   description: Provider-agnostic API for conversation analysis, knowledge access, AI generation, and Multi-Agent orchestration.
 servers:
   - url: http://127.0.0.1:8787
