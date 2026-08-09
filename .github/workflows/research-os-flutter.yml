@@ -52,6 +52,16 @@ jobs:
       - name: Generate web platform shell
         run: flutter create --platforms=web --project-name=research_os_flutter .
 
+      - name: Apply Research OS web branding
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python ../../scripts/apply-research-os-branding.py --app-root . --platform web
+          test -f web/favicon.png
+          test -f web/icons/Icon-192.png
+          test -f web/icons/Icon-512.png
+          test -f web/icons/Icon-maskable-192.png
+          test -f web/icons/Icon-maskable-512.png
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -86,6 +96,7 @@ jobs:
             echo
             echo "- Parent workflow: Research OS Windows Desktop"
             echo "- Trigger: ${{ github.event_name }}"
+            echo "- Research OS web/PWA branding applied from the shared master icon"
             echo "- Generic analyze/test are owned by the main workflow"
             echo "- This workflow produces the Pages-ready web artifact and dispatches deployment"
           } >> "$GITHUB_STEP_SUMMARY"

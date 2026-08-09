@@ -4,13 +4,26 @@ on:
   workflow_dispatch:
     inputs:
       target_sha:
-        description: Commit SHA that completed the split Windows release pipeline
+        description: Exact candidate commit SHA
         required: true
+        type: string
+      source_installer_run:
+        description: Research OS Build Installer workflow run ID
+        required: false
+        type: string
+      source_validation_run:
+        description: Research OS Installer Validation workflow run ID
+        required: false
         type: string
       source_release_run:
         description: Research OS Release workflow run ID
         required: false
         type: string
+      candidate_only:
+        description: Verify a development candidate without release publication
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -24,76 +37,206 @@ jobs:
   windows-foundation:
     name: Windows split-pipeline compatibility gate
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     env:
       TARGET_SHA: ${{ inputs.target_sha }}
+      SOURCE_INSTALLER_RUN: ${{ inputs.source_installer_run }}
+      SOURCE_VALIDATION_RUN: ${{ inputs.source_validation_run }}
       SOURCE_RELEASE_RUN: ${{ inputs.source_release_run }}
+      CANDIDATE_ONLY: ${{ inputs.candidate_only }}
+      V1_ROLLBACK_BASELINE: d05189d151b6bfa65938dad7a812ac104db195f4
     steps:
-      - name: Confirm verified release artifact exists
+      - name: Checkout exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Resolve validation-only candidate evidence
+        if: ${{ inputs.candidate_only == true }}
+        id: candidate
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          run_id="$SOURCE_RELEASE_RUN"
+          set -euo pipefail
+          installer_run="$SOURCE_INSTALLER_RUN"
+          validation_run="$SOURCE_VALIDATION_RUN"
+          for attempt in $(seq 1 60); do
+            if [ -z "$installer_run" ]; then
+              installer_run="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
+            fi
+            if [ -z "$validation_run" ]; then
+              validation_run="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Installer Validation" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
+            fi
+            if [ -n "$installer_run" ] && [ -n "$validation_run" ]; then break; fi
+            echo "Waiting for candidate evidence: attempt=$attempt installer=${installer_run:-pending} validation=${validation_run:-pending}"
+            sleep 15
+          done
+          test -n "$installer_run" || { echo "No successful installer run for $TARGET_SHA"; exit 1; }
+          test -n "$validation_run" || { echo "No successful installer validation run for $TARGET_SHA"; exit 1; }
 
-          if [ -n "$run_id" ]; then
-            workflow_name="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+          verify_run() {
+            local run_id="$1"
+            local expected="$2"
+            local workflow status conclusion head_sha
+            workflow="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
             status="$(gh run view "$run_id" --repo "${{ github.repository }}" --json status --jq '.status')"
             conclusion="$(gh run view "$run_id" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+            head_sha="$(gh run view "$run_id" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+            test "$workflow" = "$expected" || { echo "Unexpected workflow: $workflow"; exit 1; }
+            test "$status" = "completed" || { echo "Run $run_id is not completed"; exit 1; }
+            test "$conclusion" = "success" || { echo "Run $run_id did not succeed"; exit 1; }
+            test "$head_sha" = "$TARGET_SHA" || { echo "Run $run_id SHA $head_sha != $TARGET_SHA"; exit 1; }
+          }
+          verify_run "$installer_run" "Research OS Build Installer"
+          verify_run "$validation_run" "Research OS Installer Validation"
+          echo "installer_run=$installer_run" >> "$GITHUB_OUTPUT"
+          echo "validation_run=$validation_run" >> "$GITHUB_OUTPUT"
 
-            if [ "$workflow_name" != "Research OS Release" ]; then
-              echo "Run $run_id is not a Research OS Release run: $workflow_name"
-              exit 1
-            fi
-            if [ "$status" = "completed" ] && [ "$conclusion" != "success" ]; then
-              echo "Release run $run_id completed with conclusion: $conclusion"
-              exit 1
-            fi
-            if [ "$status" != "in_progress" ] && [ "$status" != "completed" ]; then
-              echo "Release run $run_id has unexpected status: $status"
-              exit 1
-            fi
-          else
-            run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Release" --commit "$TARGET_SHA" --limit 20 --json databaseId,status,conclusion --jq '[.[] | select((.status == "completed" and .conclusion == "success") or .status == "in_progress")][0].databaseId')"
-            if [ -z "$run_id" ]; then
-              echo "No release run found for $TARGET_SHA. For workflow-dispatch releases, pass source_release_run."
-              exit 1
-            fi
-          fi
-
-          echo "Split Windows pipeline reached release stage for $TARGET_SHA (run $run_id)."
-
-      - name: Publish compatibility success
+      - name: Download candidate installer and build exact-SHA manifest
+        if: ${{ inputs.candidate_only == true }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALLER_RUN: ${{ steps.candidate.outputs.installer_run }}
+          VALIDATION_RUN: ${{ steps.candidate.outputs.validation_run }}
         run: |
-          echo "Research OS Windows Desktop represents the successful split pipeline gate."
-          echo "Secondary validation workflows will be dispatched directly."
+          set -euo pipefail
+          mkdir -p candidate-evidence
+          gh run download "$INSTALLER_RUN" --repo "${{ github.repository }}" --name "research-os-installer-$TARGET_SHA" --dir candidate-evidence
+          setup="$(find candidate-evidence -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
+          test -n "$setup" || { echo "Candidate Setup EXE missing"; exit 1; }
+          sha256sum "$setup" | tee candidate-evidence/SHA256SUMS.txt
+          python - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path
+          setup=next(Path('candidate-evidence').glob('Research-OS-Setup-*-x64.exe'))
+          pubspec=Path('apps/research_os_flutter/pubspec.yaml').read_text(encoding='utf-8')
+          installer=Path('installer/research-os.iss').read_text(encoding='utf-8')
+          openapi=Path('tools/research_os_api/openapi.yaml').read_text(encoding='utf-8')
+          manifest={
+              'schema_version': 1,
+              'evidence_type': 'v2-development-candidate',
+              'publication': 'validation-only',
+              'target_sha': os.environ['TARGET_SHA'],
+              'source_installer_run': os.environ['INSTALLER_RUN'],
+              'source_validation_run': os.environ['VALIDATION_RUN'],
+              'validation': 'passed',
+              'components': {
+                  'flutter_app': re.search(r'^version:\s*(\S+)', pubspec, re.MULTILINE).group(1),
+                  'installer': re.search(r'#define MyAppVersion "([^"]+)"', installer).group(1),
+                  'api_contract': re.search(r'^\s*version:\s*([^\s]+)', openapi, re.MULTILINE).group(1).strip('"\''),
+              },
+              'artifact': {
+                  'name': setup.name,
+                  'sha256': hashlib.sha256(setup.read_bytes()).hexdigest(),
+                  'size_bytes': setup.stat().st_size,
+              },
+              'data_boundary': r'C:\ProgramData\ResearchOS',
+              'upgrade': {'validated': True, 'preserve_local_data': True},
+              'rollback': {
+                  'validated': True,
+                  'baseline_version': '1.0.0',
+                  'baseline_sha': os.environ['V1_ROLLBACK_BASELINE'],
+              },
+              'release_created': False,
+              'tag_created': False,
+          }
+          Path('candidate-evidence/candidate-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(manifest, indent=2))
+          PY
 
-      - name: Dispatch secondary validation workflows
+      - name: Verify candidate manifest and digest
+        if: ${{ inputs.candidate_only == true }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          m=json.loads(Path('candidate-evidence/candidate-manifest.json').read_text(encoding='utf-8'))
+          assert m['target_sha'] == os.environ['TARGET_SHA']
+          assert m['validation'] == 'passed'
+          assert m['publication'] == 'validation-only'
+          assert m['rollback']['baseline_sha'] == os.environ['V1_ROLLBACK_BASELINE']
+          item=m['artifact']
+          setup=Path('candidate-evidence') / item['name']
+          assert hashlib.sha256(setup.read_bytes()).hexdigest() == item['sha256']
+          assert m['release_created'] is False and m['tag_created'] is False
+          print('Validation-only candidate manifest and installer digest verified.')
+          PY
+
+      - name: Upload verified candidate artifact
+        if: ${{ inputs.candidate_only == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-verified-candidate-${{ env.TARGET_SHA }}
+          path: candidate-evidence/**
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Confirm verified release artifact exists
+        if: ${{ inputs.candidate_only != true }}
+        id: release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for workflow in \
-            research-os-agent-platform.yml \
-            research-os-google-workspace.yml \
-            research-os-performance-gate.yml \
-            research-curator-validate.yml
-          do
+          set -euo pipefail
+          run_id="$SOURCE_RELEASE_RUN"
+          if [ -z "$run_id" ]; then
+            run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Release" --commit "$TARGET_SHA" --limit 20 --json databaseId,status,conclusion --jq '[.[] | select((.status == "completed" and .conclusion == "success") or .status == "in_progress")][0].databaseId')"
+          fi
+          test -n "$run_id" || { echo "No release run found for $TARGET_SHA"; exit 1; }
+          workflow_name="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+          head_sha="$(gh run view "$run_id" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+          test "$workflow_name" = "Research OS Release"
+          test "$head_sha" = "$TARGET_SHA"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download and verify same-SHA release manifest
+        if: ${{ inputs.candidate_only != true }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN: ${{ steps.release.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence
+          gh run download "$RELEASE_RUN" --repo "${{ github.repository }}" --name "research-os-verified-release-$TARGET_SHA" --dir release-evidence
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          m=json.loads(Path('release-evidence/release-manifest.json').read_text(encoding='utf-8'))
+          assert m['target_sha'] == os.environ['TARGET_SHA']
+          assert m['rollback']['baseline_sha'] == os.environ['V1_ROLLBACK_BASELINE']
+          item=m['artifacts'][0]
+          setup=Path('release-evidence') / item['name']
+          assert hashlib.sha256(setup.read_bytes()).hexdigest() == item['sha256']
+          print('Same-target-SHA release manifest verified.')
+          PY
+
+      - name: Candidate compatibility summary
+        if: ${{ inputs.candidate_only == true }}
+        shell: bash
+        run: |
+          {
+            echo "# Research OS V2 Candidate Compatibility"
+            echo "- Target SHA: $TARGET_SHA"
+            echo "- Installer validation: passed"
+            echo "- Upgrade + rollback: passed"
+            echo "- Exact-SHA installer digest: verified"
+            echo "- Publication: none"
+            echo "- GitHub Release/tag: not created"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dispatch release-mode secondary validation workflows
+        if: ${{ inputs.candidate_only != true }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for workflow in research-os-agent-platform.yml research-os-google-workspace.yml research-os-performance-gate.yml research-curator-validate.yml; do
             gh workflow run "$workflow" --repo "${{ github.repository }}" --ref main
           done
-
-          gh workflow run research-os-flutter.yml \
-            --repo "${{ github.repository }}" \
-            --ref main \
-            -f target_sha="$TARGET_SHA"
-
-      - name: Dispatch candidate-bound production health
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh workflow run research-os-production-health.yml \
-            --repo "${{ github.repository }}" \
-            --ref main \
-            -f target_sha="$TARGET_SHA" \
-            -f source_release_run="$SOURCE_RELEASE_RUN"
+          gh workflow run research-os-flutter.yml --repo "${{ github.repository }}" --ref main -f target_sha="$TARGET_SHA"
+          gh workflow run research-os-production-health.yml --repo "${{ github.repository }}" --ref main -f target_sha="$TARGET_SHA" -f source_release_run="${{ steps.release.outputs.run_id }}"

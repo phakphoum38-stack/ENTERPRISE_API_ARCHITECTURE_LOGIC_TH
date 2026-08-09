@@ -1,0 +1,52 @@
+name: Research OS V2 RC Coordinator
+
+on:
+  push:
+    branches:
+      - release/v2.0.0-rc.1
+    paths:
+      - ".github/workflows/research-os-v2-rc-coordinator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch-primary-gates:
+    name: Dispatch exact-SHA RC primary gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record RC candidate
+        run: |
+          echo "RC ref: $GITHUB_REF_NAME"
+          echo "RC SHA: $GITHUB_SHA"
+          echo "RC version alignment: Flutter + Installer + OpenAPI = 2.0.0-rc.1"
+
+      - name: Dispatch five primary workflows on this exact RC ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for workflow in \
+            research-os-agent-platform.yml \
+            research-os-developer-platform.yml \
+            02-build-service-host.yml \
+            research-os-branding.yml \
+            01-build-windows-app.yml
+          do
+            echo "Dispatching $workflow on $GITHUB_REF_NAME at $GITHUB_SHA"
+            gh workflow run "$workflow" \
+              --repo "$GITHUB_REPOSITORY" \
+              --ref "$GITHUB_REF_NAME"
+          done
+
+      - name: Summary
+        run: |
+          {
+            echo "# Research OS 2.0.0-rc.1 coordinator"
+            echo "- RC SHA: \`$GITHUB_SHA\`"
+            echo "- Version alignment: Flutter + Installer + OpenAPI = \`2.0.0-rc.1\`"
+            echo "- Five primary gates dispatched on the same RC ref"
+            echo "- No merge, tag, release, or production deployment is performed"
+          } >> "$GITHUB_STEP_SUMMARY"

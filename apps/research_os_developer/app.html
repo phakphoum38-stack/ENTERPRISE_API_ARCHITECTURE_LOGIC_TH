@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Research OS Developer Platform</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#07111f;color:#eaf2ff}
+    *{box-sizing:border-box}body{margin:0;background:#07111f;min-height:100vh}
+    .app{display:grid;grid-template-columns:250px 1fr;min-height:100vh}.side{border-right:1px solid #1c3650;background:#091727;padding:18px}
+    .brand{font-weight:900;font-size:19px;margin-bottom:4px}.muted{color:#8fa9c0;font-size:12px}.nav{margin-top:28px;display:grid;gap:8px}
+    .nav button{background:transparent;border:1px solid transparent;color:#cfe2f5;text-align:left;padding:11px 12px;border-radius:10px;cursor:pointer}
+    .nav button.active{background:#102942;border-color:#274b6b}.main{min-width:0}.top{height:66px;border-bottom:1px solid #1c3650;display:flex;align-items:center;padding:0 22px;gap:12px}
+    .top .spacer{flex:1}.pill{font-size:12px;padding:6px 10px;border:1px solid #2c5272;border-radius:999px;color:#9fd2ff}
+    .content{padding:22px;display:grid;gap:18px}.hero{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}.hero h1{margin:0 0 6px;font-size:28px}.hero p{margin:0;color:#9db3c7}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{background:#0b1c2f;border:1px solid #203d57;border-radius:16px;padding:17px;min-width:0}.card h2{font-size:16px;margin:0 0 12px}
+    .metric{font-size:28px;font-weight:850}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}.primary{background:#eaf2ff;color:#07111f}.secondary{background:#112a43;color:#d8eaff;border:1px solid #315675}.danger{background:#3b1b22;color:#ffd8de;border:1px solid #6f303d}
+    input,textarea,select{width:100%;background:#081522;color:#eaf2ff;border:1px solid #2b4c68;border-radius:10px;padding:10px 11px}textarea{min-height:86px;resize:vertical}.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.form .full{grid-column:1/-1}.label{font-size:12px;color:#9cb2c7;margin-bottom:5px}
+    .list{display:grid;gap:10px}.item{border:1px solid #24445e;border-radius:12px;padding:12px;background:#091827}.item-head{display:flex;justify-content:space-between;gap:10px}.tag{font-size:11px;padding:4px 8px;border-radius:999px;background:#17334d;color:#b9dcfa}.ok{color:#8de5b3}.warn{color:#ffd28a}.status{min-height:22px;color:#9fb6c9;font-size:13px}.hidden{display:none!important}
+    @media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.grid{grid-template-columns:1fr}.form{grid-template-columns:1fr}.form .full{grid-column:auto}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">Research OS</div><div class="muted">Developer Platform</div>
+    <div class="nav">
+      <button class="active">Overview</button><button>Access Requests</button><button>Active Grants</button><button disabled>Source Control 🔒</button>
+    </div>
+    <div style="margin-top:28px" class="muted">Trial Mode แยกอยู่ที่ <code>/trial</code></div>
+  </aside>
+  <section class="main">
+    <header class="top"><strong>Developer Workspace</strong><span class="pill" id="identity">Checking identity…</span><span class="spacer"></span><a class="pill" href="/trial">Trial Mode</a></header>
+    <main class="content">
+      <section id="signed-out" class="card hidden">
+        <h2>ต้องลงชื่อเข้าใช้</h2><p>Developer แบบเต็มต้องยืนยันตัวตนผ่าน trusted identity gateway ก่อน และการเข้าถึงไฟล์จริงยังต้องได้รับอนุมัติจากเจ้าของไฟล์</p>
+        <div class="row"><a id="login" class="btn primary" href="#">ลงชื่อเข้าใช้ Developer Platform</a><a class="btn secondary" href="/trial">ทดลองโดยไม่ลงทะเบียน</a></div>
+      </section>
+
+      <div id="workspace" class="hidden">
+        <section class="hero"><div><h1>Developer Access Center</h1><p>ขอสิทธิ์เฉพาะ resource ที่ต้องใช้ โดย ownership ของเจ้าของไฟล์ไม่เปลี่ยน</p></div><button class="btn secondary" id="refresh">Refresh</button></section>
+        <section class="grid">
+          <article class="card"><h2>Principal</h2><div id="principal" class="metric" style="font-size:17px;word-break:break-all">—</div></article>
+          <article class="card"><h2>Access Requests</h2><div id="request-count" class="metric">0</div></article>
+          <article class="card"><h2>Active Grants</h2><div id="grant-count" class="metric">0</div></article>
+        </section>
+
+        <section class="card">
+          <h2>Request Access</h2>
+          <div class="form">
+            <div><div class="label">Owner ID</div><input id="owner" placeholder="user:owner" /></div>
+            <div><div class="label">Workspace ID</div><input id="workspace-id" placeholder="workspace-1" /></div>
+            <div><div class="label">Resource ID</div><input id="resource-id" placeholder="file-1" /></div>
+            <div><div class="label">Resource name</div><input id="resource-name" placeholder="design.md" /></div>
+            <div><div class="label">Scopes</div><select id="scope"><option value="read">Read only</option><option value="read,comment">Read + Comment</option><option value="read,comment,write">Read + Comment + Write</option></select></div>
+            <div class="full"><div class="label">Purpose</div><textarea id="purpose" placeholder="อธิบายเหตุผลที่ต้องใช้ไฟล์นี้"></textarea></div>
+            <div class="full"><button class="btn primary" id="submit">ส่งคำขอให้เจ้าของไฟล์อนุมัติ</button></div>
+          </div>
+          <div class="status" id="form-status"></div>
+        </section>
+
+        <section class="grid" style="grid-template-columns:1fr 1fr">
+          <article class="card"><h2>My Requests</h2><div id="requests" class="list"><div class="muted">ยังไม่มีข้อมูล</div></div></article>
+          <article class="card"><h2>Active Grants</h2><div id="grants" class="list"><div class="muted">ยังไม่มีข้อมูล</div></div></article>
+        </section>
+      </div>
+    </main>
+  </section>
+</div>
+<script>
+  const $=id=>document.getElementById(id);
+  const escapeHtml=value=>String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  async function json(path, options={}){
+    const response=await fetch(path,{credentials:'include',...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});
+    let data={}; try{data=await response.json()}catch(_){data={error:{message:`HTTP ${response.status}`}}}
+    if(!response.ok){const e=new Error(data?.error?.message||data?.detail||`HTTP ${response.status}`);e.status=response.status;throw e}return data;
+  }
+  async function authConfig(){try{return await json('/v2/developer/auth/config')}catch(_){return {login_url:'/app'}}}
+  function renderRequests(items){
+    $('request-count').textContent=items.length;
+    $('requests').innerHTML=items.length?items.map(item=>`<div class="item"><div class="item-head"><strong>${escapeHtml(item.resource_name||item.resource_id)}</strong><span class="tag">${escapeHtml(item.status)}</span></div><div class="muted">${escapeHtml(item.workspace_id)} · ${escapeHtml((item.requested_scopes||[]).join(', '))}</div><p>${escapeHtml(item.purpose||'')}</p>${item.status==='pending'?`<button class="btn danger" data-cancel="${escapeHtml(item.request_id)}">ยกเลิกคำขอ</button>`:''}</div>`).join(''):'<div class="muted">ยังไม่มีคำขอ</div>';
+    document.querySelectorAll('[data-cancel]').forEach(button=>button.addEventListener('click',()=>cancelRequest(button.dataset.cancel)));
+  }
+  function renderGrants(items){
+    $('grant-count').textContent=items.length;
+    $('grants').innerHTML=items.length?items.map(item=>`<div class="item"><div class="item-head"><strong>${escapeHtml(item.resource_name||item.resource_id)}</strong><span class="tag ok">ACTIVE</span></div><div class="muted">${escapeHtml(item.workspace_id)} · ${escapeHtml((item.scopes||[]).join(', '))}</div><div class="muted">Owner: ${escapeHtml(item.owner_id)}</div></div>`).join(''):'<div class="muted">ยังไม่มี grant ที่ active</div>';
+  }
+  async function load(){
+    try{
+      const session=await json('/v2/developer/session');
+      $('identity').textContent='Signed in';$('principal').textContent=session.principal;$('signed-out').classList.add('hidden');$('workspace').classList.remove('hidden');
+      const [requests,grants]=await Promise.all([json('/v2/developer/access-requests?view=developer'),json('/v2/developer/grants')]);
+      renderRequests(requests.items||[]);renderGrants(grants.items||[]);
+    }catch(error){
+      if(error.status===401){const config=await authConfig();$('identity').textContent='Signed out';$('login').href=config.login_url||'/app';$('workspace').classList.add('hidden');$('signed-out').classList.remove('hidden');return}
+      $('identity').textContent='Unavailable';$('signed-out').classList.remove('hidden');$('signed-out').querySelector('p').textContent=`เชื่อม Developer API ไม่สำเร็จ: ${error.message}`;
+    }
+  }
+  async function submit(){
+    $('form-status').textContent='กำลังส่งคำขอ…';
+    const payload={owner_id:$('owner').value.trim(),workspace_id:$('workspace-id').value.trim(),resource_id:$('resource-id').value.trim(),resource_name:$('resource-name').value.trim(),scopes:$('scope').value.split(','),purpose:$('purpose').value.trim()};
+    try{await json('/v2/developer/access-requests',{method:'POST',body:JSON.stringify(payload)});$('form-status').textContent='ส่งคำขอแล้ว รอเจ้าของไฟล์อนุมัติ';await load()}catch(error){$('form-status').textContent=`ส่งคำขอไม่สำเร็จ: ${error.message}`}
+  }
+  async function cancelRequest(id){try{await json(`/v2/developer/access-requests/${encodeURIComponent(id)}/cancel`,{method:'POST',body:'{}'});await load()}catch(error){alert(error.message)}}
+  $('refresh').addEventListener('click',load);$('submit').addEventListener('click',submit);load();
+</script>
+</body>
+</html>

@@ -6,11 +6,11 @@ from __future__ import annotations
 import os
 from http.server import ThreadingHTTPServer
 
-from agent_server import AgentResearchOSHandler
+from v2_server import V2ResearchOSHandler
 
 
-class CloudResearchOSHandler(AgentResearchOSHandler):
-    """Primary Research OS handler with Multi-Agent orchestration and CORS."""
+class CloudResearchOSHandler(V2ResearchOSHandler):
+    """Primary Research OS handler with V1 compatibility and V2 namespace."""
 
     def end_headers(self) -> None:
         allowed_origin = os.getenv(

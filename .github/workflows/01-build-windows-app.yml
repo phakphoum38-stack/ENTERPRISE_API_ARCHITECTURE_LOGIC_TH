@@ -36,10 +36,13 @@ jobs:
     name: Build Windows app
     runs-on: windows-latest
     timeout-minutes: 35
+    env:
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Checkout into short Windows path
+      - name: Checkout target revision into short Windows path
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.TARGET_SHA }}
           path: src
 
       - name: Enable Windows long paths
@@ -57,6 +60,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $short | Out-Null
           Copy-Item (Join-Path $source '*') $short -Recurse -Force
           Write-Host "Flutter source staged at $short"
+          Write-Host "Candidate SHA: $env:TARGET_SHA"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -68,6 +72,13 @@ jobs:
         working-directory: D:\w
         shell: pwsh
         run: flutter create --platforms=windows --project-name=research_os_flutter .
+
+      - name: Apply Research OS branding
+        working-directory: D:\w
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python "$env:GITHUB_WORKSPACE\src\scripts\apply-research-os-branding.py" --app-root "D:\w" --platform windows
 
       - name: Install Flutter dependencies
         working-directory: D:\w
@@ -103,7 +114,7 @@ jobs:
       - name: Upload Windows app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: research-os-windows-app-${{ github.sha }}
+          name: research-os-windows-app-${{ env.TARGET_SHA }}
           path: D:/w/build/windows/x64/runner/Release/**
           if-no-files-found: error
           retention-days: 14

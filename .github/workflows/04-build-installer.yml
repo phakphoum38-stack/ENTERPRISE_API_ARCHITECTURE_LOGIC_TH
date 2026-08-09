@@ -7,6 +7,11 @@ on:
         description: Commit SHA to package
         required: false
         type: string
+      dispatch_release:
+        description: Allow successful installer validation to dispatch the downstream release workflow
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -103,6 +108,15 @@ jobs:
           if (-not (Test-Path "$package\app\research_os_flutter.exe")) { throw "Desktop executable missing from package" }
           if (-not (Test-Path "$package\tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) { throw "ServiceHost missing from package" }
 
+      - name: Generate installer branding assets
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/apply-research-os-branding.py --app-root apps/research_os_flutter --platform windows
+          if (-not (Test-Path "apps\research_os_flutter\assets\branding\research_os.ico")) {
+            throw "Research OS installer icon was not generated"
+          }
+
       - name: Install Inno Setup compiler
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -130,4 +144,15 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run 05-installer-validation.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}"
+          DISPATCH_RELEASE: ${{ inputs.dispatch_release }}
+        run: |
+          $releaseFlag = if ($env:DISPATCH_RELEASE -eq 'true') { 'true' } else { 'false' }
+          gh workflow run 05-installer-validation.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}" -f dispatch_release="$releaseFlag"
+
+      - name: Dispatch validation-only candidate evidence gate
+        if: ${{ inputs.dispatch_release != true }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run research-os-windows-desktop.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}" -f candidate_only=true

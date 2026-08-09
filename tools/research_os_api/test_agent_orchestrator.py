@@ -114,7 +114,7 @@ class AgentOrchestratorTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["steps"][0]["error"], "simulated failure")
-        self.assertEqual(result["steps"][1]["error"], "dependency failed")
+        self.assertEqual(result["steps"][1]["error"], "dependency failed or cancelled")
         self.assertEqual(runtime.calls, ["fail first"])
 
     def test_rejects_duplicate_and_missing_dependencies(self) -> None:

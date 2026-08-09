@@ -1,8 +1,9 @@
 openapi: 3.1.0
 info:
   title: Research OS API
-  version: 1.0.0
-  description: Provider-agnostic API for conversation analysis, knowledge access, AI generation, and Multi-Agent orchestration.
+  version: 2.0.0-rc.1
+  description: Provider-agnostic Research OS API. V1 remains supported while the V2 draft contract is validated on the same runtime owners.
+  x-research-os-v2-status: draft
 servers:
   - url: http://127.0.0.1:8787
 paths:
@@ -93,13 +94,361 @@ paths:
       responses:
         "200":
           description: Graph nodes and edges
+  /v1/agents:
+    get:
+      summary: List registered agents
+      responses:
+        "200":
+          description: Agent catalog
+  /v1/agents/readiness:
+    get:
+      summary: Return agent readiness status
+      responses:
+        "200":
+          description: Agent readiness
+  /v1/agents/discover:
+    get:
+      summary: Discover agents by capability or permission
+      parameters:
+        - name: capability
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching agents
   /v1/agents/orchestrations:
     get:
-      summary: List Multi-Agent orchestration runs
+      summary: List and filter Multi-Agent orchestration runs
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/SearchFilter'
+        - $ref: '#/components/parameters/AgentFilter'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
       responses:
         "200":
           description: Orchestration run list
+        "400":
+          description: Invalid filter request
     post:
+      $ref: '#/components/pathItems/CreateOrchestration'
+  /v1/agents/orchestrations/{run_id}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get one Multi-Agent orchestration run
+      responses:
+        "200":
+          description: Orchestration run
+        "404":
+          description: Orchestration run not found
+  /v1/agents/orchestrations/{run_id}/timeline:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get the durable audit timeline for an orchestration run
+      responses:
+        "200":
+          description: Ordered orchestration audit events
+        "404":
+          description: Orchestration run not found
+  /v1/agents/orchestrations/{run_id}/execute:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/ExecuteOrchestration'
+  /v1/agents/orchestrations/{run_id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/ConfirmOrchestration'
+  /v1/agents/orchestrations/{run_id}/retry:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/RetryOrchestration'
+  /v1/agents/orchestrations/{run_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/CancelOrchestration'
+
+  /v2/health/readiness:
+    get:
+      summary: Consolidated V2 readiness for runtime, agents, active provider, and local storage
+      responses:
+        "200":
+          description: All required V2 components are ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2Readiness'
+        "503":
+          description: One or more required V2 components are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/agents:
+    get:
+      summary: V2 agent catalog backed by the same dynamic registry as V1
+      responses:
+        "200":
+          description: Versioned agent catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2AgentCatalog'
+  /v2/agents/readiness:
+    get:
+      summary: V2 alias for agent readiness
+      responses:
+        "200":
+          description: Versioned agent readiness payload
+  /v2/agents/discover:
+    get:
+      summary: V2 alias for capability discovery
+      parameters:
+        - name: capability
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Versioned capability discovery payload
+  /v2/orchestrations:
+    get:
+      summary: Cursor-paginated V2 orchestration history
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/SearchFilter'
+        - $ref: '#/components/parameters/AgentFilter'
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor returned by the previous page.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Versioned orchestration page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2OrchestrationPage'
+        "400":
+          description: Invalid filter, page size, or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+    post:
+      summary: Create an orchestration through the V2 transport contract
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective, steps]
+              properties:
+                objective:
+                  type: string
+                  minLength: 1
+                steps:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/DelegatedStepInput'
+      responses:
+        "201":
+          description: Versioned orchestration created response
+        "400":
+          description: Invalid orchestration request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/orchestrations/{run_id}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get one V2 orchestration run
+      responses:
+        "200":
+          description: Versioned orchestration response
+        "404":
+          description: Orchestration not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/orchestrations/{run_id}/timeline:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get the durable V2 orchestration audit timeline
+      responses:
+        "200":
+          description: Versioned audit timeline
+        "404":
+          description: Orchestration not found
+  /v2/orchestrations/{run_id}/execute:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/ExecuteOrchestration'
+  /v2/orchestrations/{run_id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/ConfirmOrchestration'
+  /v2/orchestrations/{run_id}/retry:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/RetryOrchestration'
+  /v2/orchestrations/{run_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/CancelOrchestration'
+  /v2/workspaces:
+    get:
+      summary: List local-first V2 workspaces from the shared Workspace Knowledge Engine
+      responses:
+        "200":
+          description: Versioned workspace catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2WorkspaceList'
+        "503":
+          description: Workspace index is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/workspaces/{workspace_id}/knowledge:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      summary: Search cursor-paginated workspace knowledge with provenance and evidence
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive full-text query over title, content, tags, and evidence.
+          schema:
+            type: string
+        - name: kinds
+          in: query
+          required: false
+          description: Comma-separated knowledge record kinds to include.
+          schema:
+            type: string
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor returned by the previous knowledge page.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Versioned knowledge search page with provenance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2KnowledgePage'
+        "400":
+          description: Invalid workspace search query, page size, or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+        "404":
+          description: Workspace not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+        "503":
+          description: Workspace index is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+
+components:
+  parameters:
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema:
+        type: string
+    WorkspaceId:
+      name: workspace_id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    StatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+    SearchFilter:
+      name: q
+      in: query
+      required: false
+      description: Case-insensitive search over run ID, objective, step ID, and step objective.
+      schema:
+        type: string
+    AgentFilter:
+      name: agent
+      in: query
+      required: false
+      schema:
+        type: string
+  pathItems:
+    CreateOrchestration:
       summary: Create a Multi-Agent orchestration run
       requestBody:
         required: true
@@ -122,20 +471,7 @@ paths:
           description: Orchestration created
         "400":
           description: Invalid orchestration request
-  /v1/agents/orchestrations/{run_id}:
-    parameters:
-      - $ref: '#/components/parameters/RunId'
-    get:
-      summary: Get one Multi-Agent orchestration run
-      responses:
-        "200":
-          description: Orchestration run
-        "404":
-          description: Orchestration run not found
-  /v1/agents/orchestrations/{run_id}/execute:
-    parameters:
-      - $ref: '#/components/parameters/RunId'
-    post:
+    ExecuteOrchestration:
       summary: Execute all currently runnable orchestration steps
       requestBody:
         required: false
@@ -150,26 +486,47 @@ paths:
       responses:
         "200":
           description: Updated orchestration run
+        "400":
+          description: Run cannot be executed in its current state
         "404":
           description: Orchestration run not found
-  /v1/agents/orchestrations/{run_id}/confirm:
-    parameters:
-      - $ref: '#/components/parameters/RunId'
-    post:
+    ConfirmOrchestration:
       summary: Confirm write-capable tasks waiting at the governance gate
       responses:
         "200":
           description: Confirmed and updated orchestration run
+        "400":
+          description: Run cannot be confirmed in its current state
         "404":
           description: Orchestration run not found
-components:
-  parameters:
-    RunId:
-      name: run_id
-      in: path
-      required: true
-      schema:
-        type: string
+    RetryOrchestration:
+      summary: Retry failed orchestration steps within their bounded attempt policy
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                step_id:
+                  type: string
+                  description: Retry one failed step. Omit to retry all currently retryable failed steps.
+      responses:
+        "200":
+          description: Retried and updated orchestration run
+        "400":
+          description: No retryable steps or retry limit exhausted
+        "404":
+          description: Orchestration run not found
+    CancelOrchestration:
+      summary: Cancel a non-terminal orchestration run and persist the cancellation
+      responses:
+        "200":
+          description: Cancelled orchestration run
+        "400":
+          description: Terminal orchestration run cannot be cancelled
+        "404":
+          description: Orchestration run not found
   schemas:
     DelegatedStepInput:
       type: object
@@ -181,8 +538,7 @@ components:
           type: string
           minLength: 1
         requested_agent:
-          type: string
-          nullable: true
+          type: [string, 'null']
         depends_on:
           type: array
           items:
@@ -190,3 +546,209 @@ components:
         context:
           type: object
           additionalProperties: true
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+          description: Maximum explicit execution attempts for this delegated step.
+    V2OrchestrationRun:
+      type: object
+      required: [run_id, objective, status, steps]
+      properties:
+        run_id:
+          type: string
+        objective:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: number
+        updated_at:
+          type: number
+        steps:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    V2PageMetadata:
+      type: object
+      required: [page_size, returned]
+      properties:
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        returned:
+          type: integer
+          minimum: 0
+        next_cursor:
+          type: [string, 'null']
+    V2OrchestrationPage:
+      type: object
+      required: [api_version, items, page, filters]
+      properties:
+        api_version:
+          const: v2
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2OrchestrationRun'
+        page:
+          $ref: '#/components/schemas/V2PageMetadata'
+        filters:
+          type: object
+          additionalProperties: true
+    V2AgentCatalog:
+      type: object
+      required: [api_version, agents, count]
+      properties:
+        api_version:
+          const: v2
+        count:
+          type: integer
+          minimum: 0
+        agents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    V2Workspace:
+      type: object
+      required: [workspace_id, name, created_at, updated_at]
+      properties:
+        workspace_id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        created_at:
+          type: number
+        updated_at:
+          type: number
+    V2WorkspaceList:
+      type: object
+      required: [api_version, workspaces, count]
+      properties:
+        api_version:
+          const: v2
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2Workspace'
+        count:
+          type: integer
+          minimum: 0
+    V2Provenance:
+      type: object
+      required: [source_type, source_id, evidence, imported_at]
+      properties:
+        source_type:
+          type: string
+        source_id:
+          type: string
+        source_path:
+          type: [string, 'null']
+        evidence:
+          type: array
+          items:
+            type: string
+        imported_at:
+          type: number
+    V2KnowledgeRecord:
+      type: object
+      required: [record_id, workspace_id, kind, title, content, content_hash, provenance, tags, updated_at, score]
+      properties:
+        record_id:
+          type: string
+        workspace_id:
+          type: string
+        kind:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        content_hash:
+          type: string
+        provenance:
+          $ref: '#/components/schemas/V2Provenance'
+        tags:
+          type: array
+          items:
+            type: string
+        updated_at:
+          type: number
+        score:
+          type: integer
+          minimum: 0
+    V2KnowledgePage:
+      type: object
+      required: [api_version, workspace_id, items, page, filters]
+      properties:
+        api_version:
+          const: v2
+        workspace_id:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2KnowledgeRecord'
+        page:
+          $ref: '#/components/schemas/V2PageMetadata'
+        filters:
+          type: object
+          required: [q, kinds]
+          properties:
+            q:
+              type: string
+            kinds:
+              type: array
+              items:
+                type: string
+    V2Readiness:
+      type: object
+      required: [api_version, version, ready, runtime, agents, provider, storage, checked_at]
+      properties:
+        api_version:
+          const: v2
+        version:
+          type: string
+        ready:
+          type: boolean
+        runtime:
+          type: object
+          additionalProperties: true
+        agents:
+          type: object
+          additionalProperties: true
+        provider:
+          type: object
+          additionalProperties: true
+        storage:
+          type: object
+          additionalProperties: true
+        checked_at:
+          type: number
+    V2ErrorEnvelope:
+      type: object
+      required: [api_version, error]
+      properties:
+        api_version:
+          const: v2
+        error:
+          type: object
+          required: [code, message, status]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            status:
+              type: integer

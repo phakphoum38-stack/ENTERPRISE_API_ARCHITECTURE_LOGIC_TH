@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Research OS Developer Trial</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg:#07101b; --panel:#0b1725; --panel2:#0e1d2e; --line:#20364b;
+      --text:#eaf2fb; --muted:#91a7ba; --accent:#78c8ff; --ok:#7ce2a9; --warn:#ffc86a;
+    }
+    * { box-sizing:border-box; }
+    html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); }
+    body { min-height:100vh; overflow:hidden; }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    .app { display:grid; grid-template-columns:220px minmax(0,1fr); min-height:100vh; }
+    .sidebar { background:#08131f; border-right:1px solid var(--line); padding:18px 14px; display:flex; flex-direction:column; gap:20px; }
+    .brand { display:flex; align-items:center; gap:11px; padding:4px 6px 14px; }
+    .logo { width:36px; height:36px; border-radius:12px; display:grid; place-items:center; background:linear-gradient(145deg,#173856,#0d2034); border:1px solid #285271; font-weight:900; color:#bde5ff; }
+    .brand strong { display:block; font-size:14px; }
+    .brand small { color:var(--muted); font-size:11px; }
+    .nav { display:grid; gap:5px; }
+    .nav button { width:100%; border:0; background:transparent; color:#adc0d1; text-align:left; padding:10px 11px; border-radius:9px; }
+    .nav button.active,.nav button:hover { background:#10243a; color:#fff; }
+    .trial-card { margin-top:auto; border:1px solid #27425a; background:#0d1d2c; border-radius:14px; padding:13px; }
+    .trial-card .pill { display:inline-flex; border:1px solid #30617d; color:#a9dcff; border-radius:999px; padding:4px 8px; font-size:11px; }
+    .trial-card p { color:var(--muted); font-size:12px; line-height:1.5; margin:9px 0 0; }
+
+    .main { min-width:0; display:grid; grid-template-rows:58px minmax(0,1fr) 26px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--line); background:#091522; padding:0 18px; }
+    .crumbs { min-width:0; display:flex; align-items:center; gap:8px; color:#bdd0df; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .crumbs span { color:#627b8f; }
+    .top-actions { display:flex; align-items:center; gap:8px; }
+    .btn { border:1px solid #2a4962; background:#10243a; color:#d8ebf8; padding:8px 11px; border-radius:9px; font-size:12px; }
+    .btn.primary { background:#dff3ff; border-color:#dff3ff; color:#07111c; font-weight:800; }
+    .btn.locked { opacity:.55; cursor:not-allowed; }
+
+    .workspace { min-height:0; display:grid; grid-template-columns:260px minmax(0,1fr) 280px; }
+    .files,.inspector { min-height:0; background:var(--panel); }
+    .files { border-right:1px solid var(--line); display:grid; grid-template-rows:auto auto minmax(0,1fr); }
+    .inspector { border-left:1px solid var(--line); overflow:auto; }
+    .panel-head { padding:15px 14px 10px; font-size:12px; color:#c5d7e6; letter-spacing:.04em; text-transform:uppercase; }
+    .search { padding:0 12px 10px; }
+    .search input { width:100%; background:#08121d; color:#ddecf7; border:1px solid #253d51; border-radius:9px; padding:9px 10px; outline:none; }
+    .search input:focus { border-color:#4e92bd; }
+    .tree { padding:4px 8px 12px; overflow:auto; }
+    .tree .folder { color:#88a8bf; font-size:12px; padding:8px 8px 5px; }
+    .file { width:100%; border:0; background:transparent; color:#bbccda; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 9px; border-radius:8px; text-align:left; }
+    .file:hover,.file.active { background:#10243a; color:#fff; }
+    .file small { color:#68849a; }
+
+    .editor { min-width:0; min-height:0; background:#07111c; display:grid; grid-template-rows:40px minmax(0,1fr); }
+    .tabs { border-bottom:1px solid var(--line); display:flex; align-items:end; gap:3px; padding-left:8px; overflow:auto; }
+    .tab { height:40px; display:flex; align-items:center; gap:8px; padding:0 12px; border-right:1px solid #183047; color:#afc1cf; font-size:12px; }
+    .tab.active { background:#0a1724; color:#fff; border-top:2px solid var(--accent); }
+    .code-wrap { min-height:0; overflow:auto; padding:18px 0 60px; }
+    pre { margin:0; counter-reset:line; }
+    code.source { display:block; font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace; font-size:13px; line-height:1.7; color:#cce4f4; white-space:pre; }
+    .line { display:block; min-height:22px; padding:0 22px 0 56px; position:relative; }
+    .line::before { counter-increment:line; content:counter(line); position:absolute; left:0; width:42px; text-align:right; color:#415b70; padding-right:10px; user-select:none; }
+    .empty { padding:40px; color:#7891a5; text-align:center; }
+
+    .section { padding:15px; border-bottom:1px solid #1a3043; }
+    .section h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:#9cb4c6; }
+    .kv { display:grid; gap:8px; }
+    .kv div { display:flex; justify-content:space-between; gap:12px; font-size:12px; }
+    .kv span:first-child { color:#71899d; }
+    .scope { display:flex; flex-wrap:wrap; gap:6px; }
+    .chip { border:1px solid #29485f; background:#0b1b29; color:#b8d4e7; padding:5px 8px; border-radius:999px; font-size:11px; }
+    .chip.ok { border-color:#286143; color:#99efbd; }
+    .chip.no { border-color:#70413e; color:#ffb2aa; }
+    .notice { background:#121f2d; border:1px solid #2d465a; border-radius:10px; padding:11px; font-size:12px; line-height:1.5; color:#aabecd; }
+    .notice strong { color:#fff; }
+
+    .statusbar { display:flex; align-items:center; justify-content:space-between; padding:0 10px; border-top:1px solid #1e3447; background:#0a1723; color:#7f9aae; font-size:11px; }
+    .status-left,.status-right { display:flex; gap:12px; }
+    .dot { color:var(--ok); }
+
+    @media (max-width:1050px){ .workspace{grid-template-columns:230px minmax(0,1fr)} .inspector{display:none} }
+    @media (max-width:720px){
+      body{overflow:auto}.app{grid-template-columns:1fr}.sidebar{display:none}.main{min-height:100vh}.workspace{grid-template-columns:1fr;grid-template-rows:230px minmax(520px,1fr)}.files{border-right:0;border-bottom:1px solid var(--line)}
+      .top-actions .hide-mobile{display:none}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">R</div><div><strong>Research OS</strong><small>Developer Platform</small></div></div>
+    <nav class="nav">
+      <button class="active">▣ Trial Workspace</button>
+      <button>⌕ Search</button>
+      <button>◫ API Explorer</button>
+      <button class="locked" title="ต้องลงชื่อเข้าใช้">⌘ Source Control 🔒</button>
+      <button class="locked" title="ต้องลงชื่อเข้าใช้">⚙ Developer Settings 🔒</button>
+    </nav>
+    <div class="trial-card">
+      <span class="pill">TRIAL · ไม่ต้องลงทะเบียน</span>
+      <p>Synthetic demo only · Read-only<br>ไม่เข้าถึงไฟล์จริงหรือ private workspace</p>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="crumbs">Developer Trial <span>/</span> trial-workspace <span>/</span> <b id="crumbFile">เลือกไฟล์</b></div>
+      <div class="top-actions">
+        <button class="btn hide-mobile" id="refresh">↻ Reload</button>
+        <button class="btn locked" id="commit" title="Trial ไม่อนุญาตให้ commit">Commit 🔒</button>
+        <button class="btn primary">Sign in for full access</button>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <aside class="files">
+        <div class="panel-head">Explorer · Trial</div>
+        <div class="search"><input id="query" placeholder="ค้นหา demo files…" autocomplete="off" /></div>
+        <div class="tree">
+          <div class="folder">⌄ trial-workspace</div>
+          <div id="resources"><div class="empty">กำลังโหลด…</div></div>
+        </div>
+      </aside>
+
+      <section class="editor">
+        <div class="tabs"><div class="tab active" id="tabTitle">Welcome</div></div>
+        <div class="code-wrap" id="editor"><div class="empty">เลือกไฟล์ตัวอย่างจาก Explorer เพื่อดูเนื้อหา</div></div>
+      </section>
+
+      <aside class="inspector">
+        <div class="section">
+          <h3>Trial Session</h3>
+          <div class="kv">
+            <div><span>Registration</span><span>Not required</span></div>
+            <div><span>Account</span><span>Ephemeral</span></div>
+            <div><span>Data source</span><span>Synthetic</span></div>
+            <div><span>Access</span><span>Read-only</span></div>
+          </div>
+        </div>
+        <div class="section">
+          <h3>Allowed</h3>
+          <div class="scope"><span class="chip ok">Browse</span><span class="chip ok">Search</span><span class="chip ok">Read</span><span class="chip ok">API preview</span></div>
+        </div>
+        <div class="section">
+          <h3>Restricted</h3>
+          <div class="scope"><span class="chip no">Write</span><span class="chip no">Delete</span><span class="chip no">Commit</span><span class="chip no">Private files</span><span class="chip no">Grant management</span></div>
+        </div>
+        <div class="section">
+          <div class="notice"><strong>Developer แบบเต็ม</strong><br>ต้องลงชื่อเข้าใช้และได้รับอนุมัติจากเจ้าของไฟล์ก่อน เจ้าของไฟล์ยังคงเป็นเจ้าของและใช้งานไฟล์เดิมได้ตามปกติ</div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="statusbar">
+      <div class="status-left"><span><span class="dot">●</span> Trial API</span><span id="status">Connecting…</span></div>
+      <div class="status-right"><span>Read-only</span><span>No registration</span></div>
+    </footer>
+  </main>
+</div>
+<script>
+  const API = window.RESEARCH_OS_DEVELOPER_API || '';
+  const resourceBox = document.getElementById('resources');
+  const editor = document.getElementById('editor');
+  const status = document.getElementById('status');
+  const query = document.getElementById('query');
+  const tabTitle = document.getElementById('tabTitle');
+  const crumbFile = document.getElementById('crumbFile');
+  let activeId = null;
+
+  function escapeHtml(value='') {
+    return value.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  }
+
+  function renderCode(content='') {
+    const lines = content.replace(/\r/g,'').split('\n');
+    editor.innerHTML = `<pre><code class="source">${lines.map(line => `<span class="line">${escapeHtml(line) || ' '}</span>`).join('')}</code></pre>`;
+  }
+
+  async function openResource(id, name) {
+    activeId = id;
+    document.querySelectorAll('.file').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+    status.textContent = 'Loading resource…';
+    try {
+      const response = await fetch(`${API}/v2/developer/trial/resources/${encodeURIComponent(id)}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      tabTitle.textContent = name;
+      crumbFile.textContent = name;
+      renderCode(data.resource.content || '');
+      status.textContent = `${data.resource.language || data.resource.kind} · synthetic demo · read-only`;
+    } catch (error) {
+      editor.innerHTML = `<div class="empty">เปิดไฟล์ไม่ได้: ${escapeHtml(error.message)}</div>`;
+      status.textContent = 'Trial API error';
+    }
+  }
+
+  async function loadResources(search='') {
+    status.textContent = 'Loading Trial Mode…';
+    const suffix = search ? `?q=${encodeURIComponent(search)}` : '';
+    try {
+      const response = await fetch(`${API}/v2/developer/trial/resources${suffix}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      resourceBox.innerHTML = data.items.length ? data.items.map(item => `
+        <button class="file${item.resource_id === activeId ? ' active' : ''}" data-id="${escapeHtml(item.resource_id)}" data-name="${escapeHtml(item.name)}">
+          <span>▧ ${escapeHtml(item.name)}</span><small>${escapeHtml(item.kind)}</small>
+        </button>`).join('') : '<div class="empty">ไม่พบไฟล์ตัวอย่าง</div>';
+      resourceBox.querySelectorAll('.file').forEach(el => el.addEventListener('click', () => openResource(el.dataset.id, el.dataset.name)));
+      status.textContent = `${data.count} demo resources · synthetic only`;
+      if (!activeId && data.items[0]) openResource(data.items[0].resource_id, data.items[0].name);
+    } catch (error) {
+      resourceBox.innerHTML = `<div class="empty">เชื่อม Trial API ไม่ได้: ${escapeHtml(error.message)}</div>`;
+      status.textContent = 'Disconnected';
+    }
+  }
+
+  let timer;
+  query.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => loadResources(query.value.trim()), 180); });
+  document.getElementById('refresh').addEventListener('click', () => loadResources(query.value.trim()));
+  document.getElementById('commit').addEventListener('click', async () => {
+    status.textContent = 'Commit ถูกจำกัดใน Trial Mode';
+    try { await fetch(`${API}/v2/developer/trial/commit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); } catch (_) {}
+  });
+  loadResources();
+</script>
+</body>
+</html>

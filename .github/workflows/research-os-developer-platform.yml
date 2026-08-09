@@ -1,0 +1,111 @@
+name: Research OS Developer Platform
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/research_os_developer/**"
+      - "tools/research_os_api/developer_*.py"
+      - "tools/research_os_api/test_developer_*.py"
+      - ".github/workflows/research-os-developer-platform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/research_os_developer/**"
+      - "tools/research_os_api/developer_*.py"
+      - "tools/research_os_api/test_developer_*.py"
+      - ".github/workflows/research-os-developer-platform.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-developer-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-developer-platform:
+    name: Owner-approved developer access + registration-free trial
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Developer Platform
+        run: |
+          python -m py_compile tools/research_os_api/developer_access.py
+          python -m py_compile tools/research_os_api/developer_identity.py
+          python -m py_compile tools/research_os_api/developer_server.py
+
+      - name: Test production signed identity assertions
+        working-directory: tools/research_os_api
+        run: python -m unittest test_developer_identity.py -v
+
+      - name: Test owner-approved access engine API and Trial Mode
+        working-directory: tools/research_os_api
+        env:
+          # Compatibility is enabled only for the existing integration-test helper.
+          # Production default remains signed assertions with legacy headers disabled.
+          RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS: "true"
+        run: >-
+          python -m unittest
+          test_developer_access.py
+          test_developer_server.py
+          test_developer_trial_page.py
+          -v
+
+      - name: Verify production default disables legacy identity headers
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          import os
+          from developer_server import _truthy
+          os.environ.pop('RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS', None)
+          assert _truthy('RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS') is False
+          print('Legacy identity headers are disabled by default.')
+          PY
+
+      - name: Verify registration-free Trial UI is packaged
+        run: |
+          test -f apps/research_os_developer/index.html
+          grep -q "Developer Trial" apps/research_os_developer/index.html
+          grep -q "ไม่ต้องลงทะเบียน" apps/research_os_developer/index.html
+          grep -q "/v2/developer/trial/resources" apps/research_os_developer/index.html
+          if grep -q "http://127.0.0.1:8790" apps/research_os_developer/index.html; then
+            echo "Trial UI must use the same-origin Developer API"
+            exit 1
+          fi
+          echo "Registration-free Trial UI uses same-origin synthetic-demo APIs."
+
+      - name: Verify regular Research OS boundary remains independent
+        run: |
+          test -f apps/research_os_flutter/pubspec.yaml
+          test -f tools/research_os_api/render_server.py
+          grep -q "Research OS Developer Platform" apps/research_os_developer/README.md
+          if grep -R "developer_server" apps/research_os_flutter/lib >/dev/null 2>&1; then
+            echo "Regular Research OS must not directly embed the Developer Platform server"
+            exit 1
+          fi
+          echo "Regular Research OS and Developer Platform remain separate application boundaries."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "# Research OS Developer Platform"
+            echo "- Separate application/API boundary validated"
+            echo "- Signed HMAC identity assertions: signature, TTL and replay protection tested"
+            echo "- Legacy identity headers disabled by production default"
+            echo "- Registration-free /trial UI validated"
+            echo "- Trial data is synthetic-demo-only and read-only"
+            echo "- Trial write/delete/commit/approval paths remain restricted"
+            echo "- Owner approval required before developer access"
+            echo "- Owner access remains unchanged"
+            echo "- Scoped grant, expiry and revocation behavior tested"
+            echo "- Regular Research OS sign-in boundary remains independent"
+          } >> "$GITHUB_STEP_SUMMARY"

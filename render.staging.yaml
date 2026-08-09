@@ -1,0 +1,47 @@
+# Research OS V2 staging blueprint.
+# This file is intentionally separate from render.yaml so the existing production
+# service is not mutated or auto-deployed while V2 remains a Draft candidate.
+services:
+  - type: web
+    name: research-os-api-v2-staging
+    runtime: python
+    plan: free
+    autoDeploy: false
+    buildCommand: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+    startCommand: cd tools/research_os_api && python render_server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: RESEARCH_OS_PROVIDER
+        value: mock
+      - key: RESEARCH_OS_API_HOST
+        value: 0.0.0.0
+      - key: RESEARCH_OS_ALLOWED_ORIGIN
+        sync: false
+      - key: RESEARCH_OS_DATA_DIR
+        value: /tmp/ResearchOSData
+
+  - type: web
+    name: research-os-developer-v2-staging
+    runtime: python
+    plan: free
+    autoDeploy: false
+    buildCommand: python -m unittest tools.research_os_api.test_developer_identity tools.research_os_api.test_developer_access -v
+    startCommand: cd tools/research_os_api && python developer_server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: RESEARCH_OS_DEVELOPER_HOST
+        value: 0.0.0.0
+      - key: RESEARCH_OS_IDENTITY_ASSERTION_MAX_AGE
+        value: "120"
+      - key: RESEARCH_OS_IDENTITY_PROXY_SECRET
+        sync: false
+      - key: RESEARCH_OS_DEVELOPER_LOGIN_URL
+        sync: false
+      - key: RESEARCH_OS_DATA_DIR
+        value: /tmp/ResearchOSData
+      # RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS is intentionally absent.
+      # Signed HMAC identity assertions are therefore required by default.

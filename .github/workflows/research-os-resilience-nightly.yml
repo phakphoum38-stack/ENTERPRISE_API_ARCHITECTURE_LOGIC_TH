@@ -17,6 +17,9 @@ jobs:
     name: Retry, timeout and API resilience
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    env:
+      RESEARCH_OS_PROVIDER: mock
+      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -87,6 +90,77 @@ jobs:
           print('Non-retryable 400 fails immediately.')
           PY
 
+      - name: Inject local storage failure
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from unittest.mock import patch
+          from v2_observability import storage_readiness
+
+          with patch.object(Path, 'mkdir', side_effect=PermissionError('injected storage denial')):
+              state = storage_readiness('/tmp/research-os-injected-denial')
+          assert state['ready'] is False, state
+          assert state['writable'] is False, state
+          assert state['error'] == 'PermissionError', state
+          print('Storage failure injection reported unavailable without crashing.')
+          PY
+
+      - name: Inject runtime interruption and verify durable resume
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+          from agent_orchestrator import AgentOrchestrator
+          from agent_runtime import AgentEventBus, AgentTaskQueue, SharedContextStore
+
+          with tempfile.TemporaryDirectory() as tmp:
+              root=Path(tmp)
+              state=root/'agents'/'orchestrations.json'
+              runtime=AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp))
+              orchestrator=AgentOrchestrator(runtime=runtime, storage_path=state)
+              run=orchestrator.create_run('runtime interruption injection', [{
+                  'step_id':'research',
+                  'objective':'research runtime interruption evidence',
+                  'requested_agent':'research',
+              }])
+              run_id=run['run_id']
+
+              payload=json.loads(state.read_text(encoding='utf-8'))
+              payload['runs'][0]['status']='running'
+              payload['runs'][0]['steps'][0]['status']='running'
+              payload['runs'][0]['steps'][0]['task_id']='injected-stale-task'
+              state.write_text(json.dumps(payload), encoding='utf-8')
+
+              recovered=AgentOrchestrator(
+                  runtime=AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp)),
+                  storage_path=state,
+              )
+              interrupted=recovered.get(run_id)
+              assert interrupted['status']=='interrupted', interrupted
+              assert interrupted['steps'][0]['status']=='planned', interrupted
+              completed=recovered.execute(run_id)
+              assert completed['run_id']==run_id, completed
+              assert completed['status']=='completed', completed
+              print('Injected runtime interruption recovered and resumed:', run_id)
+          PY
+
+      - name: Verify diagnostics redaction under injected secrets
+        working-directory: tools/research_os_api
+        env:
+          RESEARCH_OS_TEST_TOKEN: never-print-this-value
+        run: |
+          python - <<'PY'
+          import json
+          from v2_observability import diagnostics_bundle
+          text=json.dumps(diagnostics_bundle(), sort_keys=True)
+          assert 'never-print-this-value' not in text
+          assert '[REDACTED]' in text
+          print('Diagnostics secret redaction passed.')
+          PY
+
       - name: Verify retry policy bounds
         working-directory: tools/research_os_api
         run: |
@@ -102,10 +176,12 @@ jobs:
         if: always()
         run: |
           {
-            echo "# Research OS Resilience Nightly"
+            echo "# Research OS Resilience Nightly V2"
             echo "- API regression suite: executed"
-            echo "- Gemini transient 503 recovery: tested"
-            echo "- Non-retryable 400 behavior: tested"
+            echo "- Provider 503 recovery and non-retryable behavior: tested"
+            echo "- Local storage failure injection: tested"
+            echo "- Runtime interruption and durable resume: tested"
+            echo "- Diagnostics secret redaction: tested"
             echo "- Retry/backoff bounds: verified"
             echo "- Result: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"

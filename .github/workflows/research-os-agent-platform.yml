@@ -6,12 +6,20 @@ on:
     branches: [main]
     paths:
       - "tools/research_os_api/agent_*.py"
+      - "tools/research_os_api/v2_*.py"
       - "tools/research_os_api/test_agent_*.py"
+      - "tools/research_os_api/test_v2_*.py"
+      - "tools/research_os_api/openapi.yaml"
+      - "tools/research_curator/**"
       - ".github/workflows/research-os-agent-platform.yml"
   pull_request:
     paths:
       - "tools/research_os_api/agent_*.py"
+      - "tools/research_os_api/v2_*.py"
       - "tools/research_os_api/test_agent_*.py"
+      - "tools/research_os_api/test_v2_*.py"
+      - "tools/research_os_api/openapi.yaml"
+      - "tools/research_curator/**"
       - ".github/workflows/research-os-agent-platform.yml"
 
 permissions:
@@ -40,24 +48,87 @@ jobs:
           python -m py_compile tools/research_os_api/agent_runtime.py
           python -m py_compile tools/research_os_api/agent_orchestrator.py
           python -m py_compile tools/research_os_api/agent_server.py
+          python -m py_compile tools/research_os_api/v2_server.py
+          python -m py_compile tools/research_os_api/v2_completion_crew.py
+          python -m py_compile tools/research_os_api/v2_observability.py
+          python -m py_compile tools/research_os_api/v2_quality_gate.py
 
       - name: Test Agent Registry Router Runtime Orchestration and HTTP API
         working-directory: tools/research_os_api
-        run: python -m unittest test_agent_platform.py test_agent_runtime.py test_agent_orchestrator.py test_agent_server.py -v
+        run: >-
+          python -m unittest
+          test_agent_platform.py
+          test_agent_runtime.py
+          test_agent_orchestrator.py
+          test_agent_orchestrator_persistence.py
+          test_agent_server.py
+          test_v2_completion_crew.py
+          test_v2_server.py
+          test_v2_openapi.py
+          test_v2_observability.py
+          test_v2_version_alignment.py
+          -v
 
       - name: Validate initial agent registry
         working-directory: tools/research_os_api
         run: |
           python - <<'PY'
-          from agent_platform import AGENTS
-          expected = {"research", "document", "github", "google_workspace", "shift"}
+          from agent_platform import AGENTS, AgentRegistry
+          expected = {"research", "developer", "document", "github", "google_workspace", "shift"}
           actual = {agent.agent_id for agent in AGENTS}
           if actual != expected:
               raise SystemExit(f"Agent registry mismatch: {actual}")
           for agent in AGENTS:
               if not agent.capabilities or not agent.permissions or not agent.memory_scope:
                   raise SystemExit(f"Incomplete agent contract: {agent.agent_id}")
-          print("Agent registry OK:", ", ".join(sorted(actual)))
+          readiness = AgentRegistry().readiness()
+          if readiness["ready_count"] != len(expected):
+              raise SystemExit(f"Initial readiness mismatch: {readiness}")
+          print("Core agent registry OK:", ", ".join(sorted(actual)))
+          PY
+
+      - name: Validate isolated V2 Completion Crew
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from agent_platform import AGENTS, REGISTRY
+          from v2_completion_crew import COMPLETION_CREW
+          core = {agent.agent_id for agent in AGENTS}
+          crew = {agent.agent_id for agent in COMPLETION_CREW}
+          if core & crew:
+              raise SystemExit(f"Completion crew overlaps core agents: {core & crew}")
+          registered = {item["agent_id"] for item in REGISTRY.list()}
+          if not core | crew <= registered:
+              raise SystemExit(f"Registry missing agents: {(core | crew) - registered}")
+          if any(agent.fallback_agents for agent in COMPLETION_CREW):
+              raise SystemExit("Completion crew must not fallback to active core agents")
+          print("V2 Completion Crew isolated:", ", ".join(sorted(crew)))
+          PY
+
+      - name: Validate dynamic capability discovery and readiness routing
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from agent_platform import AgentDefinition, AgentRegistry, AgentRouter
+          registry = AgentRegistry()
+          registry.register(AgentDefinition(
+              "temporary_helper",
+              "Temporary Helper",
+              "CI dynamic helper",
+              ("temporary_capability",),
+              ("memory.read",),
+              "shared:temporary-helper",
+          ))
+          matches = registry.discover(capability="temporary_capability")
+          if [item["agent_id"] for item in matches] != ["temporary_helper"]:
+              raise SystemExit(f"Dynamic discovery failed: {matches}")
+          registry.set_health("temporary_helper", "unavailable", reason="ci readiness test")
+          if registry.discover(capability="temporary_capability"):
+              raise SystemExit("Unavailable helper remained discoverable as ready")
+          routed = AgentRouter(registry).route("debug code api build", requested_agent="developer")
+          if routed["agent"]["agent_id"] != "developer":
+              raise SystemExit(f"Developer routing failed: {routed}")
+          print("Dynamic discovery and readiness routing OK")
           PY
 
       - name: Enforce confirmation policy on write-capable agents
@@ -90,8 +161,11 @@ jobs:
               names = [e["event_type"] for e in events]
               if names != ["task.queued", "task.started", "task.completed"]:
                   raise SystemExit(f"Unexpected event sequence: {names}")
-              if runtime.dashboard()["shared_context"] != "local_persistent":
+              dashboard = runtime.dashboard()
+              if dashboard["shared_context"] != "local_persistent":
                   raise SystemExit("Shared context is not local-persistent")
+              if not dashboard["agent_readiness"]["ready"]:
+                  raise SystemExit("Agent readiness is not healthy")
               print("Agent Runtime OK")
           PY
 
@@ -100,12 +174,16 @@ jobs:
         run: |
           python - <<'PY'
           import tempfile
+          from pathlib import Path
           from agent_orchestrator import AgentOrchestrator
           from agent_runtime import AgentEventBus, AgentTaskQueue, SharedContextStore
 
           with tempfile.TemporaryDirectory() as tmp:
               runtime = AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp))
-              orchestrator = AgentOrchestrator(runtime=runtime)
+              orchestrator = AgentOrchestrator(
+                  runtime=runtime,
+                  storage_path=Path(tmp) / "agents" / "orchestrations.json",
+              )
               run = orchestrator.create_run(
                   "Research then prepare shift calendar sync",
                   [
@@ -125,19 +203,32 @@ jobs:
               waiting = orchestrator.execute(run["run_id"])
               if waiting["status"] != "awaiting_confirmation":
                   raise SystemExit(f"Expected orchestration confirmation gate, got {waiting['status']}")
-              completed = orchestrator.confirm(run["run_id"])
+              restarted = AgentOrchestrator(
+                  runtime=AgentTaskQueue(
+                      event_bus=AgentEventBus(),
+                      context_store=SharedContextStore(tmp),
+                  ),
+                  storage_path=Path(tmp) / "agents" / "orchestrations.json",
+              )
+              completed = restarted.confirm(run["run_id"])
               if completed["status"] != "completed":
-                  raise SystemExit(f"Orchestration did not complete: {completed['status']}")
-              print("Multi-Agent orchestration OK")
+                  raise SystemExit(f"Recovered orchestration did not complete: {completed['status']}")
+              print("Durable Multi-Agent orchestration OK")
           PY
+
+      - name: Run V2 performance and resilience quality probes
+        working-directory: tools/research_os_api
+        run: python v2_quality_gate.py all
 
       - name: Summary
         if: always()
         run: |
           {
-            echo "# Research OS Agent Platform"
-            echo "- Agent registry/runtime/permission checks remain"
-            echo "- Multi-Agent orchestrator compile and unit tests enabled"
-            echo "- Orchestrator HTTP create/list/get/execute/confirm contract tested"
-            echo "- Dependency delegation and confirmation flow validated"
+            echo "# Research OS Agent Platform V2"
+            echo "- Core agents and isolated Completion Crew validated"
+            echo "- Dynamic registry/provider fallback/permission checks validated"
+            echo "- Durable orchestration and V1/V2 compatibility tests enabled"
+            echo "- Workspace/evidence OpenAPI contract enforced"
+            echo "- Performance baseline and resilience failure injection executed"
+            echo "- Confirmation and restart recovery remain enforced"
           } >> "$GITHUB_STEP_SUMMARY"
