@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Research OS API V2 compatibility, pagination, workspace and readiness facade.
+"""Research OS API V2 compatibility, pagination, workspace and intelligence facade.
 
 V2 uses the same V1 runtime/orchestrator owners and the existing Workspace
 Knowledge Engine. Only transport contracts are versioned here; state and
-business logic remain single-source.
+business logic remain single-source. Phase 7 adds read-only System Introspection
+and planning endpoints; no direct tool execution or permission-grant endpoint is
+exposed through this facade.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import base64
 import os
 import sys
+from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -19,7 +22,9 @@ from urllib.parse import parse_qs, unquote, urlsplit, urlunsplit
 import agent_server
 from agent_server import AgentResearchOSHandler
 from ai_gateway import gateway_report
+from v2_brain_runtime import BRAIN_RUNTIME
 from v2_observability import readiness_snapshot
+from v2_system_introspection import SystemIntrospection, parse_ready_only
 
 _CURATOR_DIR = Path(__file__).resolve().parents[1] / "research_curator"
 if str(_CURATOR_DIR) not in sys.path:
@@ -65,14 +70,103 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
             self._send_v2_workspace_knowledge(workspace_id, parsed.query)
             return
 
+        if parsed.path == "/v2/intelligence" or parsed.path.startswith("/v2/intelligence/"):
+            self._send_v2_intelligence_get(parsed.path, parsed.query)
+            return
+
         self._rewrite_v2_path()
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         self._v2_request = parsed.path.startswith("/v2/")
+        if parsed.path == "/v2/intelligence/plan":
+            self._send_v2_intelligence_plan()
+            return
+        if parsed.path.startswith("/v2/intelligence/"):
+            self._send(
+                HTTPStatus.NOT_FOUND,
+                {"error": "intelligence_route_not_found", "detail": "unknown intelligence POST route"},
+            )
+            return
         self._rewrite_v2_path()
         super().do_POST()
+
+    @staticmethod
+    def _intelligence() -> SystemIntrospection:
+        return SystemIntrospection(BRAIN_RUNTIME, agent_server.REGISTRY)
+
+    def _send_v2_intelligence_get(self, path: str, raw_query: str) -> None:
+        try:
+            query = parse_qs(raw_query)
+            capability = self._first(query, "capability")
+            permission = self._first(query, "permission")
+            ready_only = parse_ready_only(self._first(query, "ready_only"))
+            intelligence = self._intelligence()
+
+            if path in {"/v2/intelligence", "/v2/intelligence/"}:
+                payload = intelligence.manifest()
+            elif path == "/v2/intelligence/capabilities":
+                payload = intelligence.capabilities()
+            elif path == "/v2/intelligence/agents":
+                payload = intelligence.agents(
+                    scope=self._first(query, "scope") or "all",
+                    capability=capability,
+                    permission=permission,
+                    ready_only=ready_only,
+                )
+            elif path == "/v2/intelligence/skills":
+                payload = intelligence.skills(
+                    capability=capability,
+                    permission=permission,
+                    ready_only=ready_only,
+                )
+            elif path == "/v2/intelligence/tools":
+                payload = intelligence.tools(
+                    capability=capability,
+                    permission=permission,
+                    ready_only=ready_only,
+                )
+            elif path == "/v2/intelligence/permissions":
+                payload = intelligence.permissions()
+            elif path == "/v2/intelligence/architecture":
+                payload = intelligence.architecture()
+            elif path == "/v2/intelligence/project-state":
+                payload = intelligence.project_state()
+            elif path == "/v2/intelligence/health":
+                payload = intelligence.health()
+            else:
+                self._send(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": "intelligence_route_not_found", "detail": f"unknown intelligence route: {path}"},
+                )
+                return
+            self._send(HTTPStatus.OK, payload)
+        except (TypeError, ValueError) as exc:
+            self._send(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "invalid_intelligence_query", "detail": str(exc)},
+            )
+
+    def _send_v2_intelligence_plan(self) -> None:
+        try:
+            body = self._read_json()
+            objective = str(body.get("objective") or "")
+            session_id_raw = str(body.get("session_id") or "").strip()
+            context_raw = body.get("context")
+            if context_raw is not None and not isinstance(context_raw, Mapping):
+                raise ValueError("context must be an object")
+            payload = self._intelligence().plan(
+                objective,
+                session_id=session_id_raw or None,
+                context=dict(context_raw or {}),
+            )
+            self._send(HTTPStatus.OK, payload)
+        except (TypeError, ValueError) as exc:
+            self._send(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "invalid_intelligence_plan", "detail": str(exc)},
+            )
 
     def _workspace_engine(self) -> WorkspaceKnowledgeEngine:
         data_dir = os.environ.get("RESEARCH_OS_DATA_DIR") or str(Path.home() / "ResearchOSData")
