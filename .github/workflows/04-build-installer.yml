@@ -7,6 +7,11 @@ on:
         description: Commit SHA to package
         required: false
         type: string
+      dispatch_release:
+        description: Allow successful installer validation to dispatch the downstream release workflow
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -139,4 +144,6 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run 05-installer-validation.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}"
+        run: |
+          $releaseFlag = if (${{ inputs.dispatch_release == true }}) { 'true' } else { 'false' }
+          gh workflow run 05-installer-validation.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}" -f dispatch_release="$releaseFlag"
