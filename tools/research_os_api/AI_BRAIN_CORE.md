@@ -50,7 +50,7 @@ Implemented:
 - idempotency-key reuse of completed results
 - observation records for attempts/results
 - activity-ledger events for plan/retry/failure/completion
-- redacted persisted tool payload/evidence/output fields
+- key-based redaction for persisted tool payload/evidence/output fields
 
 Initial executable tools are intentionally internal and read-only:
 
@@ -85,6 +85,10 @@ No Brain Runtime method exposes a direct adapter invocation path. The low-level 
 Automatic retries are bounded to at most the configured controller maximum (1-5 attempts) and are enabled only when the ToolDefinition declares the operation idempotent. Non-idempotent tools execute once per explicit execution request.
 
 A process restart converts a checkpoint left in `running` state to `interrupted`. Resuming requires a fresh ExecutionRequest because persisted checkpoint payloads are redacted and are not a secret-recovery mechanism.
+
+## Current hardening boundary
+
+The current persistence redactor is key-based. Tool adapters that handle secret material must declare `secret_access`, must not intentionally return raw secret values, and require an additional secret-aware output hardening slice before external credential-bearing adapters are promoted to production use.
 
 ## Release boundary
 
