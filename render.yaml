@@ -32,7 +32,7 @@ services:
     repo: https://github.com/phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
     branch: candidate/v2-staging-4e25c05
     autoDeploy: false
-    buildCommand: RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS=1 python -m unittest tools.research_os_api.test_developer_identity tools.research_os_api.test_developer_access tools.research_os_api.test_developer_server -v
+    buildCommand: cd tools/research_os_api && RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS=1 python -m unittest test_developer_identity test_developer_access test_developer_server -v
     startCommand: cd tools/research_os_api && RESEARCH_OS_DEVELOPER_PORT=$PORT python developer_server.py
     healthCheckPath: /health
     envVars:
