@@ -3,8 +3,8 @@
 
 Skills are executable contracts, not prompt adjectives. This registry owns skill
 identity, versioning, capability discovery, dependency ordering, permission
-requirements and verification evidence. Execution adapters are intentionally
-separate and will attach in a later slice.
+requirements, tool requirements and verification evidence. Execution remains a
+separate governed runtime boundary.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from typing import Any, Iterable
 
 _ID_RE = re.compile(r"^[a-z][a-z0-9_.-]{2,79}$")
 _VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9_.-]+)?$")
+SKILL_REGISTRY_CONTRACT = "brain-skills-phase-4"
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,7 @@ class SkillDefinition:
     capabilities: tuple[str, ...]
     required_skills: tuple[str, ...] = ()
     required_tools: tuple[str, ...] = ()
+    required_tool_capabilities: tuple[str, ...] = ()
     permissions: tuple[str, ...] = ()
     required_evidence: tuple[str, ...] = ()
     owner: str = "Research OS"
@@ -41,8 +43,9 @@ CORE_BRAIN_SKILLS: tuple[SkillDefinition, ...] = (
         "Goal Analysis",
         "Extracts explicit goals, constraints, known facts and unknowns before planning.",
         ("goal_analysis", "intent", "known_unknown", "constraints"),
-        permissions=("memory.read",),
-        required_evidence=("goal", "constraints"),
+        required_tool_capabilities=("context_engine",),
+        permissions=("memory.read", "runtime.read"),
+        required_evidence=("objective",),
     ),
     SkillDefinition(
         "brain.risk-assessment",
@@ -59,8 +62,9 @@ CORE_BRAIN_SKILLS: tuple[SkillDefinition, ...] = (
         "Evidence Verification",
         "Checks named evidence before Research OS treats a task as verified.",
         ("verification", "evidence", "definition_of_done", "traceability"),
+        required_tool_capabilities=("session_inspection",),
         permissions=("runtime.read", "memory.read"),
-        required_evidence=("verification_result",),
+        required_evidence=("session_id",),
     ),
 )
 
@@ -84,6 +88,10 @@ class SkillRegistry:
             raise ValueError(f"skill capabilities required: {skill.skill_id}")
         if skill.skill_id in skill.required_skills:
             raise ValueError(f"skill cannot depend on itself: {skill.skill_id}")
+        if len(set(skill.required_tools)) != len(skill.required_tools):
+            raise ValueError(f"duplicate required tool: {skill.skill_id}")
+        if len(set(skill.required_tool_capabilities)) != len(skill.required_tool_capabilities):
+            raise ValueError(f"duplicate required tool capability: {skill.skill_id}")
 
     def register(self, skill: SkillDefinition, *, replace: bool = False) -> dict[str, Any]:
         self._validate(skill)
@@ -186,12 +194,13 @@ class SkillRegistry:
         ready = [item for item in skills if item["ready"]]
         return {
             "registry": "research_os_skills",
+            "contract": SKILL_REGISTRY_CONTRACT,
             "skill_count": len(skills),
             "ready_count": len(ready),
             "enabled_count": sum(1 for item in skills if item["enabled"]),
             "capabilities": self.capability_catalog(),
             "skills": skills,
-            "execution": "contract_only",
+            "execution": "skill_to_tool_executor",
         }
 
 
