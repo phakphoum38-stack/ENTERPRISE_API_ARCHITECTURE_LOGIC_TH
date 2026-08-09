@@ -4,6 +4,7 @@ import json
 import tempfile
 import threading
 import unittest
+import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -40,13 +41,36 @@ class V2CompatibilityTests(unittest.TestCase):
             headers={"Content-Type": "application/json"},
             method=method,
         )
-        with urllib.request.urlopen(request, timeout=5) as response:
-            return response.status, json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                return response.status, json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            return exc.code, json.loads(exc.read().decode("utf-8"))
+
+    def create_run(self, index: int) -> str:
+        status, created = self.request(
+            "/v2/orchestrations",
+            method="POST",
+            body={
+                "objective": f"V2 compatibility run {index}",
+                "steps": [
+                    {
+                        "step_id": "research",
+                        "objective": f"research compatibility evidence {index}",
+                        "requested_agent": "research",
+                    }
+                ],
+            },
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(created["api_version"], "v2")
+        return created["run"]["run_id"]
 
     def test_v1_and_v2_agent_catalog_share_registry(self) -> None:
         status_v1, v1 = self.request("/v1/agents")
         status_v2, v2 = self.request("/v2/agents")
         self.assertEqual((status_v1, status_v2), (200, 200))
+        self.assertEqual(v2["api_version"], "v2")
         self.assertEqual(v1["count"], v2["count"])
         self.assertEqual(
             {item["agent_id"] for item in v1["agents"]},
@@ -54,22 +78,7 @@ class V2CompatibilityTests(unittest.TestCase):
         )
 
     def test_v2_orchestration_is_visible_through_v1(self) -> None:
-        status, created = self.request(
-            "/v2/orchestrations",
-            method="POST",
-            body={
-                "objective": "V2 compatibility run",
-                "steps": [
-                    {
-                        "step_id": "research",
-                        "objective": "research compatibility evidence",
-                        "requested_agent": "research",
-                    }
-                ],
-            },
-        )
-        self.assertEqual(status, 201)
-        run_id = created["run"]["run_id"]
+        run_id = self.create_run(1)
 
         status_v1, v1 = self.request(f"/v1/agents/orchestrations/{run_id}")
         status_v2, v2 = self.request(f"/v2/orchestrations/{run_id}")
@@ -88,6 +97,40 @@ class V2CompatibilityTests(unittest.TestCase):
         _, history = self.request("/v1/agents/orchestrations?status=completed&limit=10")
         self.assertEqual(history["count"], 1)
         self.assertEqual(history["runs"][0]["run_id"], run_id)
+
+    def test_v2_cursor_pagination_preserves_filters(self) -> None:
+        ids = [self.create_run(index) for index in range(3)]
+        status, first = self.request(
+            "/v2/orchestrations?page_size=2&q=compatibility&agent=research"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(first["api_version"], "v2")
+        self.assertEqual(len(first["items"]), 2)
+        self.assertEqual(first["page"]["page_size"], 2)
+        cursor = first["page"]["next_cursor"]
+        self.assertIsInstance(cursor, str)
+
+        status, second = self.request(
+            f"/v2/orchestrations?page_size=2&q=compatibility&agent=research&cursor={cursor}"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(len(second["items"]), 1)
+        self.assertIsNone(second["page"]["next_cursor"])
+        returned = {item["run_id"] for item in first["items"] + second["items"]}
+        self.assertEqual(returned, set(ids))
+
+    def test_v2_errors_have_machine_readable_envelope(self) -> None:
+        status, payload = self.request("/v2/orchestrations?page_size=101")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["api_version"], "v2")
+        self.assertEqual(payload["error"]["code"], "invalid_pagination")
+        self.assertEqual(payload["error"]["status"], 400)
+        self.assertIn("page_size", payload["error"]["message"])
+
+        status, missing = self.request("/v2/orchestrations/does-not-exist")
+        self.assertEqual(status, 404)
+        self.assertEqual(missing["error"]["code"], "orchestration_not_found")
+        self.assertEqual(missing["error"]["status"], 404)
 
 
 if __name__ == "__main__":
