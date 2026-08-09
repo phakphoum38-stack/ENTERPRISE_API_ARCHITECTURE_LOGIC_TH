@@ -299,8 +299,12 @@ class AgentRouter:
         }
 
 
+REGISTRY = AgentRegistry()
+ROUTER = AgentRouter(REGISTRY)
+
+
 def platform_dashboard(registry: AgentRegistry | None = None) -> dict[str, Any]:
-    registry = registry or AgentRegistry()
+    registry = registry or REGISTRY
     readiness = registry.readiness()
     return {
         "platform": "research_os_agents",
