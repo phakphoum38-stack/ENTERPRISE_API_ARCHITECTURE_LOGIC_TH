@@ -9,10 +9,42 @@ class FakeAgentApiClient extends ResearchOSApiClient {
   final List<Map<String, dynamic>> runs = <Map<String, dynamic>>[];
   bool executed = false;
   bool confirmed = false;
+  bool cancelled = false;
+  bool retried = false;
 
   @override
-  Future<Map<String, dynamic>> getOrchestrations() async =>
-      <String, dynamic>{'runs': runs, 'count': runs.length};
+  Future<Map<String, dynamic>> getOrchestrations({
+    String? status,
+    String? query,
+    String? agent,
+    int? limit,
+  }) async => <String, dynamic>{'runs': runs, 'count': runs.length};
+
+  @override
+  Future<Map<String, dynamic>> getAgents() async => <String, dynamic>{
+        'agents': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'agent_id': 'v2_agent_center_engineer',
+            'name': 'V2 Agent Center Engineer',
+            'permission_profile': 'write_confirmed',
+            'health': <String, dynamic>{'status': 'ready', 'ready': true},
+          },
+        ],
+        'count': 1,
+      };
+
+  @override
+  Future<Map<String, dynamic>> getOrchestrationTimeline(String runId) async =>
+      <String, dynamic>{
+        'run_id': runId,
+        'events': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'event_type': 'run.created',
+            'run_status': 'planned',
+            'step_id': null,
+          },
+        ],
+      };
 
   @override
   Future<Map<String, dynamic>> createOrchestration({
@@ -59,6 +91,23 @@ class FakeAgentApiClient extends ResearchOSApiClient {
   }
 
   @override
+  Future<Map<String, dynamic>> cancelOrchestration(String runId) async {
+    cancelled = true;
+    runs.first['status'] = 'cancelled';
+    return <String, dynamic>{'run': runs.first};
+  }
+
+  @override
+  Future<Map<String, dynamic>> retryOrchestration(
+    String runId, {
+    String? stepId,
+  }) async {
+    retried = true;
+    runs.first['status'] = 'planned';
+    return <String, dynamic>{'run': runs.first};
+  }
+
+  @override
   void close() {}
 }
 
@@ -71,9 +120,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(home: AgentCenterPage(apiClient: api)),
-    );
+    await tester.pumpWidget(MaterialApp(home: AgentCenterPage(apiClient: api)));
     await tester.pumpAndSettle();
 
     expect(find.text('No orchestration runs yet'), findsOneWidget);
@@ -103,11 +150,57 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.executed, isTrue);
     expect(find.text('awaiting_confirmation'), findsOneWidget);
+    expect(find.byKey(const Key('approval-run-12345678')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('confirm-run-12345678')));
     await tester.pumpAndSettle();
     expect(api.confirmed, isTrue);
     expect(find.text('completed'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Agent Center V2 exposes timeline health and cancellation controls',
+      (tester) async {
+    final api = FakeAgentApiClient();
+    api.runs.add(<String, dynamic>{
+      'run_id': 'run-v2controls',
+      'objective': 'Validate V2 controls',
+      'status': 'planned',
+      'steps': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'step_id': 'step-1',
+          'requested_agent': 'v2_agent_center_engineer',
+          'status': 'planned',
+          'depends_on': <String>[],
+        },
+      ],
+    });
+    tester.view.physicalSize = const Size(1200, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(home: AgentCenterPage(apiClient: api)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('workspace-selector')), findsOneWidget);
+    expect(find.byKey(const Key('cancel-run-v2controls')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('load-agent-health')));
+    await tester.pumpAndSettle();
+    expect(find.text('V2 Agent Center Engineer'), findsOneWidget);
+    expect(find.text('ready'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('timeline-run-v2controls')));
+    await tester.pumpAndSettle();
+    expect(find.text('run.created'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('cancel-run-v2controls')));
+    await tester.pumpAndSettle();
+    expect(api.cancelled, isTrue);
+    expect(find.text('cancelled'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
