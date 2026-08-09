@@ -27,6 +27,9 @@ jobs:
       RESEARCH_OS_PROVIDER: mock
       RESEARCH_OS_API_HOST: 127.0.0.1
       RESEARCH_OS_API_PORT: "8787"
+      HOST: 127.0.0.1
+      PORT: "8787"
+      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
 
     steps:
       - name: Checkout validated commit
@@ -38,20 +41,25 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Start local API
+      - name: Start primary V2-compatible API
         shell: bash
         run: |
-          python tools/research_os_api/server.py --host 127.0.0.1 --port 8787 >/tmp/research-os-performance.log 2>&1 &
+          python tools/research_os_api/render_server.py >/tmp/research-os-performance.log 2>&1 &
           echo $! >/tmp/research-os-performance.pid
 
-      - name: Measure local health latency
+      - name: Measure health and V2 readiness latency
         run: |
           python - <<'PY'
           import json, statistics, time, urllib.request
-          url = "http://127.0.0.1:8787/health"
+
+          endpoints = {
+              "health": "http://127.0.0.1:8787/health",
+              "v2_readiness": "http://127.0.0.1:8787/v2/health/readiness",
+          }
+
           for _ in range(30):
               try:
-                  with urllib.request.urlopen(url, timeout=2) as r:
+                  with urllib.request.urlopen(endpoints["health"], timeout=2) as r:
                       if json.load(r).get("status") == "ok":
                           break
               except Exception:
@@ -59,19 +67,23 @@ jobs:
           else:
               raise SystemExit("API did not start")
 
-          samples=[]
-          for _ in range(20):
-              started=time.perf_counter()
-              with urllib.request.urlopen(url, timeout=2) as r:
-                  payload=json.load(r)
-              assert payload["status"] == "ok"
-              samples.append((time.perf_counter()-started)*1000)
-          samples.sort()
-          p95=samples[max(0, int(len(samples)*0.95)-1)]
-          avg=statistics.mean(samples)
-          print(f"health avg_ms={avg:.1f} p95_ms={p95:.1f} max_ms={max(samples):.1f}")
-          if p95 > 500:
-              raise SystemExit(f"Local /health p95 too slow: {p95:.1f} ms")
+          for name, url in endpoints.items():
+              samples=[]
+              for _ in range(20):
+                  started=time.perf_counter()
+                  with urllib.request.urlopen(url, timeout=2) as r:
+                      payload=json.load(r)
+                  if name == "health":
+                      assert payload["status"] == "ok", payload
+                  else:
+                      assert payload["ready"] is True, payload
+                  samples.append((time.perf_counter()-started)*1000)
+              samples.sort()
+              p95=samples[max(0, int(len(samples)*0.95)-1)]
+              avg=statistics.mean(samples)
+              print(f"{name} avg_ms={avg:.1f} p95_ms={p95:.1f} max_ms={max(samples):.1f}")
+              if p95 > 500:
+                  raise SystemExit(f"{name} p95 too slow: {p95:.1f} ms")
           PY
 
       - name: Verify retry policy exists
@@ -95,8 +107,9 @@ jobs:
         if: always()
         run: |
           {
-            echo "# Research OS Performance Gate — Secondary"
-            echo "- Generic API tests removed; owned by main workflow"
-            echo "- Generic Flutter analyze/test/build removed; owned by main/Flutter secondary"
-            echo "- Health latency and retry-policy checks remain"
+            echo "# Research OS Performance Gate — V2 Secondary"
+            echo "- Primary V2-compatible API used"
+            echo "- /health latency measured"
+            echo "- /v2/health/readiness latency measured"
+            echo "- Provider retry policy remains bounded"
           } >> "$GITHUB_STEP_SUMMARY"
