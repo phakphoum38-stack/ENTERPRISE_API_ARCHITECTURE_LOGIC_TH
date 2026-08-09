@@ -14,6 +14,7 @@ class ToolRegistryTests(unittest.TestCase):
         self.assertEqual(TOOL_REGISTRY_CONTRACT, report["contract"])
         self.assertEqual(3, report["tool_count"])
         self.assertEqual(0, report["ready_count"])
+        self.assertEqual(0, report["mutating_count"])
         self.assertEqual("permissioned_execution_controller_only", report["execution_boundary"])
 
     def test_adapter_registration_makes_tool_ready(self) -> None:
