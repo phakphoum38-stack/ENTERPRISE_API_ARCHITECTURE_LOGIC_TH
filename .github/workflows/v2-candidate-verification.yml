@@ -5,28 +5,44 @@ on:
     inputs:
       target_sha:
         description: Exact V2 candidate commit SHA
-        required: true
+        required: false
         type: string
       source_installer_run:
         description: Successful Research OS Build Installer run ID
-        required: true
+        required: false
         type: string
       source_validation_run:
         description: Successful Research OS Installer Validation run ID
-        required: true
+        required: false
         type: string
+  pull_request:
+    paths:
+      - "apps/research_os_flutter/**"
+      - "tools/research_os_api/**"
+      - "tools/research_curator/**"
+      - "tools/research_os_service/**"
+      - "installer/**"
+      - "scripts/*research-os*.ps1"
+      - ".github/workflows/0*-*.yml"
+      - ".github/workflows/v2-candidate-verification.yml"
+      - ".github/workflows/research-os-windows-desktop.yml"
+      - ".github/workflows/research-os-production-health.yml"
 
 permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: research-os-v2-candidate-${{ github.event.pull_request.head.sha || inputs.target_sha || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   verify-candidate:
     name: Verify exact-SHA candidate evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
-      TARGET_SHA: ${{ inputs.target_sha }}
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha || github.sha }}
       INSTALLER_RUN: ${{ inputs.source_installer_run }}
       VALIDATION_RUN: ${{ inputs.source_validation_run }}
       V1_ROLLBACK_BASELINE: d05189d151b6bfa65938dad7a812ac104db195f4
@@ -35,6 +51,32 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_SHA }}
+
+      - name: Resolve exact-SHA installer and validation evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          installer_run="$INSTALLER_RUN"
+          validation_run="$VALIDATION_RUN"
+          for attempt in $(seq 1 60); do
+            if [ -z "$installer_run" ]; then
+              installer_run="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
+            fi
+            if [ -z "$validation_run" ]; then
+              validation_run="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Installer Validation" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
+            fi
+            if [ -n "$installer_run" ] && [ -n "$validation_run" ]; then
+              break
+            fi
+            echo "Waiting for exact-SHA installer/validation evidence: attempt=$attempt installer=${installer_run:-pending} validation=${validation_run:-pending}"
+            sleep 15
+          done
+          test -n "$installer_run" || { echo "No successful installer run found for $TARGET_SHA"; exit 1; }
+          test -n "$validation_run" || { echo "No successful installer validation run found for $TARGET_SHA"; exit 1; }
+          echo "INSTALLER_RUN=$installer_run" >> "$GITHUB_ENV"
+          echo "VALIDATION_RUN=$validation_run" >> "$GITHUB_ENV"
 
       - name: Verify installer and validation runs are exact-SHA successes
         shell: bash
