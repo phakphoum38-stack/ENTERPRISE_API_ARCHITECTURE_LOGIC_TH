@@ -70,6 +70,7 @@ class AgentServerTests(unittest.TestCase):
         self.assertEqual(status, 201)
         run_id = created["run"]["run_id"]
         self.assertEqual(created["run"]["status"], "planned")
+        self.assertEqual(created["run"]["events"][0]["event_type"], "run.created")
 
         status, listed = self.request("/v1/agents/orchestrations")
         self.assertEqual(status, 200)
@@ -88,6 +89,79 @@ class AgentServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(executed["run"]["status"], "completed")
         self.assertTrue(all(step["status"] == "completed" for step in executed["run"]["steps"]))
+
+    def test_history_filters_and_timeline(self) -> None:
+        status, research = self.request(
+            "/v1/agents/orchestrations",
+            method="POST",
+            body={
+                "objective": "research durable history",
+                "steps": [
+                    {
+                        "step_id": "research",
+                        "objective": "inspect repository history",
+                        "requested_agent": "research",
+                    }
+                ],
+            },
+        )
+        self.assertEqual(status, 201)
+        research_id = research["run"]["run_id"]
+
+        status, shift = self.request(
+            "/v1/agents/orchestrations",
+            method="POST",
+            body={
+                "objective": "sync shift calendar",
+                "steps": [
+                    {
+                        "step_id": "shift",
+                        "objective": "calendar_sync shift roster",
+                        "requested_agent": "shift",
+                    }
+                ],
+            },
+        )
+        self.assertEqual(status, 201)
+        shift_id = shift["run"]["run_id"]
+
+        status, executed = self.request(
+            f"/v1/agents/orchestrations/{research_id}/execute",
+            method="POST",
+            body={},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(executed["run"]["status"], "completed")
+
+        status, filtered = self.request(
+            "/v1/agents/orchestrations?status=completed&agent=research&q=history&limit=10"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(filtered["count"], 1)
+        self.assertEqual(filtered["runs"][0]["run_id"], research_id)
+        self.assertEqual(filtered["filters"]["status"], "completed")
+        self.assertEqual(filtered["filters"]["agent"], "research")
+
+        status, shift_filtered = self.request("/v1/agents/orchestrations?agent=shift")
+        self.assertEqual(status, 200)
+        self.assertEqual(shift_filtered["count"], 1)
+        self.assertEqual(shift_filtered["runs"][0]["run_id"], shift_id)
+
+        status, timeline = self.request(
+            f"/v1/agents/orchestrations/{research_id}/timeline"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(timeline["run_id"], research_id)
+        self.assertGreaterEqual(timeline["count"], 4)
+        event_types = [event["event_type"] for event in timeline["events"]]
+        self.assertIn("run.created", event_types)
+        self.assertIn("run.execution_started", event_types)
+        self.assertIn("step.completed", event_types)
+        self.assertIn("run.status_changed", event_types)
+
+        status, invalid = self.request("/v1/agents/orchestrations?limit=201")
+        self.assertEqual(status, 400)
+        self.assertEqual(invalid["error"], "bad_request")
 
     def test_confirmation_route_resumes_write_capable_plan(self) -> None:
         status, created = self.request(
@@ -133,6 +207,10 @@ class AgentServerTests(unittest.TestCase):
         self.assertEqual(payload["error"], "bad_request")
 
         status, payload = self.request("/v1/agents/orchestrations/missing")
+        self.assertEqual(status, 404)
+        self.assertEqual(payload["error"], "orchestration_not_found")
+
+        status, payload = self.request("/v1/agents/orchestrations/missing/timeline")
         self.assertEqual(status, 404)
         self.assertEqual(payload["error"], "orchestration_not_found")
 
