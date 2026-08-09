@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
 import 'features/chat/chat_page.dart';
+import 'features/developer_access/developer_access_page.dart';
 import 'features/github/github_dashboard_page.dart';
 import 'features/google_workspace/google_workspace_page.dart';
 import 'features/graph/knowledge_graph_page.dart';
@@ -52,6 +53,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
               widget.onThemeModeChanged ?? (ThemeMode value) {},
           onApiBaseUrlChanged: widget.onApiBaseUrlChanged,
         ),
+        DeveloperAccessPage(),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
