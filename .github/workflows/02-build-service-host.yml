@@ -79,6 +79,8 @@ jobs:
           RESEARCH_OS_SYNC_KEY: windows-ci-test-key
           RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\ResearchOSData
           RESEARCH_OS_CONVERSATION_STORE: ${{ runner.temp }}\ResearchOSData\sessions\conversations.json
+          # Compatibility is test-only. Production remains signed-assertion-only by default.
+          RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS: "1"
         run: python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
 
       - name: Publish Research OS ServiceHost
