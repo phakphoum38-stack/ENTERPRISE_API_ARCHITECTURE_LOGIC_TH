@@ -15,6 +15,7 @@ from agent_runtime import AgentTaskQueue
 _FINAL_STEP_STATES = {"completed", "failed"}
 _WAITING_STEP_STATES = {"awaiting_confirmation"}
 _RECOVERABLE_STEP_STATES = {"planned", "queued", "running", "blocked", "interrupted"}
+_MAX_HISTORY_LIMIT = 200
 
 
 @dataclass
@@ -31,6 +32,16 @@ class DelegatedStep:
 
 
 @dataclass
+class AuditEvent:
+    event_id: str
+    event_type: str
+    timestamp: float
+    run_status: str
+    step_id: str | None = None
+    detail: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class OrchestrationRun:
     run_id: str
     objective: str
@@ -38,6 +49,7 @@ class OrchestrationRun:
     status: str = "planned"
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
+    events: list[AuditEvent] = field(default_factory=list)
 
 
 class AgentOrchestrator:
@@ -97,13 +109,24 @@ class AgentOrchestrator:
 
         run = OrchestrationRun(str(uuid.uuid4()), objective, delegated)
         self._runs[run.run_id] = run
+        self._record_event(
+            run,
+            "run.created",
+            detail={"step_count": len(delegated)},
+        )
         self._persist()
         return self._payload(run)
 
     def execute(self, run_id: str, confirmed: bool = False) -> dict[str, Any]:
         run = self._require(run_id)
+        previous_status = run.status
         run.status = "running"
         run.updated_at = time.time()
+        self._record_event(
+            run,
+            "run.execution_started",
+            detail={"confirmed": confirmed, "previous_status": previous_status},
+        )
         self._persist()
 
         while True:
@@ -115,12 +138,19 @@ class AgentOrchestrator:
                     step.status = "planned"
                     step.task_id = None
                     step.error = None
+                    self._record_event(run, "step.resumed", step_id=step.step_id)
 
                 dependencies = [self._step(run, dep) for dep in step.depends_on]
                 if any(dep.status == "failed" for dep in dependencies):
                     step.status = "failed"
                     step.error = "dependency failed"
                     progressed = True
+                    self._record_event(
+                        run,
+                        "step.failed",
+                        step_id=step.step_id,
+                        detail={"error": step.error},
+                    )
                     self._persist()
                     continue
                 if not all(dep.status == "completed" for dep in dependencies):
@@ -146,6 +176,16 @@ class AgentOrchestrator:
                 step.error = task.get("error")
                 run.updated_at = time.time()
                 progressed = True
+                self._record_event(
+                    run,
+                    f"step.{step.status}",
+                    step_id=step.step_id,
+                    detail={
+                        "task_id": step.task_id,
+                        "requested_agent": step.requested_agent,
+                        "error": step.error,
+                    },
+                )
                 self._persist()
 
             if not progressed:
@@ -162,6 +202,7 @@ class AgentOrchestrator:
 
     def confirm(self, run_id: str) -> dict[str, Any]:
         run = self._require(run_id)
+        self._record_event(run, "run.confirmation_received")
         for step in run.steps:
             if step.status != "awaiting_confirmation":
                 continue
@@ -173,7 +214,8 @@ class AgentOrchestrator:
                 except ValueError:
                     task = None
 
-            if task is None:
+            recovered = task is None
+            if recovered:
                 dependencies = [self._step(run, dep) for dep in step.depends_on]
                 inherited = {
                     dep.step_id: dep.result for dep in dependencies if dep.result is not None
@@ -196,21 +238,67 @@ class AgentOrchestrator:
             step.result = task.get("result")
             step.error = task.get("error")
             run.updated_at = time.time()
+            self._record_event(
+                run,
+                f"step.{step.status}",
+                step_id=step.step_id,
+                detail={
+                    "task_id": step.task_id,
+                    "confirmation_recovered": recovered,
+                    "error": step.error,
+                },
+            )
             self._persist()
         return self.execute(run_id, confirmed=True)
 
     def get(self, run_id: str) -> dict[str, Any]:
         return self._payload(self._require(run_id))
 
-    def list(self) -> list[dict[str, Any]]:
-        return [
-            self._payload(run)
-            for run in sorted(
-                self._runs.values(), key=lambda item: item.created_at, reverse=True
-            )
-        ]
+    def timeline(self, run_id: str) -> list[dict[str, Any]]:
+        run = self._require(run_id)
+        return [asdict(event) for event in sorted(run.events, key=lambda item: item.timestamp)]
+
+    def list(
+        self,
+        *,
+        status: str | None = None,
+        query: str | None = None,
+        agent: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        if limit is not None and (limit < 1 or limit > _MAX_HISTORY_LIMIT):
+            raise ValueError(f"limit must be between 1 and {_MAX_HISTORY_LIMIT}")
+
+        normalized_status = status.strip().casefold() if status else None
+        normalized_query = query.strip().casefold() if query else None
+        normalized_agent = agent.strip().casefold() if agent else None
+
+        runs = sorted(
+            self._runs.values(), key=lambda item: item.created_at, reverse=True
+        )
+        filtered: list[OrchestrationRun] = []
+        for run in runs:
+            if normalized_status and run.status.casefold() != normalized_status:
+                continue
+            if normalized_agent and not any(
+                (step.requested_agent or "").casefold() == normalized_agent
+                for step in run.steps
+            ):
+                continue
+            if normalized_query:
+                searchable = [run.run_id, run.objective]
+                searchable.extend(step.step_id for step in run.steps)
+                searchable.extend(step.objective for step in run.steps)
+                if not any(normalized_query in value.casefold() for value in searchable):
+                    continue
+            filtered.append(run)
+            if limit is not None and len(filtered) >= limit:
+                break
+
+        return [self._payload(run) for run in filtered]
 
     def _refresh_run_status(self, run: OrchestrationRun) -> None:
+        previous_status = run.status
         statuses = {step.status for step in run.steps}
         if "failed" in statuses:
             run.status = "failed"
@@ -223,6 +311,12 @@ class AgentOrchestrator:
         else:
             run.status = "blocked"
         run.updated_at = time.time()
+        if run.status != previous_status:
+            self._record_event(
+                run,
+                "run.status_changed",
+                detail={"from": previous_status, "to": run.status},
+            )
 
     def _load_runs(self) -> None:
         if self.storage_path is None or not self.storage_path.exists():
@@ -235,12 +329,14 @@ class AgentOrchestrator:
             ) from exc
 
         raw_runs = payload.get("runs", []) if isinstance(payload, dict) else []
+        recovered_any = False
         for item in raw_runs:
             steps = []
             for raw_step in item.get("steps", []):
                 status = str(raw_step.get("status") or "planned")
                 if status in _RECOVERABLE_STEP_STATES and status != "planned":
                     status = "interrupted"
+                    recovered_any = True
                 steps.append(
                     DelegatedStep(
                         step_id=str(raw_step.get("step_id") or ""),
@@ -254,6 +350,18 @@ class AgentOrchestrator:
                         error=raw_step.get("error"),
                     )
                 )
+            events = [
+                AuditEvent(
+                    event_id=str(raw_event.get("event_id") or uuid.uuid4()),
+                    event_type=str(raw_event.get("event_type") or "run.legacy_event"),
+                    timestamp=float(raw_event.get("timestamp") or time.time()),
+                    run_status=str(raw_event.get("run_status") or item.get("status") or "planned"),
+                    step_id=raw_event.get("step_id"),
+                    detail=dict(raw_event.get("detail") or {}),
+                )
+                for raw_event in item.get("events", [])
+                if isinstance(raw_event, dict)
+            ]
             run = OrchestrationRun(
                 run_id=str(item.get("run_id") or ""),
                 objective=str(item.get("objective") or ""),
@@ -261,15 +369,24 @@ class AgentOrchestrator:
                 status=str(item.get("status") or "planned"),
                 created_at=float(item.get("created_at") or time.time()),
                 updated_at=float(item.get("updated_at") or time.time()),
+                events=events,
             )
             if run.status in {"running", "blocked"} or any(
                 step.status == "interrupted" for step in run.steps
             ):
+                previous_status = run.status
                 run.status = "interrupted"
+                recovered_any = True
+                self._record_event(
+                    run,
+                    "run.recovered_after_restart",
+                    detail={"from": previous_status, "to": "interrupted"},
+                )
             if run.run_id:
                 self._runs[run.run_id] = run
 
-        self._persist()
+        if recovered_any or raw_runs:
+            self._persist()
 
     def _persist(self) -> None:
         if self.storage_path is None:
@@ -288,6 +405,26 @@ class AgentOrchestrator:
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         temporary.replace(self.storage_path)
+
+    def _record_event(
+        self,
+        run: OrchestrationRun,
+        event_type: str,
+        *,
+        step_id: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        run.events.append(
+            AuditEvent(
+                event_id=str(uuid.uuid4()),
+                event_type=event_type,
+                timestamp=time.time(),
+                run_status=run.status,
+                step_id=step_id,
+                detail=dict(detail or {}),
+            )
+        )
+        run.updated_at = time.time()
 
     def _require(self, run_id: str) -> OrchestrationRun:
         try:
