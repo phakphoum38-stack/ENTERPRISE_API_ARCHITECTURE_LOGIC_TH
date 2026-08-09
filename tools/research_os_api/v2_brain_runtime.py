@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Research OS AI Brain runtime composition.
 
-The runtime composes provider-neutral cognition, context, domain skills,
-decision/risk policy, permissioned Tool execution, governed task orchestration,
-post-execution verification and safe experience learning. Model providers remain
-behind AI Gateway; the Brain never calls adapters directly and never self-modifies
-from learned outcomes.
+The runtime composes provider-neutral cognition, context, capability graph,
+domain skills, decision/risk policy, permissioned Tool execution, governed task
+orchestration, post-execution verification and safe experience learning. Model
+providers remain behind AI Gateway; the Brain never calls adapters directly and
+never self-modifies from learned outcomes.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from v2_brain_context import ContextEngine, ContextSource
 from v2_brain_core import ActivityLedger, ResearchOSBrain, WorkingMemory
 from v2_brain_decision import ActionCandidate, DecisionEngine
 from v2_brain_team import brain_team_dashboard, register_brain_team
+from v2_capability_graph import CapabilityGraph
 from v2_domain_skills import catalog as domain_skill_catalog
 from v2_domain_skills import install_domain_skill_packs
 from v2_execution_hardening import (
@@ -76,6 +77,11 @@ class BrainRuntime:
         self.decisions = decision_engine or DecisionEngine()
         self.tools = tool_registry or ToolRegistry()
         self._attach_internal_tool_adapters()
+        self.capability_graph = CapabilityGraph(
+            agents=self.registry,
+            skills=self.skills,
+            tools=self.tools,
+        )
         self.learning = LearningEngine(self.brain.ledger)
 
         if execution_controller is not None:
@@ -159,6 +165,7 @@ class BrainRuntime:
                     raise
 
     def introspect(self) -> dict[str, Any]:
+        graph = self.capability_graph.snapshot()
         return {
             "brain": self.brain.introspect(),
             "team": brain_team_dashboard(self.registry),
@@ -168,6 +175,12 @@ class BrainRuntime:
                 "runtime_install": self.domain_skill_report,
             },
             "tools": self.tools.dashboard(),
+            "capability_graph": {
+                "contract": graph["contract"],
+                "counts": graph["counts"],
+                "persisted": graph["persisted"],
+                "duplicate_registry": graph["duplicate_registry"],
+            },
             "context": {
                 "engine": "authority-provenance-budget",
                 "default_budget_chars": self.context.default_budget_chars,
@@ -184,6 +197,7 @@ class BrainRuntime:
             "task_runner_phase": "brain_core_phase_8",
             "learning_phase": "brain_core_phase_9",
             "domain_skills_phase": "brain_core_phase_10",
+            "capability_graph_phase": "brain_core_phase_10",
             "tool_execution": "secret_aware_permissioned_controller_enabled",
             "direct_adapter_access": False,
             "post_execution_verification": True,
@@ -275,6 +289,7 @@ class BrainRuntime:
             "context": context_snapshot,
             "skill_matches": skill_matches,
             "tool_matches": tool_matches,
+            "capability_graph": self.capability_graph.resolve(plan.required_capabilities),
             "team": brain_team_dashboard(self.registry),
         }
 
@@ -300,6 +315,9 @@ class BrainRuntime:
 
     def match_tools(self, capabilities: Iterable[str]) -> dict[str, Any]:
         return self.tools.match_capabilities(capabilities, ready_only=True)
+
+    def resolve_capabilities(self, capabilities: Iterable[str]) -> dict[str, Any]:
+        return self.capability_graph.resolve(capabilities)
 
     def execute_tool(
         self,
