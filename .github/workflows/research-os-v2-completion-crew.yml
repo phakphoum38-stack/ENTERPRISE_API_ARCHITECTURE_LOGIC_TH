@@ -4,11 +4,15 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "tools/research_os_api/v2_completion_crew.py"
-      - "tools/research_os_api/test_v2_completion_crew.py"
+      - "tools/research_os_api/v2_*.py"
+      - "tools/research_os_api/test_v2_*.py"
       - "tools/research_os_api/agent_runtime.py"
+      - "tools/research_os_api/openapi.yaml"
       - "tools/research_curator/workspace_engine.py"
       - "tools/research_curator/test_workspace_engine.py"
+      - "apps/research_os_flutter/lib/src/features/agents/**"
+      - "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
+      - "apps/research_os_flutter/test/agent_center_test.dart"
       - ".github/workflows/research-os-v2-completion-crew.yml"
 
 permissions:
@@ -22,6 +26,9 @@ jobs:
   completion-crew:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    env:
+      RESEARCH_OS_PROVIDER: mock
+      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,13 +41,15 @@ jobs:
       - name: Compile V2 completion modules
         run: |
           python -m py_compile tools/research_os_api/v2_completion_crew.py
+          python -m py_compile tools/research_os_api/v2_server.py
+          python -m py_compile tools/research_os_api/v2_observability.py
           python -m py_compile tools/research_os_api/agent_runtime.py
           python -m py_compile tools/research_curator/knowledge_ops.py
           python -m py_compile tools/research_curator/workspace_engine.py
 
-      - name: Validate isolated completion crew
+      - name: Validate V2 completion API and reliability suites
         working-directory: tools/research_os_api
-        run: python -m unittest test_v2_completion_crew.py -v
+        run: python -m unittest discover -p "test_v2_*.py" -v
 
       - name: Validate Workspace and Knowledge Engine
         working-directory: tools/research_curator
@@ -63,6 +72,8 @@ jobs:
               raise SystemExit(f"Completion crew missing from runtime: {crew_ids - runtime_ids}")
           if not base_ids <= runtime_ids:
               raise SystemExit(f"Active agents were replaced or removed: {base_ids - runtime_ids}")
+          if any(item.fallback_agents for item in COMPLETION_CREW):
+              raise SystemExit("Completion crew must not fallback to active agents")
           print("V2 completion crew registered without replacing active agents")
           PY
 
@@ -73,6 +84,7 @@ jobs:
             echo "# Research OS V2 Completion Crew"
             echo "- Fresh V2-only helper agents validated"
             echo "- Existing active agents are not replaced or reused"
-            echo "- Workspace boundaries and local incremental knowledge index tested"
-            echo "- Search, provenance, duplicate/conflict detection and export/import tested"
+            echo "- Workspace/Knowledge Engine tests executed"
+            echo "- V2 API compatibility/pagination/error contracts executed"
+            echo "- V2 readiness/diagnostics/redaction tests executed"
           } >> "$GITHUB_STEP_SUMMARY"
