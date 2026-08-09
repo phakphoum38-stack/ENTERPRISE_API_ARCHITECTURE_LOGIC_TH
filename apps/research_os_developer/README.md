@@ -30,6 +30,12 @@ This keeps authentication replaceable (Google, Microsoft, GitHub, enterprise OID
 6. Every developer read/write operation must call the Developer Access Engine before touching the canonical resource.
 7. Owner access bypasses developer grants because ownership is unchanged.
 
+## RC validation contract
+
+A release-candidate promotion must validate the Developer Platform on the exact candidate SHA. The validation must preserve the separate application boundary, signed identity assertion checks, legacy-header production default, registration-free synthetic Trial Mode, owner approval, scoped grants, expiry/revocation behavior, and unchanged regular Research OS ownership/access semantics.
+
+Passing this validation is evidence for the Developer Platform boundary only. It does not authorize a merge to `main`, tag creation, GitHub Release publication, production deployment, or exposure of real file adapters before their authorization enforcement is proven.
+
 ## Non-goals
 
 - No copy-on-share file ownership model.
