@@ -1,5 +1,5 @@
-# Primary CI trigger
+# Research OS Primary CI Trigger
 
-This marker exists to trigger the primary `Research OS Windows Desktop` workflow after the workflow-orchestration cleanup.
+This file is intentionally documentation-only and exists to retrigger the primary Research OS validation set after a final documentation-only commit when the validated code SHA has changed.
 
-Secondary Research OS workflows are expected to run only as downstream/specialized validations rather than duplicate the primary push pipeline.
+Current validation intent: AI Brain Phase 8 governed task runner, canonical AgentOrchestrator dependency graph, step-scoped approval, secret-safe durable task bindings, and evidence-first completion.
