@@ -161,7 +161,7 @@ class FakeAgentApiClient extends ResearchOSApiClient {
   }
 
   @override
-  Future<Map<String, dynamic>> getV2BrainAgents({bool readyOnly = true}) async =>
+  Future<Map<String, dynamic>> getV2SquaredBrainAgents({bool readyOnly = true}) async =>
       <String, dynamic>{
         'api_version': 'v2',
         'brain_team': <Map<String, dynamic>>[
@@ -259,7 +259,7 @@ class FakeAgentApiClient extends ResearchOSApiClient {
   void close() {}
 }
 
-void configureView(WidgetTester tester, {double height = 1200}) {
+void configureView(WidgetTester tester, {double height = 2600}) {
   tester.view.physicalSize = Size(1200, height);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
@@ -361,7 +361,7 @@ void main() {
   testWidgets('Agent Center exposes read-only AI Brain Inspector and plan preview',
       (tester) async {
     final api = FakeAgentApiClient();
-    configureView(tester, height: 1600);
+    configureView(tester, height: 3000);
 
     await tester.pumpWidget(testApp(api));
     await tester.pumpAndSettle();
@@ -405,7 +405,7 @@ void main() {
         },
       ],
     });
-    configureView(tester, height: 1400);
+    configureView(tester, height: 4200);
 
     await tester.pumpWidget(testApp(api));
     await tester.pumpAndSettle();
