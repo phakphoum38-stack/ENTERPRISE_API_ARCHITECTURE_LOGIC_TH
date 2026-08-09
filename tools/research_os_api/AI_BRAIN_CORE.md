@@ -232,11 +232,64 @@ Planning safeguards:
 
 Phase 7 intentionally does **not** add `/execute`, `/grant`, `/release`, or `/deploy` intelligence endpoints. Real mutations still have to use the Phase 3/4 Execution Controller and Phase 6 approval boundaries.
 
+## Phase 8 — Governed end-to-end Task Runner
+
+Contract: `brain-governed-task-runner-phase-8`
+
+Phase 8 connects the Brain components into one governed task lifecycle without creating a second orchestration DAG. `AgentOrchestrator` remains the canonical dependency graph and durable agent-delegation owner. The Task Runner stores only the Brain plan-to-skill binding, execution status and verified evidence keyed to the orchestration run.
+
+Implemented lifecycle:
+
+```text
+Goal
+  -> Brain Plan
+  -> required capabilities
+  -> explicit Skill/action bindings
+  -> deterministic Agent selection from capability matches
+  -> AgentOrchestrator dependency run
+  -> SkillExecutor
+  -> Tool capability match
+  -> Decision / permission / approval gates
+  -> HardenedExecutionController
+  -> Tool observation + checkpoint
+  -> Skill evidence verification
+  -> Brain final verification
+  -> Activity Ledger + governed task evidence
+```
+
+Task Runner safeguards:
+
+- required capabilities must have an explicit Skill/action binding; the Brain does not invent an adapter action when the Skill contract does not define one
+- Skill readiness, capability ownership, permissions and ready Tool matching are checked before an orchestration run is created
+- the existing Brain capability matches select the requested Agent deterministically
+- the existing `AgentOrchestrator` owns task dependencies; Phase 8 does not introduce a second DAG
+- tool payloads and evidence are not copied into the AgentOrchestrator context
+- every Skill still reaches tools only through `SkillExecutor -> HardenedExecutionController`
+- mutating tool calls stop at `awaiting_approval`
+- approval is scoped to the next pending Skill step; approving one Skill step does not mark later mutation steps as approved
+- completed Skill steps use stable idempotency keys keyed by governed task + step
+- successful adapter execution is insufficient: every Skill must satisfy its evidence contract and the task receives a final Brain verification
+- blocked, failed and `verification_failed` states fail closed
+- prepared tasks and the canonical orchestration can be reloaded after restart
+- cancellation delegates to the existing AgentOrchestrator when its run is still active
+- no unrestricted shell or direct Tool Registry invocation path is added
+
+Secret boundary:
+
+- raw credential-shaped values are rejected from durable objective, context, task payload and evidence bindings before Brain planning or task persistence
+- secret-bearing values required by a trusted adapter must be supplied only as ephemeral execution input or through Credential Broker integration
+- ephemeral execution inputs are merged only in memory for the selected step, their secret values are discovered by the Phase 4 redactor, and they are never written into the governed-task store
+- persisted Task Runner state is sanitized again as defense in depth
+
+Phase 8 is an **internal runtime integration slice**. It does not add an HTTP `/execute` endpoint. External execution transport remains intentionally closed until identity, approval binding, ownership and production gateway controls are ready.
+
 ## Skill integration
 
 Phase 5/6 packs participate in the existing Skill -> Tool path. Skills declare required capabilities and permissions; the Tool Registry resolves a matching ready adapter, the controller enforces permissions and approval, and the Brain verifies declared evidence before a skill can be reported as verified.
 
 Phase 7 lets the model or UI discover those contracts dynamically so changing the underlying model/provider does not erase Research OS skills, permissions, architecture knowledge, or tool readiness state.
+
+Phase 8 makes those contracts composable as a governed task. It intentionally requires explicit Skill/action bindings until domain Skill Packs define stronger action schemas; unknown action semantics remain blocked instead of guessed.
 
 ## Execution contract
 
@@ -245,6 +298,9 @@ Goal
   -> System Introspection / Capability Discovery
   -> Context
   -> Plan
+  -> Governed Task binding
+  -> Agent selection
+  -> AgentOrchestrator dependency graph
   -> Skill selection
   -> Skill dependency resolution
   -> Tool capability matching
@@ -252,13 +308,14 @@ Goal
   -> Skill permission check
   -> Tool permission check
   -> Dry-run / preview when state may change
-  -> Approval fingerprint binding
-  -> Explicit approval gate
+  -> Approval fingerprint binding where the adapter requires it
+  -> Explicit pending-step approval gate
   -> Secret-aware execution scope
   -> Tool adapter
   -> Observation
   -> Checkpoint
-  -> Post-execution evidence verification
+  -> Skill evidence verification
+  -> Brain final verification
   -> Memory / Ledger
 ```
 
@@ -270,15 +327,19 @@ Automatic retries are bounded to at most the configured controller maximum (1-5 
 
 A process restart converts a checkpoint left in `running` state to `interrupted`. Resuming requires a fresh execution request because persisted checkpoint payloads are redacted and are not a credential-recovery mechanism.
 
+Phase 8 also persists task-to-orchestration linkage. A prepared task can reload the same durable AgentOrchestrator run after restart rather than rebuilding a new dependency graph.
+
 ## Secret handling boundary
 
 Phase 4 protects persisted and returned Brain execution records against secrets reflected by adapters under neutral field names or embedded in exception strings. Secret values discovered or supplied for one execution live only in an ephemeral context-local scope and are not included in checkpoints, activity records or diagnostics.
 
-Phase 7 applies the same secret-safe boundary to introspection planning responses. This does not make arbitrary external adapters automatically trusted. Credential-bearing adapters still require explicit registration, least-privilege permissions, provider-specific tests and production trust-boundary review before promotion.
+Phase 7 applies the same secret-safe boundary to introspection planning responses. Phase 8 additionally rejects raw secret material before durable task planning/binding and permits secret-bearing execution input only ephemerally. This does not make arbitrary external adapters automatically trusted. Credential-bearing adapters still require explicit registration, least-privilege permissions, provider-specific tests and production trust-boundary review before promotion.
 
 ## Current development boundary
 
-Brain Phase 7 can now describe its own agents, capabilities, skills, tools, permissions, architecture, runtime state and health, and can produce a bounded read-only plan over that structure. Phase 6 mutation adapters remain opt-in and approval-gated.
+Brain Phase 8 can now describe its own runtime, produce a bounded plan, bind explicit executable Skills, delegate through the canonical AgentOrchestrator, execute through the existing permissioned Skill/Tool boundary and require evidence before a governed task becomes verified.
+
+Phase 8 does not claim autonomous arbitrary development. A capability with no ready Skill/action binding remains blocked. The next intelligence layers can add curated domain Skill Packs and stronger action schemas without weakening the Brain Core permission model.
 
 It still does **not** expose an unrestricted terminal, arbitrary shell execution, arbitrary filesystem access, file deletion, GitHub merge, workflow dispatch, tag/release creation, Google Workspace writes, installer mutation, release promotion or production deployment.
 
