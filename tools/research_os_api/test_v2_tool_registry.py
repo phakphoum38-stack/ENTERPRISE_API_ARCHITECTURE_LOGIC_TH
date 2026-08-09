@@ -28,6 +28,25 @@ class ToolRegistryTests(unittest.TestCase):
         result = registry.invoke("brain.skills.inspect", "list", {}, dry_run=False)
         self.assertEqual("list", result["action"])
 
+    def test_disabled_tool_cannot_receive_executable_adapter(self) -> None:
+        registry = ToolRegistry(())
+        registry.register(
+            ToolDefinition(
+                "test.disabled",
+                "1.0.0",
+                "Disabled",
+                "Disabled tool contract.",
+                ("disabled_test",),
+                enabled=False,
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "tool disabled"):
+            registry.register_adapter(
+                "test.disabled",
+                lambda action, payload, dry_run: {"ok": True},
+            )
+        self.assertFalse(registry.describe("test.disabled")["ready"])
+
     def test_mutating_tool_contract_requires_explicit_metadata(self) -> None:
         registry = ToolRegistry(())
         registry.register(
