@@ -24,6 +24,89 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
   Future<Map<String, dynamic>> getProviderGateway() =>
       _getJson('/v2/providers');
+
+  Future<Map<String, dynamic>> getIntelligenceManifest() =>
+      _getJson('/v2/intelligence');
+  Future<Map<String, dynamic>> getIntelligenceHealth() =>
+      _getJson('/v2/intelligence/health');
+  Future<Map<String, dynamic>> getIntelligenceCapabilities() =>
+      _getJson('/v2/intelligence/capabilities');
+  Future<Map<String, dynamic>> getIntelligencePermissions() =>
+      _getJson('/v2/intelligence/permissions');
+  Future<Map<String, dynamic>> getIntelligenceArchitecture() =>
+      _getJson('/v2/intelligence/architecture');
+  Future<Map<String, dynamic>> getIntelligenceProjectState() =>
+      _getJson('/v2/intelligence/project-state');
+
+  Future<Map<String, dynamic>> getIntelligenceAgents({
+    String scope = 'all',
+    String? capability,
+    String? permission,
+    bool readyOnly = true,
+  }) => _getIntelligenceCollection(
+        '/v2/intelligence/agents',
+        scope: scope,
+        capability: capability,
+        permission: permission,
+        readyOnly: readyOnly,
+      );
+
+  Future<Map<String, dynamic>> getV2BrainAgents({bool readyOnly = true}) =>
+      getIntelligenceAgents(scope: 'brain', readyOnly: readyOnly);
+
+  Future<Map<String, dynamic>> getIntelligenceSkills({
+    String? capability,
+    String? permission,
+    bool readyOnly = true,
+  }) => _getIntelligenceCollection(
+        '/v2/intelligence/skills',
+        capability: capability,
+        permission: permission,
+        readyOnly: readyOnly,
+      );
+
+  Future<Map<String, dynamic>> getIntelligenceTools({
+    String? capability,
+    String? permission,
+    bool readyOnly = true,
+  }) => _getIntelligenceCollection(
+        '/v2/intelligence/tools',
+        capability: capability,
+        permission: permission,
+        readyOnly: readyOnly,
+      );
+
+  Future<Map<String, dynamic>> planIntelligence(
+    String objective, {
+    String? sessionId,
+    Map<String, Object?> context = const <String, Object?>{},
+  }) => _postJson('/v2/intelligence/plan', <String, Object?>{
+        'objective': objective,
+        if (sessionId != null && sessionId.trim().isNotEmpty)
+          'session_id': sessionId.trim(),
+        if (context.isNotEmpty) 'context': context,
+      });
+
+  Future<Map<String, dynamic>> _getIntelligenceCollection(
+    String path, {
+    String? scope,
+    String? capability,
+    String? permission,
+    bool readyOnly = true,
+  }) async {
+    final params = <String, String>{
+      'ready_only': readyOnly ? 'true' : 'false',
+      if (scope != null && scope.trim().isNotEmpty) 'scope': scope.trim(),
+      if (capability != null && capability.trim().isNotEmpty)
+        'capability': capability.trim(),
+      if (permission != null && permission.trim().isNotEmpty)
+        'permission': permission.trim(),
+    };
+    final uri = _uri(path).replace(queryParameters: params);
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
+
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
@@ -44,17 +127,6 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> getAgents() => _getJson('/v1/agents');
   Future<Map<String, dynamic>> getAgentReadiness() =>
       _getJson('/v1/agents/readiness');
-
-  Future<Map<String, dynamic>> getV2BrainAgents({bool readyOnly = true}) async {
-    final uri = _uri('/v2/intelligence/agents').replace(
-      queryParameters: <String, String>{
-        'scope': 'brain',
-        'ready_only': readyOnly ? 'true' : 'false',
-      },
-    );
-    final response = await _client.get(uri);
-    return _decode(response);
-  }
 
   Future<Map<String, dynamic>> discoverAgents({String? capability}) async {
     final value = capability?.trim();
