@@ -15,16 +15,28 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
   bool _loading = true;
   bool _creating = false;
   bool _loadingHealth = false;
+  bool _loadingWorkspaces = true;
+  bool _searchingKnowledge = false;
   String? _error;
-  String _workspace = 'default';
+  String? _workspace;
   List<Map<String, dynamic>> _runs = const [];
   List<Map<String, dynamic>> _agents = const [];
+  List<Map<String, dynamic>> _workspaces = const [];
+  List<Map<String, dynamic>> _knowledge = const [];
   final Set<String> _busy = <String>{};
+  final TextEditingController _knowledgeQuery = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadRuns();
+    _loadWorkspaces();
+  }
+
+  @override
+  void dispose() {
+    _knowledgeQuery.dispose();
+    super.dispose();
   }
 
   Future<void> _loadRuns() async {
@@ -36,6 +48,51 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
       if (mounted) setState(() { _runs = runs; _loading = false; });
     } catch (error) {
       if (mounted) setState(() { _loading = false; _error = error.toString(); });
+    }
+  }
+
+  Future<void> _loadWorkspaces() async {
+    setState(() => _loadingWorkspaces = true);
+    try {
+      final payload = await widget.apiClient.getV2Workspaces();
+      final raw = payload['workspaces'];
+      final items = raw is List ? raw.whereType<Map>().map(_map).toList() : <Map<String, dynamic>>[];
+      final current = _workspace;
+      final ids = items.map((item) => '${item['workspace_id'] ?? ''}').where((id) => id.isNotEmpty).toSet();
+      if (!mounted) return;
+      setState(() {
+        _workspaces = items;
+        _workspace = current != null && ids.contains(current)
+            ? current
+            : (ids.isEmpty ? null : ids.first);
+        _loadingWorkspaces = false;
+        _knowledge = const [];
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingWorkspaces = false;
+        _error = error.toString();
+      });
+    }
+  }
+
+  Future<void> _searchKnowledge() async {
+    final workspace = _workspace;
+    if (workspace == null) return;
+    setState(() => _searchingKnowledge = true);
+    try {
+      final payload = await widget.apiClient.searchWorkspaceKnowledge(
+        workspace,
+        query: _knowledgeQuery.text,
+      );
+      final raw = payload['items'];
+      final items = raw is List ? raw.whereType<Map>().map(_map).toList() : <Map<String, dynamic>>[];
+      if (mounted) setState(() => _knowledge = items);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _searchingKnowledge = false);
     }
   }
 
@@ -129,27 +186,77 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
         const EnterprisePageHeader(
           icon: Icons.smart_toy_outlined,
           title: 'Agent Center V2',
-          subtitle: 'Orchestration graph, timeline, approvals, retry/cancel/resume, health และ workspace context',
+          subtitle: 'Orchestration graph, timeline, approvals, retry/cancel/resume, health และ workspace knowledge',
         ),
         const SizedBox(height: 18),
         EnterpriseSection(
-          title: 'Workspace',
-          subtitle: 'เลือกขอบเขต context และ artifacts',
-          child: Row(children: [
-            const Icon(Icons.workspaces_outline),
-            const SizedBox(width: 12),
-            DropdownButton<String>(
-              key: const Key('workspace-selector'),
-              value: _workspace,
-              items: const [
-                DropdownMenuItem(value: 'default', child: Text('Default workspace')),
-                DropdownMenuItem(value: 'research', child: Text('Research workspace')),
-                DropdownMenuItem(value: 'operations', child: Text('Operations workspace')),
-              ],
-              onChanged: (value) => setState(() => _workspace = value ?? 'default'),
-            ),
-            const Spacer(),
-            Text('Active: $_workspace'),
+          title: 'Workspace & knowledge',
+          subtitle: 'เลือก workspace จริงจาก local index และค้นหา records พร้อม provenance',
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Icon(Icons.workspaces_outline),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButton<String>(
+                  key: const Key('workspace-selector'),
+                  value: _workspace,
+                  isExpanded: true,
+                  hint: Text(_loadingWorkspaces ? 'Loading workspaces...' : 'No workspace indexed'),
+                  items: _workspaces.map((item) {
+                    final id = '${item['workspace_id'] ?? ''}';
+                    return DropdownMenuItem(value: id, child: Text('${item['name'] ?? id}'));
+                  }).where((item) => item.value?.isNotEmpty == true).toList(),
+                  onChanged: _loadingWorkspaces ? null : (value) => setState(() { _workspace = value; _knowledge = const []; }),
+                ),
+              ),
+              IconButton(
+                key: const Key('refresh-workspaces'),
+                tooltip: 'Refresh workspaces',
+                onPressed: _loadingWorkspaces ? null : _loadWorkspaces,
+                icon: const Icon(Icons.refresh),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  key: const Key('knowledge-search-query'),
+                  controller: _knowledgeQuery,
+                  enabled: _workspace != null,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'Search workspace knowledge',
+                  ),
+                  onSubmitted: (_) => _searchKnowledge(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Semantics(
+                button: true,
+                label: 'Search workspace knowledge',
+                child: FilledButton.icon(
+                  key: const Key('knowledge-search-button'),
+                  onPressed: _workspace == null || _searchingKnowledge ? null : _searchKnowledge,
+                  icon: const Icon(Icons.manage_search),
+                  label: const Text('Search'),
+                ),
+              ),
+            ]),
+            if (_searchingKnowledge) const LinearProgressIndicator(),
+            if (_knowledge.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ..._knowledge.map((record) {
+                final provenance = record['provenance'] is Map ? _map(record['provenance'] as Map) : <String, dynamic>{};
+                return Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.fact_check_outlined),
+                    title: Text('${record['title'] ?? record['record_id'] ?? 'Knowledge record'}'),
+                    subtitle: Text('${record['kind'] ?? 'record'} • source: ${provenance['source_type'] ?? 'unknown'} / ${provenance['source_id'] ?? '-'}'),
+                    trailing: Text('score ${record['score'] ?? 0}'),
+                  ),
+                );
+              }),
+            ],
           ]),
         ),
         const SizedBox(height: 18),
@@ -164,10 +271,14 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
                     key: Key('approval-$id'),
                     leading: const Icon(Icons.approval_outlined),
                     title: Text('${run['objective'] ?? 'Approval required'}'),
-                    trailing: FilledButton(
-                      key: Key('approval-confirm-$id'),
-                      onPressed: _busy.contains(id) ? null : () => _action(id, 'confirm'),
-                      child: const Text('Approve'),
+                    trailing: Semantics(
+                      button: true,
+                      label: 'Approve orchestration ${_short(id)}',
+                      child: FilledButton(
+                        key: Key('approval-confirm-$id'),
+                        onPressed: _busy.contains(id) ? null : () => _action(id, 'confirm'),
+                        child: const Text('Approve'),
+                      ),
                     ),
                   );
                 }).toList()),
@@ -175,15 +286,19 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
         const SizedBox(height: 18),
         EnterpriseSection(
           title: 'Multi-Agent orchestration',
-          subtitle: 'Dependency status และ run controls',
+          subtitle: 'Visual dependency graph, status และ run controls',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
               Expanded(child: Text(_loading ? 'กำลังโหลด orchestration...' : '${_runs.length} orchestration run(s)')),
-              FilledButton.icon(
-                key: const Key('create-orchestration-button'),
-                onPressed: _creating ? null : _create,
-                icon: const Icon(Icons.add),
-                label: const Text('Create orchestration'),
+              Semantics(
+                button: true,
+                label: 'Create orchestration',
+                child: FilledButton.icon(
+                  key: const Key('create-orchestration-button'),
+                  onPressed: _creating ? null : _create,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create orchestration'),
+                ),
               ),
               IconButton(onPressed: _loading ? null : _loadRuns, icon: const Icon(Icons.refresh)),
             ]),
@@ -241,23 +356,22 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [Expanded(child: Text('${run['objective'] ?? 'Untitled orchestration'}')), Chip(label: Text(status))]),
           Text('Run ${_short(id)}'),
-          ...steps.whereType<Map>().map((raw) {
-            final step = _map(raw);
-            final deps = step['depends_on'] is List ? (step['depends_on'] as List).join(', ') : '';
-            return ListTile(
-              dense: true,
-              leading: const Icon(Icons.account_tree_outlined),
-              title: Text('${step['step_id'] ?? 'step'} → ${step['requested_agent'] ?? 'auto'}'),
-              subtitle: Text(deps.isEmpty ? 'No dependency' : 'Depends on: $deps'),
-              trailing: Chip(label: Text('${step['status'] ?? 'planned'}')),
-            );
-          }),
+          const SizedBox(height: 10),
+          Semantics(
+            label: 'Orchestration dependency graph for run ${_short(id)}',
+            child: _DependencyGraph(steps: steps.whereType<Map>().map(_map).toList()),
+          ),
+          const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
-            OutlinedButton.icon(
-              key: Key('execute-$id'),
-              onPressed: busy ? null : () => _action(id, 'execute'),
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('Execute'),
+            Semantics(
+              button: true,
+              label: 'Execute orchestration ${_short(id)}',
+              child: OutlinedButton.icon(
+                key: Key('execute-$id'),
+                onPressed: busy ? null : () => _action(id, 'execute'),
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Execute'),
+              ),
             ),
             OutlinedButton.icon(
               key: Key('timeline-$id'),
@@ -277,6 +391,40 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
 
   static Map<String, dynamic> _map(Map<dynamic, dynamic> value) => value.map((key, value) => MapEntry(key.toString(), value));
   static String _short(String value) => value.length <= 8 ? value : value.substring(0, 8);
+}
+
+class _DependencyGraph extends StatelessWidget {
+  const _DependencyGraph({required this.steps});
+  final List<Map<String, dynamic>> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    if (steps.isEmpty) return const Text('No steps');
+    return Wrap(
+      key: const Key('orchestration-dependency-graph'),
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (var index = 0; index < steps.length; index++) ...[
+          if (index > 0) const Icon(Icons.arrow_forward, size: 18),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Text('${steps[index]['step_id'] ?? 'step'} • ${steps[index]['requested_agent'] ?? 'auto'}'),
+              Text('${steps[index]['status'] ?? 'planned'}', style: Theme.of(context).textTheme.labelSmall),
+              if (steps[index]['depends_on'] is List && (steps[index]['depends_on'] as List).isNotEmpty)
+                Text('← ${(steps[index]['depends_on'] as List).join(', ')}', style: Theme.of(context).textTheme.bodySmall),
+            ]),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 class _CreateDialog extends StatefulWidget {
