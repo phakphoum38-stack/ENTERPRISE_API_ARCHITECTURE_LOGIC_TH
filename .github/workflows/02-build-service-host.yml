@@ -55,10 +55,12 @@ jobs:
         run: |
           python -m py_compile tools/research_os_api/server.py
           python -m py_compile tools/research_os_api/render_server.py
+          python -m py_compile tools/research_os_api/v2_server.py
           python -m py_compile tools/research_os_api/agent_server.py
           python -m py_compile tools/research_os_api/agent_orchestrator.py
           python -m py_compile tools/research_os_api/agent_platform.py
           python -m py_compile tools/research_os_api/agent_runtime.py
+          python -m py_compile tools/research_os_api/v2_completion_crew.py
           python -m py_compile tools/research_os_api/conversation_store.py
           python -m py_compile tools/research_os_api/memory.py
           python -m py_compile tools/research_os_api/google_workspace.py
