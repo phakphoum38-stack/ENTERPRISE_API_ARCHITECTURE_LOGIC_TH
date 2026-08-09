@@ -22,6 +22,8 @@ class ResearchOSApiClient {
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
+  Future<Map<String, dynamic>> getProviderGateway() =>
+      _getJson('/v2/providers');
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
@@ -168,14 +170,12 @@ class ResearchOSApiClient {
 
   Future<Map<String, dynamic>> generateText(String prompt) {
     return _postJson('/v1/ai/generate', <String, Object?>{
-      'provider': 'gemini',
       'prompt': prompt,
     });
   }
 
   Future<Map<String, dynamic>> answerWithMemory(String question) {
     return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
-      'provider': 'gemini',
       'question': question,
     });
   }
