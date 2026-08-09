@@ -1,29 +1,35 @@
 #!/usr/bin/env python3
-"""Research OS API V2 compatibility and readiness facade.
+"""Research OS API V2 compatibility, pagination and readiness facade.
 
-V2 aliases use the same V1 runtime/orchestrator owners so state and business
-logic remain single-source while clients migrate incrementally.
+V2 uses the same V1 runtime/orchestrator owners. Only transport contracts are
+versioned here; state and business logic remain single-source.
 """
 
 from __future__ import annotations
 
+import base64
 from http import HTTPStatus
-from urllib.parse import urlsplit, urlunsplit
+from typing import Any
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
+import agent_server
 from agent_server import AgentResearchOSHandler
 from v2_observability import readiness_snapshot
 
 
 class V2ResearchOSHandler(AgentResearchOSHandler):
-    """Expose V2 aliases and consolidated readiness while preserving V1."""
+    """Expose V2 contracts while preserving every supported V1 route."""
 
     _v2_aliases = (
         ("/v2/orchestrations", "/v1/agents/orchestrations"),
         ("/v2/agents", "/v1/agents"),
     )
+    _v2_request = False
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
+        self._v2_request = parsed.path.startswith("/v2/")
+
         if parsed.path == "/v2/health/readiness":
             payload = readiness_snapshot()
             self._send(
@@ -31,12 +37,78 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
                 payload,
             )
             return
+
+        if parsed.path == "/v2/orchestrations":
+            self._send_v2_orchestration_page(parsed.query)
+            return
+
         self._rewrite_v2_path()
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
+        parsed = urlsplit(self.path)
+        self._v2_request = parsed.path.startswith("/v2/")
         self._rewrite_v2_path()
         super().do_POST()
+
+    def _send_v2_orchestration_page(self, raw_query: str) -> None:
+        try:
+            query = parse_qs(raw_query)
+            page_size = int(self._first(query, "page_size") or "50")
+            if page_size < 1 or page_size > 100:
+                raise ValueError("page_size must be between 1 and 100")
+            offset = self._decode_cursor(self._first(query, "cursor"))
+            all_runs = agent_server.ORCHESTRATOR.list(
+                status=self._first(query, "status"),
+                query=self._first(query, "q"),
+                agent=self._first(query, "agent"),
+                limit=200,
+            )
+            items = all_runs[offset : offset + page_size]
+            next_offset = offset + len(items)
+            next_cursor = (
+                self._encode_cursor(next_offset) if next_offset < len(all_runs) else None
+            )
+            self._send(
+                HTTPStatus.OK,
+                {
+                    "items": items,
+                    "page": {
+                        "page_size": page_size,
+                        "returned": len(items),
+                        "next_cursor": next_cursor,
+                    },
+                    "filters": {
+                        "status": self._first(query, "status"),
+                        "q": self._first(query, "q"),
+                        "agent": self._first(query, "agent"),
+                    },
+                },
+            )
+        except (TypeError, ValueError) as exc:
+            self._send(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "invalid_pagination", "detail": str(exc)},
+            )
+
+    def _send(self, status: HTTPStatus | int, payload: dict[str, Any]) -> None:
+        status_code = int(status)
+        if self._v2_request:
+            if status_code >= 400:
+                raw_code = payload.get("error")
+                code = raw_code if isinstance(raw_code, str) else f"http_{status_code}"
+                message = str(payload.get("detail") or payload.get("message") or code)
+                payload = {
+                    "api_version": "v2",
+                    "error": {
+                        "code": code,
+                        "message": message,
+                        "status": status_code,
+                    },
+                }
+            else:
+                payload = {"api_version": "v2", **payload}
+        super()._send(status, payload)
 
     def _rewrite_v2_path(self) -> None:
         parsed = urlsplit(self.path)
@@ -50,6 +122,32 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
         self.path = urlunsplit(
             (parsed.scheme, parsed.netloc, rewritten, parsed.query, parsed.fragment)
         )
+
+    @staticmethod
+    def _first(query: dict[str, list[str]], key: str) -> str | None:
+        values = query.get(key)
+        if not values:
+            return None
+        value = values[0].strip()
+        return value or None
+
+    @staticmethod
+    def _encode_cursor(offset: int) -> str:
+        return base64.urlsafe_b64encode(str(offset).encode("ascii")).decode("ascii").rstrip("=")
+
+    @staticmethod
+    def _decode_cursor(value: str | None) -> int:
+        if not value:
+            return 0
+        try:
+            padded = value + "=" * (-len(value) % 4)
+            decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("ascii")
+            offset = int(decoded)
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("cursor is invalid") from exc
+        if offset < 0:
+            raise ValueError("cursor is invalid")
+        return offset
 
 
 __all__ = ["V2ResearchOSHandler"]
