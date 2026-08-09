@@ -41,65 +41,49 @@ class DeveloperActionsPhase6Tests(unittest.TestCase):
             payload = {"path": "lib/app.py", "content": "value = 2\n"}
 
             preview = runtime.execute_tool(
-                "workspace.file.change",
-                "write",
-                session_id="write-preview",
-                payload=payload,
-                granted_permissions=("workspace.read", "workspace.write"),
-                dry_run=True,
+                "workspace.file.change", "write", session_id="write-preview", payload=payload,
+                granted_permissions=("workspace.read", "workspace.write"), dry_run=True,
             )
             self.assertEqual("completed", preview["status"])
             self.assertIn("-value = 1", preview["output"]["diff"])
             self.assertIn("+value = 2", preview["output"]["diff"])
-            token = preview["output"]["change_token"]
+            fingerprint = preview["output"]["approval_fingerprint"]
 
             waiting = runtime.execute_tool(
-                "workspace.file.change",
-                "write",
-                session_id="write-apply",
-                payload={**payload, "change_token": token},
+                "workspace.file.change", "write", session_id="write-apply",
+                payload={**payload, "approval_fingerprint": fingerprint},
                 granted_permissions=("workspace.read", "workspace.write"),
             )
             self.assertEqual("awaiting_approval", waiting["status"])
             self.assertEqual("value = 1\n", (Path(tmp) / "lib" / "app.py").read_text())
 
             done = runtime.execute_tool(
-                "workspace.file.change",
-                "write",
-                session_id="write-apply",
-                payload={**payload, "change_token": token},
-                granted_permissions=("workspace.read", "workspace.write"),
-                approved=True,
+                "workspace.file.change", "write", session_id="write-apply",
+                payload={**payload, "approval_fingerprint": fingerprint},
+                granted_permissions=("workspace.read", "workspace.write"), approved=True,
             )
             self.assertEqual("completed", done["status"])
             self.assertTrue(done["output"]["verification"]["matches"])
             self.assertEqual("value = 2\n", (Path(tmp) / "lib" / "app.py").read_text())
 
-    def test_workspace_change_fails_closed_on_stale_token_and_secret_paths(self) -> None:
+    def test_workspace_change_fails_closed_on_stale_fingerprint_and_secret_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             self.seed(tmp)
             runtime = self.runtime(tmp)
             pack = install_developer_action_tools(runtime.tools, tmp)
             payload = {"path": "lib/app.py", "content": "value = 2\n"}
             preview = runtime.execute_tool(
-                "workspace.file.change",
-                "write",
-                session_id="stale-preview",
-                payload=payload,
-                granted_permissions=("workspace.read", "workspace.write"),
-                dry_run=True,
+                "workspace.file.change", "write", session_id="stale-preview", payload=payload,
+                granted_permissions=("workspace.read", "workspace.write"), dry_run=True,
             )
             (Path(tmp) / "lib" / "app.py").write_text("value = 99\n", encoding="utf-8")
             failed = runtime.execute_tool(
-                "workspace.file.change",
-                "write",
-                session_id="stale-apply",
-                payload={**payload, "change_token": preview["output"]["change_token"]},
-                granted_permissions=("workspace.read", "workspace.write"),
-                approved=True,
+                "workspace.file.change", "write", session_id="stale-apply",
+                payload={**payload, "approval_fingerprint": preview["output"]["approval_fingerprint"]},
+                granted_permissions=("workspace.read", "workspace.write"), approved=True,
             )
             self.assertEqual("failed", failed["status"])
-            self.assertIn("change_token mismatch", failed["error"])
+            self.assertIn("approval_fingerprint mismatch", failed["error"])
             with self.assertRaises(WorkspaceBoundaryError):
                 pack.file_change("write", {"path": ".env", "content": "x=1\n"}, dry_run=True)
             with self.assertRaises(WorkspaceBoundaryError):
@@ -116,37 +100,24 @@ class DeveloperActionsPhase6Tests(unittest.TestCase):
                 return {"returncode": 0, "stdout": "ok", "stderr": ""}
 
             profile = CommandProfile(
-                "unit.test",
-                ("python", "-m", "unittest", "discover"),
-                timeout_seconds=30,
-                category="test",
+                "unit.test", ("python", "-m", "unittest", "discover"),
+                timeout_seconds=30, category="test",
             )
             install_developer_action_tools(
-                runtime.tools,
-                tmp,
-                command_profiles=(profile,),
-                command_executor=executor,
+                runtime.tools, tmp, command_profiles=(profile,), command_executor=executor,
             )
             payload = {"command_id": "unit.test", "argv": ["unexpected", "payload"]}
             preview = runtime.execute_tool(
-                "workspace.command.run",
-                "run",
-                session_id="command-preview",
-                payload=payload,
-                granted_permissions=("workspace.execute",),
-                dry_run=True,
+                "workspace.command.run", "run", session_id="command-preview", payload=payload,
+                granted_permissions=("workspace.execute",), dry_run=True,
             )
             self.assertEqual(["python", "-m", "unittest", "discover"], preview["output"]["argv"])
             self.assertEqual([], calls)
 
             with patch.dict(os.environ, {"GITHUB_TOKEN": "must-not-inherit", "API_KEY": "blocked"}, clear=False):
                 done = runtime.execute_tool(
-                    "workspace.command.run",
-                    "run",
-                    session_id="command-apply",
-                    payload=payload,
-                    granted_permissions=("workspace.execute",),
-                    approved=True,
+                    "workspace.command.run", "run", session_id="command-apply", payload=payload,
+                    granted_permissions=("workspace.execute",), approved=True,
                 )
             self.assertEqual("completed", done["status"])
             self.assertNotIn("GITHUB_TOKEN", calls[0]["env"])
@@ -164,11 +135,8 @@ class DeveloperActionsPhase6Tests(unittest.TestCase):
 
             pack = install_github_write_tools(runtime.tools, provider=provider)
             base = {
-                "repository": "owner/repo",
-                "path": "lib/app.py",
-                "content": "value = 2\n",
-                "message": "feat: update app",
-                "expected_sha": "c" * 40,
+                "repository": "owner/repo", "path": "lib/app.py", "content": "value = 2\n",
+                "message": "feat: update app", "expected_sha": "c" * 40,
             }
             for branch in ("main", "release/v2.0.0-rc.1", "deploy/production"):
                 with self.assertRaisesRegex(ValueError, "protected GitHub branch"):
@@ -176,30 +144,22 @@ class DeveloperActionsPhase6Tests(unittest.TestCase):
 
             payload = {**base, "branch": "feature/phase6"}
             preview = runtime.execute_tool(
-                "github.branch.file.upsert",
-                "upsert",
-                session_id="github-preview",
-                payload=payload,
-                granted_permissions=("github.write",),
-                dry_run=True,
+                "github.branch.file.upsert", "upsert", session_id="github-preview", payload=payload,
+                granted_permissions=("github.write",), dry_run=True,
             )
             self.assertEqual([], calls)
+            fingerprint = preview["output"]["approval_fingerprint"]
             waiting = runtime.execute_tool(
-                "github.branch.file.upsert",
-                "upsert",
-                session_id="github-apply",
-                payload={**payload, "change_token": preview["output"]["change_token"]},
+                "github.branch.file.upsert", "upsert", session_id="github-apply",
+                payload={**payload, "approval_fingerprint": fingerprint},
                 granted_permissions=("github.write",),
             )
             self.assertEqual("awaiting_approval", waiting["status"])
             self.assertEqual([], calls)
             done = runtime.execute_tool(
-                "github.branch.file.upsert",
-                "upsert",
-                session_id="github-apply",
-                payload={**payload, "change_token": preview["output"]["change_token"]},
-                granted_permissions=("github.write",),
-                approved=True,
+                "github.branch.file.upsert", "upsert", session_id="github-apply",
+                payload={**payload, "approval_fingerprint": fingerprint},
+                granted_permissions=("github.write",), approved=True,
             )
             self.assertEqual("completed", done["status"])
             self.assertEqual("file_upsert", calls[0][0])
@@ -210,38 +170,23 @@ class DeveloperActionsPhase6Tests(unittest.TestCase):
     def test_github_comment_skill_verifies_without_code_state_change(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.runtime(tmp)
-            install_github_write_tools(
-                runtime.tools,
-                provider=lambda action, payload: {"comment_id": 9001},
-            )
+            install_github_write_tools(runtime.tools, provider=lambda action, payload: {"comment_id": 9001})
             runtime.skills.register(
                 SkillDefinition(
-                    "github.pr-comment",
-                    "1.0.0",
-                    "GitHub PR Comment",
-                    "Adds a governed PR comment.",
-                    ("github_pr_feedback",),
-                    required_tool_capabilities=("github_pull_request_comment",),
-                    permissions=("github.write",),
-                    required_evidence=("applied", "comment_id"),
+                    "github.pr-comment", "1.0.0", "GitHub PR Comment", "Adds a governed PR comment.",
+                    ("github_pr_feedback",), required_tool_capabilities=("github_pull_request_comment",),
+                    permissions=("github.write",), required_evidence=("applied", "comment_id"),
                 )
             )
             payload = {"repository": "owner/repo", "pr_number": 19, "comment": "review evidence attached"}
             preview = runtime.execute_tool(
-                "github.pull_request.comment",
-                "comment",
-                session_id="comment-preview",
-                payload=payload,
-                granted_permissions=("github.write",),
-                dry_run=True,
+                "github.pull_request.comment", "comment", session_id="comment-preview", payload=payload,
+                granted_permissions=("github.write",), dry_run=True,
             )
             result = runtime.execute_skill(
-                "github.pr-comment",
-                "comment",
-                session_id="comment-skill",
-                payload={**payload, "change_token": preview["output"]["change_token"]},
-                granted_permissions=("github.write",),
-                approved=True,
+                "github.pr-comment", "comment", session_id="comment-skill",
+                payload={**payload, "approval_fingerprint": preview["output"]["approval_fingerprint"]},
+                granted_permissions=("github.write",), approved=True,
             )
             self.assertEqual("verified", result["status"])
             self.assertEqual("github.pull_request.comment", result["selected_tool_id"])
@@ -251,33 +196,20 @@ class DeveloperActionsPhase6Tests(unittest.TestCase):
             runtime = self.runtime(tmp)
             secret = "phase6-provider-secret"
             install_github_write_tools(
-                runtime.tools,
-                provider=lambda action, payload: {"commit_sha": "d" * 40, "echo": secret},
+                runtime.tools, provider=lambda action, payload: {"commit_sha": "d" * 40, "echo": secret},
             )
             payload = {
-                "repository": "owner/repo",
-                "branch": "feature/redaction",
-                "path": "app.py",
-                "content": "x=1\n",
-                "message": "test",
-                "expected_sha": "e" * 40,
+                "repository": "owner/repo", "branch": "feature/redaction", "path": "app.py",
+                "content": "x=1\n", "message": "test", "expected_sha": "e" * 40,
             }
             preview = runtime.execute_tool(
-                "github.branch.file.upsert",
-                "upsert",
-                session_id="redaction-preview",
-                payload=payload,
-                granted_permissions=("github.write",),
-                dry_run=True,
+                "github.branch.file.upsert", "upsert", session_id="redaction-preview", payload=payload,
+                granted_permissions=("github.write",), dry_run=True,
             )
             done = runtime.execute_tool(
-                "github.branch.file.upsert",
-                "upsert",
-                session_id="redaction-apply",
-                payload={**payload, "change_token": preview["output"]["change_token"]},
-                granted_permissions=("github.write",),
-                approved=True,
-                secret_values=(secret,),
+                "github.branch.file.upsert", "upsert", session_id="redaction-apply",
+                payload={**payload, "approval_fingerprint": preview["output"]["approval_fingerprint"]},
+                granted_permissions=("github.write",), approved=True, secret_values=(secret,),
             )
             self.assertEqual("completed", done["status"])
             self.assertNotIn(secret, str(done))
