@@ -11,6 +11,11 @@ on:
         description: Installer workflow run ID
         required: false
         type: string
+      rollback_sha:
+        description: Stable V1 SHA used for rollback validation
+        required: false
+        default: d05189d151b6bfa65938dad7a812ac104db195f4
+        type: string
       dispatch_release:
         description: Dispatch the downstream release workflow after successful validation
         required: false
@@ -23,12 +28,13 @@ permissions:
 
 jobs:
   installer-validation:
-    name: Install upgrade data service health uninstall
+    name: Install upgrade rollback data service health uninstall
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       SOURCE_RUN_ID: ${{ inputs.source_installer_run }}
+      ROLLBACK_SHA: ${{ inputs.rollback_sha }}
     steps:
       - name: Checkout tested revision
         uses: actions/checkout@v4
@@ -165,32 +171,94 @@ jobs:
           }
           .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
 
-      - name: Uninstall Setup EXE silently
+      - name: Uninstall V2 Setup EXE silently
         shell: pwsh
         run: |
           $root = Join-Path $env:ProgramFiles 'Research OS'
           $uninstaller = Get-ChildItem $root -Filter 'unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $uninstaller) { throw "Uninstaller executable was not found" }
-          $log = "$env:RUNNER_TEMP\research-os-uninstall.log"
+          $log = "$env:RUNNER_TEMP\research-os-uninstall-v2.log"
           $p = Start-Process -FilePath $uninstaller.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
           if ($p.ExitCode -ne 0) {
             if (Test-Path $log) { Get-Content $log -Tail 300 }
-            throw "Uninstaller failed with exit code $($p.ExitCode)"
+            throw "V2 uninstaller failed with exit code $($p.ExitCode)"
           }
-          if (Test-Path $log) { Get-Content $log -Tail 80 }
 
-      - name: Verify service removed and V1 data preserved after uninstall
+      - name: Verify V2 service removed and V1 data preserved
         shell: pwsh
         run: |
           for ($i = 0; $i -lt 20; $i++) {
             if (-not (Get-Service ResearchOSService -ErrorAction SilentlyContinue)) { break }
             Start-Sleep -Milliseconds 500
           }
-          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
-            sc.exe query ResearchOSService | Out-Host
-            throw "ResearchOSService still exists after uninstall"
+          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { throw "ResearchOSService still exists after V2 uninstall" }
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 is still listening after V2 uninstall" }
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+
+      - name: Resolve and download stable V1 rollback installer
+        id: rollback-run
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runId = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$env:ROLLBACK_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+          if (-not $runId) { throw "No successful stable V1 installer run found for rollback SHA $env:ROLLBACK_SHA" }
+          New-Item -ItemType Directory -Force -Path rollback-installer | Out-Null
+          gh run download "$runId" --repo "${{ github.repository }}" --name "research-os-installer-$env:ROLLBACK_SHA" --dir rollback-installer
+          $setup = Get-ChildItem "rollback-installer\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Stable V1 rollback installer artifact is unavailable or expired" }
+          "run_id=$runId" >> $env:GITHUB_OUTPUT
+          Write-Host "Rollback installer run: $runId"
+
+      - name: Install stable V1 rollback package
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem "rollback-installer\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          $log = "$env:RUNNER_TEMP\research-os-rollback-v1-install.log"
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 300 }
+            throw "Stable V1 rollback install failed with exit code $($p.ExitCode)"
           }
-          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 is still listening after uninstall" }
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+
+      - name: Verify stable V1 rollback service health and data compatibility
+        shell: pwsh
+        run: |
+          $ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            try {
+              $response = Invoke-WebRequest -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2 -SkipHttpErrorCheck
+              if ($response.StatusCode -eq 200 -and $response.Content -match '"status"\s*:\s*"ok"') { $ready = $true; break }
+            } catch { }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $ready) { throw "Stable V1 rollback health endpoint did not become ready" }
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+          Write-Host "Stable V1 rollback is healthy and V1 local data hashes are unchanged."
+
+      - name: Uninstall stable V1 rollback package
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:ProgramFiles 'Research OS'
+          $uninstaller = Get-ChildItem $root -Filter 'unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $uninstaller) { throw "Stable V1 rollback uninstaller was not found" }
+          $log = "$env:RUNNER_TEMP\research-os-rollback-v1-uninstall.log"
+          $p = Start-Process -FilePath $uninstaller.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 300 }
+            throw "Stable V1 rollback uninstall failed with exit code $($p.ExitCode)"
+          }
+
+      - name: Verify final service removal and preserved data
+        shell: pwsh
+        run: |
+          for ($i = 0; $i -lt 20; $i++) {
+            if (-not (Get-Service ResearchOSService -ErrorAction SilentlyContinue)) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { throw "ResearchOSService still exists after rollback validation" }
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 is still listening after rollback validation" }
           .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
 
       - name: Emergency cleanup and diagnostics
@@ -201,10 +269,8 @@ jobs:
           Write-Host "=== FINAL SERVICE STATE ==="
           & sc.exe query ResearchOSService 2>&1 | Out-Host
           $global:LASTEXITCODE = 0
-
           Write-Host "=== FINAL PORT STATE ==="
           Get-NetTCPConnection -LocalPort 8787 -ErrorAction SilentlyContinue | Format-Table -AutoSize
-
           if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
             & sc.exe stop ResearchOSService 2>&1 | Out-Host
             $global:LASTEXITCODE = 0
@@ -212,11 +278,8 @@ jobs:
             & sc.exe delete ResearchOSService 2>&1 | Out-Host
             $global:LASTEXITCODE = 0
           }
-
           $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
-          foreach ($listener in $listeners) {
-            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
-          }
+          foreach ($listener in $listeners) { Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue }
           $global:LASTEXITCODE = 0
           exit 0
 
@@ -225,7 +288,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run 06-release.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ steps.installer-run.outputs.run_id }}"
+        run: gh workflow run 06-release.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ steps.installer-run.outputs.run_id }}"
 
       - name: Record validation-only mode
         if: ${{ success() && inputs.dispatch_release != true }}
