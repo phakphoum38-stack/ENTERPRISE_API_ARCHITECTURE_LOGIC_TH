@@ -12,13 +12,20 @@ from agent_platform import (
 class AgentPlatformTest(unittest.TestCase):
     def test_registry_contains_initial_agents(self):
         ids = {agent.agent_id for agent in AGENTS}
-        self.assertEqual(
-            ids,
-            {"research", "developer", "document", "github", "google_workspace", "shift"},
-        )
+        core_ids = {"research", "developer", "document", "github", "google_workspace", "shift"}
+        self.assertEqual(ids, core_ids)
+
         dashboard = platform_dashboard()
-        self.assertEqual(dashboard["agent_count"], 6)
-        self.assertEqual(dashboard["ready_agent_count"], 6)
+        dashboard_ids = {agent["agent_id"] for agent in dashboard["agents"]}
+        crew_ids = {
+            "v2_workspace_engineer",
+            "v2_agent_center_engineer",
+            "v2_api_compat_engineer",
+            "v2_reliability_release_engineer",
+        }
+        self.assertEqual(dashboard_ids, core_ids | crew_ids)
+        self.assertEqual(dashboard["agent_count"], 10)
+        self.assertEqual(dashboard["ready_agent_count"], 10)
         self.assertEqual(dashboard["dynamic_registration"], "active")
         self.assertEqual(dashboard["provider_preferences"], "per-agent")
         self.assertEqual(dashboard["fallback_routing"], "active")
