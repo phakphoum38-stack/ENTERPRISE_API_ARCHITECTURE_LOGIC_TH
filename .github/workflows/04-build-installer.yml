@@ -144,6 +144,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          DISPATCH_RELEASE: ${{ inputs.dispatch_release }}
         run: |
-          $releaseFlag = if (${{ inputs.dispatch_release == true }}) { 'true' } else { 'false' }
+          $releaseFlag = if ($env:DISPATCH_RELEASE -eq 'true') { 'true' } else { 'false' }
           gh workflow run 05-installer-validation.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}" -f dispatch_release="$releaseFlag"
