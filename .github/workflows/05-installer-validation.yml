@@ -11,6 +11,11 @@ on:
         description: Installer workflow run ID
         required: false
         type: string
+      dispatch_release:
+        description: Dispatch the downstream release workflow after successful validation
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -216,8 +221,14 @@ jobs:
           exit 0
 
       - name: Dispatch release workflow
-        if: success()
+        if: ${{ success() && inputs.dispatch_release == true }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run 06-release.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ steps.installer-run.outputs.run_id }}"
+
+      - name: Record validation-only mode
+        if: ${{ success() && inputs.dispatch_release != true }}
+        shell: pwsh
+        run: |
+          Write-Host "Installer validation completed in validation-only mode. Downstream release was not dispatched."
