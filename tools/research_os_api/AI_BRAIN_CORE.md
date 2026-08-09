@@ -50,7 +50,6 @@ Implemented:
 - idempotency-key reuse of completed results
 - observation records for attempts/results
 - activity-ledger events for plan/retry/failure/completion
-- key-based redaction for persisted tool payload/evidence/output fields
 
 Initial executable tools are intentionally internal and read-only:
 
@@ -58,7 +57,29 @@ Initial executable tools are intentionally internal and read-only:
 - `brain.session.inspect`
 - `brain.context.inspect`
 
-External filesystem, terminal, GitHub, Google Workspace and other adapters are not automatically trusted or discovered. They must be registered with an explicit ToolDefinition and routed through the same Execution Controller before use.
+## Phase 4 — Secret-aware Skill -> Tool execution
+
+Implemented:
+
+- secret redaction contract `brain-secret-redaction-phase-4`
+- ephemeral per-execution secret scopes that are never persisted
+- automatic discovery of values stored under sensitive input keys
+- explicit ephemeral secret values for non-standard credential fields
+- value-aware scrubbing of adapter output, exceptions, observations, checkpoints and ledger events
+- common Bearer / provider-key shape scrubbing as a second defensive layer
+- secret-aware checkpoint and activity-ledger facades while preserving the canonical Activity Ledger
+- Tool capability matching contract `brain-tool-matching-phase-4`
+- deterministic selection of one ready tool that satisfies all requested capabilities
+- Skill Registry contract `brain-skills-phase-4` with `required_tool_capabilities`
+- Skill -> Tool execution contract `brain-skill-tool-execution-phase-4`
+- skill dependency resolution before execution
+- skill-level permission gating before adapter invocation
+- tool-level permission / risk / approval gating through the hardened Execution Controller
+- post-execution verification against each skill's declared evidence contract
+- explicit `verification_failed` instead of treating a successful tool call as a completed skill when evidence is missing
+- single-tool skill execution in Phase 4; multi-tool skills are intentionally routed to orchestration rather than guessed
+
+The three internal read-only tools are now sufficient to exercise the Brain execution path and foundational Brain skills. External filesystem, terminal, GitHub, Google Workspace and other adapters are still not automatically trusted or discovered. They must be registered with an explicit ToolDefinition and pass through the same hardened controller.
 
 ## Execution contract
 
@@ -66,29 +87,38 @@ External filesystem, terminal, GitHub, Google Workspace and other adapters are n
 Goal
   -> Context
   -> Plan
-  -> Skill / Capability selection
-  -> Tool selection
+  -> Skill selection
+  -> Skill dependency resolution
+  -> Tool capability matching
   -> Decision + Risk
-  -> Permission check
+  -> Skill permission check
+  -> Tool permission check
   -> Approval gate when mutating
+  -> Secret-aware execution scope
   -> Tool adapter
   -> Observation
   -> Checkpoint
-  -> Verification / Evidence
+  -> Post-execution evidence verification
   -> Memory / Ledger
 ```
 
-No Brain Runtime method exposes a direct adapter invocation path. The low-level registry invocation method exists for the Execution Controller boundary and must not be treated as an authorization API.
+No Brain Runtime method exposes a direct authorization bypass to an adapter. The low-level registry invocation method exists only underneath the governed execution boundary and must not be treated as a public authorization API.
 
 ## Retry and recovery
 
 Automatic retries are bounded to at most the configured controller maximum (1-5 attempts) and are enabled only when the ToolDefinition declares the operation idempotent. Non-idempotent tools execute once per explicit execution request.
 
-A process restart converts a checkpoint left in `running` state to `interrupted`. Resuming requires a fresh ExecutionRequest because persisted checkpoint payloads are redacted and are not a secret-recovery mechanism.
+A process restart converts a checkpoint left in `running` state to `interrupted`. Resuming requires a fresh execution request because persisted checkpoint payloads are redacted and are not a credential-recovery mechanism.
 
-## Current hardening boundary
+## Secret handling boundary
 
-The current persistence redactor is key-based. Tool adapters that handle secret material must declare `secret_access`, must not intentionally return raw secret values, and require an additional secret-aware output hardening slice before external credential-bearing adapters are promoted to production use.
+Phase 4 protects persisted and returned Brain execution records against secrets reflected by adapters under neutral field names or embedded in exception strings. Secret values discovered or supplied for one execution live only in an ephemeral context-local scope and are not included in checkpoints, activity records or diagnostics.
+
+This does not make arbitrary external adapters automatically trusted. Credential-bearing adapters still require explicit registration, least-privilege permissions, provider-specific tests, and production trust-boundary review before promotion.
+
+## Current development boundary
+
+Brain Phase 4 establishes the model-independent control plane and hardened internal execution path. It does not yet add unrestricted filesystem, terminal, GitHub-write, Google Workspace-write or production deployment adapters. Those integrations should arrive as separate permissioned adapter slices with their own evidence and rollback contracts.
 
 ## Release boundary
 
