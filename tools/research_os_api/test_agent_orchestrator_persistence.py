@@ -221,6 +221,73 @@ class DurableOrchestrationTests(unittest.TestCase):
                 [event["event_type"] for event in restarted.timeline(created["run_id"])],
             )
 
+    def test_schema_v1_state_migrates_without_data_loss(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_path = root / "agents" / "orchestrations.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "updated_at": 1.0,
+                        "runs": [
+                            {
+                                "run_id": "legacy-run",
+                                "objective": "preserve v1 durable state",
+                                "status": "completed",
+                                "created_at": 1.0,
+                                "updated_at": 2.0,
+                                "steps": [
+                                    {
+                                        "step_id": "research",
+                                        "objective": "legacy research step",
+                                        "requested_agent": "research",
+                                        "depends_on": [],
+                                        "context": {"legacy": True},
+                                        "status": "completed",
+                                        "task_id": "legacy-task",
+                                        "result": {"ok": True},
+                                        "error": None,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            orchestrator = AgentOrchestrator(storage_path=state_path)
+            migrated = orchestrator.get("legacy-run")
+            self.assertEqual(migrated["run_id"], "legacy-run")
+            self.assertEqual(migrated["status"], "completed")
+            self.assertEqual(migrated["steps"][0]["result"], {"ok": True})
+            self.assertEqual(migrated["steps"][0]["attempt_count"], 0)
+            self.assertEqual(migrated["steps"][0]["max_attempts"], 3)
+
+            persisted = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["schema_version"], 2)
+            self.assertEqual(persisted["runs"][0]["run_id"], "legacy-run")
+            self.assertEqual(persisted["runs"][0]["steps"][0]["step_id"], "research")
+
+    def test_openapi_preserves_v1_routes_and_declares_phase1_extensions(self) -> None:
+        contract = Path(__file__).with_name("openapi.yaml").read_text(encoding="utf-8")
+        required_paths = [
+            "/v1/agents/orchestrations:",
+            "/v1/agents/orchestrations/{run_id}:",
+            "/v1/agents/orchestrations/{run_id}/execute:",
+            "/v1/agents/orchestrations/{run_id}/confirm:",
+            "/v1/agents/orchestrations/{run_id}/timeline:",
+            "/v1/agents/orchestrations/{run_id}/retry:",
+            "/v1/agents/orchestrations/{run_id}/cancel:",
+        ]
+        for path in required_paths:
+            self.assertIn(path, contract)
+        self.assertIn("max_attempts:", contract)
+        self.assertIn("maximum: 5", contract)
+        self.assertIn("maximum: 200", contract)
+
 
 if __name__ == "__main__":
     unittest.main()
