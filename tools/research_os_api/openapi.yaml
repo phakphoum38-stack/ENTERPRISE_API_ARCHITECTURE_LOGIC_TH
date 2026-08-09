@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Research OS API
-  version: 2.0.0-dev.1
+  version: 2.0.0-rc.1
   description: Provider-agnostic Research OS API. V1 remains supported while the V2 draft contract is validated on the same runtime owners.
   x-research-os-v2-status: draft
 servers:
