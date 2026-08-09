@@ -11,6 +11,11 @@ on:
         description: ServiceHost workflow run ID
         required: false
         type: string
+      dispatch_release:
+        description: Allow the installer validation chain to dispatch release
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -152,4 +157,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run 04-build-installer.yml --repo "${{ github.repository }}" --ref main -f target_sha="$env:TARGET_SHA"
+          DISPATCH_RELEASE: ${{ inputs.dispatch_release }}
+        run: |
+          $releaseFlag = if ($env:DISPATCH_RELEASE -eq 'true') { 'true' } else { 'false' }
+          gh workflow run 04-build-installer.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f dispatch_release="$releaseFlag"
