@@ -84,6 +84,29 @@ class DeveloperAccessStoreTests(unittest.TestCase):
         )
         self.assertFalse(developer_write["allowed"])
 
+    def test_owner_can_list_and_revoke_active_grants(self) -> None:
+        request = self._request()
+        grant = self.store.approve_request(
+            owner_id="user:owner",
+            request_id=request["request_id"],
+            scopes=["read"],
+            expires_in_seconds=3600,
+        )
+        owner_grants = self.store.list_owner_grants("user:owner")
+        self.assertEqual([item["grant_id"] for item in owner_grants], [grant["grant_id"]])
+        self.assertTrue(owner_grants[0]["active"])
+        self.assertTrue(owner_grants[0]["owner_access_unchanged"])
+
+        self.store.revoke_grant(
+            owner_id="user:owner",
+            grant_id=grant["grant_id"],
+            reason="Owner revoked access",
+        )
+        self.assertEqual(self.store.list_owner_grants("user:owner"), [])
+        historical = self.store.list_owner_grants("user:owner", active_only=False)
+        self.assertEqual(len(historical), 1)
+        self.assertFalse(historical[0]["active"])
+
     def test_owner_can_revoke_developer_immediately(self) -> None:
         request = self._request()
         grant = self.store.approve_request(
