@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Research OS AI Brain runtime composition.
 
-Phase 2 composes the provider-neutral Brain Core with context assembly, the
-versioned Skill Registry, deterministic decision/risk policy, the existing Agent
-Registry, and the isolated 12-agent Brain engineering team. Tool execution stays
-disabled until the permissioned execution-port slice is implemented.
+Phase 3 composes the provider-neutral Brain Core with context assembly, the
+versioned Skill Registry, deterministic decision/risk policy, Tool Registry,
+permissioned execution, durable checkpoints and the isolated 12-agent Brain
+engineering team. The Brain never calls adapters directly: all tool execution
+passes through ExecutionController governance.
 """
 
 from __future__ import annotations
@@ -17,7 +18,9 @@ from v2_brain_context import ContextEngine, ContextSource
 from v2_brain_core import ActivityLedger, ResearchOSBrain, WorkingMemory
 from v2_brain_decision import ActionCandidate, DecisionEngine
 from v2_brain_team import brain_team_dashboard, register_brain_team
+from v2_execution_controller import CheckpointStore, ExecutionController, ExecutionRequest
 from v2_skill_registry import SkillRegistry
+from v2_tool_registry import ToolRegistry
 
 
 class BrainRuntime:
@@ -30,6 +33,9 @@ class BrainRuntime:
         skill_registry: SkillRegistry | None = None,
         context_engine: ContextEngine | None = None,
         decision_engine: DecisionEngine | None = None,
+        tool_registry: ToolRegistry | None = None,
+        checkpoint_store: CheckpointStore | None = None,
+        execution_controller: ExecutionController | None = None,
     ) -> None:
         self.registry = registry or AgentRegistry()
         register_brain_team(self.registry)
@@ -41,12 +47,79 @@ class BrainRuntime:
         self.skills = skill_registry or SkillRegistry()
         self.context = context_engine or ContextEngine()
         self.decisions = decision_engine or DecisionEngine()
+        self.tools = tool_registry or ToolRegistry()
+        self._attach_internal_tool_adapters()
+
+        if execution_controller is not None:
+            self.execution = execution_controller
+        else:
+            checkpoints = checkpoint_store
+            if checkpoints is None and working_memory is not None:
+                checkpoints = CheckpointStore(working_memory.root.parent)
+            self.execution = ExecutionController(
+                tools=self.tools,
+                decisions=self.decisions,
+                ledger=self.brain.ledger,
+                checkpoints=checkpoints,
+            )
+
+    def _attach_internal_tool_adapters(self) -> None:
+        def skills_adapter(action: str, payload: Mapping[str, Any], dry_run: bool) -> Mapping[str, Any]:
+            if action == "list":
+                return {"skills": self.skills.list(), "count": len(self.skills.list())}
+            if action == "discover":
+                capability = str(payload.get("capability") or "").strip()
+                if not capability:
+                    raise ValueError("capability is required")
+                matches = self.skills.discover(capability=capability)
+                return {"capability": capability, "skills": matches, "count": len(matches)}
+            if action == "dashboard":
+                return self.skills.dashboard()
+            raise ValueError(f"unsupported brain.skills.inspect action: {action}")
+
+        def session_adapter(action: str, payload: Mapping[str, Any], dry_run: bool) -> Mapping[str, Any]:
+            if action != "get":
+                raise ValueError(f"unsupported brain.session.inspect action: {action}")
+            target = str(payload.get("session_id") or "").strip()
+            if not target:
+                raise ValueError("session_id is required")
+            return self.brain.session(target)
+
+        def context_adapter(action: str, payload: Mapping[str, Any], dry_run: bool) -> Mapping[str, Any]:
+            if action != "build":
+                raise ValueError(f"unsupported brain.context.inspect action: {action}")
+            objective = str(payload.get("objective") or "").strip()
+            if not objective:
+                raise ValueError("objective is required")
+            raw_context = payload.get("context")
+            context = raw_context if isinstance(raw_context, Mapping) else None
+            session_id = str(payload.get("session_id") or "").strip() or None
+            budget_value = payload.get("budget_chars")
+            budget_chars = int(budget_value) if budget_value is not None else None
+            return self.build_context(
+                objective,
+                session_id=session_id,
+                context=context,
+                budget_chars=budget_chars,
+            )
+
+        for tool_id, adapter in (
+            ("brain.skills.inspect", skills_adapter),
+            ("brain.session.inspect", session_adapter),
+            ("brain.context.inspect", context_adapter),
+        ):
+            try:
+                self.tools.register_adapter(tool_id, adapter)
+            except ValueError as exc:
+                if "already registered" not in str(exc):
+                    raise
 
     def introspect(self) -> dict[str, Any]:
         return {
             "brain": self.brain.introspect(),
             "team": brain_team_dashboard(self.registry),
             "skills": self.skills.dashboard(),
+            "tools": self.tools.dashboard(),
             "context": {
                 "engine": "authority-provenance-budget",
                 "default_budget_chars": self.context.default_budget_chars,
@@ -54,8 +127,10 @@ class BrainRuntime:
                 "long_term_memory_port": type(self.context.memory).__name__,
             },
             "decision_policy": self.decisions.policy(),
-            "phase": "brain_core_phase_2",
-            "tool_execution": "disabled_until_permissioned_execution_port",
+            "execution": self.execution.dashboard(),
+            "phase": "brain_core_phase_3",
+            "tool_execution": "permissioned_controller_enabled",
+            "direct_adapter_access": False,
         }
 
     def build_context(
@@ -129,14 +204,19 @@ class BrainRuntime:
         )
         plan = self.brain.plan(objective, session_id=session_id, context=context)
         skill_matches: dict[str, list[str]] = {}
+        tool_matches: dict[str, list[str]] = {}
         for capability in plan.required_capabilities:
             skill_matches[capability] = [
                 item["skill_id"] for item in self.skills.discover(capability=capability)
+            ]
+            tool_matches[capability] = [
+                item["tool_id"] for item in self.tools.discover(capability=capability)
             ]
         return {
             "plan": plan,
             "context": context_snapshot,
             "skill_matches": skill_matches,
+            "tool_matches": tool_matches,
             "team": brain_team_dashboard(self.registry),
         }
 
@@ -156,6 +236,39 @@ class BrainRuntime:
 
     def discover_skills(self, capability: str) -> list[dict[str, Any]]:
         return self.skills.discover(capability=capability)
+
+    def discover_tools(self, capability: str, *, ready_only: bool = True) -> list[dict[str, Any]]:
+        return self.tools.discover(capability=capability, ready_only=ready_only)
+
+    def execute_tool(
+        self,
+        tool_id: str,
+        action: str,
+        *,
+        session_id: str,
+        payload: Mapping[str, Any] | None = None,
+        granted_permissions: Iterable[str] = (),
+        evidence: Mapping[str, Any] | None = None,
+        approved: bool = False,
+        dry_run: bool = False,
+        idempotency_key: str | None = None,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        result = self.execution.execute(
+            ExecutionRequest(
+                session_id=session_id,
+                tool_id=tool_id,
+                action=action,
+                payload=dict(payload or {}),
+                granted_permissions=tuple(granted_permissions),
+                evidence=dict(evidence or {}),
+                approved=approved,
+                dry_run=dry_run,
+                idempotency_key=idempotency_key,
+                correlation_id=correlation_id,
+            )
+        )
+        return asdict(result)
 
 
 BRAIN_RUNTIME = BrainRuntime()
