@@ -24,12 +24,14 @@ jobs:
   windows-foundation:
     name: Windows split-pipeline compatibility gate
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       TARGET_SHA: ${{ inputs.target_sha }}
       SOURCE_RELEASE_RUN: ${{ inputs.source_release_run }}
+      V1_ROLLBACK_BASELINE: d05189d151b6bfa65938dad7a812ac104db195f4
     steps:
       - name: Confirm verified release artifact exists
+        id: release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -40,33 +42,64 @@ jobs:
             workflow_name="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
             status="$(gh run view "$run_id" --repo "${{ github.repository }}" --json status --jq '.status')"
             conclusion="$(gh run view "$run_id" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+            head_sha="$(gh run view "$run_id" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
 
-            if [ "$workflow_name" != "Research OS Release" ]; then
-              echo "Run $run_id is not a Research OS Release run: $workflow_name"
-              exit 1
-            fi
-            if [ "$status" = "completed" ] && [ "$conclusion" != "success" ]; then
-              echo "Release run $run_id completed with conclusion: $conclusion"
-              exit 1
-            fi
-            if [ "$status" != "in_progress" ] && [ "$status" != "completed" ]; then
-              echo "Release run $run_id has unexpected status: $status"
-              exit 1
+            test "$workflow_name" = "Research OS Release" || { echo "Run $run_id is not Research OS Release: $workflow_name"; exit 1; }
+            test "$head_sha" = "$TARGET_SHA" || { echo "Release run SHA $head_sha does not match $TARGET_SHA"; exit 1; }
+            if [ "$status" = "completed" ]; then
+              test "$conclusion" = "success" || { echo "Release run $run_id completed with $conclusion"; exit 1; }
+            else
+              test "$status" = "in_progress" || { echo "Release run $run_id has unexpected status: $status"; exit 1; }
             fi
           else
             run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Release" --commit "$TARGET_SHA" --limit 20 --json databaseId,status,conclusion --jq '[.[] | select((.status == "completed" and .conclusion == "success") or .status == "in_progress")][0].databaseId')"
-            if [ -z "$run_id" ]; then
-              echo "No release run found for $TARGET_SHA. For workflow-dispatch releases, pass source_release_run."
-              exit 1
-            fi
+            test -n "$run_id" || { echo "No release run found for $TARGET_SHA"; exit 1; }
           fi
 
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
           echo "Split Windows pipeline reached release stage for $TARGET_SHA (run $run_id)."
+
+      - name: Download and verify same-SHA release manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN: ${{ steps.release.outputs.run_id }}
+        run: |
+          mkdir -p release-evidence
+          for attempt in $(seq 1 12); do
+            if gh run download "$RELEASE_RUN" --repo "${{ github.repository }}" --name "research-os-verified-release-$TARGET_SHA" --dir release-evidence 2>/tmp/release-download.err; then
+              break
+            fi
+            if [ "$attempt" = "12" ]; then
+              cat /tmp/release-download.err || true
+              echo "Verified release artifact was not downloadable"
+              exit 1
+            fi
+            sleep 5
+          done
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          manifest_path=Path('release-evidence/release-manifest.json')
+          if not manifest_path.exists():
+              raise SystemExit('release-manifest.json missing')
+          manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
+          assert manifest['target_sha'] == os.environ['TARGET_SHA'], manifest
+          assert manifest['validation'] == 'passed', manifest
+          assert manifest['rollback']['baseline_sha'] == os.environ['V1_ROLLBACK_BASELINE'], manifest
+          artifact=manifest['artifacts'][0]
+          setup=Path('release-evidence') / artifact['name']
+          assert setup.exists(), setup
+          actual=hashlib.sha256(setup.read_bytes()).hexdigest()
+          assert actual == artifact['sha256'], (actual, artifact['sha256'])
+          print('Same-target-SHA manifest, installer digest and rollback baseline verified.')
+          PY
 
       - name: Publish compatibility success
         run: |
           echo "Research OS Windows Desktop represents the successful split pipeline gate."
-          echo "Secondary validation workflows will be dispatched directly."
+          echo "Verified artifact manifest is bound to $TARGET_SHA."
 
       - name: Dispatch secondary validation workflows
         shell: bash
@@ -96,4 +129,4 @@ jobs:
             --repo "${{ github.repository }}" \
             --ref main \
             -f target_sha="$TARGET_SHA" \
-            -f source_release_run="$SOURCE_RELEASE_RUN"
+            -f source_release_run="${{ steps.release.outputs.run_id }}"
