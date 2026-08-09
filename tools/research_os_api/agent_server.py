@@ -115,7 +115,7 @@ class AgentResearchOSHandler(ResearchOSHandler):
         if path.startswith(self._prefix + "/"):
             relative = path[len(self._prefix) + 1 :].strip("/")
             parts = relative.split("/") if relative else []
-            if len(parts) != 2 or parts[1] not in {"execute", "confirm"}:
+            if len(parts) != 2 or parts[1] not in {"execute", "confirm", "retry", "cancel"}:
                 self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
                 return
             run_id, action = parts
@@ -126,8 +126,16 @@ class AgentResearchOSHandler(ResearchOSHandler):
                         run_id,
                         confirmed=bool(body.get("confirmed", False)),
                     )
-                else:
+                elif action == "confirm":
                     run = ORCHESTRATOR.confirm(run_id)
+                elif action == "retry":
+                    step_id = body.get("step_id")
+                    run = ORCHESTRATOR.retry(
+                        run_id,
+                        step_id=str(step_id).strip() if step_id else None,
+                    )
+                else:
+                    run = ORCHESTRATOR.cancel(run_id)
                 self._send(HTTPStatus.OK, {"run": run})
             except ValueError as exc:
                 message = str(exc)
