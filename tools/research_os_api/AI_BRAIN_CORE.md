@@ -187,14 +187,62 @@ GitHub mutation safeguards:
 - tests inject deterministic mutation providers; CI does not need a live GitHub write credential
 - no delete, merge, workflow dispatch, tag, GitHub Release or deployment action exists in this pack
 
+## Phase 7 — System Introspection and governed Brain API
+
+Contract: `brain-system-introspection-phase-7`
+
+Phase 7 makes the Research OS intelligence structure queryable by the model, UI, and diagnostics without granting execution authority. The facade composes existing registries instead of copying their state into a second database.
+
+Implemented read-only endpoints:
+
+- `GET /v2/intelligence`
+- `GET /v2/intelligence/capabilities`
+- `GET /v2/intelligence/agents`
+- `GET /v2/intelligence/skills`
+- `GET /v2/intelligence/tools`
+- `GET /v2/intelligence/permissions`
+- `GET /v2/intelligence/architecture`
+- `GET /v2/intelligence/project-state`
+- `GET /v2/intelligence/health`
+- `POST /v2/intelligence/plan`
+
+Introspection semantics:
+
+- operational agents come from the existing `agent_platform.REGISTRY`
+- isolated Brain engineering roles come from `v2_brain_team.BRAIN_TEAM`
+- skill state comes from `BrainRuntime.skills`
+- tool state and real adapter readiness come from `BrainRuntime.tools`
+- provider/model selection remains owned by AI Gateway
+- orchestration remains owned by `AgentOrchestrator`
+- workspace knowledge remains owned by `WorkspaceKnowledgeEngine`
+- capability entries distinguish `known`, `routable`, `skill_supported`, and `executable`
+- a tool is executable only when a runtime adapter is actually ready; source-code presence alone does not make it executable
+- permission introspection is descriptive only and cannot grant permissions
+- Project State whitelists build/channel/version presence and execution-surface metadata; private data-directory paths are never returned
+- runtime Project State explicitly does not claim authority over release, publication, or production state
+
+Planning safeguards:
+
+- `/v2/intelligence/plan` is read-only and does not execute tools
+- planning does not grant permissions or approvals
+- objective and context sizes are bounded
+- output is JSON-safe and passes through the secret redaction boundary
+- credential-like strings reflected into the plan/context are scrubbed
+- no hidden chain-of-thought is exposed; only auditable plan/context/capability results are returned
+
+Phase 7 intentionally does **not** add `/execute`, `/grant`, `/release`, or `/deploy` intelligence endpoints. Real mutations still have to use the Phase 3/4 Execution Controller and Phase 6 approval boundaries.
+
 ## Skill integration
 
 Phase 5/6 packs participate in the existing Skill -> Tool path. Skills declare required capabilities and permissions; the Tool Registry resolves a matching ready adapter, the controller enforces permissions and approval, and the Brain verifies declared evidence before a skill can be reported as verified.
+
+Phase 7 lets the model or UI discover those contracts dynamically so changing the underlying model/provider does not erase Research OS skills, permissions, architecture knowledge, or tool readiness state.
 
 ## Execution contract
 
 ```text
 Goal
+  -> System Introspection / Capability Discovery
   -> Context
   -> Plan
   -> Skill selection
@@ -226,11 +274,13 @@ A process restart converts a checkpoint left in `running` state to `interrupted`
 
 Phase 4 protects persisted and returned Brain execution records against secrets reflected by adapters under neutral field names or embedded in exception strings. Secret values discovered or supplied for one execution live only in an ephemeral context-local scope and are not included in checkpoints, activity records or diagnostics.
 
-This does not make arbitrary external adapters automatically trusted. Credential-bearing adapters still require explicit registration, least-privilege permissions, provider-specific tests and production trust-boundary review before promotion.
+Phase 7 applies the same secret-safe boundary to introspection planning responses. This does not make arbitrary external adapters automatically trusted. Credential-bearing adapters still require explicit registration, least-privilege permissions, provider-specific tests and production trust-boundary review before promotion.
 
 ## Current development boundary
 
-Brain Phase 6 now has governed workspace edits, trusted-profile test/build execution, non-protected-branch GitHub file upsert and PR comments. It still does **not** expose an unrestricted terminal, arbitrary shell execution, arbitrary filesystem access, file deletion, GitHub merge, workflow dispatch, tag/release creation, Google Workspace writes, installer mutation, release promotion or production deployment.
+Brain Phase 7 can now describe its own agents, capabilities, skills, tools, permissions, architecture, runtime state and health, and can produce a bounded read-only plan over that structure. Phase 6 mutation adapters remain opt-in and approval-gated.
+
+It still does **not** expose an unrestricted terminal, arbitrary shell execution, arbitrary filesystem access, file deletion, GitHub merge, workflow dispatch, tag/release creation, Google Workspace writes, installer mutation, release promotion or production deployment.
 
 ## Release boundary
 
