@@ -25,6 +25,28 @@ class AgentRuntimeTest(unittest.TestCase):
             events = runtime.events.list(task_id=task["task_id"])
             self.assertEqual([event["event_type"] for event in events], ["task.queued", "task.started", "task.completed"])
 
+    def test_runtime_events_preserve_correlation_and_orchestration_ids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self._runtime(tmp)
+            task = runtime.submit(
+                "research runtime observability",
+                requested_agent="research",
+                context={
+                    "orchestration_run_id": "run-observe-1",
+                    "correlation_id": "corr-observe-1",
+                },
+            )
+            self.assertEqual(task["run_id"], "run-observe-1")
+            self.assertEqual(task["correlation_id"], "corr-observe-1")
+            self.assertEqual(task["result"]["run_id"], "run-observe-1")
+            events = runtime.events.list(task_id=task["task_id"])
+            self.assertTrue(events)
+            self.assertEqual({event["run_id"] for event in events}, {"run-observe-1"})
+            self.assertEqual(
+                {event["correlation_id"] for event in events},
+                {"corr-observe-1"},
+            )
+
     def test_developer_task_uses_developer_agent(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self._runtime(tmp, AgentRouter(AgentRegistry()))
