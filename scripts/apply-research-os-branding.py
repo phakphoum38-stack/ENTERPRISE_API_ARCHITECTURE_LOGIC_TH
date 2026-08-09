@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 from PIL import Image
@@ -49,14 +48,36 @@ def save_png(image: Image.Image, path: Path, size: int) -> None:
     image.resize((size, size), Image.Resampling.LANCZOS).save(path, "PNG", optimize=True)
 
 
+def save_ico(image: Image.Image, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(
+        path,
+        format="ICO",
+        sizes=[
+            (16, 16),
+            (20, 20),
+            (24, 24),
+            (32, 32),
+            (40, 40),
+            (48, 48),
+            (64, 64),
+            (128, 128),
+            (256, 256),
+        ],
+    )
+
+
+def apply_shared(image: Image.Image, root: Path) -> None:
+    branding = root / "assets" / "branding"
+    save_png(image, branding / "research_os_512.png", 512)
+    save_png(image, branding / "research_os_256.png", 256)
+    save_ico(image, branding / "research_os.ico")
+    print(f"Shared branding assets: {branding}")
+
+
 def apply_windows(image: Image.Image, root: Path) -> None:
     target = root / "windows" / "runner" / "resources" / "app_icon.ico"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    image.save(
-        target,
-        format="ICO",
-        sizes=[(16, 16), (20, 20), (24, 24), (32, 32), (40, 40), (48, 48), (64, 64), (128, 128), (256, 256)],
-    )
+    save_ico(image, target)
     print(f"Windows icon: {target}")
 
 
@@ -95,8 +116,6 @@ def apply_web(image: Image.Image, root: Path) -> None:
 
 
 def apply_linux(image: Image.Image, root: Path) -> None:
-    # Flutter's generated Linux runner does not embed a desktop icon by default.
-    # Keep deterministic PNG assets for AppImage/deb/rpm/desktop packaging.
     assets = root / "linux" / "packaging" / "icons"
     for size in (16, 32, 48, 64, 128, 256, 512):
         target = assets / f"research-os-{size}.png"
@@ -122,9 +141,10 @@ def main() -> None:
         raise SystemExit(f"Research OS master icon not found: {master}")
 
     image = Image.open(master).convert("RGBA")
+    apply_shared(image, root)
+
     requested = set(args.platform or ["all"])
     platforms = ["windows", "android", "ios", "macos", "web", "linux"] if "all" in requested else sorted(requested)
-
     handlers = {
         "windows": apply_windows,
         "android": apply_android,
@@ -134,17 +154,15 @@ def main() -> None:
         "linux": apply_linux,
     }
 
-    applied = []
+    applied = ["shared"]
     for platform in platforms:
         platform_dir = root / platform
         if not platform_dir.exists():
-            print(f"Skip {platform}: platform shell does not exist at {platform_dir}")
+            print(f"Prepared shared assets; skip {platform} shell because it does not exist yet: {platform_dir}")
             continue
         handlers[platform](image, root)
         applied.append(platform)
 
-    if not applied:
-        raise SystemExit("No platform icons were applied. Generate a Flutter platform shell first.")
     print("Research OS branding applied to: " + ", ".join(applied))
 
 
