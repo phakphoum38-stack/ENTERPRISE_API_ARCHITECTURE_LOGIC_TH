@@ -6,9 +6,11 @@ import unittest
 
 import test_v2_brain_context
 import test_v2_brain_decision
+import test_v2_domain_skills
 import test_v2_execution_controller
 import test_v2_execution_hardening
 import test_v2_governed_task_runner
+import test_v2_learning_engine
 import test_v2_secret_redactor
 import test_v2_skill_executor
 import test_v2_skill_registry
@@ -53,12 +55,15 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertIn("v2_brain_architect", matches["architecture"])
             self.assertEqual(12, result["team"]["ready_count"])
 
-    def test_phase_four_introspection_exposes_secret_aware_skill_execution(self) -> None:
+    def test_runtime_introspection_exposes_complete_brain_layers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             report = self.make_runtime(tmp).introspect()
-            self.assertEqual("brain_core_phase_4", report["phase"])
+            self.assertEqual("brain_core_phase_10", report["phase"])
             self.assertEqual("brain_core_phase_8", report["task_runner_phase"])
-            self.assertGreaterEqual(report["skills"]["ready_count"], 3)
+            self.assertEqual("brain_core_phase_9", report["learning_phase"])
+            self.assertEqual("brain_core_phase_10", report["domain_skills_phase"])
+            self.assertGreaterEqual(report["skills"]["ready_count"], 30)
+            self.assertGreaterEqual(report["skills"]["operational_contract_count"], 30)
             self.assertEqual(3, report["tools"]["ready_count"])
             self.assertTrue(report["context"]["secret_redaction"])
             self.assertFalse(report["decision_policy"]["hidden_chain_of_thought"])
@@ -69,8 +74,12 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertTrue(report["post_execution_verification"])
             self.assertEqual("brain-skill-tool-execution-phase-4", report["skill_execution"]["contract"])
             self.assertEqual("brain-governed-task-runner-phase-8", report["task_runner"]["contract"])
+            self.assertEqual("brain-learning-experience-phase-9", report["learning"]["contract"])
+            self.assertEqual("brain-domain-skills-phase-10", report["domain_skills"]["contract"])
             self.assertEqual("AgentOrchestrator", report["canonical_dependency_graph"])
             self.assertFalse(report["task_runner"]["unrestricted_shell"])
+            self.assertFalse(report["self_modification"])
+            self.assertFalse(report["learning"]["policy"]["automatic_skill_rewrite"])
 
     def test_plan_returns_context_snapshot_without_secret_leak(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,11 +93,24 @@ class BrainRuntimeTests(unittest.TestCase):
             self.assertEqual("[REDACTED]", result["context"]["values"]["api_key"])
             self.assertNotIn("must-not-leak", repr(result["context"]))
 
-    def test_foundational_verification_skill_is_discoverable(self) -> None:
+    def test_foundational_and_domain_verification_skills_are_discoverable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.make_runtime(tmp)
             matches = runtime.discover_skills("verification")
-            self.assertEqual(["brain.evidence-verification"], [item["skill_id"] for item in matches])
+            ids = {item["skill_id"] for item in matches}
+            self.assertIn("brain.evidence-verification", ids)
+            self.assertIn("software.regression-verification", ids)
+            self.assertIn("security.permission-review", ids)
+
+    def test_domain_skill_exposes_operational_procedure_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.make_runtime(tmp)
+            core = runtime.skills.describe("brain.goal-analysis")
+            domain = runtime.skills.describe("software.debug-diagnosis")
+            self.assertTrue(core["operational_contract"])
+            self.assertTrue(core["procedure"])
+            self.assertTrue(domain["operational_contract"])
+            self.assertTrue(domain["required_evidence"])
 
     def test_internal_skill_tool_runs_only_with_required_permission(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -108,7 +130,7 @@ class BrainRuntimeTests(unittest.TestCase):
                 idempotency_key="skills-list-once",
             )
             self.assertEqual("completed", completed["status"])
-            self.assertGreaterEqual(completed["output"]["count"], 3)
+            self.assertGreaterEqual(completed["output"]["count"], 30)
             self.assertEqual(1, completed["attempts"])
 
     def test_context_tool_routes_through_hardened_execution_controller(self) -> None:
@@ -206,12 +228,14 @@ def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite, pattern: 
     suite.addTests(loader.loadTestsFromModule(test_v2_brain_context))
     suite.addTests(loader.loadTestsFromModule(test_v2_brain_decision))
     suite.addTests(loader.loadTestsFromModule(test_v2_skill_registry))
+    suite.addTests(loader.loadTestsFromModule(test_v2_domain_skills))
     suite.addTests(loader.loadTestsFromModule(test_v2_tool_registry))
     suite.addTests(loader.loadTestsFromModule(test_v2_execution_controller))
     suite.addTests(loader.loadTestsFromModule(test_v2_secret_redactor))
     suite.addTests(loader.loadTestsFromModule(test_v2_execution_hardening))
     suite.addTests(loader.loadTestsFromModule(test_v2_skill_executor))
     suite.addTests(loader.loadTestsFromModule(test_v2_governed_task_runner))
+    suite.addTests(loader.loadTestsFromModule(test_v2_learning_engine))
     return suite
 
 
