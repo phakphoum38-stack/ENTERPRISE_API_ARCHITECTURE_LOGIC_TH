@@ -24,11 +24,18 @@ jobs:
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       SOURCE_INSTALLER_RUN: ${{ inputs.source_installer_run }}
+      V1_ROLLBACK_BASELINE: d05189d151b6bfa65938dad7a812ac104db195f4
     steps:
       - name: Checkout candidate metadata
         uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_SHA }}
+
+      - name: Verify rollback baseline exists
+        shell: bash
+        run: |
+          git cat-file -e "$V1_ROLLBACK_BASELINE^{commit}"
+          echo "Stable V1 rollback baseline: $V1_ROLLBACK_BASELINE"
 
       - name: Resolve installer build run
         id: installer-run
@@ -59,7 +66,7 @@ jobs:
         run: |
           setup="$(find verified-installer -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
           sha256sum "$setup" | tee verified-installer/SHA256SUMS.txt
-          printf 'commit=%s\ninstaller_run=%s\nvalidation=passed\n' "$TARGET_SHA" "$INSTALLER_RUN" > verified-installer/VERIFIED.txt
+          printf 'commit=%s\ninstaller_run=%s\nvalidation=passed\nrollback_baseline=%s\n' "$TARGET_SHA" "$INSTALLER_RUN" "$V1_ROLLBACK_BASELINE" > verified-installer/VERIFIED.txt
           python - <<'PY'
           import hashlib, json, os, re
           from pathlib import Path
@@ -88,6 +95,11 @@ jobs:
               }],
               'data_boundary': r'C:\ProgramData\ResearchOS',
               'upgrade_policy': 'preserve-local-data',
+              'rollback': {
+                  'baseline_version': '1.0.0',
+                  'baseline_sha': os.environ['V1_ROLLBACK_BASELINE'],
+                  'data_compatibility': 'preserve-local-data-boundary',
+              },
           }
           Path('verified-installer/release-manifest.json').write_text(
               json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
@@ -99,16 +111,17 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import hashlib, json
+          import hashlib, json, os
           from pathlib import Path
           manifest=json.loads(Path('verified-installer/release-manifest.json').read_text())
           item=manifest['artifacts'][0]
           setup=Path('verified-installer') / item['name']
           actual=hashlib.sha256(setup.read_bytes()).hexdigest()
           assert actual == item['sha256'], (actual, item['sha256'])
-          assert manifest['target_sha'] == '${{ env.TARGET_SHA }}'
+          assert manifest['target_sha'] == os.environ['TARGET_SHA']
           assert manifest['validation'] == 'passed'
-          print('Release manifest digest verified.')
+          assert manifest['rollback']['baseline_sha'] == os.environ['V1_ROLLBACK_BASELINE']
+          print('Release manifest digest and rollback baseline verified.')
           PY
 
       - name: Upload verified release artifact
