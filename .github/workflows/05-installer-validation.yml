@@ -18,9 +18,9 @@ permissions:
 
 jobs:
   installer-validation:
-    name: Install service health uninstall
+    name: Install upgrade data service health uninstall
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       SOURCE_RUN_ID: ${{ inputs.source_installer_run }}
@@ -66,8 +66,17 @@ jobs:
           foreach ($listener in $listeners) { Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue }
           Start-Sleep -Seconds 2
           if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 still has a listener before installation" }
+          $root = Join-Path $env:ProgramFiles 'Research OS'
+          if (Test-Path $root) { Remove-Item $root -Recurse -Force }
+          $data = Join-Path $env:ProgramData 'ResearchOS'
+          if (Test-Path $data) { Remove-Item $data -Recurse -Force }
 
-      - name: Install Setup EXE silently
+      - name: Seed representative V1 local data
+        shell: pwsh
+        run: |
+          .\scripts\v2-data-preservation.ps1 -Action Seed -DataDir "$env:ProgramData\ResearchOS"
+
+      - name: Install V2 Setup EXE silently
         shell: pwsh
         run: |
           $setup = Get-ChildItem "installer-under-test\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
@@ -80,7 +89,7 @@ jobs:
           }
           if (Test-Path $log) { Get-Content $log -Tail 80 }
 
-      - name: Verify installed files
+      - name: Verify installed files and V2 package modules
         shell: pwsh
         run: |
           $root = Join-Path $env:ProgramFiles 'Research OS'
@@ -88,9 +97,18 @@ jobs:
             "$root\app\research_os_flutter.exe",
             "$root\runtime\python\python.exe",
             "$root\tools\research_os_service\publish\ResearchOS.ServiceHost.exe",
+            "$root\tools\research_os_api\v2_server.py",
+            "$root\tools\research_os_api\v2_observability.py",
+            "$root\tools\research_os_api\v2_completion_crew.py",
             "$root\scripts\research-os-service.ps1"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Installed file missing: $path" } }
+          if (-not (Test-Path "$env:ProgramData\ResearchOS\workspaces")) { throw "V2 workspace data directory missing" }
+
+      - name: Verify V1 data survived V2 installation
+        shell: pwsh
+        run: |
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
 
       - name: Verify ResearchOSService is running
         shell: pwsh
@@ -104,7 +122,7 @@ jobs:
             throw "ResearchOSService is not running"
           }
 
-      - name: Verify service health endpoint
+      - name: Verify service V1 health and V2 readiness endpoints
         shell: pwsh
         run: |
           $ready = $false
@@ -123,6 +141,24 @@ jobs:
             Get-Process ResearchOS.ServiceHost -ErrorAction SilentlyContinue | Format-List *
             throw "Installed Research OS health endpoint did not become ready"
           }
+          $v2 = Invoke-WebRequest -Uri "http://127.0.0.1:8787/v2/health/readiness" -TimeoutSec 5 -SkipHttpErrorCheck
+          Write-Host "V2 readiness: HTTP $($v2.StatusCode) $($v2.Content)"
+          if ($v2.StatusCode -ne 200) { throw "V2 readiness endpoint is not healthy" }
+          $payload = $v2.Content | ConvertFrom-Json
+          if (-not $payload.ready) { throw "V2 readiness reported not ready" }
+          if (-not $payload.storage.writable) { throw "V2 storage readiness reported not writable" }
+
+      - name: Reinstall V2 in-place to exercise upgrade path
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem "installer-under-test\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          $log = "$env:RUNNER_TEMP\research-os-upgrade.log"
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 300 }
+            throw "In-place upgrade simulation failed with exit code $($p.ExitCode)"
+          }
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
 
       - name: Uninstall Setup EXE silently
         shell: pwsh
@@ -138,7 +174,7 @@ jobs:
           }
           if (Test-Path $log) { Get-Content $log -Tail 80 }
 
-      - name: Verify service removed after uninstall
+      - name: Verify service removed and V1 data preserved after uninstall
         shell: pwsh
         run: |
           for ($i = 0; $i -lt 20; $i++) {
@@ -150,6 +186,7 @@ jobs:
             throw "ResearchOSService still exists after uninstall"
           }
           if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 is still listening after uninstall" }
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
 
       - name: Emergency cleanup and diagnostics
         if: always()
@@ -175,9 +212,6 @@ jobs:
           foreach ($listener in $listeners) {
             Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
           }
-
-          # Diagnostics must never determine validation success. The strict
-          # install/service/health/uninstall assertions above are authoritative.
           $global:LASTEXITCODE = 0
           exit 0
 
