@@ -36,7 +36,7 @@ Implemented:
 
 Implemented:
 
-- Tool Registry with explicit metadata and runtime adapters
+- Tool Registry contract `brain-tools-phase-3` with explicit metadata and runtime adapters
 - capability and permission discovery
 - side-effect metadata (`mutating`, `destructive`, `network`, `secret_access`)
 - dry-run and idempotency declarations
