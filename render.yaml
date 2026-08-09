@@ -1,7 +1,7 @@
-# Research OS V2 isolated staging deployment blueprint.
+# Research OS V2 RC isolated staging deployment blueprint.
 # Blueprint configuration lives on this deploy branch, while both services build
-# from candidate/v2-staging-4e25c05 which points exactly at verified candidate
-# 4e25c05c9c14a857a21fc639d0bb3467015a1974.
+# from candidate/v2-rc1-staging-be8a4bce which points exactly at the CI-verified RC
+# be8a4bce033e3873eb71254b10b6e24cd0fd2110.
 services:
   - type: web
     name: research-os-api-v2-staging
@@ -9,7 +9,7 @@ services:
     plan: free
     region: singapore
     repo: https://github.com/phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
-    branch: candidate/v2-staging-4e25c05
+    branch: candidate/v2-rc1-staging-be8a4bce
     autoDeploy: false
     buildCommand: RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS=1 python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
     startCommand: cd tools/research_os_api && python render_server.py
@@ -30,7 +30,7 @@ services:
     plan: free
     region: singapore
     repo: https://github.com/phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
-    branch: candidate/v2-staging-4e25c05
+    branch: candidate/v2-rc1-staging-be8a4bce
     autoDeploy: false
     buildCommand: cd tools/research_os_api && RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS=1 python -m unittest test_developer_identity test_developer_access test_developer_server -v
     startCommand: cd tools/research_os_api && RESEARCH_OS_DEVELOPER_PORT=$PORT python developer_server.py
