@@ -14,6 +14,8 @@ import urllib.request
 from dataclasses import asdict, dataclass
 from typing import Callable
 
+from credential_broker import CredentialBroker, CredentialBrokerError
+
 
 @dataclass(frozen=True)
 class ProviderDescriptor:
@@ -50,19 +52,8 @@ PROVIDER_REGISTRY: tuple[ProviderDescriptor, ...] = (
 )
 
 
-_ENV_CREDENTIALS: dict[str, tuple[str, ...]] = {
-    "gemini": ("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY"),
-    "anthropic": ("RESEARCH_OS_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
-    "openai-compatible": ("RESEARCH_OS_OPENAI_API_KEY", "OPENAI_API_KEY"),
-}
-
-
 def _truthy(value: str | None) -> bool:
     return bool(value and value.strip().lower() in {"1", "true", "yes", "on"})
-
-
-def _has_any_env(names: tuple[str, ...]) -> bool:
-    return any(bool(os.getenv(name, "").strip()) for name in names)
 
 
 def _probe_url(url: str, *, timeout: float = 0.25) -> bool:
@@ -87,8 +78,13 @@ def local_discovery_enabled() -> bool:
     return not _truthy(os.getenv("CI"))
 
 
-def inspect_providers(*, probe: Callable[[str], bool] | None = None) -> list[ProviderStatus]:
+def inspect_providers(
+    *,
+    probe: Callable[[str], bool] | None = None,
+    broker: CredentialBroker | None = None,
+) -> list[ProviderStatus]:
     probe = probe or _probe_url
+    broker = broker or CredentialBroker()
     statuses: list[ProviderStatus] = [
         ProviderStatus(
             provider="mock",
@@ -131,12 +127,18 @@ def inspect_providers(*, probe: Callable[[str], bool] | None = None) -> list[Pro
     )
 
     for provider in ("gemini", "anthropic", "openai-compatible"):
-        credential_present = _has_any_env(_ENV_CREDENTIALS[provider])
+        try:
+            credential_status = broker.status(provider)
+            credential_present = bool(credential_status["present"])
+            credential_source = str(credential_status["source"])
+        except CredentialBrokerError:
+            credential_present = False
+            credential_source = "credential-store-error"
         statuses.append(
             ProviderStatus(
                 provider=provider,
                 state="available" if credential_present else "needs_setup",
-                source="environment" if credential_present else "not-configured",
+                source=credential_source if credential_present else credential_source,
                 ready=credential_present,
                 credential_present=credential_present,
                 reason="credential detected" if credential_present else "credential not configured",
@@ -145,7 +147,11 @@ def inspect_providers(*, probe: Callable[[str], bool] | None = None) -> list[Pro
     return statuses
 
 
-def resolve_provider(*, probe: Callable[[str], bool] | None = None) -> ProviderResolution:
+def resolve_provider(
+    *,
+    probe: Callable[[str], bool] | None = None,
+    broker: CredentialBroker | None = None,
+) -> ProviderResolution:
     """Resolve the active provider without leaking secrets.
 
     Precedence:
@@ -165,18 +171,25 @@ def resolve_provider(*, probe: Callable[[str], bool] | None = None) -> ProviderR
             return ProviderResolution(selected, "explicit", "unsupported explicit provider")
         return ProviderResolution(selected, "explicit", "explicit provider configuration")
 
-    statuses = {item.provider: item for item in inspect_providers(probe=probe)}
+    statuses = {
+        item.provider: item
+        for item in inspect_providers(probe=probe, broker=broker)
+    }
     for provider in ("local", "gemini", "anthropic", "openai-compatible"):
         if statuses[provider].ready:
             return ProviderResolution(provider, statuses[provider].source, "first ready provider by local-first policy")
     return ProviderResolution("mock", "builtin", "no configured provider is ready")
 
 
-def gateway_report(*, probe: Callable[[str], bool] | None = None) -> dict[str, object]:
-    resolution = resolve_provider(probe=probe)
+def gateway_report(
+    *,
+    probe: Callable[[str], bool] | None = None,
+    broker: CredentialBroker | None = None,
+) -> dict[str, object]:
+    resolution = resolve_provider(probe=probe, broker=broker)
     return {
         "selected": asdict(resolution),
-        "providers": [asdict(item) for item in inspect_providers(probe=probe)],
+        "providers": [asdict(item) for item in inspect_providers(probe=probe, broker=broker)],
         "registry": [asdict(item) for item in PROVIDER_REGISTRY],
         "safe": True,
         "note": "Credential values are never returned.",
