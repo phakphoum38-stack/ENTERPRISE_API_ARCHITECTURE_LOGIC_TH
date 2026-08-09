@@ -65,8 +65,9 @@ jobs:
         run: flutter create --platforms=ios,macos --project-name=research_os_flutter .
       - name: Apply Research OS Apple branding
         run: |
-          python3 -m pip install --disable-pip-version-check pillow
-          python3 scripts/apply-research-os-branding.py --app-root /tmp/research_os_flutter --platform ios --platform macos
+          python3 -m venv "$RUNNER_TEMP/research-os-branding-venv"
+          "$RUNNER_TEMP/research-os-branding-venv/bin/python" -m pip install --disable-pip-version-check pillow
+          "$RUNNER_TEMP/research-os-branding-venv/bin/python" scripts/apply-research-os-branding.py --app-root /tmp/research_os_flutter --platform ios --platform macos
       - name: Verify iOS and macOS icons
         run: |
           test -f /tmp/research_os_flutter/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
