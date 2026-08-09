@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Separate Research OS Developer Platform API.
 
-Authentication is delegated to a trusted identity gateway. This service accepts
-identity headers only when the gateway also presents the configured shared
-secret. It stores access-request/grant metadata only; canonical user files and
-ownership remain unchanged.
+Authenticated Developer access is delegated to a trusted identity gateway and
+requires owner approval for real resources. A registration-free Trial Mode is
+also available, but it is isolated to synthetic demo resources and cannot read
+or mutate canonical user files, access grants, ownership, or source control.
 """
 
 from __future__ import annotations
@@ -16,9 +16,49 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from developer_access import DeveloperAccessStore
+
+
+TRIAL_RESOURCES: tuple[dict[str, Any], ...] = (
+    {
+        "resource_id": "demo-api-client",
+        "workspace_id": "trial-workspace",
+        "kind": "code",
+        "name": "api_client.py",
+        "language": "python",
+        "summary": "Synthetic read-only API client example.",
+        "content": "def get_health(client):\n    return client.get('/health')\n",
+    },
+    {
+        "resource_id": "demo-openapi",
+        "workspace_id": "trial-workspace",
+        "kind": "api",
+        "name": "openapi-demo.yaml",
+        "language": "yaml",
+        "summary": "Synthetic API contract example for Developer Trial Mode.",
+        "content": "openapi: 3.1.0\ninfo:\n  title: Trial API\n  version: demo\n",
+    },
+    {
+        "resource_id": "demo-readme",
+        "workspace_id": "trial-workspace",
+        "kind": "document",
+        "name": "README.md",
+        "language": "markdown",
+        "summary": "Trial workspace guide. No owner files are exposed.",
+        "content": "# Developer Trial\nRead-only synthetic workspace.\n",
+    },
+)
+
+TRIAL_CAPABILITIES = {
+    "registration_required": False,
+    "persistent_account": False,
+    "workspace": "trial-workspace",
+    "allowed": ["browse_demo_resources", "read_demo_resource", "search_demo_resources", "simulate_read_authorization"],
+    "restricted": ["real_file_access", "write", "delete", "commit", "owner_approval", "grant_management", "private_workspace_access"],
+    "data_source": "synthetic_demo_only",
+}
 
 
 class DeveloperPlatformHandler(BaseHTTPRequestHandler):
@@ -64,10 +104,43 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
     def _error(self, status: HTTPStatus | int, code: str, message: str) -> None:
         self._send(status, {"error": {"code": code, "message": message, "status": int(status)}})
 
+    @staticmethod
+    def _trial_resource(resource_id: str) -> dict[str, Any] | None:
+        return next((dict(item) for item in TRIAL_RESOURCES if item["resource_id"] == resource_id), None)
+
+    def _trial_get(self, parsed) -> bool:
+        path = parsed.path
+        if path == "/v2/developer/trial":
+            self._send(HTTPStatus.OK, {"mode": "trial", **TRIAL_CAPABILITIES})
+            return True
+        if path == "/v2/developer/trial/resources":
+            query = (parse_qs(parsed.query).get("q") or [""])[0].strip().casefold()
+            items = [dict(item) for item in TRIAL_RESOURCES]
+            if query:
+                items = [
+                    item for item in items
+                    if query in " ".join((item["name"], item["kind"], item["language"], item["summary"])).casefold()
+                ]
+            summaries = [{key: value for key, value in item.items() if key != "content"} for item in items]
+            self._send(HTTPStatus.OK, {"mode": "trial", "items": summaries, "count": len(summaries), "query": query})
+            return True
+        prefix = "/v2/developer/trial/resources/"
+        if path.startswith(prefix):
+            resource_id = unquote(path[len(prefix):]).strip("/")
+            item = self._trial_resource(resource_id)
+            if item is None:
+                self._error(HTTPStatus.NOT_FOUND, "trial_resource_not_found", resource_id)
+            else:
+                self._send(HTTPStatus.OK, {"mode": "trial", "resource": item, "read_only": True})
+            return True
+        return False
+
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         if parsed.path == "/health":
             self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-developer-api"})
+            return
+        if self._trial_get(parsed):
             return
         try:
             principal = self._principal()
@@ -96,8 +169,40 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         try:
-            principal = self._principal()
             body = self._read_json()
+            if parsed.path == "/v2/developer/trial/authorize":
+                resource_id = str(body.get("resource_id") or "").strip()
+                scope = str(body.get("scope") or "read").strip().lower()
+                if scope != "read":
+                    self._error(HTTPStatus.FORBIDDEN, "trial_restricted", "Trial Mode permits read simulation only")
+                    return
+                item = self._trial_resource(resource_id)
+                if item is None:
+                    self._error(HTTPStatus.NOT_FOUND, "trial_resource_not_found", resource_id)
+                    return
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "mode": "trial",
+                        "authorization": {
+                            "allowed": True,
+                            "scope": "read",
+                            "resource_id": resource_id,
+                            "persistent": False,
+                            "real_resource": False,
+                        },
+                    },
+                )
+                return
+            if parsed.path.startswith("/v2/developer/trial/"):
+                self._error(
+                    HTTPStatus.FORBIDDEN,
+                    "trial_restricted",
+                    "Trial Mode cannot write, delete, commit, approve, or manage grants",
+                )
+                return
+
+            principal = self._principal()
             store = self._store()
 
             if parsed.path == "/v2/developer/access-requests":
@@ -115,7 +220,7 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
 
             request_prefix = "/v2/developer/access-requests/"
             if parsed.path.startswith(request_prefix):
-                relative = parsed.path[len(request_prefix) :].strip("/")
+                relative = parsed.path[len(request_prefix):].strip("/")
                 parts = relative.split("/") if relative else []
                 if len(parts) == 2 and parts[1] in {"approve", "reject", "cancel"}:
                     request_id, action = parts
@@ -142,7 +247,7 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
 
             grant_prefix = "/v2/developer/grants/"
             if parsed.path.startswith(grant_prefix) and parsed.path.endswith("/revoke"):
-                grant_id = parsed.path[len(grant_prefix) : -len("/revoke")].strip("/")
+                grant_id = parsed.path[len(grant_prefix):-len("/revoke")].strip("/")
                 item = store.revoke_grant(
                     owner_id=principal,
                     grant_id=grant_id,
