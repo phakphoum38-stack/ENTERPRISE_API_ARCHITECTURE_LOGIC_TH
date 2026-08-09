@@ -1,9 +1,9 @@
 # Research OS v2 Fast-Track Plan
 
-Status: IMPLEMENTING — `2.0.0-dev.1` candidate; Phase 7 desktop/release validation and final same-SHA quality gates pending.
+Status: RELEASE CANDIDATE — `2.0.0-rc.1`; exact-SHA regression, installer validation, verified candidate, and live staging revalidation are in progress.
 
 Baseline target: Research OS `1.0.0` stable (`d05189d151b6bfa65938dad7a812ac104db195f4`).
-Development branch: `develop/v2`.
+Release-candidate branch: `release/v2.0.0-rc.1`.
 
 ## V2 principles
 
@@ -68,30 +68,29 @@ Development branch: `develop/v2`.
 - [x] Failure-injection tests for transient provider failure, non-retryable provider failure, storage denial, and runtime interruption/resume
 - [x] Production health coverage for new V2 readiness endpoint
 
-Validation evidence: Agent Platform run `31291840074` on SHA `f123d4b05620f96a0eef166706de3286324eeaf3` passed the 51-test API/runtime contract suite and the combined V2 performance/resilience quality probe.
-
 ## Phase 7 — Desktop delivery V2
 
-- [ ] V2 Windows release build and installer validation — Windows app release build is green; installer validation remains
-- [ ] Upgrade path from V1 preserving local data/configuration — preservation fixture and in-place validation steps implemented; candidate run remains
-- [ ] Rollback path to last stable V1 baseline where compatible — stable baseline recorded; end-to-end rollback validation remains
+- [x] V2 Windows release build and installer validation passed on verified development candidate
+- [x] Upgrade path from V1 preserving local data/configuration passed under CI-controlled service quiesce
+- [x] Rollback path to last stable V1 baseline validated
 - [x] Release manifest with component versions and artifact digests
-- [ ] Same-target-SHA end-to-end candidate pipeline — manifest binding gate implemented; full candidate run remains
-- [ ] Reproducible verified release artifact
+- [x] Same-target-SHA end-to-end candidate pipeline passed on verified development candidate
+- [x] Reproducible verified candidate artifact produced
+- [x] Live Render staging health/readiness and Developer security boundary passed on verified development candidate
+- [ ] Repeat all exact-SHA gates for `2.0.0-rc.1`
 
-## Quality gates
+## Quality gates for 2.0.0-rc.1
 
-- [x] Flutter analyze clean on current `2.0.0-dev.1` implementation head
-- [x] Flutter/widget/integration tests pass on current `2.0.0-dev.1` implementation head
-- [x] Agent Platform tests pass on current `2.0.0-dev.1` implementation line
-- [x] API contract/compatibility tests pass on current implementation line
-- [x] Persistence/migration tests pass in Agent Platform validation
-- [x] Performance/resilience quality probe passes on current implementation line
-- [x] Windows release app build and artifact pass on current implementation head
-- [ ] Upgrade/rollback installer tests pass
-- [ ] Release artifact verification pass
-- [ ] Production Health pass
-- [ ] Full V2 candidate pipeline passes on one target SHA
+- [ ] Agent Platform
+- [ ] Developer Platform
+- [ ] Build Service Host
+- [ ] Branding
+- [ ] Build Windows App
+- [ ] Runtime Smoke
+- [ ] Build Installer
+- [ ] Installer Validation
+- [ ] Windows Desktop verified candidate
+- [ ] Live Render staging gate
 
 ## V2 Completion Crew
 
@@ -104,9 +103,13 @@ Fresh V2-only helpers are registered separately from the six core agents and do 
 
 ## Version sequence
 
-1. `2.0.0-dev.1` — current integrated V2 development candidate
-2. `2.0.0-rc.1` — full regression/release candidate after remaining Phase 7 gaps and quality gates pass
-3. `2.0.0` — stable after upgrade, rollback, release, and health gates pass
+1. `2.0.0-dev.1` — integrated V2 development candidate, fully verified including live staging
+2. `2.0.0-rc.1` — current full regression/release candidate
+3. `2.0.0` — stable only after RC exact-SHA gates, staging validation, and explicit merge approval
+
+## Publication hold
+
+Do not merge `main`, create a GitHub Release/tag, publish a public announcement, or deploy V2 over production V1 without explicit owner approval.
 
 ## Working rule
 
