@@ -339,6 +339,79 @@ paths:
       - $ref: '#/components/parameters/RunId'
     post:
       $ref: '#/components/pathItems/CancelOrchestration'
+  /v2/workspaces:
+    get:
+      summary: List local-first V2 workspaces from the shared Workspace Knowledge Engine
+      responses:
+        "200":
+          description: Versioned workspace catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2WorkspaceList'
+        "503":
+          description: Workspace index is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/workspaces/{workspace_id}/knowledge:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      summary: Search cursor-paginated workspace knowledge with provenance and evidence
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive full-text query over title, content, tags, and evidence.
+          schema:
+            type: string
+        - name: kinds
+          in: query
+          required: false
+          description: Comma-separated knowledge record kinds to include.
+          schema:
+            type: string
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor returned by the previous knowledge page.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Versioned knowledge search page with provenance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2KnowledgePage'
+        "400":
+          description: Invalid workspace search query, page size, or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+        "404":
+          description: Workspace not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+        "503":
+          description: Workspace index is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
 
 components:
   parameters:
@@ -348,6 +421,13 @@ components:
       required: true
       schema:
         type: string
+    WorkspaceId:
+      name: workspace_id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
     StatusFilter:
       name: status
       in: query
@@ -532,11 +612,106 @@ components:
           const: v2
         count:
           type: integer
+          minimum: 0
         agents:
           type: array
           items:
             type: object
             additionalProperties: true
+    V2Workspace:
+      type: object
+      required: [workspace_id, name, created_at, updated_at]
+      properties:
+        workspace_id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        created_at:
+          type: number
+        updated_at:
+          type: number
+    V2WorkspaceList:
+      type: object
+      required: [api_version, workspaces, count]
+      properties:
+        api_version:
+          const: v2
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2Workspace'
+        count:
+          type: integer
+          minimum: 0
+    V2Provenance:
+      type: object
+      required: [source_type, source_id, evidence, imported_at]
+      properties:
+        source_type:
+          type: string
+        source_id:
+          type: string
+        source_path:
+          type: [string, 'null']
+        evidence:
+          type: array
+          items:
+            type: string
+        imported_at:
+          type: number
+    V2KnowledgeRecord:
+      type: object
+      required: [record_id, workspace_id, kind, title, content, content_hash, provenance, tags, updated_at, score]
+      properties:
+        record_id:
+          type: string
+        workspace_id:
+          type: string
+        kind:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        content_hash:
+          type: string
+        provenance:
+          $ref: '#/components/schemas/V2Provenance'
+        tags:
+          type: array
+          items:
+            type: string
+        updated_at:
+          type: number
+        score:
+          type: integer
+          minimum: 0
+    V2KnowledgePage:
+      type: object
+      required: [api_version, workspace_id, items, page, filters]
+      properties:
+        api_version:
+          const: v2
+        workspace_id:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2KnowledgeRecord'
+        page:
+          $ref: '#/components/schemas/V2PageMetadata'
+        filters:
+          type: object
+          required: [q, kinds]
+          properties:
+            q:
+              type: string
+            kinds:
+              type: array
+              items:
+                type: string
     V2Readiness:
       type: object
       required: [api_version, version, ready, runtime, agents, provider, storage, checked_at]
