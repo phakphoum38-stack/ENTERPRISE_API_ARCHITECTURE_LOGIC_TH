@@ -279,7 +279,7 @@ def run_resilience() -> dict:
         )
         interrupted = recovered.get(run_id)
         assert interrupted["status"] == "interrupted", interrupted
-        assert interrupted["steps"][0]["status"] == "planned", interrupted
+        assert interrupted["steps"][0]["status"] == "interrupted", interrupted
         completed = recovered.execute(run_id)
         assert completed["run_id"] == run_id, completed
         assert completed["status"] == "completed", completed
