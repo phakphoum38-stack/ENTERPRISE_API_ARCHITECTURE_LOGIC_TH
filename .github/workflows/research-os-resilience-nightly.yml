@@ -106,6 +106,47 @@ jobs:
           print('Storage failure injection reported unavailable without crashing.')
           PY
 
+      - name: Inject runtime interruption and verify durable resume
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+          from agent_orchestrator import AgentOrchestrator
+          from agent_runtime import AgentEventBus, AgentTaskQueue, SharedContextStore
+
+          with tempfile.TemporaryDirectory() as tmp:
+              root=Path(tmp)
+              state=root/'agents'/'orchestrations.json'
+              runtime=AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp))
+              orchestrator=AgentOrchestrator(runtime=runtime, storage_path=state)
+              run=orchestrator.create_run('runtime interruption injection', [{
+                  'step_id':'research',
+                  'objective':'research runtime interruption evidence',
+                  'requested_agent':'research',
+              }])
+              run_id=run['run_id']
+
+              payload=json.loads(state.read_text(encoding='utf-8'))
+              payload['runs'][0]['status']='running'
+              payload['runs'][0]['steps'][0]['status']='running'
+              payload['runs'][0]['steps'][0]['task_id']='injected-stale-task'
+              state.write_text(json.dumps(payload), encoding='utf-8')
+
+              recovered=AgentOrchestrator(
+                  runtime=AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp)),
+                  storage_path=state,
+              )
+              interrupted=recovered.get(run_id)
+              assert interrupted['status']=='interrupted', interrupted
+              assert interrupted['steps'][0]['status']=='planned', interrupted
+              completed=recovered.execute(run_id)
+              assert completed['run_id']==run_id, completed
+              assert completed['status']=='completed', completed
+              print('Injected runtime interruption recovered and resumed:', run_id)
+          PY
+
       - name: Verify diagnostics redaction under injected secrets
         working-directory: tools/research_os_api
         env:
@@ -139,6 +180,7 @@ jobs:
             echo "- API regression suite: executed"
             echo "- Provider 503 recovery and non-retryable behavior: tested"
             echo "- Local storage failure injection: tested"
+            echo "- Runtime interruption and durable resume: tested"
             echo "- Diagnostics secret redaction: tested"
             echo "- Retry/backoff bounds: verified"
             echo "- Result: ${{ job.status }}"
