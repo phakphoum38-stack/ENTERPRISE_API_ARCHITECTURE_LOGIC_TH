@@ -10,6 +10,7 @@ on:
       - "tools/research_os_api/test_agent_*.py"
       - "tools/research_os_api/test_v2_*.py"
       - "tools/research_os_api/openapi.yaml"
+      - "tools/research_curator/**"
       - ".github/workflows/research-os-agent-platform.yml"
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - "tools/research_os_api/test_agent_*.py"
       - "tools/research_os_api/test_v2_*.py"
       - "tools/research_os_api/openapi.yaml"
+      - "tools/research_curator/**"
       - ".github/workflows/research-os-agent-platform.yml"
 
 permissions:
