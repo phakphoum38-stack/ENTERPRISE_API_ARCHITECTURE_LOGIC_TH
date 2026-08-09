@@ -16,6 +16,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from ai_gateway import resolve_provider
+from credential_broker import CredentialBroker, CredentialBrokerError
+
 
 @dataclass(frozen=True)
 class ProviderResult:
@@ -131,15 +134,6 @@ def _env_or_default(name: str, default: str) -> str:
     return value.strip() if value and value.strip() else default
 
 
-def _first_env(*names: str) -> str | None:
-    """Return the first non-empty environment variable from ``names``."""
-    for name in names:
-        value = os.getenv(name)
-        if value and value.strip():
-            return value.strip()
-    return None
-
-
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
     if not url or not url.strip():
         raise ProviderError("provider endpoint is empty")
@@ -179,8 +173,18 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
     raise ProviderError(f"provider request failed: {last_error}")
 
 
+def _selected_provider(name: str | None) -> str:
+    if name and name.strip():
+        return name.strip().lower()
+    configured = os.getenv("RESEARCH_OS_PROVIDER", "").strip().lower()
+    if configured and configured != "auto":
+        return configured
+    return resolve_provider().provider
+
+
 def build_provider(name: str | None = None) -> AIProvider:
-    selected = (name or os.getenv("RESEARCH_OS_PROVIDER", "mock")).lower()
+    selected = _selected_provider(name)
+    broker = CredentialBroker()
     if selected == "mock":
         return MockProvider()
     if selected in {"openai", "openai-compatible", "local"}:
@@ -189,15 +193,22 @@ def build_provider(name: str | None = None) -> AIProvider:
             "http://localhost:11434/v1/chat/completions",
         )
         model = _env_or_default("RESEARCH_OS_OPENAI_MODEL", "local-model")
+        try:
+            api_key = None if selected == "local" else broker.resolve("openai-compatible")
+        except CredentialBrokerError as exc:
+            raise ProviderError(str(exc)) from exc
         return OpenAICompatibleProvider(
             endpoint=endpoint,
-            api_key=os.getenv("RESEARCH_OS_OPENAI_API_KEY"),
+            api_key=api_key,
             default_model=model,
         )
     if selected == "anthropic":
-        key = os.getenv("RESEARCH_OS_ANTHROPIC_API_KEY")
+        try:
+            key = broker.resolve("anthropic")
+        except CredentialBrokerError as exc:
+            raise ProviderError(str(exc)) from exc
         if not key:
-            raise ProviderError("missing RESEARCH_OS_ANTHROPIC_API_KEY")
+            raise ProviderError("missing Anthropic API credential")
         return AnthropicProvider(
             endpoint=_env_or_default(
                 "RESEARCH_OS_ANTHROPIC_ENDPOINT",
@@ -210,11 +221,12 @@ def build_provider(name: str | None = None) -> AIProvider:
             ),
         )
     if selected == "gemini":
-        key = _first_env("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY")
+        try:
+            key = broker.resolve("gemini")
+        except CredentialBrokerError as exc:
+            raise ProviderError(str(exc)) from exc
         if not key:
-            raise ProviderError(
-                "missing Gemini API key (set RESEARCH_OS_GEMINI_API_KEY or GEMINI_API_KEY)"
-            )
+            raise ProviderError("missing Gemini API credential")
         return GeminiProvider(
             endpoint_template=_env_or_default(
                 "RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE",
