@@ -6,8 +6,10 @@ tracking working state, resolving capabilities, producing an auditable plan,
 and verifying evidence. It intentionally does not expose hidden model
 chain-of-thought and does not execute tools directly yet.
 
-Brain Core is provider-neutral. Skills, tools, knowledge and model execution are
-ports that can be attached in later slices without replacing this core.
+Brain Core is provider-neutral. Context assembly, skills and deterministic
+risk/decision policy are composed by ``v2_brain_runtime``. Tool execution,
+knowledge adapters and model execution remain permissioned ports that can be
+attached in later slices without replacing this core.
 """
 
 from __future__ import annotations
@@ -35,7 +37,7 @@ SENSITIVE_KEY_RE = re.compile(
 class BrainIdentity:
     system: str = "Research OS"
     component: str = "AI Brain Core"
-    version: str = "0.1.0"
+    version: str = "0.2.0"
     role: str = "model-independent intelligence control plane"
 
 
@@ -304,7 +306,9 @@ class ResearchOSBrain:
             BrainPortState("agent_registry", "connected", "AgentRegistry"),
             BrainPortState("working_memory", "connected", "Brain Core"),
             BrainPortState("activity_ledger", "connected", "Brain Core"),
-            BrainPortState("skill_registry", "port_ready", "future Skill Registry"),
+            BrainPortState("skill_registry", "connected_via_runtime", "SkillRegistry"),
+            BrainPortState("context_engine", "connected_via_runtime", "ContextEngine"),
+            BrainPortState("decision_engine", "connected_via_runtime", "DecisionEngine"),
             BrainPortState("tool_registry", "port_ready", "future Tool Registry"),
             BrainPortState("knowledge", "port_ready", "existing Knowledge Engine adapter"),
             BrainPortState("model_gateway", "external", "AI Gateway"),
@@ -317,13 +321,14 @@ class ResearchOSBrain:
                 "understand",
                 "plan",
                 "resolve_capabilities",
+                "decide",
                 "execute",
                 "verify",
                 "learn",
             ],
             "execution": {
                 "direct_tool_execution": False,
-                "reason": "Brain Core slice 1 plans and verifies; tool execution is attached later through permissioned ports.",
+                "reason": "Brain Core phase 2 plans, assembles context, evaluates risk and verifies; tool execution is attached later through permissioned ports.",
             },
             "ports": [asdict(item) for item in ports],
             "capability_count": len(catalog),
