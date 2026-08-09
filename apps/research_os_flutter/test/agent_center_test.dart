@@ -218,7 +218,6 @@ void main() {
     final api = FakeAgentApiClient();
     configureView(tester);
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
 
     await tester.pumpWidget(testApp(api));
     await tester.pumpAndSettle();
@@ -241,6 +240,7 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   testWidgets('Agent Center V2 exposes timeline health and cancellation controls',
