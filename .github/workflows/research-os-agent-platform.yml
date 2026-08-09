@@ -56,15 +56,44 @@ jobs:
         working-directory: tools/research_os_api
         run: |
           python - <<'PY'
-          from agent_platform import AGENTS
-          expected = {"research", "document", "github", "google_workspace", "shift"}
+          from agent_platform import AGENTS, AgentRegistry
+          expected = {"research", "developer", "document", "github", "google_workspace", "shift"}
           actual = {agent.agent_id for agent in AGENTS}
           if actual != expected:
               raise SystemExit(f"Agent registry mismatch: {actual}")
           for agent in AGENTS:
               if not agent.capabilities or not agent.permissions or not agent.memory_scope:
                   raise SystemExit(f"Incomplete agent contract: {agent.agent_id}")
+          readiness = AgentRegistry().readiness()
+          if readiness["ready_count"] != len(expected):
+              raise SystemExit(f"Initial readiness mismatch: {readiness}")
           print("Agent registry OK:", ", ".join(sorted(actual)))
+          PY
+
+      - name: Validate dynamic capability discovery and readiness routing
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from agent_platform import AgentDefinition, AgentRegistry, AgentRouter
+          registry = AgentRegistry()
+          registry.register(AgentDefinition(
+              "temporary_helper",
+              "Temporary Helper",
+              "CI dynamic helper",
+              ("temporary_capability",),
+              ("memory.read",),
+              "shared:temporary-helper",
+          ))
+          matches = registry.discover(capability="temporary_capability")
+          if [item["agent_id"] for item in matches] != ["temporary_helper"]:
+              raise SystemExit(f"Dynamic discovery failed: {matches}")
+          registry.set_health("temporary_helper", "unavailable", reason="ci readiness test")
+          if registry.discover(capability="temporary_capability"):
+              raise SystemExit("Unavailable helper remained discoverable as ready")
+          routed = AgentRouter(registry).route("debug code api build", requested_agent="developer")
+          if routed["agent"]["agent_id"] != "developer":
+              raise SystemExit(f"Developer routing failed: {routed}")
+          print("Dynamic discovery and readiness routing OK")
           PY
 
       - name: Enforce confirmation policy on write-capable agents
@@ -97,8 +126,11 @@ jobs:
               names = [e["event_type"] for e in events]
               if names != ["task.queued", "task.started", "task.completed"]:
                   raise SystemExit(f"Unexpected event sequence: {names}")
-              if runtime.dashboard()["shared_context"] != "local_persistent":
+              dashboard = runtime.dashboard()
+              if dashboard["shared_context"] != "local_persistent":
                   raise SystemExit("Shared context is not local-persistent")
+              if not dashboard["agent_readiness"]["ready"]:
+                  raise SystemExit("Agent readiness is not healthy")
               print("Agent Runtime OK")
           PY
 
@@ -154,8 +186,9 @@ jobs:
         run: |
           {
             echo "# Research OS Agent Platform"
-            echo "- Agent registry/runtime/permission checks remain"
-            echo "- Durable orchestrator persistence and restart recovery tests enabled"
-            echo "- Orchestrator HTTP create/list/get/execute/confirm contract tested"
+            echo "- Dynamic registry and capability discovery validated"
+            echo "- Developer Assistant routing and readiness-aware selection validated"
+            echo "- Runtime permission and confirmation checks remain active"
+            echo "- Durable orchestrator persistence, retry, cancel and restart recovery tests enabled"
             echo "- Dependency delegation and confirmation flow validated across restart"
           } >> "$GITHUB_STEP_SUMMARY"
