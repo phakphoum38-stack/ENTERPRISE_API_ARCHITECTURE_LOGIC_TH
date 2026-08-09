@@ -39,11 +39,47 @@ class ResearchOSApiClient {
         'enabled_services': services,
       });
 
-  Future<Map<String, dynamic>> getOrchestrations() =>
-      _getJson('/v1/agents/orchestrations');
+  Future<Map<String, dynamic>> getAgents() => _getJson('/v1/agents');
+  Future<Map<String, dynamic>> getAgentReadiness() =>
+      _getJson('/v1/agents/readiness');
+
+  Future<Map<String, dynamic>> discoverAgents({String? capability}) async {
+    final value = capability?.trim();
+    if (value == null || value.isEmpty) {
+      return _getJson('/v1/agents/discover');
+    }
+    final uri = _uri('/v1/agents/discover').replace(
+      queryParameters: <String, String>{'capability': value},
+    );
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> getOrchestrations({
+    String? status,
+    String? query,
+    String? agent,
+    int? limit,
+  }) async {
+    final params = <String, String>{};
+    if (status != null && status.trim().isNotEmpty) params['status'] = status.trim();
+    if (query != null && query.trim().isNotEmpty) params['q'] = query.trim();
+    if (agent != null && agent.trim().isNotEmpty) params['agent'] = agent.trim();
+    if (limit != null) params['limit'] = '$limit';
+    final uri = _uri('/v1/agents/orchestrations').replace(
+      queryParameters: params.isEmpty ? null : params,
+    );
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
 
   Future<Map<String, dynamic>> getOrchestration(String runId) =>
       _getJson('/v1/agents/orchestrations/${Uri.encodeComponent(runId)}');
+
+  Future<Map<String, dynamic>> getOrchestrationTimeline(String runId) =>
+      _getJson(
+        '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/timeline',
+      );
 
   Future<Map<String, dynamic>> createOrchestration({
     required String objective,
@@ -66,6 +102,23 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> confirmOrchestration(String runId) =>
       _postJson(
         '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/confirm',
+        const <String, Object?>{},
+      );
+
+  Future<Map<String, dynamic>> retryOrchestration(
+    String runId, {
+    String? stepId,
+  }) =>
+      _postJson(
+        '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/retry',
+        <String, Object?>{
+          if (stepId != null && stepId.trim().isNotEmpty) 'step_id': stepId.trim(),
+        },
+      );
+
+  Future<Map<String, dynamic>> cancelOrchestration(String runId) =>
+      _postJson(
+        '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/cancel',
         const <String, Object?>{},
       );
 
