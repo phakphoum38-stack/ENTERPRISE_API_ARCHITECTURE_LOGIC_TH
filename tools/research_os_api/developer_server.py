@@ -207,8 +207,14 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, {"items": items, "count": len(items), "view": view})
                 return
             if parsed.path == "/v2/developer/grants":
-                items = self._store().list_developer_grants(principal, active_only=True)
-                self._send(HTTPStatus.OK, {"items": items, "count": len(items)})
+                view = (query.get("view") or ["developer"])[0].strip().lower()
+                if view == "owner":
+                    items = self._store().list_owner_grants(principal, active_only=True)
+                elif view == "developer":
+                    items = self._store().list_developer_grants(principal, active_only=True)
+                else:
+                    raise ValueError("view must be owner or developer")
+                self._send(HTTPStatus.OK, {"items": items, "count": len(items), "view": view})
                 return
             self._error(HTTPStatus.NOT_FOUND, "not_found", parsed.path)
         except PermissionError as exc:
