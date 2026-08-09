@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from agent_platform import ROUTER, AgentRouter
+from v2_completion_crew import register_completion_crew
 
 
 @dataclass
@@ -201,4 +202,6 @@ class AgentTaskQueue:
         return asdict(task)
 
 
+# Register a fresh, isolated V2 completion crew before the shared runtime starts.
+register_completion_crew(ROUTER.registry)
 RUNTIME = AgentTaskQueue()
