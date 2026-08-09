@@ -6,12 +6,16 @@ on:
     branches: [main]
     paths:
       - "tools/research_os_api/agent_*.py"
+      - "tools/research_os_api/v2_*.py"
       - "tools/research_os_api/test_agent_*.py"
+      - "tools/research_os_api/test_v2_*.py"
       - ".github/workflows/research-os-agent-platform.yml"
   pull_request:
     paths:
       - "tools/research_os_api/agent_*.py"
+      - "tools/research_os_api/v2_*.py"
       - "tools/research_os_api/test_agent_*.py"
+      - "tools/research_os_api/test_v2_*.py"
       - ".github/workflows/research-os-agent-platform.yml"
 
 permissions:
@@ -40,6 +44,8 @@ jobs:
           python -m py_compile tools/research_os_api/agent_runtime.py
           python -m py_compile tools/research_os_api/agent_orchestrator.py
           python -m py_compile tools/research_os_api/agent_server.py
+          python -m py_compile tools/research_os_api/v2_server.py
+          python -m py_compile tools/research_os_api/v2_completion_crew.py
 
       - name: Test Agent Registry Router Runtime Orchestration and HTTP API
         working-directory: tools/research_os_api
@@ -50,6 +56,8 @@ jobs:
           test_agent_orchestrator.py
           test_agent_orchestrator_persistence.py
           test_agent_server.py
+          test_v2_completion_crew.py
+          test_v2_server.py
           -v
 
       - name: Validate initial agent registry
@@ -67,7 +75,25 @@ jobs:
           readiness = AgentRegistry().readiness()
           if readiness["ready_count"] != len(expected):
               raise SystemExit(f"Initial readiness mismatch: {readiness}")
-          print("Agent registry OK:", ", ".join(sorted(actual)))
+          print("Core agent registry OK:", ", ".join(sorted(actual)))
+          PY
+
+      - name: Validate isolated V2 Completion Crew
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from agent_platform import AGENTS, REGISTRY
+          from v2_completion_crew import COMPLETION_CREW
+          core = {agent.agent_id for agent in AGENTS}
+          crew = {agent.agent_id for agent in COMPLETION_CREW}
+          if core & crew:
+              raise SystemExit(f"Completion crew overlaps core agents: {core & crew}")
+          registered = {item["agent_id"] for item in REGISTRY.list()}
+          if not core | crew <= registered:
+              raise SystemExit(f"Registry missing agents: {(core | crew) - registered}")
+          if any(agent.fallback_agents for agent in COMPLETION_CREW):
+              raise SystemExit("Completion crew must not fallback to active core agents")
+          print("V2 Completion Crew isolated:", ", ".join(sorted(crew)))
           PY
 
       - name: Validate dynamic capability discovery and readiness routing
@@ -185,10 +211,9 @@ jobs:
         if: always()
         run: |
           {
-            echo "# Research OS Agent Platform"
-            echo "- Dynamic registry and capability discovery validated"
-            echo "- Developer Assistant routing and readiness-aware selection validated"
-            echo "- Runtime permission and confirmation checks remain active"
-            echo "- Durable orchestrator persistence, retry, cancel and restart recovery tests enabled"
-            echo "- Dependency delegation and confirmation flow validated across restart"
+            echo "# Research OS Agent Platform V2"
+            echo "- Core agents and isolated Completion Crew validated"
+            echo "- Dynamic registry/provider fallback/permission checks validated"
+            echo "- Durable orchestration and V1/V2 compatibility tests enabled"
+            echo "- Confirmation and restart recovery remain enforced"
           } >> "$GITHUB_STEP_SUMMARY"
