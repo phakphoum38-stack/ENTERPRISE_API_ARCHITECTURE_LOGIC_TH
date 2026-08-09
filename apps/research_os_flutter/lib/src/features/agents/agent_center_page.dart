@@ -13,27 +13,13 @@ class AgentCenterPage extends StatefulWidget {
 }
 
 class _AgentCenterPageState extends State<AgentCenterPage> {
-  static const _agents = <_AgentView>[
-    _AgentView('Research Agent', Icons.psychology_outlined,
-        'Research • Synthesis • Memory • Knowledge',
-        'memory.read • knowledge.read/write'),
-    _AgentView('Document Agent', Icons.description_outlined,
-        'PDF • Word • Excel • PowerPoint • Markdown',
-        'documents.read • knowledge.write'),
-    _AgentView('GitHub Agent', Icons.account_tree_outlined,
-        'Repository • Commit • PR • Issues • Workflows', 'github.read'),
-    _AgentView('Google Workspace Agent', Icons.apps_outlined,
-        'Drive • Docs • Sheets • Calendar • Gmail • Workspace',
-        'google.read • write with confirmation'),
-    _AgentView('Shift Agent', Icons.calendar_view_week_outlined,
-        'Roster • Replacement • Leave • Conflict • Calendar Sync',
-        'sheets.read • calendar write with confirmation'),
-  ];
-
   bool _loading = true;
   bool _creating = false;
+  bool _loadingHealth = false;
   String? _error;
+  String _workspace = 'default';
   List<Map<String, dynamic>> _runs = const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _agents = const <Map<String, dynamic>>[];
   final Set<String> _busyRuns = <String>{};
 
   @override
@@ -53,9 +39,7 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
       final payload = await widget.apiClient.getOrchestrations();
       final rawRuns = payload['runs'];
       final runs = rawRuns is List
-          ? rawRuns.whereType<Map>().map((item) {
-              return item.map((key, value) => MapEntry(key.toString(), value));
-            }).toList()
+          ? rawRuns.whereType<Map>().map(_stringKeyed).toList()
           : <Map<String, dynamic>>[];
       if (!mounted) return;
       setState(() {
@@ -71,13 +55,30 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
     }
   }
 
+  Future<void> _loadHealth() async {
+    setState(() => _loadingHealth = true);
+    try {
+      final payload = await widget.apiClient.getAgents();
+      final raw = payload['agents'];
+      final agents = raw is List
+          ? raw.whereType<Map>().map(_stringKeyed).toList()
+          : <Map<String, dynamic>>[];
+      if (!mounted) return;
+      setState(() => _agents = agents);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loadingHealth = false);
+    }
+  }
+
   Future<void> _createOrchestration() async {
     final draft = await showDialog<_OrchestrationDraft>(
       context: context,
       builder: (context) => const _CreateOrchestrationDialog(),
     );
     if (draft == null || !mounted) return;
-
     setState(() {
       _creating = true;
       _error = null;
@@ -96,13 +97,19 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
     }
   }
 
-  Future<void> _runAction(String runId, {required bool confirm}) async {
+  Future<void> _action(String runId, String action) async {
     setState(() => _busyRuns.add(runId));
     try {
-      if (confirm) {
-        await widget.apiClient.confirmOrchestration(runId);
-      } else {
-        await widget.apiClient.executeOrchestration(runId);
+      switch (action) {
+        case 'confirm':
+          await widget.apiClient.confirmOrchestration(runId);
+        case 'retry':
+          await widget.apiClient.retryOrchestration(runId);
+        case 'cancel':
+          await widget.apiClient.cancelOrchestration(runId);
+        case 'execute':
+        case 'resume':
+          await widget.apiClient.executeOrchestration(runId);
       }
       await _loadRuns();
     } catch (error) {
@@ -113,227 +120,199 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
     }
   }
 
+  Future<void> _showTimeline(String runId) async {
+    try {
+      final payload = await widget.apiClient.getOrchestrationTimeline(runId);
+      final raw = payload['events'];
+      final events = raw is List
+          ? raw.whereType<Map>().map(_stringKeyed).toList()
+          : <Map<String, dynamic>>[];
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Run timeline • ${_shortId(runId)}'),
+          content: SizedBox(
+            width: 620,
+            child: events.isEmpty
+                ? const Text('No timeline events yet.')
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: events.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final event = events[index];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.circle_outlined, size: 16),
+                        title: Text((event['event_type'] ?? 'event').toString()),
+                        subtitle: Text(
+                          'status: ${(event['run_status'] ?? 'unknown')} • step: ${(event['step_id'] ?? '-')}',
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: <Widget>[
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.toString());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final approvals = _runs
+        .where((run) => run['status']?.toString() == 'awaiting_confirmation')
+        .toList();
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 32),
       children: <Widget>[
         const EnterprisePageHeader(
           icon: Icons.smart_toy_outlined,
-          title: 'Agent Center',
+          title: 'Agent Center V2',
           subtitle:
-              'จัดการผู้ช่วยเฉพาะทาง, routing, orchestration, task queue, events และสิทธิ์การทำงานจากศูนย์กลางเดียว',
+              'Orchestration graph, live timeline, approvals, health, retry/cancel/resume และ workspace context ในศูนย์กลางเดียว',
         ),
-        const SizedBox(height: 24),
-        const EnterpriseSection(
-          title: 'Runtime overview',
-          subtitle: 'สถานะของ Agent Runtime 1.0',
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
+        const SizedBox(height: 20),
+        EnterpriseSection(
+          title: 'Workspace',
+          subtitle: 'ขอบเขต context และ artifact สำหรับ orchestration ใหม่',
+          child: Row(
             children: <Widget>[
-              SizedBox(
-                  width: 230,
-                  child: EnterpriseStatusTile(
-                      icon: Icons.route_outlined,
-                      title: 'Router',
-                      value: 'Capability based',
-                      caption: 'Research fallback')),
-              SizedBox(
-                  width: 230,
-                  child: EnterpriseStatusTile(
-                      icon: Icons.queue_outlined,
-                      title: 'Task Queue',
-                      value: 'Active',
-                      caption: 'Local runtime')),
-              SizedBox(
-                  width: 230,
-                  child: EnterpriseStatusTile(
-                      icon: Icons.swap_horiz,
-                      title: 'Event Bus',
-                      value: 'Active',
-                      caption: 'Runtime events')),
-              SizedBox(
-                  width: 230,
-                  child: EnterpriseStatusTile(
-                      icon: Icons.memory_outlined,
-                      title: 'Shared Context',
-                      value: 'Local-first',
-                      caption: 'ResearchOSData/agents')),
+              const Icon(Icons.workspaces_outline),
+              const SizedBox(width: 12),
+              DropdownButton<String>(
+                key: const Key('workspace-selector'),
+                value: _workspace,
+                items: const <DropdownMenuItem<String>>[
+                  DropdownMenuItem(value: 'default', child: Text('Default workspace')),
+                  DropdownMenuItem(value: 'research', child: Text('Research workspace')),
+                  DropdownMenuItem(value: 'operations', child: Text('Operations workspace')),
+                ],
+                onChanged: (value) => setState(() => _workspace = value ?? 'default'),
+              ),
+              const Spacer(),
+              Text('Active: $_workspace'),
             ],
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
+        EnterpriseSection(
+          title: 'Approval inbox',
+          subtitle: 'งานเขียนข้อมูลจะหยุดรอการยืนยันที่นี่',
+          child: approvals.isEmpty
+              ? const ListTile(
+                  leading: Icon(Icons.verified_outlined),
+                  title: Text('No approvals waiting'),
+                  subtitle: Text('Write-capable actions will appear here before execution.'),
+                )
+              : Column(
+                  children: approvals.map((run) {
+                    final id = (run['run_id'] ?? '').toString();
+                    return ListTile(
+                      key: Key('approval-$id'),
+                      leading: const Icon(Icons.approval_outlined),
+                      title: Text((run['objective'] ?? 'Approval required').toString()),
+                      subtitle: Text('Run ${_shortId(id)}'),
+                      trailing: FilledButton(
+                        key: Key('confirm-$id'),
+                        onPressed: _busyRuns.contains(id) ? null : () => _action(id, 'confirm'),
+                        child: const Text('Approve'),
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+        const SizedBox(height: 20),
         EnterpriseSection(
           title: 'Multi-Agent orchestration',
-          subtitle:
-              'สร้างและติดตาม dependency chain, execution state และ confirmation gate จาก runtime จริง',
+          subtitle: 'Dependency graph, execution state และ run controls',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Row(
                 children: <Widget>[
                   Expanded(
-                    child: Text(
-                      _loading
-                          ? 'กำลังโหลด orchestration...'
-                          : '${_runs.length} orchestration run(s)',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
+                    child: Text(_loading
+                        ? 'กำลังโหลด orchestration...'
+                        : '${_runs.length} orchestration run(s)'),
                   ),
                   FilledButton.icon(
                     key: const Key('create-orchestration-button'),
                     onPressed: _creating ? null : _createOrchestration,
-                    icon: _creating
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.add),
+                    icon: const Icon(Icons.add),
                     label: const Text('Create orchestration'),
                   ),
-                  const SizedBox(width: 8),
                   IconButton(
-                    tooltip: 'Refresh orchestrations',
+                    tooltip: 'Refresh',
                     onPressed: _loading ? null : _loadRuns,
                     icon: const Icon(Icons.refresh),
                   ),
                 ],
               ),
-              if (_loading) ...<Widget>[
-                const SizedBox(height: 10),
-                const LinearProgressIndicator(),
-              ],
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 10),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.error_outline),
-                    title: const Text('Orchestrator API unavailable'),
-                    subtitle: Text(_error!),
-                    trailing: TextButton(
-                      onPressed: _loadRuns,
-                      child: const Text('Retry'),
-                    ),
-                  ),
+              if (_loading) const LinearProgressIndicator(),
+              if (_error != null)
+                ListTile(
+                  leading: const Icon(Icons.error_outline),
+                  title: const Text('Agent Center API warning'),
+                  subtitle: Text(_error!),
                 ),
-              ],
-              if (!_loading && _error == null && _runs.isEmpty) ...<Widget>[
-                const SizedBox(height: 10),
+              if (!_loading && _runs.isEmpty)
                 const Card(
                   child: ListTile(
                     leading: Icon(Icons.hub_outlined),
                     title: Text('No orchestration runs yet'),
-                    subtitle: Text(
-                        'กด Create orchestration เพื่อสร้างแผนงาน Multi-Agent ใหม่จากหน้านี้'),
+                    subtitle: Text('กด Create orchestration เพื่อสร้างแผนงาน Multi-Agent ใหม่จากหน้านี้'),
                   ),
                 ),
-              ],
               ..._runs.map(_buildRunCard),
             ],
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
         EnterpriseSection(
-          title: 'Registered agents',
-          subtitle:
-              'Agent ทุกตัวใช้ permission model และ confirmation policy ชุดเดียวกัน',
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 1050
-                  ? 3
-                  : constraints.maxWidth >= 650
-                      ? 2
-                      : 1;
-              final width =
-                  (constraints.maxWidth - (columns - 1) * 12) / columns;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _agents
-                    .map((agent) => SizedBox(
-                          width: width,
-                          child: Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(18),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Row(children: <Widget>[
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .secondaryContainer,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Icon(agent.icon),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                        child: Text(agent.name,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleMedium
-                                                ?.copyWith(
-                                                    fontWeight:
-                                                        FontWeight.w700))),
-                                    const Chip(label: Text('Ready')),
-                                  ]),
-                                  const SizedBox(height: 14),
-                                  Text(agent.capabilities),
-                                  const SizedBox(height: 12),
-                                  const Divider(height: 1),
-                                  const SizedBox(height: 10),
-                                  Text('Permissions',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelMedium),
-                                  const SizedBox(height: 3),
-                                  Text(agent.permissions,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ))
-                    .toList(),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 28),
-        const EnterpriseSection(
-          title: 'Governance',
-          subtitle: 'กติกากลางสำหรับ Agent ทุกตัว',
+          title: 'Agent health & capabilities',
+          subtitle: 'Readiness ของ core agents และ V2 Completion Crew',
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Card(
-                  child: ListTile(
-                      leading: Icon(Icons.verified_user_outlined),
-                      title: Text('Write actions require confirmation'),
-                      subtitle: Text(
-                          'งานที่แก้ Calendar, Google Workspace หรือข้อมูลภายนอกจะหยุดรอการยืนยันก่อน Execute'))),
-              SizedBox(height: 8),
-              Card(
-                  child: ListTile(
-                      leading: Icon(Icons.storage_outlined),
-                      title: Text('Shared Context แบบ Local-first'),
-                      subtitle: Text(
-                          'Context ของ Agent อยู่ใต้ ResearchOSData/agents และไม่บังคับพึ่ง Cloud'))),
-              SizedBox(height: 8),
-              Card(
-                  child: ListTile(
-                      leading: Icon(Icons.account_tree_outlined),
-                      title: Text('Dependency-aware orchestration'),
-                      subtitle: Text(
-                          'Agent ถัดไปจะทำงานเมื่อ dependency สำเร็จ และรับ dependency results เป็น context โดยอัตโนมัติ'))),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  key: const Key('load-agent-health'),
+                  onPressed: _loadingHealth ? null : _loadHealth,
+                  icon: const Icon(Icons.monitor_heart_outlined),
+                  label: const Text('Refresh health'),
+                ),
+              ),
+              if (_loadingHealth) const LinearProgressIndicator(),
+              if (_agents.isEmpty && !_loadingHealth)
+                const ListTile(
+                  leading: Icon(Icons.health_and_safety_outlined),
+                  title: Text('Health data not loaded'),
+                  subtitle: Text('กด Refresh health เพื่ออ่าน readiness จาก Agent Registry จริง'),
+                ),
+              ..._agents.map((agent) {
+                final health = agent['health'] is Map
+                    ? _stringKeyed(agent['health'] as Map)
+                    : <String, dynamic>{};
+                final ready = health['ready'] == true;
+                return ListTile(
+                  leading: Icon(ready ? Icons.check_circle_outline : Icons.error_outline),
+                  title: Text((agent['name'] ?? agent['agent_id'] ?? 'Agent').toString()),
+                  subtitle: Text(
+                    '${(agent['capabilities'] is List ? (agent['capabilities'] as List).join(' • ') : '')}\n${(agent['permission_profile'] ?? 'standard')}',
+                  ),
+                  isThreeLine: true,
+                  trailing: Chip(label: Text((health['status'] ?? 'unknown').toString())),
+                );
+              }),
             ],
           ),
         ),
@@ -348,104 +327,112 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
     final steps = run['steps'] is List ? run['steps'] as List : const <dynamic>[];
     final busy = _busyRuns.contains(runId);
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
+    return Card(
+      margin: const EdgeInsets.only(top: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(objective,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                ),
+                Chip(label: Text(status)),
+              ],
+            ),
+            Text('Run ${_shortId(runId)}'),
+            const SizedBox(height: 10),
+            ...steps.whereType<Map>().map((raw) {
+              final step = _stringKeyed(raw);
+              final stepId = (step['step_id'] ?? 'step').toString();
+              final agent = (step['requested_agent'] ?? 'auto').toString();
+              final stepStatus = (step['status'] ?? 'planned').toString();
+              final depends = step['depends_on'] is List
+                  ? (step['depends_on'] as List).join(', ')
+                  : '';
+              return Row(
                 children: <Widget>[
-                  Expanded(
-                    child: Text(objective,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                  ),
-                  Chip(label: Text(status)),
+                  const Icon(Icons.account_tree_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('$stepId → $agent${depends.isEmpty ? '' : ' • depends: $depends'}')),
+                  Chip(label: Text(stepStatus)),
                 ],
-              ),
-              const SizedBox(height: 4),
-              Text('Run ${_shortId(runId)}',
-                  style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 12),
-              ...steps.whereType<Map>().map((step) {
-                final stepId = (step['step_id'] ?? 'step').toString();
-                final agent = (step['requested_agent'] ?? 'auto').toString();
-                final stepStatus = (step['status'] ?? 'planned').toString();
-                final dependsOn = step['depends_on'] is List
-                    ? (step['depends_on'] as List).join(', ')
-                    : '';
-                return ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.subdirectory_arrow_right),
-                  title: Text('$stepId • $agent'),
-                  subtitle: Text(dependsOn.isEmpty
-                      ? 'No dependency'
-                      : 'Depends on: $dependsOn'),
-                  trailing: Chip(label: Text(stepStatus)),
-                );
-              }),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: <Widget>[
+              );
+            }),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                OutlinedButton.icon(
+                  key: Key('execute-$runId'),
+                  onPressed: busy || runId.isEmpty ? null : () => _action(runId, 'execute'),
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Execute'),
+                ),
+                OutlinedButton.icon(
+                  key: Key('timeline-$runId'),
+                  onPressed: busy || runId.isEmpty ? null : () => _showTimeline(runId),
+                  icon: const Icon(Icons.timeline),
+                  label: const Text('Timeline'),
+                ),
+                if (status == 'failed')
                   OutlinedButton.icon(
-                    key: Key('execute-$runId'),
-                    onPressed: busy || runId.isEmpty
-                        ? null
-                        : () => _runAction(runId, confirm: false),
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Execute'),
+                    key: Key('retry-$runId'),
+                    onPressed: busy ? null : () => _action(runId, 'retry'),
+                    icon: const Icon(Icons.replay),
+                    label: const Text('Retry'),
                   ),
-                  if (status == 'awaiting_confirmation')
-                    FilledButton.icon(
-                      key: Key('confirm-$runId'),
-                      onPressed: busy || runId.isEmpty
-                          ? null
-                          : () => _runAction(runId, confirm: true),
-                      icon: const Icon(Icons.verified_outlined),
-                      label: const Text('Confirm'),
-                    ),
-                  if (busy)
-                    const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
+                if (status == 'interrupted' || status == 'blocked')
+                  OutlinedButton.icon(
+                    key: Key('resume-$runId'),
+                    onPressed: busy ? null : () => _action(runId, 'resume'),
+                    icon: const Icon(Icons.resume),
+                    label: const Text('Resume'),
+                  ),
+                if (!{'completed', 'failed', 'cancelled'}.contains(status))
+                  TextButton.icon(
+                    key: Key('cancel-$runId'),
+                    onPressed: busy ? null : () => _action(runId, 'cancel'),
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('Cancel'),
+                  ),
+                if (status == 'awaiting_confirmation')
+                  FilledButton.icon(
+                    key: Key('confirm-$runId'),
+                    onPressed: busy ? null : () => _action(runId, 'confirm'),
+                    icon: const Icon(Icons.verified_outlined),
+                    label: const Text('Confirm'),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  static String _shortId(String value) {
-    if (value.length <= 8) return value;
-    return value.substring(0, 8);
-  }
+  static Map<String, dynamic> _stringKeyed(Map<dynamic, dynamic> value) =>
+      value.map((key, value) => MapEntry(key.toString(), value));
+
+  static String _shortId(String value) =>
+      value.length <= 8 ? value : value.substring(0, 8);
 }
 
 class _CreateOrchestrationDialog extends StatefulWidget {
   const _CreateOrchestrationDialog();
 
   @override
-  State<_CreateOrchestrationDialog> createState() =>
-      _CreateOrchestrationDialogState();
+  State<_CreateOrchestrationDialog> createState() => _CreateOrchestrationDialogState();
 }
 
-class _CreateOrchestrationDialogState
-    extends State<_CreateOrchestrationDialog> {
+class _CreateOrchestrationDialogState extends State<_CreateOrchestrationDialog> {
   final _objective = TextEditingController();
   final _firstStep = TextEditingController();
   final _secondStep = TextEditingController();
@@ -454,10 +441,15 @@ class _CreateOrchestrationDialogState
 
   static const _agentIds = <String>[
     'research',
+    'developer',
     'document',
     'github',
     'google_workspace',
     'shift',
+    'v2_workspace_engineer',
+    'v2_agent_center_engineer',
+    'v2_api_compat_engineer',
+    'v2_reliability_release_engineer',
   ];
 
   @override
@@ -466,29 +458,6 @@ class _CreateOrchestrationDialogState
     _firstStep.dispose();
     _secondStep.dispose();
     super.dispose();
-  }
-
-  void _submit() {
-    final objective = _objective.text.trim();
-    final first = _firstStep.text.trim();
-    final second = _secondStep.text.trim();
-    if (objective.isEmpty || first.isEmpty) return;
-
-    final steps = <Map<String, Object?>>[
-      <String, Object?>{
-        'step_id': 'step-1',
-        'objective': first,
-        'requested_agent': _firstAgent,
-      },
-      if (second.isNotEmpty)
-        <String, Object?>{
-          'step_id': 'step-2',
-          'objective': second,
-          'requested_agent': _secondAgent,
-          'depends_on': <String>['step-1'],
-        },
-    ];
-    Navigator.of(context).pop(_OrchestrationDraft(objective, steps));
   }
 
   @override
@@ -504,71 +473,87 @@ class _CreateOrchestrationDialogState
               TextField(
                 key: const Key('orchestration-objective'),
                 controller: _objective,
-                decoration: const InputDecoration(
-                  labelText: 'Overall objective',
-                  hintText: 'เช่น วิเคราะห์เอกสารและสรุปเป็นองค์ความรู้',
-                ),
+                decoration: const InputDecoration(labelText: 'Objective'),
               ),
-              const SizedBox(height: 14),
-              TextField(
-                key: const Key('orchestration-step-1'),
+              const SizedBox(height: 12),
+              _stepEditor(
                 controller: _firstStep,
-                decoration: const InputDecoration(labelText: 'Step 1 objective'),
+                key: const Key('orchestration-step-1'),
+                value: _firstAgent,
+                onAgentChanged: (value) => setState(() => _firstAgent = value ?? 'research'),
               ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                key: const Key('orchestration-agent-1'),
-                initialValue: _firstAgent,
-                decoration: const InputDecoration(labelText: 'Step 1 agent'),
-                items: _agentIds
-                    .map((value) => DropdownMenuItem(
-                          value: value,
-                          child: Text(value),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) setState(() => _firstAgent = value);
-                },
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                key: const Key('orchestration-step-2'),
+              const SizedBox(height: 12),
+              _stepEditor(
                 controller: _secondStep,
-                decoration: const InputDecoration(
-                  labelText: 'Step 2 objective (optional)',
-                  helperText: 'Step 2 จะขึ้นกับผลจาก Step 1 อัตโนมัติ',
-                ),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                key: const Key('orchestration-agent-2'),
-                initialValue: _secondAgent,
-                decoration: const InputDecoration(labelText: 'Step 2 agent'),
-                items: _agentIds
-                    .map((value) => DropdownMenuItem(
-                          value: value,
-                          child: Text(value),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) setState(() => _secondAgent = value);
-                },
+                key: const Key('orchestration-step-2'),
+                value: _secondAgent,
+                onAgentChanged: (value) => setState(() => _secondAgent = value ?? 'document'),
               ),
             ],
           ),
         ),
       ),
       actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         FilledButton(
           key: const Key('submit-orchestration'),
           onPressed: _submit,
           child: const Text('Create'),
         ),
       ],
+    );
+  }
+
+  Widget _stepEditor({
+    required TextEditingController controller,
+    required Key key,
+    required String value,
+    required ValueChanged<String?> onAgentChanged,
+  }) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: TextField(
+            key: key,
+            controller: controller,
+            decoration: const InputDecoration(labelText: 'Step objective'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        DropdownButton<String>(
+          value: value,
+          items: _agentIds
+              .map((id) => DropdownMenuItem<String>(value: id, child: Text(id)))
+              .toList(),
+          onChanged: onAgentChanged,
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    final objective = _objective.text.trim();
+    final first = _firstStep.text.trim();
+    final second = _secondStep.text.trim();
+    if (objective.isEmpty || first.isEmpty || second.isEmpty) return;
+    Navigator.pop(
+      context,
+      _OrchestrationDraft(
+        objective,
+        <Map<String, Object?>>[
+          <String, Object?>{
+            'step_id': 'step-1',
+            'objective': first,
+            'requested_agent': _firstAgent,
+          },
+          <String, Object?>{
+            'step_id': 'step-2',
+            'objective': second,
+            'requested_agent': _secondAgent,
+            'depends_on': <String>['step-1'],
+          },
+        ],
+      ),
     );
   }
 }
@@ -578,12 +563,4 @@ class _OrchestrationDraft {
 
   final String objective;
   final List<Map<String, Object?>> steps;
-}
-
-class _AgentView {
-  const _AgentView(this.name, this.icon, this.capabilities, this.permissions);
-  final String name;
-  final IconData icon;
-  final String capabilities;
-  final String permissions;
 }
