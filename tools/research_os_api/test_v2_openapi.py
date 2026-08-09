@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+
+class V2OpenAPIContractTests(unittest.TestCase):
+    def test_v2_contract_is_declared_in_single_openapi_source(self) -> None:
+        text = Path(__file__).with_name("openapi.yaml").read_text(encoding="utf-8")
+        required = (
+            "/v2/health/readiness:",
+            "/v2/agents:",
+            "/v2/agents/readiness:",
+            "/v2/agents/discover:",
+            "/v2/orchestrations:",
+            "/v2/orchestrations/{run_id}:",
+            "/v2/orchestrations/{run_id}/timeline:",
+            "/v2/orchestrations/{run_id}/execute:",
+            "/v2/orchestrations/{run_id}/confirm:",
+            "/v2/orchestrations/{run_id}/retry:",
+            "/v2/orchestrations/{run_id}/cancel:",
+            "V2OrchestrationPage:",
+            "V2PageMetadata:",
+            "V2Readiness:",
+            "V2ErrorEnvelope:",
+            "name: page_size",
+            "name: cursor",
+            "x-research-os-v2-status: draft",
+        )
+        missing = [marker for marker in required if marker not in text]
+        self.assertEqual(missing, [])
+
+    def test_v1_contract_remains_present_during_v2_migration(self) -> None:
+        text = Path(__file__).with_name("openapi.yaml").read_text(encoding="utf-8")
+        for marker in (
+            "/v1/providers:",
+            "/v1/agents:",
+            "/v1/agents/orchestrations:",
+            "/v1/agents/orchestrations/{run_id}/execute:",
+        ):
+            self.assertIn(marker, text)
+
+
+if __name__ == "__main__":
+    unittest.main()
