@@ -69,8 +69,8 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
         return DeveloperAccessStore(data_dir)
 
     @staticmethod
-    def _trial_page_path() -> Path:
-        return Path(__file__).resolve().parents[2] / "apps" / "research_os_developer" / "index.html"
+    def _app_dir() -> Path:
+        return Path(__file__).resolve().parents[2] / "apps" / "research_os_developer"
 
     def _principal(self) -> str:
         configured = (os.environ.get("RESEARCH_OS_IDENTITY_PROXY_SECRET") or "").strip()
@@ -102,18 +102,26 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_html(self, status: HTTPStatus | int, html: str) -> None:
-        body = html.encode("utf-8")
-        self.send_response(int(status))
+    def _send_html(self, path: Path) -> None:
+        try:
+            body = path.read_bytes()
+        except OSError:
+            self._error(HTTPStatus.NOT_FOUND, "ui_not_found", path.name)
+            return
+        self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:",
+        )
         self.end_headers()
         self.wfile.write(body)
 
@@ -126,13 +134,6 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
 
     def _trial_get(self, parsed) -> bool:
         path = parsed.path
-        if path in {"/trial", "/trial/"}:
-            page = self._trial_page_path()
-            if not page.exists():
-                self._error(HTTPStatus.NOT_FOUND, "trial_ui_missing", "Developer Trial UI is unavailable")
-            else:
-                self._send_html(HTTPStatus.OK, page.read_text(encoding="utf-8"))
-            return True
         if path == "/v2/developer/trial":
             self._send(HTTPStatus.OK, {"mode": "trial", **TRIAL_CAPABILITIES})
             return True
@@ -163,11 +164,37 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
         if parsed.path == "/health":
             self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-developer-api"})
             return
+        if parsed.path in {"/trial", "/trial/"}:
+            self._send_html(self._app_dir() / "index.html")
+            return
+        if parsed.path in {"/app", "/app/"}:
+            self._send_html(self._app_dir() / "app.html")
+            return
+        if parsed.path == "/v2/developer/auth/config":
+            self._send(
+                HTTPStatus.OK,
+                {
+                    "login_url": (os.environ.get("RESEARCH_OS_DEVELOPER_LOGIN_URL") or "/app").strip(),
+                    "identity_provider": "trusted_gateway",
+                    "registration_required": True,
+                },
+            )
+            return
         if self._trial_get(parsed):
             return
         try:
             principal = self._principal()
             query = parse_qs(parsed.query)
+            if parsed.path == "/v2/developer/session":
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "authenticated": True,
+                        "principal": principal,
+                        "identity_provider": "trusted_gateway",
+                    },
+                )
+                return
             if parsed.path == "/v2/developer/access-requests":
                 view = (query.get("view") or ["developer"])[0].strip().lower()
                 if view == "owner":
@@ -307,7 +334,6 @@ def main() -> int:
     port = int(os.environ.get("RESEARCH_OS_DEVELOPER_PORT", "8790"))
     server = ThreadingHTTPServer((host, port), DeveloperPlatformHandler)
     print(f"Research OS Developer Platform API listening on http://{host}:{port}")
-    print(f"Registration-free trial UI: http://{host}:{port}/trial")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
