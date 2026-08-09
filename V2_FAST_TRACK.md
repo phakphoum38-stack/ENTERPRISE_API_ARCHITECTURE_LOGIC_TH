@@ -1,6 +1,6 @@
 # Research OS v2 Fast-Track Plan
 
-Status: IMPLEMENTING — `2.0.0-dev.1` candidate; Phase 5–7 contract/release validation and final quality gates pending.
+Status: IMPLEMENTING — `2.0.0-dev.1` candidate; Phase 7 desktop/release validation and final same-SHA quality gates pending.
 
 Baseline target: Research OS `1.0.0` stable (`d05189d151b6bfa65938dad7a812ac104db195f4`).
 Development branch: `develop/v2`.
@@ -53,20 +53,22 @@ Development branch: `develop/v2`.
 ## Phase 5 — API V2 and compatibility
 
 - [x] Define V2 API namespace/contract without breaking required V1 clients
-- [ ] Versioned schemas for orchestration, agents, workspaces, and evidence — orchestration/agents/readiness/error schemas implemented; workspace/evidence OpenAPI schemas remain
+- [x] Versioned schemas for orchestration, agents, workspaces, evidence, readiness, and errors
 - [x] Compatibility tests covering supported V1 orchestration/agent endpoints
 - [x] Deterministic error model and machine-readable error codes
-- [ ] Pagination/filtering contracts for run history and knowledge queries — both transports/tests implemented; workspace knowledge OpenAPI declaration remains
-- [x] OpenAPI contract tests for the currently declared V1/V2 contract
+- [x] Pagination/filtering contracts for run history and workspace knowledge queries
+- [x] OpenAPI contract tests for the declared V1/V2 contract
 
 ## Phase 6 — Observability and operations
 
 - [x] Structured runtime events with correlation/run IDs propagated across task lifecycle
 - [x] Health/readiness checks for runtime, agents, provider adapters, and storage
 - [x] Local diagnostics bundle with secrets redacted
-- [ ] Performance baseline for startup, orchestration latency, and memory use — thresholds and measurement gate implemented; dedicated validation run remains
-- [ ] Failure-injection tests for provider/storage/runtime interruptions — all three injections implemented; dedicated resilience run remains
+- [x] Performance baseline for startup, readiness, orchestration latency, and memory RSS enforced by the V2 quality probe
+- [x] Failure-injection tests for transient provider failure, non-retryable provider failure, storage denial, and runtime interruption/resume
 - [x] Production health coverage for new V2 readiness endpoint
+
+Validation evidence: Agent Platform run `31291840074` on SHA `f123d4b05620f96a0eef166706de3286324eeaf3` passed the 51-test API/runtime contract suite and the combined V2 performance/resilience quality probe.
 
 ## Phase 7 — Desktop delivery V2
 
@@ -84,6 +86,7 @@ Development branch: `develop/v2`.
 - [x] Agent Platform tests pass on current `2.0.0-dev.1` implementation line
 - [x] API contract/compatibility tests pass on current implementation line
 - [x] Persistence/migration tests pass in Agent Platform validation
+- [x] Performance/resilience quality probe passes on current implementation line
 - [x] Windows release app build and artifact pass on current implementation head
 - [ ] Upgrade/rollback installer tests pass
 - [ ] Release artifact verification pass
@@ -102,7 +105,7 @@ Fresh V2-only helpers are registered separately from the six core agents and do 
 ## Version sequence
 
 1. `2.0.0-dev.1` — current integrated V2 development candidate
-2. `2.0.0-rc.1` — full regression/release candidate after remaining Phase 5–7 gaps and quality gates pass
+2. `2.0.0-rc.1` — full regression/release candidate after remaining Phase 7 gaps and quality gates pass
 3. `2.0.0` — stable after upgrade, rollback, release, and health gates pass
 
 ## Working rule
