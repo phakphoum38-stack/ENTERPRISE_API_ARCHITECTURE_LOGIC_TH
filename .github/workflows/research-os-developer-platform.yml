@@ -39,16 +39,36 @@ jobs:
       - name: Compile Developer Platform
         run: |
           python -m py_compile tools/research_os_api/developer_access.py
+          python -m py_compile tools/research_os_api/developer_identity.py
           python -m py_compile tools/research_os_api/developer_server.py
+
+      - name: Test production signed identity assertions
+        working-directory: tools/research_os_api
+        run: python -m unittest test_developer_identity.py -v
 
       - name: Test owner-approved access engine API and Trial Mode
         working-directory: tools/research_os_api
+        env:
+          # Compatibility is enabled only for the existing integration-test helper.
+          # Production default remains signed assertions with legacy headers disabled.
+          RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS: "true"
         run: >-
           python -m unittest
           test_developer_access.py
           test_developer_server.py
           test_developer_trial_page.py
           -v
+
+      - name: Verify production default disables legacy identity headers
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          import os
+          from developer_server import _truthy
+          os.environ.pop('RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS', None)
+          assert _truthy('RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS') is False
+          print('Legacy identity headers are disabled by default.')
+          PY
 
       - name: Verify registration-free Trial UI is packaged
         run: |
@@ -79,10 +99,11 @@ jobs:
           {
             echo "# Research OS Developer Platform"
             echo "- Separate application/API boundary validated"
+            echo "- Signed HMAC identity assertions: signature, TTL and replay protection tested"
+            echo "- Legacy identity headers disabled by production default"
             echo "- Registration-free /trial UI validated"
             echo "- Trial data is synthetic-demo-only and read-only"
             echo "- Trial write/delete/commit/approval paths remain restricted"
-            echo "- Trusted identity gateway required for real resources"
             echo "- Owner approval required before developer access"
             echo "- Owner access remains unchanged"
             echo "- Scoped grant, expiry and revocation behavior tested"
