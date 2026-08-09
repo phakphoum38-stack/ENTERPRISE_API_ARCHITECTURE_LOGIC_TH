@@ -9,6 +9,7 @@ on:
       - "tools/research_os_api/v2_*.py"
       - "tools/research_os_api/test_agent_*.py"
       - "tools/research_os_api/test_v2_*.py"
+      - "tools/research_os_api/openapi.yaml"
       - ".github/workflows/research-os-agent-platform.yml"
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - "tools/research_os_api/v2_*.py"
       - "tools/research_os_api/test_agent_*.py"
       - "tools/research_os_api/test_v2_*.py"
+      - "tools/research_os_api/openapi.yaml"
       - ".github/workflows/research-os-agent-platform.yml"
 
 permissions:
@@ -46,6 +48,8 @@ jobs:
           python -m py_compile tools/research_os_api/agent_server.py
           python -m py_compile tools/research_os_api/v2_server.py
           python -m py_compile tools/research_os_api/v2_completion_crew.py
+          python -m py_compile tools/research_os_api/v2_observability.py
+          python -m py_compile tools/research_os_api/v2_quality_gate.py
 
       - name: Test Agent Registry Router Runtime Orchestration and HTTP API
         working-directory: tools/research_os_api
@@ -58,6 +62,9 @@ jobs:
           test_agent_server.py
           test_v2_completion_crew.py
           test_v2_server.py
+          test_v2_openapi.py
+          test_v2_observability.py
+          test_v2_version_alignment.py
           -v
 
       - name: Validate initial agent registry
@@ -207,6 +214,10 @@ jobs:
               print("Durable Multi-Agent orchestration OK")
           PY
 
+      - name: Run V2 performance and resilience quality probes
+        working-directory: tools/research_os_api
+        run: python v2_quality_gate.py all
+
       - name: Summary
         if: always()
         run: |
@@ -215,5 +226,7 @@ jobs:
             echo "- Core agents and isolated Completion Crew validated"
             echo "- Dynamic registry/provider fallback/permission checks validated"
             echo "- Durable orchestration and V1/V2 compatibility tests enabled"
+            echo "- Workspace/evidence OpenAPI contract enforced"
+            echo "- Performance baseline and resilience failure injection executed"
             echo "- Confirmation and restart recovery remain enforced"
           } >> "$GITHUB_STEP_SUMMARY"
