@@ -37,8 +37,14 @@ jobs:
     name: Build ServiceHost
     runs-on: windows-latest
     timeout-minutes: 25
+    env:
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TARGET_REF: ${{ github.head_ref || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout target revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
@@ -89,14 +95,15 @@ jobs:
       - name: Upload ServiceHost artifact
         uses: actions/upload-artifact@v4
         with:
-          name: research-os-service-host-${{ github.sha }}
+          name: research-os-service-host-${{ env.TARGET_SHA }}
           path: tools/research_os_service/publish/**
           if-no-files-found: error
           retention-days: 14
 
-      - name: Dispatch runtime smoke test
-        if: github.event_name != 'pull_request'
+      - name: Dispatch runtime smoke validation chain
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run 03-runtime-smoke-test.yml --repo "${{ github.repository }}" --ref main -f target_sha="${{ github.sha }}" -f source_service_run="${{ github.run_id }}"
+        run: |
+          Write-Host "Dispatching validation-only chain for $env:TARGET_SHA on ref $env:TARGET_REF"
+          gh workflow run 03-runtime-smoke-test.yml --repo "${{ github.repository }}" --ref "$env:TARGET_REF" -f target_sha="$env:TARGET_SHA" -f source_service_run="${{ github.run_id }}" -f dispatch_release=false
