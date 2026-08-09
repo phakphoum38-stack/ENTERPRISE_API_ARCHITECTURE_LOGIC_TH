@@ -12,10 +12,13 @@ from agent_platform import AgentRouter
 from agent_runtime import AgentTaskQueue
 
 
-_FINAL_STEP_STATES = {"completed", "failed"}
+_FINAL_STEP_STATES = {"completed", "failed", "cancelled"}
 _WAITING_STEP_STATES = {"awaiting_confirmation"}
 _RECOVERABLE_STEP_STATES = {"planned", "queued", "running", "blocked", "interrupted"}
+_TERMINAL_RUN_STATES = {"completed", "failed", "cancelled"}
 _MAX_HISTORY_LIMIT = 200
+_DEFAULT_MAX_ATTEMPTS = 3
+_MAX_ALLOWED_ATTEMPTS = 5
 
 
 @dataclass
@@ -29,6 +32,8 @@ class DelegatedStep:
     task_id: str | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
+    attempt_count: int = 0
+    max_attempts: int = _DEFAULT_MAX_ATTEMPTS
 
 
 @dataclass
@@ -90,6 +95,11 @@ class AgentOrchestrator:
             if step_id in known_ids:
                 raise ValueError(f"duplicate step_id: {step_id}")
             known_ids.add(step_id)
+            max_attempts = int(item.get("max_attempts", _DEFAULT_MAX_ATTEMPTS))
+            if max_attempts < 1 or max_attempts > _MAX_ALLOWED_ATTEMPTS:
+                raise ValueError(
+                    f"max_attempts for {step_id} must be between 1 and {_MAX_ALLOWED_ATTEMPTS}"
+                )
             delegated.append(
                 DelegatedStep(
                     step_id=step_id,
@@ -97,6 +107,7 @@ class AgentOrchestrator:
                     requested_agent=item.get("requested_agent"),
                     depends_on=tuple(item.get("depends_on") or ()),
                     context=dict(item.get("context") or {}),
+                    max_attempts=max_attempts,
                 )
             )
 
@@ -119,6 +130,9 @@ class AgentOrchestrator:
 
     def execute(self, run_id: str, confirmed: bool = False) -> dict[str, Any]:
         run = self._require(run_id)
+        if run.status == "cancelled":
+            raise ValueError("orchestration run is cancelled")
+
         previous_status = run.status
         run.status = "running"
         run.updated_at = time.time()
@@ -141,9 +155,9 @@ class AgentOrchestrator:
                     self._record_event(run, "step.resumed", step_id=step.step_id)
 
                 dependencies = [self._step(run, dep) for dep in step.depends_on]
-                if any(dep.status == "failed" for dep in dependencies):
+                if any(dep.status in {"failed", "cancelled"} for dep in dependencies):
                     step.status = "failed"
-                    step.error = "dependency failed"
+                    step.error = "dependency failed or cancelled"
                     progressed = True
                     self._record_event(
                         run,
@@ -156,6 +170,21 @@ class AgentOrchestrator:
                 if not all(dep.status == "completed" for dep in dependencies):
                     continue
 
+                if step.attempt_count >= step.max_attempts:
+                    step.status = "failed"
+                    step.error = "retry limit exhausted"
+                    self._record_event(
+                        run,
+                        "step.retry_exhausted",
+                        step_id=step.step_id,
+                        detail={
+                            "attempt_count": step.attempt_count,
+                            "max_attempts": step.max_attempts,
+                        },
+                    )
+                    self._persist()
+                    continue
+
                 inherited = {
                     dep.step_id: dep.result for dep in dependencies if dep.result is not None
                 }
@@ -163,7 +192,19 @@ class AgentOrchestrator:
                     **step.context,
                     "orchestration_run_id": run.run_id,
                     "dependency_results": inherited,
+                    "attempt": step.attempt_count + 1,
+                    "max_attempts": step.max_attempts,
                 }
+                step.attempt_count += 1
+                self._record_event(
+                    run,
+                    "step.attempt_started",
+                    step_id=step.step_id,
+                    detail={
+                        "attempt": step.attempt_count,
+                        "max_attempts": step.max_attempts,
+                    },
+                )
                 task = self.runtime.submit(
                     step.objective,
                     requested_agent=step.requested_agent,
@@ -184,6 +225,8 @@ class AgentOrchestrator:
                         "task_id": step.task_id,
                         "requested_agent": step.requested_agent,
                         "error": step.error,
+                        "attempt": step.attempt_count,
+                        "max_attempts": step.max_attempts,
                     },
                 )
                 self._persist()
@@ -202,6 +245,8 @@ class AgentOrchestrator:
 
     def confirm(self, run_id: str) -> dict[str, Any]:
         run = self._require(run_id)
+        if run.status == "cancelled":
+            raise ValueError("orchestration run is cancelled")
         self._record_event(run, "run.confirmation_received")
         for step in run.steps:
             if step.status != "awaiting_confirmation":
@@ -225,6 +270,8 @@ class AgentOrchestrator:
                     "orchestration_run_id": run.run_id,
                     "dependency_results": inherited,
                     "recovered_confirmation": True,
+                    "attempt": step.attempt_count,
+                    "max_attempts": step.max_attempts,
                 }
                 task = self.runtime.submit(
                     step.objective,
@@ -246,10 +293,88 @@ class AgentOrchestrator:
                     "task_id": step.task_id,
                     "confirmation_recovered": recovered,
                     "error": step.error,
+                    "attempt": step.attempt_count,
+                    "max_attempts": step.max_attempts,
                 },
             )
             self._persist()
         return self.execute(run_id, confirmed=True)
+
+    def retry(self, run_id: str, step_id: str | None = None) -> dict[str, Any]:
+        run = self._require(run_id)
+        if run.status == "cancelled":
+            raise ValueError("orchestration run is cancelled")
+
+        candidates = [self._step(run, step_id)] if step_id else list(run.steps)
+        retried = 0
+        for step in candidates:
+            if step.status != "failed":
+                continue
+            if step.attempt_count >= step.max_attempts:
+                self._record_event(
+                    run,
+                    "step.retry_rejected",
+                    step_id=step.step_id,
+                    detail={
+                        "reason": "retry limit exhausted",
+                        "attempt_count": step.attempt_count,
+                        "max_attempts": step.max_attempts,
+                    },
+                )
+                continue
+            if step.error and step.error.startswith("dependency failed"):
+                dependencies = [self._step(run, dep) for dep in step.depends_on]
+                if not all(dep.status == "completed" for dep in dependencies):
+                    continue
+            step.status = "planned"
+            step.task_id = None
+            step.result = None
+            step.error = None
+            retried += 1
+            self._record_event(
+                run,
+                "step.retry_requested",
+                step_id=step.step_id,
+                detail={
+                    "next_attempt": step.attempt_count + 1,
+                    "max_attempts": step.max_attempts,
+                },
+            )
+
+        if retried == 0:
+            self._persist()
+            raise ValueError("no retryable failed steps")
+
+        run.status = "planned"
+        self._persist()
+        return self.execute(run_id)
+
+    def cancel(self, run_id: str) -> dict[str, Any]:
+        run = self._require(run_id)
+        if run.status == "cancelled":
+            return self._payload(run)
+        if run.status in {"completed", "failed"}:
+            raise ValueError(f"cannot cancel terminal orchestration run: {run.status}")
+
+        previous_status = run.status
+        for step in run.steps:
+            if step.status not in _FINAL_STEP_STATES:
+                step.status = "cancelled"
+                step.error = "cancelled by request"
+                self._record_event(
+                    run,
+                    "step.cancelled",
+                    step_id=step.step_id,
+                    detail={"task_id": step.task_id},
+                )
+        run.status = "cancelled"
+        self._record_event(
+            run,
+            "run.cancelled",
+            detail={"from": previous_status},
+        )
+        self._persist()
+        return self._payload(run)
 
     def get(self, run_id: str) -> dict[str, Any]:
         return self._payload(self._require(run_id))
@@ -300,7 +425,9 @@ class AgentOrchestrator:
     def _refresh_run_status(self, run: OrchestrationRun) -> None:
         previous_status = run.status
         statuses = {step.status for step in run.steps}
-        if "failed" in statuses:
+        if "cancelled" in statuses and statuses <= {"completed", "cancelled"}:
+            run.status = "cancelled"
+        elif "failed" in statuses:
             run.status = "failed"
         elif "awaiting_confirmation" in statuses:
             run.status = "awaiting_confirmation"
@@ -337,6 +464,8 @@ class AgentOrchestrator:
                 if status in _RECOVERABLE_STEP_STATES and status != "planned":
                     status = "interrupted"
                     recovered_any = True
+                max_attempts = int(raw_step.get("max_attempts", _DEFAULT_MAX_ATTEMPTS))
+                max_attempts = max(1, min(max_attempts, _MAX_ALLOWED_ATTEMPTS))
                 steps.append(
                     DelegatedStep(
                         step_id=str(raw_step.get("step_id") or ""),
@@ -348,6 +477,8 @@ class AgentOrchestrator:
                         task_id=raw_step.get("task_id"),
                         result=raw_step.get("result"),
                         error=raw_step.get("error"),
+                        attempt_count=max(0, int(raw_step.get("attempt_count", 0))),
+                        max_attempts=max_attempts,
                     )
                 )
             events = [
@@ -371,8 +502,9 @@ class AgentOrchestrator:
                 updated_at=float(item.get("updated_at") or time.time()),
                 events=events,
             )
-            if run.status in {"running", "blocked"} or any(
-                step.status == "interrupted" for step in run.steps
+            if run.status not in _TERMINAL_RUN_STATES and (
+                run.status in {"running", "blocked"}
+                or any(step.status == "interrupted" for step in run.steps)
             ):
                 previous_status = run.status
                 run.status = "interrupted"
@@ -393,7 +525,7 @@ class AgentOrchestrator:
             return
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "updated_at": time.time(),
             "runs": [
                 self._payload(run)
