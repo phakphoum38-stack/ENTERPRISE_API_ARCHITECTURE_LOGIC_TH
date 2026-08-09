@@ -79,7 +79,60 @@ Implemented:
 - explicit `verification_failed` instead of treating a successful tool call as a completed skill when evidence is missing
 - single-tool skill execution in Phase 4; multi-tool skills are intentionally routed to orchestration rather than guessed
 
-The three internal read-only tools are now sufficient to exercise the Brain execution path and foundational Brain skills. External filesystem, terminal, GitHub, Google Workspace and other adapters are still not automatically trusted or discovered. They must be registered with an explicit ToolDefinition and pass through the same hardened controller.
+## Phase 5 — Real read-only developer adapters
+
+Phase 5 adds the first adapters that read real project and GitHub state while preserving the Phase 3/4 permission, secret and evidence boundaries. These adapters are opt-in per Brain Tool Registry; they are not globally trusted merely because the code exists.
+
+### Sandboxed workspace pack
+
+Contract: `brain-workspace-read-tools-phase-5`
+
+Implemented tools:
+
+- `workspace.file.read` — bounded UTF-8 text reads
+- `workspace.directory.list` — bounded directory browsing
+- `workspace.code.search` — bounded source-code text search
+- `workspace.repository.map` — bounded relative-path repository map
+- `workspace.build.inspect` — static detection of manifests, CI workflows, installer definitions and test files
+
+Workspace safeguards:
+
+- an explicit workspace root is required at adapter installation time
+- absolute paths and `..` traversal are rejected
+- resolved targets must remain inside the configured workspace
+- returned paths are workspace-relative rather than absolute host paths
+- common VCS, dependency, build-output and cache directories are excluded from broad scans
+- common credential directories and credential-file names are blocked
+- `.env` variants are blocked except `.env.example`
+- binary / non-UTF-8 content and oversized file reads are rejected
+- read, search, map and scan counts are bounded
+- adapters do not execute shell commands
+- adapters do not use the network
+- every call still requires `workspace.read` through the existing Execution Controller
+
+The path denylist is a defense-in-depth boundary, not a claim that every safe-looking source/config file can never contain sensitive text. Phase 4 reflected-secret redaction still applies to adapter results, and additional domain-specific secret rules can be added as adapters expand.
+
+### Governed GitHub read pack
+
+Contract: `brain-github-read-tools-phase-5`
+
+Implemented tool:
+
+- `github.repository.dashboard` — compact repository metadata, recent commits, open pull requests and workflow-run status using the existing read-only GitHub dashboard provider
+
+GitHub safeguards:
+
+- input is restricted to `owner/name`; arbitrary URLs are not accepted by the Phase 5 adapter
+- the ToolDefinition is read-only (`mutating=false`, `destructive=false`)
+- network access and possible API-side credential use are declared explicitly (`network=true`, `secret_access=true`)
+- every call requires `github.read`
+- no merge, workflow dispatch, commit, release, tag or deployment actions are exposed
+- adapter output and exceptions remain inside the Phase 4 secret-aware execution boundary
+- CI uses an injected deterministic provider rather than live GitHub credentials/network calls
+
+### Skill integration
+
+Both Phase 5 packs participate in the existing Skill -> Tool path. A skill may declare a required capability such as `workspace_file_read` or `github_repository_read`; the Tool Registry resolves a ready matching adapter, the controller enforces permissions, and the Brain verifies required evidence after execution before reporting the skill as verified.
 
 ## Execution contract
 
@@ -118,7 +171,7 @@ This does not make arbitrary external adapters automatically trusted. Credential
 
 ## Current development boundary
 
-Brain Phase 4 establishes the model-independent control plane and hardened internal execution path. It does not yet add unrestricted filesystem, terminal, GitHub-write, Google Workspace-write or production deployment adapters. Those integrations should arrive as separate permissioned adapter slices with their own evidence and rollback contracts.
+Brain Phase 5 now has governed read-only workspace and GitHub status adapters. It still does not add unrestricted filesystem access, terminal execution, filesystem write, GitHub write, Google Workspace write or production deployment adapters. Those integrations must arrive as separate permissioned slices with explicit mutation metadata, approval, evidence, recovery and rollback contracts.
 
 ## Release boundary
 
