@@ -48,7 +48,10 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
     } on DeveloperAccessApiException catch (error) {
       if (!mounted) return;
       setState(() {
-        _signedIn = error.statusCode != 401 && error.statusCode != 403;
+        _signedIn = false;
+        _principal = null;
+        _requests = const [];
+        _grants = const [];
         _error = error.message;
         _loading = false;
       });
