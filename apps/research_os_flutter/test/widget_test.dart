@@ -21,6 +21,45 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
+  Future<Map<String, dynamic>> getProviderGateway() async => <String, dynamic>{
+        'api_version': 'v2',
+        'gateway': <String, dynamic>{
+          'selected': <String, dynamic>{
+            'provider': 'gemini',
+            'source': 'environment',
+            'reason': 'credential detected',
+          },
+          'providers': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'provider': 'mock',
+              'state': 'available',
+              'source': 'builtin',
+              'ready': true,
+              'credential_present': false,
+            },
+            <String, dynamic>{
+              'provider': 'gemini',
+              'state': 'available',
+              'source': 'environment',
+              'ready': true,
+              'credential_present': true,
+            },
+          ],
+          'registry': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'name': 'mock',
+              'capabilities': <String>['chat'],
+            },
+            <String, dynamic>{
+              'name': 'gemini',
+              'capabilities': <String>['chat', 'vision', 'tools'],
+            },
+          ],
+          'safe': true,
+        },
+      };
+
+  @override
   Future<Map<String, dynamic>> getKnowledgeArtifacts() async => <String, dynamic>{
         'artifacts': <Map<String, dynamic>>[
           <String, dynamic>{
