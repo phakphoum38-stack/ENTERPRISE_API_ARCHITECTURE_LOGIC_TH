@@ -1,0 +1,78 @@
+name: Research OS V2 Completion Crew
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/research_os_api/v2_completion_crew.py"
+      - "tools/research_os_api/test_v2_completion_crew.py"
+      - "tools/research_os_api/agent_runtime.py"
+      - "tools/research_curator/workspace_engine.py"
+      - "tools/research_curator/test_workspace_engine.py"
+      - ".github/workflows/research-os-v2-completion-crew.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-v2-completion-crew-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  completion-crew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile V2 completion modules
+        run: |
+          python -m py_compile tools/research_os_api/v2_completion_crew.py
+          python -m py_compile tools/research_os_api/agent_runtime.py
+          python -m py_compile tools/research_curator/knowledge_ops.py
+          python -m py_compile tools/research_curator/workspace_engine.py
+
+      - name: Validate isolated completion crew
+        working-directory: tools/research_os_api
+        run: python -m unittest test_v2_completion_crew.py -v
+
+      - name: Validate Workspace and Knowledge Engine
+        working-directory: tools/research_curator
+        run: python -m unittest test_workspace_engine.py -v
+
+      - name: Validate completion crew runtime registration
+        working-directory: tools/research_os_api
+        run: |
+          python - <<'PY'
+          from agent_platform import AGENTS
+          from agent_runtime import RUNTIME
+          from v2_completion_crew import COMPLETION_CREW
+
+          base_ids = {item.agent_id for item in AGENTS}
+          crew_ids = {item.agent_id for item in COMPLETION_CREW}
+          runtime_ids = {item["agent_id"] for item in RUNTIME.router.registry.list()}
+          if base_ids & crew_ids:
+              raise SystemExit("Completion crew overlaps active agent IDs")
+          if not crew_ids <= runtime_ids:
+              raise SystemExit(f"Completion crew missing from runtime: {crew_ids - runtime_ids}")
+          if not base_ids <= runtime_ids:
+              raise SystemExit(f"Active agents were replaced or removed: {base_ids - runtime_ids}")
+          print("V2 completion crew registered without replacing active agents")
+          PY
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "# Research OS V2 Completion Crew"
+            echo "- Fresh V2-only helper agents validated"
+            echo "- Existing active agents are not replaced or reused"
+            echo "- Workspace boundaries and local incremental knowledge index tested"
+            echo "- Search, provenance, duplicate/conflict detection and export/import tested"
+          } >> "$GITHUB_STEP_SUMMARY"
