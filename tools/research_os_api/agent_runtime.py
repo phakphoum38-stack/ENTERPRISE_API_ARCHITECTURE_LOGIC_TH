@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from agent_platform import AgentRouter
+from agent_platform import ROUTER, AgentRouter
 
 
 @dataclass
@@ -97,7 +97,7 @@ class SharedContextStore:
 
 class AgentTaskQueue:
     def __init__(self, router: AgentRouter | None = None, event_bus: AgentEventBus | None = None, context_store: SharedContextStore | None = None) -> None:
-        self.router = router or AgentRouter()
+        self.router = router or ROUTER
         self.events = event_bus or AgentEventBus()
         self.context_store = context_store or SharedContextStore()
         self._tasks: dict[str, RuntimeTask] = {}
@@ -151,7 +151,7 @@ class AgentTaskQueue:
                 "objective": task.objective,
                 "context": merged_context,
                 "execution": "runtime_ready",
-                "note": "Agent Runtime 1.0 dispatch is active. Domain-specific executors will replace this generic executor incrementally.",
+                "note": "Agent Runtime 2.0 dispatch is active with shared dynamic registry and readiness-aware routing.",
             }
             task.status = "completed"
             task.updated_at = time.time()
@@ -173,8 +173,9 @@ class AgentTaskQueue:
 
     def dashboard(self) -> dict[str, Any]:
         tasks = self.list()
+        readiness = self.router.registry.readiness()
         return {
-            "runtime": "agent_runtime_1.0",
+            "runtime": "agent_runtime_2.0",
             "task_count": len(tasks),
             "queued": sum(1 for task in tasks if task["status"] == "queued"),
             "awaiting_confirmation": sum(1 for task in tasks if task["status"] == "awaiting_confirmation"),
@@ -184,6 +185,7 @@ class AgentTaskQueue:
             "event_bus": "active",
             "task_queue": "active",
             "shared_context": "local_persistent",
+            "agent_readiness": readiness,
             "events": self.events.list(limit=20),
         }
 
