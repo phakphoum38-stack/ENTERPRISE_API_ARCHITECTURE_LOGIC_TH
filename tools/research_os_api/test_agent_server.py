@@ -89,6 +89,7 @@ class AgentServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(executed["run"]["status"], "completed")
         self.assertTrue(all(step["status"] == "completed" for step in executed["run"]["steps"]))
+        self.assertTrue(all(step["attempt_count"] == 1 for step in executed["run"]["steps"]))
 
     def test_history_filters_and_timeline(self) -> None:
         status, research = self.request(
@@ -156,6 +157,7 @@ class AgentServerTests(unittest.TestCase):
         event_types = [event["event_type"] for event in timeline["events"]]
         self.assertIn("run.created", event_types)
         self.assertIn("run.execution_started", event_types)
+        self.assertIn("step.attempt_started", event_types)
         self.assertIn("step.completed", event_types)
         self.assertIn("run.status_changed", event_types)
 
@@ -197,6 +199,51 @@ class AgentServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(confirmed["run"]["status"], "completed")
 
+    def test_cancel_and_retry_routes(self) -> None:
+        status, created = self.request(
+            "/v1/agents/orchestrations",
+            method="POST",
+            body={
+                "objective": "cancel this run",
+                "steps": [
+                    {
+                        "step_id": "research",
+                        "objective": "wait for cancellation",
+                        "requested_agent": "research",
+                        "max_attempts": 2,
+                    }
+                ],
+            },
+        )
+        self.assertEqual(status, 201)
+        run_id = created["run"]["run_id"]
+        self.assertEqual(created["run"]["steps"][0]["max_attempts"], 2)
+
+        status, retry = self.request(
+            f"/v1/agents/orchestrations/{run_id}/retry",
+            method="POST",
+            body={"step_id": "research"},
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("no retryable failed steps", retry["detail"])
+
+        status, cancelled = self.request(
+            f"/v1/agents/orchestrations/{run_id}/cancel",
+            method="POST",
+            body={},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(cancelled["run"]["status"], "cancelled")
+        self.assertEqual(cancelled["run"]["steps"][0]["status"], "cancelled")
+
+        status, blocked = self.request(
+            f"/v1/agents/orchestrations/{run_id}/execute",
+            method="POST",
+            body={},
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("cancelled", blocked["detail"])
+
     def test_rejects_invalid_contract_and_unknown_run(self) -> None:
         status, payload = self.request(
             "/v1/agents/orchestrations",
@@ -205,6 +252,17 @@ class AgentServerTests(unittest.TestCase):
         )
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"], "bad_request")
+
+        status, payload = self.request(
+            "/v1/agents/orchestrations",
+            method="POST",
+            body={
+                "objective": "bad retry limit",
+                "steps": [{"step_id": "x", "objective": "x", "max_attempts": 6}],
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("max_attempts", payload["detail"])
 
         status, payload = self.request("/v1/agents/orchestrations/missing")
         self.assertEqual(status, 404)
