@@ -27,7 +27,10 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _savingEndpoint = false;
   String? _error;
   String _activeProvider = 'unknown';
-  List<String> _providers = const <String>[];
+  String _activeSource = 'unknown';
+  String _activeReason = '';
+  List<Map<String, dynamic>> _providerStatuses = const <Map<String, dynamic>>[];
+  Map<String, List<String>> _capabilities = const <String, List<String>>{};
   late final TextEditingController _apiController;
 
   @override
@@ -49,12 +52,38 @@ class _SettingsPageState extends State<SettingsPage> {
       _error = null;
     });
     try {
-      final payload = await widget.apiClient.getProviders();
+      final payload = await widget.apiClient.getProviderGateway();
       if (!mounted) return;
-      final rawProviders = payload['providers'];
+      final gateway = payload['gateway'];
+      if (gateway is! Map) {
+        throw const ResearchOSApiException('Research OS AI Gateway response is missing.');
+      }
+      final selected = gateway['selected'];
+      final rawProviders = gateway['providers'];
+      final rawRegistry = gateway['registry'];
+      final capabilityMap = <String, List<String>>{};
+      if (rawRegistry is List) {
+        for (final item in rawRegistry) {
+          if (item is! Map) continue;
+          final name = item['name']?.toString();
+          if (name == null || name.isEmpty) continue;
+          final rawCapabilities = item['capabilities'];
+          capabilityMap[name] = rawCapabilities is List
+              ? rawCapabilities.map((value) => value.toString()).toList()
+              : const <String>[];
+        }
+      }
       setState(() {
-        _activeProvider = payload['active']?.toString() ?? 'unknown';
-        _providers = rawProviders is List ? rawProviders.map((item) => item.toString()).toList() : const <String>[];
+        _activeProvider = selected is Map ? selected['provider']?.toString() ?? 'unknown' : 'unknown';
+        _activeSource = selected is Map ? selected['source']?.toString() ?? 'unknown' : 'unknown';
+        _activeReason = selected is Map ? selected['reason']?.toString() ?? '' : '';
+        _providerStatuses = rawProviders is List
+            ? rawProviders
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList()
+            : const <Map<String, dynamic>>[];
+        _capabilities = capabilityMap;
         _loading = false;
       });
     } on Object catch (error) {
@@ -85,6 +114,32 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _savingEndpoint = false);
+    }
+  }
+
+  IconData _providerIcon(String state) {
+    switch (state) {
+      case 'available':
+        return Icons.check_circle_outline;
+      case 'needs_setup':
+        return Icons.key_outlined;
+      case 'offline':
+        return Icons.cloud_off_outlined;
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  String _providerStateLabel(String state) {
+    switch (state) {
+      case 'available':
+        return 'Available';
+      case 'needs_setup':
+        return 'Needs setup';
+      case 'offline':
+        return 'Offline';
+      default:
+        return state;
     }
   }
 
@@ -184,7 +239,7 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 28),
         EnterpriseSection(
           title: 'Provider Manager',
-          subtitle: 'Provider ถูกจัดการจาก Backend; Flutter แสดงเฉพาะสถานะและตัวเลือกที่พร้อมใช้',
+          subtitle: 'AI Gateway ตรวจหาและเลือก Provider; Flutter แสดงสถานะโดยไม่รับหรือเปิดเผย Secret',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -199,16 +254,44 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
               if (!_loading && _error == null) ...<Widget>[
-                EnterpriseStatusTile(icon: Icons.smart_toy_outlined, title: 'Active Provider', value: _activeProvider, caption: 'Backend managed'),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _providers.map((provider) => Chip(
-                    avatar: Icon(provider == _activeProvider ? Icons.check_circle : Icons.circle_outlined, size: 18),
-                    label: Text(provider),
-                  )).toList(),
+                EnterpriseStatusTile(
+                  icon: Icons.smart_toy_outlined,
+                  title: 'Selected Provider',
+                  value: _activeProvider,
+                  caption: 'Source: $_activeSource${_activeReason.isEmpty ? '' : ' • $_activeReason'}',
                 ),
+                const SizedBox(height: 12),
+                ..._providerStatuses.map((provider) {
+                  final name = provider['provider']?.toString() ?? 'unknown';
+                  final state = provider['state']?.toString() ?? 'unknown';
+                  final source = provider['source']?.toString() ?? 'unknown';
+                  final ready = provider['ready'] == true;
+                  final credentialPresent = provider['credential_present'] == true;
+                  final capabilities = _capabilities[name] ?? const <String>[];
+                  final endpoint = provider['endpoint']?.toString();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Card(
+                      key: Key('provider-status-$name'),
+                      child: ListTile(
+                        leading: Icon(_providerIcon(state)),
+                        title: Row(
+                          children: <Widget>[
+                            Expanded(child: Text(name)),
+                            if (name == _activeProvider) const Chip(label: Text('Selected')),
+                          ],
+                        ),
+                        subtitle: Text(
+                          '${_providerStateLabel(state)} • source: $source'
+                          '${credentialPresent ? ' • credential detected' : ''}'
+                          '${capabilities.isEmpty ? '' : ' • ${capabilities.join(', ')}'}'
+                          '${endpoint == null || endpoint.isEmpty ? '' : '\n$endpoint'}',
+                        ),
+                        trailing: Icon(ready ? Icons.check_circle : Icons.remove_circle_outline),
+                      ),
+                    ),
+                  );
+                }),
               ],
             ],
           ),
@@ -221,7 +304,7 @@ class _SettingsPageState extends State<SettingsPage> {
             children: <Widget>[
               Card(child: ListTile(leading: Icon(Icons.storage_outlined), title: Text('Local-first storage ready'), subtitle: Text('เมื่อรัน API บน Windows ให้ RESEARCH_OS_DATA_DIR ชี้ไปยังพื้นที่ข้อมูลบนเครื่อง'))),
               SizedBox(height: 8),
-              Card(child: ListTile(leading: Icon(Icons.security_outlined), title: Text('Secrets stay on the backend'), subtitle: Text('Flutter จะไม่จัดเก็บหรือแสดง Gemini API key, GitHub token หรือ Google refresh token'), trailing: Chip(label: Text('Protected')))),
+              Card(child: ListTile(leading: Icon(Icons.security_outlined), title: Text('Secrets stay on the backend'), subtitle: Text('Flutter ไม่จัดเก็บหรือแสดง Gemini API key, OpenAI key, GitHub token หรือ Google refresh token'), trailing: Chip(label: Text('Protected')))),
             ],
           ),
         ),
