@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Research OS AI Brain runtime composition.
 
-Phase 3 composes the provider-neutral Brain Core with context assembly, the
+Phase 4 composes the provider-neutral Brain Core with context assembly, the
 versioned Skill Registry, deterministic decision/risk policy, Tool Registry,
-permissioned execution, durable checkpoints and the isolated 12-agent Brain
-engineering team. The Brain never calls adapters directly: all tool execution
-passes through ExecutionController governance.
+secret-aware permissioned execution, Skill -> Tool execution, post-execution
+verification, durable checkpoints and the isolated 12-agent Brain engineering
+team. The Brain never calls adapters directly.
 """
 
 from __future__ import annotations
@@ -18,7 +18,13 @@ from v2_brain_context import ContextEngine, ContextSource
 from v2_brain_core import ActivityLedger, ResearchOSBrain, WorkingMemory
 from v2_brain_decision import ActionCandidate, DecisionEngine
 from v2_brain_team import brain_team_dashboard, register_brain_team
-from v2_execution_controller import CheckpointStore, ExecutionController, ExecutionRequest
+from v2_execution_hardening import (
+    HardenedExecutionController,
+    SecretAwareCheckpointStore,
+    SecretAwareExecutionRequest,
+)
+from v2_secret_redactor import redaction_status
+from v2_skill_executor import SkillExecutionRequest, SkillExecutor
 from v2_skill_registry import SkillRegistry
 from v2_tool_registry import ToolRegistry
 
@@ -34,8 +40,8 @@ class BrainRuntime:
         context_engine: ContextEngine | None = None,
         decision_engine: DecisionEngine | None = None,
         tool_registry: ToolRegistry | None = None,
-        checkpoint_store: CheckpointStore | None = None,
-        execution_controller: ExecutionController | None = None,
+        checkpoint_store: SecretAwareCheckpointStore | None = None,
+        execution_controller: HardenedExecutionController | None = None,
     ) -> None:
         self.registry = registry or AgentRegistry()
         register_brain_team(self.registry)
@@ -55,18 +61,26 @@ class BrainRuntime:
         else:
             checkpoints = checkpoint_store
             if checkpoints is None and working_memory is not None:
-                checkpoints = CheckpointStore(working_memory.root.parent)
-            self.execution = ExecutionController(
+                checkpoints = SecretAwareCheckpointStore(working_memory.root.parent)
+            self.execution = HardenedExecutionController(
                 tools=self.tools,
                 decisions=self.decisions,
                 ledger=self.brain.ledger,
                 checkpoints=checkpoints,
             )
+        self.skill_execution = SkillExecutor(
+            skills=self.skills,
+            tools=self.tools,
+            execution=self.execution,
+            brain=self.brain,
+        )
 
     def _attach_internal_tool_adapters(self) -> None:
         def skills_adapter(action: str, payload: Mapping[str, Any], dry_run: bool) -> Mapping[str, Any]:
+            del dry_run
             if action == "list":
-                return {"skills": self.skills.list(), "count": len(self.skills.list())}
+                items = self.skills.list()
+                return {"skills": items, "count": len(items)}
             if action == "discover":
                 capability = str(payload.get("capability") or "").strip()
                 if not capability:
@@ -78,6 +92,7 @@ class BrainRuntime:
             raise ValueError(f"unsupported brain.skills.inspect action: {action}")
 
         def session_adapter(action: str, payload: Mapping[str, Any], dry_run: bool) -> Mapping[str, Any]:
+            del dry_run
             if action != "get":
                 raise ValueError(f"unsupported brain.session.inspect action: {action}")
             target = str(payload.get("session_id") or "").strip()
@@ -86,6 +101,7 @@ class BrainRuntime:
             return self.brain.session(target)
 
         def context_adapter(action: str, payload: Mapping[str, Any], dry_run: bool) -> Mapping[str, Any]:
+            del dry_run
             if action != "build":
                 raise ValueError(f"unsupported brain.context.inspect action: {action}")
             objective = str(payload.get("objective") or "").strip()
@@ -128,9 +144,12 @@ class BrainRuntime:
             },
             "decision_policy": self.decisions.policy(),
             "execution": self.execution.dashboard(),
-            "phase": "brain_core_phase_3",
-            "tool_execution": "permissioned_controller_enabled",
+            "skill_execution": self.skill_execution.dashboard(),
+            "secret_redaction": redaction_status(),
+            "phase": "brain_core_phase_4",
+            "tool_execution": "secret_aware_permissioned_controller_enabled",
             "direct_adapter_access": False,
+            "post_execution_verification": True,
         }
 
     def build_context(
@@ -240,6 +259,9 @@ class BrainRuntime:
     def discover_tools(self, capability: str, *, ready_only: bool = True) -> list[dict[str, Any]]:
         return self.tools.discover(capability=capability, ready_only=ready_only)
 
+    def match_tools(self, capabilities: Iterable[str]) -> dict[str, Any]:
+        return self.tools.match_capabilities(capabilities, ready_only=True)
+
     def execute_tool(
         self,
         tool_id: str,
@@ -253,9 +275,10 @@ class BrainRuntime:
         dry_run: bool = False,
         idempotency_key: str | None = None,
         correlation_id: str | None = None,
+        secret_values: Iterable[str] = (),
     ) -> dict[str, Any]:
         result = self.execution.execute(
-            ExecutionRequest(
+            SecretAwareExecutionRequest(
                 session_id=session_id,
                 tool_id=tool_id,
                 action=action,
@@ -266,6 +289,41 @@ class BrainRuntime:
                 dry_run=dry_run,
                 idempotency_key=idempotency_key,
                 correlation_id=correlation_id,
+                secret_values=tuple(secret_values),
+            )
+        )
+        return asdict(result)
+
+    def execute_skill(
+        self,
+        skill_id: str,
+        action: str,
+        *,
+        session_id: str,
+        payload: Mapping[str, Any] | None = None,
+        granted_permissions: Iterable[str] = (),
+        evidence: Mapping[str, Any] | None = None,
+        approved: bool = False,
+        dry_run: bool = False,
+        tool_id: str | None = None,
+        idempotency_key: str | None = None,
+        correlation_id: str | None = None,
+        secret_values: Iterable[str] = (),
+    ) -> dict[str, Any]:
+        result = self.skill_execution.execute(
+            SkillExecutionRequest(
+                session_id=session_id,
+                skill_id=skill_id,
+                action=action,
+                payload=dict(payload or {}),
+                granted_permissions=tuple(granted_permissions),
+                evidence=dict(evidence or {}),
+                approved=approved,
+                dry_run=dry_run,
+                tool_id=tool_id,
+                idempotency_key=idempotency_key,
+                correlation_id=correlation_id,
+                secret_values=tuple(secret_values),
             )
         )
         return asdict(result)
