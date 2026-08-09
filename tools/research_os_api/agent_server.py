@@ -12,7 +12,7 @@ import argparse
 import os
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from agent_orchestrator import ORCHESTRATOR
 from server import ResearchOSHandler
@@ -24,22 +24,61 @@ class AgentResearchOSHandler(ResearchOSHandler):
     _prefix = "/v1/agents/orchestrations"
 
     def do_GET(self) -> None:  # noqa: N802
-        path = urlsplit(self.path).path
+        parsed = urlsplit(self.path)
+        path = parsed.path
         if path == self._prefix:
-            self._send(
-                HTTPStatus.OK,
-                {
-                    "runs": ORCHESTRATOR.list(),
-                    "count": len(ORCHESTRATOR.list()),
-                },
-            )
+            try:
+                query = parse_qs(parsed.query)
+                limit_raw = self._first_query_value(query, "limit")
+                limit = int(limit_raw) if limit_raw else None
+                runs = ORCHESTRATOR.list(
+                    status=self._first_query_value(query, "status"),
+                    query=self._first_query_value(query, "q"),
+                    agent=self._first_query_value(query, "agent"),
+                    limit=limit,
+                )
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "runs": runs,
+                        "count": len(runs),
+                        "filters": {
+                            "status": self._first_query_value(query, "status"),
+                            "q": self._first_query_value(query, "q"),
+                            "agent": self._first_query_value(query, "agent"),
+                            "limit": limit,
+                        },
+                    },
+                )
+            except (TypeError, ValueError) as exc:
+                self._send(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "bad_request", "detail": str(exc)},
+                )
             return
 
         if path.startswith(self._prefix + "/"):
-            run_id = path[len(self._prefix) + 1 :].strip("/")
-            if not run_id or "/" in run_id:
+            relative = path[len(self._prefix) + 1 :].strip("/")
+            parts = relative.split("/") if relative else []
+            if len(parts) == 2 and parts[1] == "timeline":
+                run_id = parts[0]
+                try:
+                    events = ORCHESTRATOR.timeline(run_id)
+                    self._send(
+                        HTTPStatus.OK,
+                        {"run_id": run_id, "events": events, "count": len(events)},
+                    )
+                except ValueError as exc:
+                    self._send(
+                        HTTPStatus.NOT_FOUND,
+                        {"error": "orchestration_not_found", "detail": str(exc)},
+                    )
+                return
+
+            if len(parts) != 1 or not parts[0]:
                 self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
                 return
+            run_id = parts[0]
             try:
                 self._send(HTTPStatus.OK, {"run": ORCHESTRATOR.get(run_id)})
             except ValueError as exc:
@@ -101,6 +140,14 @@ class AgentResearchOSHandler(ResearchOSHandler):
             return
 
         super().do_POST()
+
+    @staticmethod
+    def _first_query_value(query: dict[str, list[str]], key: str) -> str | None:
+        values = query.get(key)
+        if not values:
+            return None
+        value = values[0].strip()
+        return value or None
 
 
 def main() -> int:
