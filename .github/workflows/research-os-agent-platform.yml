@@ -51,8 +51,17 @@ jobs:
           python -m py_compile tools/research_os_api/v2_server.py
           python -m py_compile tools/research_os_api/v2_completion_crew.py
           python -m py_compile tools/research_os_api/v2_brain_core.py
+          python -m py_compile tools/research_os_api/v2_brain_context.py
+          python -m py_compile tools/research_os_api/v2_brain_decision.py
           python -m py_compile tools/research_os_api/v2_brain_team.py
           python -m py_compile tools/research_os_api/v2_brain_runtime.py
+          python -m py_compile tools/research_os_api/v2_secret_redactor.py
+          python -m py_compile tools/research_os_api/v2_execution_controller.py
+          python -m py_compile tools/research_os_api/v2_execution_hardening.py
+          python -m py_compile tools/research_os_api/v2_skill_registry.py
+          python -m py_compile tools/research_os_api/v2_tool_registry.py
+          python -m py_compile tools/research_os_api/v2_skill_executor.py
+          python -m py_compile tools/research_os_api/v2_workspace_tools.py
           python -m py_compile tools/research_os_api/v2_observability.py
           python -m py_compile tools/research_os_api/v2_quality_gate.py
 
@@ -69,6 +78,13 @@ jobs:
           test_v2_brain_core.py
           test_v2_brain_team.py
           test_v2_brain_runtime.py
+          test_v2_secret_redactor.py
+          test_v2_execution_controller.py
+          test_v2_execution_hardening.py
+          test_v2_skill_registry.py
+          test_v2_tool_registry.py
+          test_v2_skill_executor.py
+          test_v2_workspace_tools.py
           test_v2_server.py
           test_v2_openapi.py
           test_v2_observability.py
@@ -251,6 +267,8 @@ jobs:
             echo "# Research OS Agent Platform V2"
             echo "- Core agents and isolated Completion Crew validated"
             echo "- AI Brain Core and 12-agent engineering team validated"
+            echo "- Secret-aware Skill -> Tool execution validated"
+            echo "- Sandboxed Phase 5 workspace read adapters validated"
             echo "- Dynamic registry/provider fallback/permission checks validated"
             echo "- Durable orchestration and V1/V2 compatibility tests enabled"
             echo "- Workspace/evidence OpenAPI contract enforced"
