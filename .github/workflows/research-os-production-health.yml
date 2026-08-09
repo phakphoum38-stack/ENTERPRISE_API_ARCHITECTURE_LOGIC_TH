@@ -104,6 +104,26 @@ jobs:
           fi
           echo "Research OS API healthy after ${elapsed}s"
 
+      - name: Check V2 consolidated readiness
+        id: v2
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/v2-readiness.json -w "%{http_code}" --max-time 20 "$API_URL/v2/health/readiness")
+          echo "http_code=$code" >> "$GITHUB_OUTPUT"
+          test "$code" = "200"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/v2-readiness.json').read_text())
+          assert p.get('ready') is True, p
+          assert p.get('runtime', {}).get('task_queue') == 'active', p
+          assert p.get('agents', {}).get('ready') is True, p
+          assert p.get('storage', {}).get('writable') is True, p
+          assert p.get('provider', {}).get('ready') is True, p
+          print('V2 consolidated readiness healthy.')
+          PY
+
       - name: Check providers endpoint
         run: |
           python - <<'PY'
@@ -119,10 +139,12 @@ jobs:
         if: always()
         run: |
           {
-            echo "# Research OS Production Health"
+            echo "# Research OS Production Health V2"
             echo "- Candidate SHA: ${TARGET_SHA:-scheduled-monitor}"
             echo "- GitHub Pages: checked"
             echo "- Render health HTTP: ${{ steps.api.outputs.http_code }}"
+            echo "- V2 readiness HTTP: ${{ steps.v2.outputs.http_code }}"
             echo "- Render wake/readiness: ${{ steps.api.outputs.wake_seconds }} seconds"
+            echo "- Runtime/agents/provider/storage readiness: checked"
             echo "- Monitor cadence: every 6 hours (not a keep-alive loop)"
           } >> "$GITHUB_STEP_SUMMARY"
