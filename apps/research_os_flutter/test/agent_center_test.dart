@@ -370,9 +370,9 @@ void main() {
     expect(find.byKey(const Key('brain-ready-state')), findsOneWidget);
     expect(find.text('Brain runtime ready'), findsOneWidget);
     expect(find.byKey(const Key('brain-capability-debug')), findsOneWidget);
-    expect(find.text('software.debug-diagnosis'), findsOneWidget);
-    expect(find.text('workspace.code.search'), findsOneWidget);
-    expect(find.byKey(const Key('brain-inspector-safety')), findsOneWidget);
+    expect(find.text('software.debug-diagnosis', skipOffstage: false), findsOneWidget);
+    expect(find.text('workspace.code.search', skipOffstage: false), findsOneWidget);
+    expect(find.byKey(const Key('brain-inspector-safety'), skipOffstage: false), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('brain-plan-objective')));
     await tester.enterText(
