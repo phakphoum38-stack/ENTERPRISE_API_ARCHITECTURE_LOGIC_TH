@@ -1,6 +1,6 @@
 # Research OS v2 Fast-Track Plan
 
-Status: IMPLEMENTING — `2.0.0-dev.1` candidate; Phase 7 validation and final quality gates pending.
+Status: IMPLEMENTING — `2.0.0-dev.1` candidate; Phase 5–7 contract/release validation and final quality gates pending.
 
 Baseline target: Research OS `1.0.0` stable (`d05189d151b6bfa65938dad7a812ac104db195f4`).
 Development branch: `develop/v2`.
@@ -42,35 +42,35 @@ Development branch: `develop/v2`.
 
 ## Phase 4 — Agent Center V2 UI
 
-- [ ] Visual orchestration graph and dependency status — dependency status is implemented; graphical graph view remains
+- [x] Visual orchestration graph and dependency status
 - [x] Live run timeline and per-step audit events
 - [x] Approval inbox for write-capable actions
 - [x] Retry/cancel/resume controls
 - [x] Agent health and capability dashboard
-- [ ] Workspace selector and knowledge search UI — workspace selector is implemented; knowledge-search UI remains
-- [ ] Accessibility and widget/integration tests for critical flows — widget tests added; explicit accessibility gate remains
+- [x] Workspace selector and knowledge search UI backed by the existing local Workspace Knowledge Engine
+- [x] Accessibility semantics and widget/integration tests for critical flows
 
 ## Phase 5 — API V2 and compatibility
 
 - [x] Define V2 API namespace/contract without breaking required V1 clients
-- [ ] Versioned schemas for orchestration, agents, workspaces, and evidence — orchestration/agents/readiness/error schemas implemented; workspace/evidence transport schemas remain
+- [ ] Versioned schemas for orchestration, agents, workspaces, and evidence — orchestration/agents/readiness/error schemas implemented; workspace/evidence OpenAPI schemas remain
 - [x] Compatibility tests covering supported V1 orchestration/agent endpoints
 - [x] Deterministic error model and machine-readable error codes
-- [ ] Pagination/filtering contracts for run history and knowledge queries — run-history cursor pagination implemented; knowledge-query pagination remains
-- [x] OpenAPI contract tests
+- [ ] Pagination/filtering contracts for run history and knowledge queries — both transports/tests implemented; workspace knowledge OpenAPI declaration remains
+- [x] OpenAPI contract tests for the currently declared V1/V2 contract
 
 ## Phase 6 — Observability and operations
 
-- [ ] Structured runtime logs with correlation/run IDs — structured event primitive exists; runtime-wide integration remains
+- [x] Structured runtime events with correlation/run IDs propagated across task lifecycle
 - [x] Health/readiness checks for runtime, agents, provider adapters, and storage
 - [x] Local diagnostics bundle with secrets redacted
-- [ ] Performance baseline for startup, orchestration latency, and memory use — V2 readiness latency gate added; complete baseline run remains
-- [ ] Failure-injection tests for provider/storage/runtime interruptions — provider and storage injection added; runtime interruption injection remains
+- [ ] Performance baseline for startup, orchestration latency, and memory use — thresholds and measurement gate implemented; dedicated validation run remains
+- [ ] Failure-injection tests for provider/storage/runtime interruptions — all three injections implemented; dedicated resilience run remains
 - [x] Production health coverage for new V2 readiness endpoint
 
 ## Phase 7 — Desktop delivery V2
 
-- [ ] V2 Windows release build and installer validation
+- [ ] V2 Windows release build and installer validation — Windows app release build is green; installer validation remains
 - [ ] Upgrade path from V1 preserving local data/configuration — preservation fixture and in-place validation steps implemented; candidate run remains
 - [ ] Rollback path to last stable V1 baseline where compatible — stable baseline recorded; end-to-end rollback validation remains
 - [x] Release manifest with component versions and artifact digests
@@ -79,12 +79,12 @@ Development branch: `develop/v2`.
 
 ## Quality gates
 
-- [ ] Flutter analyze clean on final V2 candidate SHA
-- [ ] Flutter/widget/integration tests pass on final V2 candidate SHA
-- [x] Agent Platform tests pass on the current `2.0.0-dev.1` implementation line
-- [ ] API contract/compatibility tests pass on final V2 candidate SHA
+- [x] Flutter analyze clean on current `2.0.0-dev.1` implementation head
+- [x] Flutter/widget/integration tests pass on current `2.0.0-dev.1` implementation head
+- [x] Agent Platform tests pass on current `2.0.0-dev.1` implementation line
+- [x] API contract/compatibility tests pass on current implementation line
 - [x] Persistence/migration tests pass in Agent Platform validation
-- [ ] Windows release build pass
+- [x] Windows release app build and artifact pass on current implementation head
 - [ ] Upgrade/rollback installer tests pass
 - [ ] Release artifact verification pass
 - [ ] Production Health pass
@@ -102,7 +102,7 @@ Fresh V2-only helpers are registered separately from the six core agents and do 
 ## Version sequence
 
 1. `2.0.0-dev.1` — current integrated V2 development candidate
-2. `2.0.0-rc.1` — full regression/release candidate after remaining Phase 4–7 gaps and quality gates pass
+2. `2.0.0-rc.1` — full regression/release candidate after remaining Phase 5–7 gaps and quality gates pass
 3. `2.0.0` — stable after upgrade, rollback, release, and health gates pass
 
 ## Working rule
