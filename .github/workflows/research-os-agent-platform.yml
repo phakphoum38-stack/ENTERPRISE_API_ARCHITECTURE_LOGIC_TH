@@ -65,6 +65,7 @@ jobs:
           python -m py_compile tools/research_os_api/v2_github_read_tools.py
           python -m py_compile tools/research_os_api/v2_developer_action_tools.py
           python -m py_compile tools/research_os_api/v2_github_write_tools.py
+          python -m py_compile tools/research_os_api/v2_system_introspection.py
           python -m py_compile tools/research_os_api/v2_observability.py
           python -m py_compile tools/research_os_api/v2_quality_gate.py
 
@@ -90,6 +91,8 @@ jobs:
           test_v2_workspace_tools.py
           test_v2_github_read_tools.py
           test_v2_developer_actions.py
+          test_v2_system_introspection.py
+          test_v2_intelligence_server.py
           test_v2_server.py
           test_v2_openapi.py
           test_v2_observability.py
@@ -276,6 +279,7 @@ jobs:
             echo "- Governed Phase 5 GitHub read adapter validated with injected CI provider"
             echo "- Approval-gated Phase 6 workspace and GitHub developer actions validated"
             echo "- Phase 6 controlled command runner remains fixed-profile and shell-free"
+            echo "- Phase 7 System Introspection and read-only Brain planning API validated"
             echo "- Dynamic registry/provider fallback/permission checks validated"
             echo "- Durable orchestration and V1/V2 compatibility tests enabled"
             echo "- Workspace/evidence OpenAPI contract enforced"
