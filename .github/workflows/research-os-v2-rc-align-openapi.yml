@@ -1,0 +1,45 @@
+name: Research OS V2 RC Align OpenAPI
+
+on:
+  push:
+    branches:
+      - release/v2.0.0-rc.1
+    paths:
+      - ".github/workflows/research-os-v2-rc-align-openapi.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  align-openapi-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v2.0.0-rc.1
+          fetch-depth: 0
+
+      - name: Align OpenAPI release-candidate metadata
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tools/research_os_api/openapi.yaml')
+          text = path.read_text(encoding='utf-8')
+          old = '  version: 2.0.0-dev.1\n'
+          new = '  version: 2.0.0-rc.1\n'
+          if old not in text:
+              raise SystemExit('expected OpenAPI dev version not found')
+          if text.count(old) != 1:
+              raise SystemExit('expected exactly one OpenAPI info version')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Commit aligned OpenAPI version
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/research_os_api/openapi.yaml
+          git diff --cached --check
+          git commit -m "release(v2): align OpenAPI version with 2.0.0-rc.1"
+          git push origin HEAD:release/v2.0.0-rc.1
