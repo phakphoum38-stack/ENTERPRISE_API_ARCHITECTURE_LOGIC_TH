@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   validate-developer-platform:
-    name: Owner-approved developer access
+    name: Owner-approved developer access + registration-free trial
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -41,13 +41,26 @@ jobs:
           python -m py_compile tools/research_os_api/developer_access.py
           python -m py_compile tools/research_os_api/developer_server.py
 
-      - name: Test owner-approved access engine and API
+      - name: Test owner-approved access engine API and Trial Mode
         working-directory: tools/research_os_api
         run: >-
           python -m unittest
           test_developer_access.py
           test_developer_server.py
+          test_developer_trial_page.py
           -v
+
+      - name: Verify registration-free Trial UI is packaged
+        run: |
+          test -f apps/research_os_developer/index.html
+          grep -q "Developer Trial" apps/research_os_developer/index.html
+          grep -q "ไม่ต้องลงทะเบียน" apps/research_os_developer/index.html
+          grep -q "/v2/developer/trial/resources" apps/research_os_developer/index.html
+          if grep -q "http://127.0.0.1:8790" apps/research_os_developer/index.html; then
+            echo "Trial UI must use the same-origin Developer API"
+            exit 1
+          fi
+          echo "Registration-free Trial UI uses same-origin synthetic-demo APIs."
 
       - name: Verify regular Research OS boundary remains independent
         run: |
@@ -66,7 +79,10 @@ jobs:
           {
             echo "# Research OS Developer Platform"
             echo "- Separate application/API boundary validated"
-            echo "- Trusted identity gateway required"
+            echo "- Registration-free /trial UI validated"
+            echo "- Trial data is synthetic-demo-only and read-only"
+            echo "- Trial write/delete/commit/approval paths remain restricted"
+            echo "- Trusted identity gateway required for real resources"
             echo "- Owner approval required before developer access"
             echo "- Owner access remains unchanged"
             echo "- Scoped grant, expiry and revocation behavior tested"
