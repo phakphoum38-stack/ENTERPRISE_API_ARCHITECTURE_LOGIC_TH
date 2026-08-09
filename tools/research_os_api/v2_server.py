@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Research OS API V2 compatibility facade.
+"""Research OS API V2 compatibility and readiness facade.
 
-The V2 handler preserves all V1 routes and maps the new V2 namespace onto the
-same runtime/orchestrator owners. This avoids duplicating state or business
-logic while clients migrate incrementally.
+V2 aliases use the same V1 runtime/orchestrator owners so state and business
+logic remain single-source while clients migrate incrementally.
 """
 
 from __future__ import annotations
 
+from http import HTTPStatus
 from urllib.parse import urlsplit, urlunsplit
 
 from agent_server import AgentResearchOSHandler
+from v2_observability import readiness_snapshot
 
 
 class V2ResearchOSHandler(AgentResearchOSHandler):
-    """Expose versioned V2 aliases while keeping V1 fully compatible."""
+    """Expose V2 aliases and consolidated readiness while preserving V1."""
 
     _v2_aliases = (
         ("/v2/orchestrations", "/v1/agents/orchestrations"),
@@ -22,6 +23,14 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
     )
 
     def do_GET(self) -> None:  # noqa: N802
+        parsed = urlsplit(self.path)
+        if parsed.path == "/v2/health/readiness":
+            payload = readiness_snapshot()
+            self._send(
+                HTTPStatus.OK if payload["ready"] else HTTPStatus.SERVICE_UNAVAILABLE,
+                payload,
+            )
+            return
         self._rewrite_v2_path()
         super().do_GET()
 
