@@ -3,10 +3,29 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 from agent_orchestrator import AgentOrchestrator
+from agent_platform import AgentRouter
 from agent_runtime import AgentTaskQueue, SharedContextStore
+
+
+class ControlledRuntime:
+    def __init__(self, failures_before_success: int) -> None:
+        self.router = AgentRouter()
+        self.failures_before_success = failures_before_success
+        self.calls = 0
+
+    def submit(self, objective, requested_agent=None, context=None, confirmed=False):
+        self.calls += 1
+        failed = self.calls <= self.failures_before_success
+        return {
+            "task_id": str(uuid.uuid4()),
+            "status": "failed" if failed else "completed",
+            "result": None if failed else {"objective": objective, "context": dict(context or {})},
+            "error": "transient test failure" if failed else None,
+        }
 
 
 class DurableOrchestrationTests(unittest.TestCase):
@@ -44,7 +63,7 @@ class DurableOrchestrationTests(unittest.TestCase):
             payload = json.loads(
                 (root / "agents" / "orchestrations.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(payload["schema_version"], 1)
+            self.assertEqual(payload["schema_version"], 2)
 
     def test_audit_timeline_survives_restart_and_history_is_filterable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -137,6 +156,70 @@ class DurableOrchestrationTests(unittest.TestCase):
             confirmed = restarted.confirm(created["run_id"])
             self.assertEqual(confirmed["status"], "completed")
             self.assertEqual(confirmed["steps"][0]["status"], "completed")
+
+    def test_bounded_retry_succeeds_before_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runtime = ControlledRuntime(failures_before_success=1)
+            orchestrator = AgentOrchestrator(
+                runtime=runtime,
+                storage_path=root / "agents" / "orchestrations.json",
+            )
+            created = orchestrator.create_run(
+                "retry transient failure",
+                [{"step_id": "research", "objective": "retry me", "max_attempts": 2}],
+            )
+
+            first = orchestrator.execute(created["run_id"])
+            self.assertEqual(first["status"], "failed")
+            self.assertEqual(first["steps"][0]["attempt_count"], 1)
+
+            retried = orchestrator.retry(created["run_id"], "research")
+            self.assertEqual(retried["status"], "completed")
+            self.assertEqual(retried["steps"][0]["attempt_count"], 2)
+            event_types = [event["event_type"] for event in orchestrator.timeline(created["run_id"])]
+            self.assertIn("step.retry_requested", event_types)
+
+    def test_retry_limit_is_enforced(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runtime = ControlledRuntime(failures_before_success=10)
+            orchestrator = AgentOrchestrator(
+                runtime=runtime,
+                storage_path=root / "agents" / "orchestrations.json",
+            )
+            created = orchestrator.create_run(
+                "bounded retry failure",
+                [{"step_id": "research", "objective": "always fail", "max_attempts": 2}],
+            )
+            orchestrator.execute(created["run_id"])
+            second = orchestrator.retry(created["run_id"], "research")
+            self.assertEqual(second["status"], "failed")
+            self.assertEqual(second["steps"][0]["attempt_count"], 2)
+            with self.assertRaisesRegex(ValueError, "no retryable failed steps"):
+                orchestrator.retry(created["run_id"], "research")
+
+    def test_cancel_is_persistent_and_blocks_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = self._orchestrator(root)
+            created = first.create_run(
+                "cancel durable run",
+                [{"step_id": "research", "objective": "do not execute"}],
+            )
+            cancelled = first.cancel(created["run_id"])
+            self.assertEqual(cancelled["status"], "cancelled")
+            self.assertEqual(cancelled["steps"][0]["status"], "cancelled")
+
+            restarted = self._orchestrator(root)
+            restored = restarted.get(created["run_id"])
+            self.assertEqual(restored["status"], "cancelled")
+            with self.assertRaisesRegex(ValueError, "orchestration run is cancelled"):
+                restarted.execute(created["run_id"])
+            self.assertIn(
+                "run.cancelled",
+                [event["event_type"] for event in restarted.timeline(created["run_id"])],
+            )
 
 
 if __name__ == "__main__":
