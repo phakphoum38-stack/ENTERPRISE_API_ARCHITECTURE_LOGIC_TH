@@ -84,6 +84,34 @@ class V2CompatibilityTests(unittest.TestCase):
             {item["agent_id"] for item in v2["agents"]},
         )
 
+    def test_v2_provider_gateway_is_secret_safe_and_reports_selection(self) -> None:
+        keys = (
+            "RESEARCH_OS_PROVIDER",
+            "RESEARCH_OS_ENABLE_LOCAL_PROVIDER_DISCOVERY",
+            "GEMINI_API_KEY",
+        )
+        previous = {key: os.environ.get(key) for key in keys}
+        try:
+            os.environ.pop("RESEARCH_OS_PROVIDER", None)
+            os.environ["RESEARCH_OS_ENABLE_LOCAL_PROVIDER_DISCOVERY"] = "0"
+            os.environ["GEMINI_API_KEY"] = "v2-provider-secret-must-not-leak"
+            status, payload = self.request("/v2/providers")
+            self.assertEqual(status, 200)
+            self.assertEqual(payload["api_version"], "v2")
+            gateway = payload["gateway"]
+            self.assertEqual(gateway["selected"]["provider"], "gemini")
+            self.assertTrue(gateway["safe"])
+            self.assertNotIn("v2-provider-secret-must-not-leak", repr(payload))
+            gemini = next(item for item in gateway["providers"] if item["provider"] == "gemini")
+            self.assertTrue(gemini["credential_present"])
+            self.assertEqual(gemini["source"], "environment")
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
     def test_v2_orchestration_is_visible_through_v1(self) -> None:
         run_id = self.create_run(1)
 
