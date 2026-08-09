@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from agent_platform import ROUTER, AgentRouter
+from brain_skills import BRAIN
 from v2_completion_crew import register_completion_crew
 
 
@@ -175,6 +176,19 @@ class AgentTaskQueue:
         try:
             shared = self.context_store.get(f"shared:{task.selected_agent}")
             merged_context = {**shared, **task.context}
+            brain_plan = BRAIN.plan(
+                task.objective,
+                complexity_level=int(merged_context.get("brain_complexity_level", 1)),
+                requested_workers=self._optional_int(
+                    merged_context.get("brain_requested_workers")
+                ),
+                budget_workers=self._optional_int(
+                    merged_context.get("brain_budget_workers")
+                ),
+                ready_workers=self._optional_int(
+                    merged_context.get("brain_ready_workers")
+                ),
+            )
             task.result = {
                 "agent_id": task.selected_agent,
                 "objective": task.objective,
@@ -182,7 +196,8 @@ class AgentTaskQueue:
                 "execution": "runtime_ready",
                 "correlation_id": task.correlation_id,
                 "run_id": task.run_id,
-                "note": "Agent Runtime 2.0 dispatch is active with shared dynamic registry and readiness-aware routing.",
+                "brain_plan": brain_plan,
+                "note": "Agent Runtime 2.0 dispatch is active with shared dynamic registry, adaptive Brain Skills planning and readiness-aware routing.",
             }
             task.status = "completed"
             task.updated_at = time.time()
@@ -225,6 +240,10 @@ class AgentTaskQueue:
             "task_queue": "active",
             "shared_context": "local_persistent",
             "agent_readiness": readiness,
+            "brain": {
+                "skills": BRAIN.catalog(),
+                "capacity": BRAIN.capacity_snapshot(),
+            },
             "events": self.events.list(limit=20),
         }
 
@@ -244,6 +263,12 @@ class AgentTaskQueue:
             run_id=task.run_id,
             **payload,
         )
+
+    @staticmethod
+    def _optional_int(value: Any) -> int | None:
+        if value is None or value == "":
+            return None
+        return int(value)
 
     @staticmethod
     def _text(value: Any) -> str | None:
