@@ -4,14 +4,14 @@ on:
   pull_request:
     paths:
       - "software_factory/**"
-      - "tests/test_adaptive_software_factory.py"
+      - "tests/test_adaptive_software_factory*.py"
       - ".github/workflows/adaptive-software-factory.yml"
   push:
     branches:
       - main
     paths:
       - "software_factory/**"
-      - "tests/test_adaptive_software_factory.py"
+      - "tests/test_adaptive_software_factory*.py"
       - ".github/workflows/adaptive-software-factory.yml"
   workflow_dispatch:
 
@@ -35,4 +35,4 @@ jobs:
         run: python -m compileall -q software_factory
 
       - name: Run adaptive factory tests
-        run: python -m unittest -v tests/test_adaptive_software_factory.py
+        run: python -m unittest discover -v -s tests -p "test_adaptive_software_factory*.py"
