@@ -201,6 +201,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/brain/skills:
+    get:
+      summary: List provider-neutral Brain Skills from the shared V3 registry
+      responses:
+        "200":
+          description: Versioned Brain Skills catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2BrainCatalog'
+  /v2/brain/capacity:
+    get:
+      summary: Describe Adaptive 6x6 capacity and bounded active-worker policy
+      responses:
+        "200":
+          description: Theoretical 6^6 capacity and current activation limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2BrainCapacity'
+  /v2/brain/plans:
+    post:
+      summary: Create a provider-neutral adaptive Brain Skills dispatch plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective]
+              properties:
+                objective:
+                  type: string
+                  minLength: 1
+                complexity_level:
+                  type: integer
+                  minimum: 1
+                  maximum: 6
+                  default: 1
+                requested_workers:
+                  type: integer
+                  minimum: 1
+                  maximum: 46656
+                budget_workers:
+                  type: integer
+                  minimum: 1
+                ready_workers:
+                  type: integer
+                  minimum: 1
+      responses:
+        "201":
+          description: Adaptive Brain Skills plan created without starting all workers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2BrainPlan'
+        "400":
+          description: Invalid planning request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
   /v2/agents:
     get:
       summary: V2 agent catalog backed by the same dynamic registry as V1
@@ -528,6 +590,94 @@ components:
         "404":
           description: Orchestration run not found
   schemas:
+    V2BrainCatalog:
+      type: object
+      required: [api_version, brain]
+      properties:
+        api_version:
+          const: v2
+        brain:
+          type: object
+          required: [provider_mode, skill_count, skills]
+          properties:
+            provider_mode:
+              const: local_or_configured_provider
+            skill_count:
+              type: integer
+              minimum: 1
+            skills:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+    V2BrainCapacity:
+      type: object
+      required: [api_version, capacity]
+      properties:
+        api_version:
+          const: v2
+        capacity:
+          type: object
+          required:
+            - architecture
+            - branch_factor
+            - elastic_tiers
+            - max_leaf_capacity
+            - max_active_workers
+            - activation_mode
+            - all_workers_started_by_default
+          properties:
+            architecture:
+              const: adaptive_hierarchical_6x6
+            branch_factor:
+              const: 6
+            elastic_tiers:
+              const: 6
+            max_leaf_capacity:
+              const: 46656
+            max_active_workers:
+              type: integer
+              minimum: 1
+              maximum: 1296
+            activation_mode:
+              const: demand_budget_readiness
+            all_workers_started_by_default:
+              const: false
+          additionalProperties: true
+    V2BrainPlan:
+      type: object
+      required: [api_version, plan]
+      properties:
+        api_version:
+          const: v2
+        plan:
+          type: object
+          required:
+            - plan_id
+            - objective
+            - selected_skills
+            - hierarchy
+            - provider_mode
+            - requires_external_api_key
+            - writes_require_approval
+          properties:
+            plan_id:
+              type: string
+            objective:
+              type: string
+            selected_skills:
+              type: array
+              items:
+                type: string
+            hierarchy:
+              type: object
+              additionalProperties: true
+            provider_mode:
+              const: local_or_configured_provider
+            requires_external_api_key:
+              const: false
+            writes_require_approval:
+              const: true
     DelegatedStepInput:
       type: object
       required: [objective]
