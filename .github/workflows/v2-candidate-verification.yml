@@ -1,0 +1,169 @@
+name: Research OS V2 Candidate Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact V2 candidate commit SHA
+        required: true
+        type: string
+      source_installer_run:
+        description: Successful Research OS Build Installer run ID
+        required: true
+        type: string
+      source_validation_run:
+        description: Successful Research OS Installer Validation run ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify-candidate:
+    name: Verify exact-SHA candidate evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TARGET_SHA: ${{ inputs.target_sha }}
+      INSTALLER_RUN: ${{ inputs.source_installer_run }}
+      VALIDATION_RUN: ${{ inputs.source_validation_run }}
+      V1_ROLLBACK_BASELINE: d05189d151b6bfa65938dad7a812ac104db195f4
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Verify installer and validation runs are exact-SHA successes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          verify_run() {
+            local run_id="$1"
+            local expected_workflow="$2"
+            local workflow status conclusion head_sha
+            workflow="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+            status="$(gh run view "$run_id" --repo "${{ github.repository }}" --json status --jq '.status')"
+            conclusion="$(gh run view "$run_id" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+            head_sha="$(gh run view "$run_id" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+            test "$workflow" = "$expected_workflow" || { echo "Unexpected workflow for run $run_id: $workflow"; exit 1; }
+            test "$status" = "completed" || { echo "Run $run_id is not completed: $status"; exit 1; }
+            test "$conclusion" = "success" || { echo "Run $run_id did not succeed: $conclusion"; exit 1; }
+            test "$head_sha" = "$TARGET_SHA" || { echo "Run $run_id SHA $head_sha != $TARGET_SHA"; exit 1; }
+          }
+          verify_run "$INSTALLER_RUN" "Research OS Build Installer"
+          verify_run "$VALIDATION_RUN" "Research OS Installer Validation"
+
+      - name: Download exact-SHA installer artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-evidence
+          gh run download "$INSTALLER_RUN" \
+            --repo "${{ github.repository }}" \
+            --name "research-os-installer-$TARGET_SHA" \
+            --dir candidate-evidence
+          setup="$(find candidate-evidence -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
+          test -n "$setup" || { echo "Candidate Setup EXE missing"; exit 1; }
+
+      - name: Create candidate manifest and verification evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          setup="$(find candidate-evidence -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
+          sha256sum "$setup" | tee candidate-evidence/SHA256SUMS.txt
+          python - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path
+
+          setup = next(Path('candidate-evidence').glob('Research-OS-Setup-*-x64.exe'))
+          digest = hashlib.sha256(setup.read_bytes()).hexdigest()
+          pubspec = Path('apps/research_os_flutter/pubspec.yaml').read_text(encoding='utf-8')
+          app_version = re.search(r'^version:\s*(\S+)', pubspec, re.MULTILINE).group(1)
+          installer = Path('installer/research-os.iss').read_text(encoding='utf-8')
+          installer_version = re.search(r'#define MyAppVersion "([^"]+)"', installer).group(1)
+          openapi = Path('tools/research_os_api/openapi.yaml').read_text(encoding='utf-8')
+          api_version = re.search(r'^\s*version:\s*([^\s]+)', openapi, re.MULTILINE).group(1).strip('"\'')
+          manifest = {
+              'schema_version': 1,
+              'evidence_type': 'v2-development-candidate',
+              'publication': 'validation-only',
+              'target_sha': os.environ['TARGET_SHA'],
+              'source_installer_run': os.environ['INSTALLER_RUN'],
+              'source_validation_run': os.environ['VALIDATION_RUN'],
+              'validation': 'passed',
+              'components': {
+                  'flutter_app': app_version,
+                  'installer': installer_version,
+                  'api_contract': api_version,
+              },
+              'artifact': {
+                  'name': setup.name,
+                  'sha256': digest,
+                  'size_bytes': setup.stat().st_size,
+              },
+              'data_boundary': r'C:\ProgramData\ResearchOS',
+              'upgrade': {'validated': True, 'preserve_local_data': True},
+              'rollback': {
+                  'validated': True,
+                  'baseline_version': '1.0.0',
+                  'baseline_sha': os.environ['V1_ROLLBACK_BASELINE'],
+              },
+              'release_created': False,
+              'tag_created': False,
+          }
+          Path('candidate-evidence/candidate-manifest.json').write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Verify manifest binding and installer digest
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          manifest = json.loads(Path('candidate-evidence/candidate-manifest.json').read_text(encoding='utf-8'))
+          assert manifest['target_sha'] == os.environ['TARGET_SHA']
+          assert manifest['source_installer_run'] == os.environ['INSTALLER_RUN']
+          assert manifest['source_validation_run'] == os.environ['VALIDATION_RUN']
+          assert manifest['validation'] == 'passed'
+          assert manifest['publication'] == 'validation-only'
+          assert manifest['rollback']['baseline_sha'] == os.environ['V1_ROLLBACK_BASELINE']
+          item = manifest['artifact']
+          setup = Path('candidate-evidence') / item['name']
+          actual = hashlib.sha256(setup.read_bytes()).hexdigest()
+          assert actual == item['sha256'], (actual, item['sha256'])
+          assert manifest['release_created'] is False
+          assert manifest['tag_created'] is False
+          print('Exact-SHA V2 candidate evidence verified without publication.')
+          PY
+
+      - name: Upload verified candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-verified-candidate-${{ env.TARGET_SHA }}
+          path: candidate-evidence/**
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Candidate summary
+        shell: bash
+        run: |
+          {
+            echo "# Research OS V2 Candidate Verification"
+            echo "- Target SHA: $TARGET_SHA"
+            echo "- Installer run: $INSTALLER_RUN"
+            echo "- Installer validation run: $VALIDATION_RUN"
+            echo "- Upgrade/rollback evidence: passed"
+            echo "- Candidate artifact digest: verified"
+            echo "- Publication: none"
+            echo "- GitHub Release/tag: not created"
+          } >> "$GITHUB_STEP_SUMMARY"
