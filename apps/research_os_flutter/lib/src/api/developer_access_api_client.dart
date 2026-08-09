@@ -35,14 +35,14 @@ class DeveloperAccessApiClient {
         if (status != null && status.trim().isNotEmpty) 'status': status.trim(),
       },
     );
-    return _decode(await _client.get(uri));
+    return _request(() => _client.get(uri));
   }
 
   Future<Map<String, dynamic>> getOwnerGrants() async {
     final uri = _uri('/v2/developer/grants').replace(
       queryParameters: const <String, String>{'view': 'owner'},
     );
-    return _decode(await _client.get(uri));
+    return _request(() => _client.get(uri));
   }
 
   Future<Map<String, dynamic>> approveRequest(
@@ -76,21 +76,35 @@ class DeveloperAccessApiClient {
         <String, Object?>{'reason': reason},
       );
 
-  Future<Map<String, dynamic>> _get(String path) async {
-    return _decode(await _client.get(_uri(path)));
+  Future<Map<String, dynamic>> _get(String path) {
+    return _request(() => _client.get(_uri(path)));
   }
 
   Future<Map<String, dynamic>> _post(
     String path,
     Map<String, Object?> payload,
-  ) async {
-    return _decode(
-      await _client.post(
+  ) {
+    return _request(
+      () => _client.post(
         _uri(path),
         headers: const <String, String>{'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       ),
     );
+  }
+
+  Future<Map<String, dynamic>> _request(
+    Future<http.Response> Function() send,
+  ) async {
+    try {
+      return _decode(await send());
+    } on DeveloperAccessApiException {
+      rethrow;
+    } catch (error) {
+      throw DeveloperAccessApiException(
+        'เชื่อม Developer API ไม่สำเร็จ: $error',
+      );
+    }
   }
 
   Map<String, dynamic> _decode(http.Response response) {
