@@ -18,6 +18,7 @@ from typing import Any
 
 _TOOL_ID_RE = re.compile(r"^[a-z][a-z0-9_.-]{2,95}$")
 _VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9_.-]+)?$")
+TOOL_REGISTRY_CONTRACT = "brain-tools-phase-3"
 ToolAdapter = Callable[[str, Mapping[str, Any], bool], Mapping[str, Any]]
 
 
@@ -190,8 +191,8 @@ class ToolRegistry:
         """Invoke an already-authorized adapter.
 
         Permission checks intentionally do not live here. The ExecutionController
-        is the sole authorization gate and calls this method only after policy,
-        evidence and approval checks succeed.
+        is the sole Brain Runtime authorization gate and calls this method only
+        after policy, evidence and approval checks succeed.
         """
         tool = self.get(tool_id)
         if dry_run and not tool.supports_dry_run:
@@ -215,6 +216,7 @@ class ToolRegistry:
         tools = self.list()
         return {
             "registry": "research_os_tools",
+            "contract": TOOL_REGISTRY_CONTRACT,
             "tool_count": len(tools),
             "enabled_count": sum(1 for item in tools if item["enabled"]),
             "ready_count": sum(1 for item in tools if item["ready"]),
