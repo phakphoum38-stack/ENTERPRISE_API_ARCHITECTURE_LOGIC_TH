@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import unittest
 
-from v2_tool_registry import ToolDefinition, ToolRegistry
+from v2_tool_registry import TOOL_REGISTRY_CONTRACT, ToolDefinition, ToolRegistry
 
 
 class ToolRegistryTests(unittest.TestCase):
     def test_core_tools_are_metadata_only_until_adapter_is_attached(self) -> None:
         registry = ToolRegistry()
         report = registry.dashboard()
+        self.assertEqual("brain-tools-phase-3", TOOL_REGISTRY_CONTRACT)
+        self.assertEqual(TOOL_REGISTRY_CONTRACT, report["contract"])
         self.assertEqual(3, report["tool_count"])
         self.assertEqual(0, report["ready_count"])
         self.assertEqual("permissioned_execution_controller_only", report["execution_boundary"])
