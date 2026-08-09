@@ -91,7 +91,7 @@ void main() {
 
   testWidgets('owner inbox degrades safely when developer API is offline', (tester) async {
     final client = MockClient((request) async {
-      throw const http.ClientException('offline');
+      throw http.ClientException('offline');
     });
 
     await tester.pumpWidget(
