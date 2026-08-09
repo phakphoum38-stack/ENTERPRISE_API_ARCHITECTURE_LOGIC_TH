@@ -21,6 +21,7 @@ jobs:
         run: |
           echo "RC ref: $GITHUB_REF_NAME"
           echo "RC SHA: $GITHUB_SHA"
+          echo "RC version alignment: Flutter + Installer + OpenAPI = 2.0.0-rc.1"
 
       - name: Dispatch five primary workflows on this exact RC ref
         env:
@@ -45,6 +46,7 @@ jobs:
           {
             echo "# Research OS 2.0.0-rc.1 coordinator"
             echo "- RC SHA: \`$GITHUB_SHA\`"
+            echo "- Version alignment: Flutter + Installer + OpenAPI = \`2.0.0-rc.1\`"
             echo "- Five primary gates dispatched on the same RC ref"
             echo "- No merge, tag, release, or production deployment is performed"
           } >> "$GITHUB_STEP_SUMMARY"
