@@ -2,7 +2,8 @@ openapi: 3.1.0
 info:
   title: Research OS API
   version: 1.0.0
-  description: Provider-agnostic API for conversation analysis, knowledge access, AI generation, and Multi-Agent orchestration.
+  description: Provider-agnostic Research OS API. V1 remains supported while the V2 draft contract is validated on the same runtime owners.
+  x-research-os-v2-status: draft
 servers:
   - url: http://127.0.0.1:8787
 paths:
@@ -93,26 +94,42 @@ paths:
       responses:
         "200":
           description: Graph nodes and edges
+  /v1/agents:
+    get:
+      summary: List registered agents
+      responses:
+        "200":
+          description: Agent catalog
+  /v1/agents/readiness:
+    get:
+      summary: Return agent readiness status
+      responses:
+        "200":
+          description: Agent readiness
+  /v1/agents/discover:
+    get:
+      summary: Discover agents by capability or permission
+      parameters:
+        - name: capability
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching agents
   /v1/agents/orchestrations:
     get:
       summary: List and filter Multi-Agent orchestration runs
       parameters:
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: q
-          in: query
-          required: false
-          description: Case-insensitive search over run ID, objective, step ID, and step objective.
-          schema:
-            type: string
-        - name: agent
-          in: query
-          required: false
-          schema:
-            type: string
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/SearchFilter'
+        - $ref: '#/components/parameters/AgentFilter'
         - name: limit
           in: query
           required: false
@@ -126,28 +143,7 @@ paths:
         "400":
           description: Invalid filter request
     post:
-      summary: Create a Multi-Agent orchestration run
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [objective, steps]
-              properties:
-                objective:
-                  type: string
-                  minLength: 1
-                steps:
-                  type: array
-                  minItems: 1
-                  items:
-                    $ref: '#/components/schemas/DelegatedStepInput'
-      responses:
-        "201":
-          description: Orchestration created
-        "400":
-          description: Invalid orchestration request
+      $ref: '#/components/pathItems/CreateOrchestration'
   /v1/agents/orchestrations/{run_id}:
     parameters:
       - $ref: '#/components/parameters/RunId'
@@ -172,6 +168,230 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RunId'
     post:
+      $ref: '#/components/pathItems/ExecuteOrchestration'
+  /v1/agents/orchestrations/{run_id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/ConfirmOrchestration'
+  /v1/agents/orchestrations/{run_id}/retry:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/RetryOrchestration'
+  /v1/agents/orchestrations/{run_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/CancelOrchestration'
+
+  /v2/health/readiness:
+    get:
+      summary: Consolidated V2 readiness for runtime, agents, active provider, and local storage
+      responses:
+        "200":
+          description: All required V2 components are ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2Readiness'
+        "503":
+          description: One or more required V2 components are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/agents:
+    get:
+      summary: V2 agent catalog backed by the same dynamic registry as V1
+      responses:
+        "200":
+          description: Versioned agent catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2AgentCatalog'
+  /v2/agents/readiness:
+    get:
+      summary: V2 alias for agent readiness
+      responses:
+        "200":
+          description: Versioned agent readiness payload
+  /v2/agents/discover:
+    get:
+      summary: V2 alias for capability discovery
+      parameters:
+        - name: capability
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Versioned capability discovery payload
+  /v2/orchestrations:
+    get:
+      summary: Cursor-paginated V2 orchestration history
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/SearchFilter'
+        - $ref: '#/components/parameters/AgentFilter'
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor returned by the previous page.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Versioned orchestration page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2OrchestrationPage'
+        "400":
+          description: Invalid filter, page size, or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+    post:
+      summary: Create an orchestration through the V2 transport contract
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective, steps]
+              properties:
+                objective:
+                  type: string
+                  minLength: 1
+                steps:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/DelegatedStepInput'
+      responses:
+        "201":
+          description: Versioned orchestration created response
+        "400":
+          description: Invalid orchestration request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/orchestrations/{run_id}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get one V2 orchestration run
+      responses:
+        "200":
+          description: Versioned orchestration response
+        "404":
+          description: Orchestration not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/orchestrations/{run_id}/timeline:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get the durable V2 orchestration audit timeline
+      responses:
+        "200":
+          description: Versioned audit timeline
+        "404":
+          description: Orchestration not found
+  /v2/orchestrations/{run_id}/execute:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/ExecuteOrchestration'
+  /v2/orchestrations/{run_id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/ConfirmOrchestration'
+  /v2/orchestrations/{run_id}/retry:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/RetryOrchestration'
+  /v2/orchestrations/{run_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      $ref: '#/components/pathItems/CancelOrchestration'
+
+components:
+  parameters:
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema:
+        type: string
+    StatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+    SearchFilter:
+      name: q
+      in: query
+      required: false
+      description: Case-insensitive search over run ID, objective, step ID, and step objective.
+      schema:
+        type: string
+    AgentFilter:
+      name: agent
+      in: query
+      required: false
+      schema:
+        type: string
+  pathItems:
+    CreateOrchestration:
+      summary: Create a Multi-Agent orchestration run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective, steps]
+              properties:
+                objective:
+                  type: string
+                  minLength: 1
+                steps:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/DelegatedStepInput'
+      responses:
+        "201":
+          description: Orchestration created
+        "400":
+          description: Invalid orchestration request
+    ExecuteOrchestration:
       summary: Execute all currently runnable orchestration steps
       requestBody:
         required: false
@@ -190,10 +410,7 @@ paths:
           description: Run cannot be executed in its current state
         "404":
           description: Orchestration run not found
-  /v1/agents/orchestrations/{run_id}/confirm:
-    parameters:
-      - $ref: '#/components/parameters/RunId'
-    post:
+    ConfirmOrchestration:
       summary: Confirm write-capable tasks waiting at the governance gate
       responses:
         "200":
@@ -202,10 +419,7 @@ paths:
           description: Run cannot be confirmed in its current state
         "404":
           description: Orchestration run not found
-  /v1/agents/orchestrations/{run_id}/retry:
-    parameters:
-      - $ref: '#/components/parameters/RunId'
-    post:
+    RetryOrchestration:
       summary: Retry failed orchestration steps within their bounded attempt policy
       requestBody:
         required: false
@@ -224,10 +438,7 @@ paths:
           description: No retryable steps or retry limit exhausted
         "404":
           description: Orchestration run not found
-  /v1/agents/orchestrations/{run_id}/cancel:
-    parameters:
-      - $ref: '#/components/parameters/RunId'
-    post:
+    CancelOrchestration:
       summary: Cancel a non-terminal orchestration run and persist the cancellation
       responses:
         "200":
@@ -236,14 +447,6 @@ paths:
           description: Terminal orchestration run cannot be cancelled
         "404":
           description: Orchestration run not found
-components:
-  parameters:
-    RunId:
-      name: run_id
-      in: path
-      required: true
-      schema:
-        type: string
   schemas:
     DelegatedStepInput:
       type: object
@@ -255,8 +458,7 @@ components:
           type: string
           minLength: 1
         requested_agent:
-          type: string
-          nullable: true
+          type: [string, 'null']
         depends_on:
           type: array
           items:
@@ -270,3 +472,108 @@ components:
           maximum: 5
           default: 3
           description: Maximum explicit execution attempts for this delegated step.
+    V2OrchestrationRun:
+      type: object
+      required: [run_id, objective, status, steps]
+      properties:
+        run_id:
+          type: string
+        objective:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: number
+        updated_at:
+          type: number
+        steps:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    V2PageMetadata:
+      type: object
+      required: [page_size, returned]
+      properties:
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        returned:
+          type: integer
+          minimum: 0
+        next_cursor:
+          type: [string, 'null']
+    V2OrchestrationPage:
+      type: object
+      required: [api_version, items, page, filters]
+      properties:
+        api_version:
+          const: v2
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2OrchestrationRun'
+        page:
+          $ref: '#/components/schemas/V2PageMetadata'
+        filters:
+          type: object
+          additionalProperties: true
+    V2AgentCatalog:
+      type: object
+      required: [api_version, agents, count]
+      properties:
+        api_version:
+          const: v2
+        count:
+          type: integer
+        agents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    V2Readiness:
+      type: object
+      required: [api_version, version, ready, runtime, agents, provider, storage, checked_at]
+      properties:
+        api_version:
+          const: v2
+        version:
+          type: string
+        ready:
+          type: boolean
+        runtime:
+          type: object
+          additionalProperties: true
+        agents:
+          type: object
+          additionalProperties: true
+        provider:
+          type: object
+          additionalProperties: true
+        storage:
+          type: object
+          additionalProperties: true
+        checked_at:
+          type: number
+    V2ErrorEnvelope:
+      type: object
+      required: [api_version, error]
+      properties:
+        api_version:
+          const: v2
+        error:
+          type: object
+          required: [code, message, status]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            status:
+              type: integer
