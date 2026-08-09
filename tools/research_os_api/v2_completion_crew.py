@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent_platform import AgentDefinition, AgentRegistry
+from agent_platform import REGISTRY, AgentDefinition, AgentRegistry
 
 
 COMPLETION_CREW: tuple[AgentDefinition, ...] = (
@@ -121,3 +121,9 @@ def register_completion_crew(registry: AgentRegistry) -> list[dict[str, object]]
         else:
             registered.append(registry.describe(agent.agent_id))
     return registered
+
+
+# Importing the V2 crew definition guarantees the shared registry sees the same
+# isolated helpers as the runtime. Registration is idempotent and never replaces
+# an existing agent.
+GLOBAL_COMPLETION_CREW = register_completion_crew(REGISTRY)
