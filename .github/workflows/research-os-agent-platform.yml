@@ -43,7 +43,14 @@ jobs:
 
       - name: Test Agent Registry Router Runtime Orchestration and HTTP API
         working-directory: tools/research_os_api
-        run: python -m unittest test_agent_platform.py test_agent_runtime.py test_agent_orchestrator.py test_agent_server.py -v
+        run: >-
+          python -m unittest
+          test_agent_platform.py
+          test_agent_runtime.py
+          test_agent_orchestrator.py
+          test_agent_orchestrator_persistence.py
+          test_agent_server.py
+          -v
 
       - name: Validate initial agent registry
         working-directory: tools/research_os_api
@@ -100,12 +107,16 @@ jobs:
         run: |
           python - <<'PY'
           import tempfile
+          from pathlib import Path
           from agent_orchestrator import AgentOrchestrator
           from agent_runtime import AgentEventBus, AgentTaskQueue, SharedContextStore
 
           with tempfile.TemporaryDirectory() as tmp:
               runtime = AgentTaskQueue(event_bus=AgentEventBus(), context_store=SharedContextStore(tmp))
-              orchestrator = AgentOrchestrator(runtime=runtime)
+              orchestrator = AgentOrchestrator(
+                  runtime=runtime,
+                  storage_path=Path(tmp) / "agents" / "orchestrations.json",
+              )
               run = orchestrator.create_run(
                   "Research then prepare shift calendar sync",
                   [
@@ -125,10 +136,17 @@ jobs:
               waiting = orchestrator.execute(run["run_id"])
               if waiting["status"] != "awaiting_confirmation":
                   raise SystemExit(f"Expected orchestration confirmation gate, got {waiting['status']}")
-              completed = orchestrator.confirm(run["run_id"])
+              restarted = AgentOrchestrator(
+                  runtime=AgentTaskQueue(
+                      event_bus=AgentEventBus(),
+                      context_store=SharedContextStore(tmp),
+                  ),
+                  storage_path=Path(tmp) / "agents" / "orchestrations.json",
+              )
+              completed = restarted.confirm(run["run_id"])
               if completed["status"] != "completed":
-                  raise SystemExit(f"Orchestration did not complete: {completed['status']}")
-              print("Multi-Agent orchestration OK")
+                  raise SystemExit(f"Recovered orchestration did not complete: {completed['status']}")
+              print("Durable Multi-Agent orchestration OK")
           PY
 
       - name: Summary
@@ -137,7 +155,7 @@ jobs:
           {
             echo "# Research OS Agent Platform"
             echo "- Agent registry/runtime/permission checks remain"
-            echo "- Multi-Agent orchestrator compile and unit tests enabled"
+            echo "- Durable orchestrator persistence and restart recovery tests enabled"
             echo "- Orchestrator HTTP create/list/get/execute/confirm contract tested"
-            echo "- Dependency delegation and confirmation flow validated"
+            echo "- Dependency delegation and confirmation flow validated across restart"
           } >> "$GITHUB_STEP_SUMMARY"
