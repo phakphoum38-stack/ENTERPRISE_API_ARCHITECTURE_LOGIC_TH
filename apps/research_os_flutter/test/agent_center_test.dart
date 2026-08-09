@@ -225,7 +225,7 @@ void main() {
 
     expect(find.byKey(const Key('workspace-selector')), findsOneWidget);
     expect(find.text('Research workspace'), findsOneWidget);
-    expect(find.bySemanticsLabel('Search workspace knowledge'), findsOneWidget);
+    expect(find.bySemanticsLabel('Search workspace knowledge'), findsNWidgets(2));
 
     await tester.enterText(
       find.byKey(const Key('knowledge-search-query')),
