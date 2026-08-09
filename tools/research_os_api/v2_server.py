@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 import sys
 from collections.abc import Mapping
 from http import HTTPStatus
@@ -24,12 +25,15 @@ from agent_server import AgentResearchOSHandler
 from ai_gateway import gateway_report
 from v2_brain_runtime import BRAIN_RUNTIME
 from v2_observability import readiness_snapshot
+from v2_secret_redactor import sanitize_external
 from v2_system_introspection import SystemIntrospection, parse_ready_only
 
 _CURATOR_DIR = Path(__file__).resolve().parents[1] / "research_curator"
 if str(_CURATOR_DIR) not in sys.path:
     sys.path.insert(0, str(_CURATOR_DIR))
 from workspace_engine import Provenance, WorkspaceKnowledgeEngine  # noqa: E402
+
+_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
 class V2ResearchOSHandler(AgentResearchOSHandler):
@@ -151,15 +155,31 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
     def _send_v2_intelligence_plan(self) -> None:
         try:
             body = self._read_json()
-            objective = str(body.get("objective") or "")
+            objective = str(body.get("objective") or "").strip()
             session_id_raw = str(body.get("session_id") or "").strip()
             context_raw = body.get("context")
             if context_raw is not None and not isinstance(context_raw, Mapping):
                 raise ValueError("context must be an object")
+            if session_id_raw:
+                if not _SESSION_ID_RE.fullmatch(session_id_raw):
+                    raise ValueError("session_id must be 1-128 characters using letters, digits, dot, underscore, colon, or hyphen")
+                if sanitize_external(session_id_raw) != session_id_raw:
+                    raise ValueError("session_id resembles sensitive credential material")
+
+            # Sanitize before BrainRuntime.plan because planning persists the current
+            # goal/plan into Working Memory and records an Activity Ledger event.
+            # Output-only sanitization would be too late for credential-shaped input.
+            safe_objective = sanitize_external(objective)
+            safe_context_value = sanitize_external(dict(context_raw or {}))
+            if not isinstance(safe_objective, str):
+                raise ValueError("objective must resolve to text")
+            if not isinstance(safe_context_value, Mapping):
+                raise ValueError("context must resolve to an object")
+
             payload = self._intelligence().plan(
-                objective,
+                safe_objective,
                 session_id=session_id_raw or None,
-                context=dict(context_raw or {}),
+                context=dict(safe_context_value),
             )
             self._send(HTTPStatus.OK, payload)
         except (TypeError, ValueError) as exc:
