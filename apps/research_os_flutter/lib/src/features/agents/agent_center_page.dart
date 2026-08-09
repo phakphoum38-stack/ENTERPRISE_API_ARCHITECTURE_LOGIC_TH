@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/research_os_api_client.dart';
 import '../../ui/enterprise_components.dart';
+import 'brain_inspector_panel.dart';
 
 class AgentCenterPage extends StatefulWidget {
   const AgentCenterPage({required this.apiClient, super.key});
@@ -259,6 +260,8 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
             ],
           ]),
         ),
+        const SizedBox(height: 18),
+        BrainInspectorPanel(apiClient: widget.apiClient),
         const SizedBox(height: 18),
         EnterpriseSection(
           title: 'Approval inbox',
