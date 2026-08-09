@@ -4,6 +4,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 
+import test_v2_brain_context
+import test_v2_brain_decision
+import test_v2_skill_registry
 from agent_platform import AgentRegistry
 from v2_brain_core import ActivityLedger, WorkingMemory
 from v2_brain_decision import ActionCandidate
@@ -102,6 +105,17 @@ class BrainRuntimeTests(unittest.TestCase):
             )
             self.assertEqual("allowed", allowed["decision"])
             self.assertEqual("write", allowed["selected_action_id"])
+
+
+def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite, pattern: str | None) -> unittest.TestSuite:
+    """Keep Phase 2 tests inside the existing consolidated Agent Platform gate."""
+    del pattern
+    suite = unittest.TestSuite()
+    suite.addTests(tests)
+    suite.addTests(loader.loadTestsFromModule(test_v2_brain_context))
+    suite.addTests(loader.loadTestsFromModule(test_v2_brain_decision))
+    suite.addTests(loader.loadTestsFromModule(test_v2_skill_registry))
+    return suite
 
 
 if __name__ == "__main__":
