@@ -19,16 +19,39 @@ class V2OpenAPIContractTests(unittest.TestCase):
             "/v2/orchestrations/{run_id}/confirm:",
             "/v2/orchestrations/{run_id}/retry:",
             "/v2/orchestrations/{run_id}/cancel:",
+            "/v2/workspaces:",
+            "/v2/workspaces/{workspace_id}/knowledge:",
             "V2OrchestrationPage:",
             "V2PageMetadata:",
+            "V2Workspace:",
+            "V2WorkspaceList:",
+            "V2KnowledgeRecord:",
+            "V2KnowledgePage:",
+            "V2Provenance:",
             "V2Readiness:",
             "V2ErrorEnvelope:",
             "name: page_size",
             "name: cursor",
+            "name: kinds",
+            "name: workspace_id",
             "x-research-os-v2-status: draft",
         )
         missing = [marker for marker in required if marker not in text]
         self.assertEqual(missing, [])
+
+    def test_workspace_contract_keeps_provenance_and_cursor_pagination(self) -> None:
+        text = Path(__file__).with_name("openapi.yaml").read_text(encoding="utf-8")
+        for marker in (
+            "$ref: '#/components/schemas/V2WorkspaceList'",
+            "$ref: '#/components/schemas/V2KnowledgePage'",
+            "$ref: '#/components/schemas/V2Provenance'",
+            "next_cursor:",
+            "source_type:",
+            "source_id:",
+            "evidence:",
+            "content_hash:",
+        ):
+            self.assertIn(marker, text)
 
     def test_v1_contract_remains_present_during_v2_migration(self) -> None:
         text = Path(__file__).with_name("openapi.yaml").read_text(encoding="utf-8")
