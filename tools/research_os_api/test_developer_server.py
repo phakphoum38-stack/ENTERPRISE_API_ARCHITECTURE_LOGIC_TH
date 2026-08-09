@@ -16,8 +16,10 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.old_data = os.environ.get("RESEARCH_OS_DATA_DIR")
         self.old_secret = os.environ.get("RESEARCH_OS_IDENTITY_PROXY_SECRET")
+        self.old_login = os.environ.get("RESEARCH_OS_DEVELOPER_LOGIN_URL")
         os.environ["RESEARCH_OS_DATA_DIR"] = self.temp.name
         os.environ["RESEARCH_OS_IDENTITY_PROXY_SECRET"] = "test-gateway-secret"
+        os.environ["RESEARCH_OS_DEVELOPER_LOGIN_URL"] = "/identity/login"
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), DeveloperPlatformHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -26,17 +28,18 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
-        if self.old_data is None:
-            os.environ.pop("RESEARCH_OS_DATA_DIR", None)
-        else:
-            os.environ["RESEARCH_OS_DATA_DIR"] = self.old_data
-        if self.old_secret is None:
-            os.environ.pop("RESEARCH_OS_IDENTITY_PROXY_SECRET", None)
-        else:
-            os.environ["RESEARCH_OS_IDENTITY_PROXY_SECRET"] = self.old_secret
+        for name, old in (
+            ("RESEARCH_OS_DATA_DIR", self.old_data),
+            ("RESEARCH_OS_IDENTITY_PROXY_SECRET", self.old_secret),
+            ("RESEARCH_OS_DEVELOPER_LOGIN_URL", self.old_login),
+        ):
+            if old is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = old
         self.temp.cleanup()
 
-    def request(self, method: str, path: str, principal: str | None, body: dict | None = None, secret: str = "test-gateway-secret"):
+    def raw_request(self, method: str, path: str, principal: str | None = None, body: dict | None = None, secret: str = "test-gateway-secret"):
         conn = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=5)
         headers = {"Content-Type": "application/json"}
         if principal is not None:
@@ -45,10 +48,41 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         payload = json.dumps(body or {}) if body is not None else None
         conn.request(method, path, body=payload, headers=headers)
         response = conn.getresponse()
-        data = json.loads(response.read().decode("utf-8"))
+        data = response.read()
         status = response.status
+        content_type = response.getheader("Content-Type") or ""
         conn.close()
-        return status, data
+        return status, content_type, data
+
+    def request(self, method: str, path: str, principal: str | None, body: dict | None = None, secret: str = "test-gateway-secret"):
+        status, _, raw = self.raw_request(method, path, principal, body, secret)
+        return status, json.loads(raw.decode("utf-8"))
+
+    def test_trial_and_authenticated_app_are_served_separately(self) -> None:
+        status, content_type, body = self.raw_request("GET", "/trial")
+        self.assertEqual(status, 200)
+        self.assertIn("text/html", content_type)
+        self.assertIn(b"Developer Trial", body)
+
+        status, content_type, body = self.raw_request("GET", "/app")
+        self.assertEqual(status, 200)
+        self.assertIn("text/html", content_type)
+        self.assertIn(b"Developer Access Center", body)
+
+    def test_auth_config_is_public_but_session_requires_gateway_identity(self) -> None:
+        status, config = self.request("GET", "/v2/developer/auth/config", None)
+        self.assertEqual(status, 200)
+        self.assertEqual(config["login_url"], "/identity/login")
+        self.assertTrue(config["registration_required"])
+
+        status, denied = self.request("GET", "/v2/developer/session", None)
+        self.assertEqual(status, 401)
+        self.assertEqual(denied["error"]["code"], "identity_required")
+
+        status, session = self.request("GET", "/v2/developer/session", "dev:alice")
+        self.assertEqual(status, 200)
+        self.assertTrue(session["authenticated"])
+        self.assertEqual(session["principal"], "dev:alice")
 
     def test_trial_mode_requires_no_registration_or_identity(self) -> None:
         status, payload = self.request("GET", "/v2/developer/trial", None)
@@ -128,6 +162,10 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         self.assertFalse(payload["access_active"])
         request_id = payload["request"]["request_id"]
 
+        status, pending = self.request("GET", "/v2/developer/access-requests?view=owner&status=pending", "user:owner")
+        self.assertEqual(status, 200)
+        self.assertEqual([item["request_id"] for item in pending["items"]], [request_id])
+
         status, before = self.request(
             "POST",
             "/v2/developer/authorize",
@@ -146,6 +184,10 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         grant = approved["grant"]
         self.assertTrue(grant["owner_access_unchanged"])
+
+        status, owner_grants = self.request("GET", "/v2/developer/grants?view=owner", "user:owner")
+        self.assertEqual(status, 200)
+        self.assertEqual([item["grant_id"] for item in owner_grants["items"]], [grant["grant_id"]])
 
         status, read = self.request(
             "POST",
@@ -180,6 +222,10 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         self.assertFalse(revoked["grant"]["active"])
+
+        status, owner_grants = self.request("GET", "/v2/developer/grants?view=owner", "user:owner")
+        self.assertEqual(status, 200)
+        self.assertEqual(owner_grants["items"], [])
 
         _, after = self.request(
             "POST",
