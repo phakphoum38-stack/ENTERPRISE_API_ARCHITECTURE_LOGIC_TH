@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import threading
 import unittest
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
 import agent_server
 from agent_orchestrator import AgentOrchestrator
@@ -14,7 +16,10 @@ from agent_orchestrator import AgentOrchestrator
 class AgentServerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.original = agent_server.ORCHESTRATOR
-        agent_server.ORCHESTRATOR = AgentOrchestrator()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        agent_server.ORCHESTRATOR = AgentOrchestrator(
+            storage_path=Path(self.temp_dir.name) / "agents" / "orchestrations.json",
+        )
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), agent_server.AgentResearchOSHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -25,6 +30,7 @@ class AgentServerTests(unittest.TestCase):
         self.server.server_close()
         self.thread.join(timeout=2)
         agent_server.ORCHESTRATOR = self.original
+        self.temp_dir.cleanup()
 
     def request(self, path: str, *, method: str = "GET", body=None):
         data = None if body is None else json.dumps(body).encode("utf-8")
