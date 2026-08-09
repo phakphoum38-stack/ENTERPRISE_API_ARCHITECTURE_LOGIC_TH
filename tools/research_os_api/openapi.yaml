@@ -95,10 +95,36 @@ paths:
           description: Graph nodes and edges
   /v1/agents/orchestrations:
     get:
-      summary: List Multi-Agent orchestration runs
+      summary: List and filter Multi-Agent orchestration runs
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive search over run ID, objective, step ID, and step objective.
+          schema:
+            type: string
+        - name: agent
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
       responses:
         "200":
           description: Orchestration run list
+        "400":
+          description: Invalid filter request
     post:
       summary: Create a Multi-Agent orchestration run
       requestBody:
@@ -132,6 +158,16 @@ paths:
           description: Orchestration run
         "404":
           description: Orchestration run not found
+  /v1/agents/orchestrations/{run_id}/timeline:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get the durable audit timeline for an orchestration run
+      responses:
+        "200":
+          description: Ordered orchestration audit events
+        "404":
+          description: Orchestration run not found
   /v1/agents/orchestrations/{run_id}/execute:
     parameters:
       - $ref: '#/components/parameters/RunId'
@@ -150,6 +186,8 @@ paths:
       responses:
         "200":
           description: Updated orchestration run
+        "400":
+          description: Run cannot be executed in its current state
         "404":
           description: Orchestration run not found
   /v1/agents/orchestrations/{run_id}/confirm:
@@ -160,6 +198,42 @@ paths:
       responses:
         "200":
           description: Confirmed and updated orchestration run
+        "400":
+          description: Run cannot be confirmed in its current state
+        "404":
+          description: Orchestration run not found
+  /v1/agents/orchestrations/{run_id}/retry:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      summary: Retry failed orchestration steps within their bounded attempt policy
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                step_id:
+                  type: string
+                  description: Retry one failed step. Omit to retry all currently retryable failed steps.
+      responses:
+        "200":
+          description: Retried and updated orchestration run
+        "400":
+          description: No retryable steps or retry limit exhausted
+        "404":
+          description: Orchestration run not found
+  /v1/agents/orchestrations/{run_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      summary: Cancel a non-terminal orchestration run and persist the cancellation
+      responses:
+        "200":
+          description: Cancelled orchestration run
+        "400":
+          description: Terminal orchestration run cannot be cancelled
         "404":
           description: Orchestration run not found
 components:
@@ -190,3 +264,9 @@ components:
         context:
           type: object
           additionalProperties: true
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+          description: Maximum explicit execution attempts for this delegated step.
