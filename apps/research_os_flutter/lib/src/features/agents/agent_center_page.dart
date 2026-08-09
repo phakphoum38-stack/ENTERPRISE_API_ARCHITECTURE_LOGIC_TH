@@ -100,7 +100,7 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
   Future<void> _loadHealth() async {
     setState(() => _loadingHealth = true);
     try {
-      final payload = await widget.apiClient.getV2BrainAgents();
+      final payload = await widget.apiClient.getV2SquaredBrainAgents();
       final raw = payload['brain_team'];
       final agents = raw is List ? raw.whereType<Map>().map(_map).toList() : <Map<String, dynamic>>[];
       if (mounted) setState(() => _agents = agents);
@@ -186,8 +186,8 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
       children: [
         const EnterprisePageHeader(
           icon: Icons.smart_toy_outlined,
-          title: 'Agent Center V2',
-          subtitle: 'V2 Brain Team helpers, orchestration graph, approvals, timeline และ workspace knowledge',
+          title: 'Agent Center V2²',
+          subtitle: 'V2² Brain Team helpers, orchestration graph, approvals, timeline และ workspace knowledge',
         ),
         const SizedBox(height: 18),
         EnterpriseSection(
@@ -289,7 +289,7 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
         const SizedBox(height: 18),
         EnterpriseSection(
           title: 'Multi-Agent orchestration',
-          subtitle: 'V2 helper selection, dependency graph, status และ run controls',
+          subtitle: 'V2² helper selection, dependency graph, status และ run controls',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
               Expanded(child: Text(_loading ? 'กำลังโหลด orchestration...' : '${_runs.length} orchestration run(s)')),
@@ -318,8 +318,8 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
         ),
         const SizedBox(height: 18),
         EnterpriseSection(
-          title: 'V2 Brain Team helpers',
-          subtitle: 'โหลดสถานะตัวช่วยจาก System Introspection ของ Brain Runtime โดยตรง',
+          title: 'V2² Brain Team helpers',
+          subtitle: 'ใช้ canonical v2_* IDs เดิม แต่เพิ่ม Capability → Skill → Tool → Independent Review เป็น V2² helper mode',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Align(
               alignment: Alignment.centerRight,
@@ -327,16 +327,16 @@ class _AgentCenterPageState extends State<AgentCenterPage> {
                 key: const Key('load-agent-health'),
                 onPressed: _loadingHealth ? null : _loadHealth,
                 icon: const Icon(Icons.monitor_heart_outlined),
-                label: const Text('Refresh V2 helpers'),
+                label: const Text('Refresh V2² helpers'),
               ),
             ),
             if (_loadingHealth) const LinearProgressIndicator(),
-            if (_agents.isEmpty && !_loadingHealth) const ListTile(title: Text('V2 helper health not loaded')),
+            if (_agents.isEmpty && !_loadingHealth) const ListTile(title: Text('V2² helper health not loaded')),
             ..._agents.map((agent) {
               final health = agent['health'] is Map ? _map(agent['health'] as Map) : <String, dynamic>{};
               return ListTile(
                 leading: Icon(health['ready'] == true ? Icons.check_circle_outline : Icons.error_outline),
-                title: Text('${agent['name'] ?? agent['agent_id'] ?? 'V2 Helper'}'),
+                title: Text('${agent['name'] ?? agent['agent_id'] ?? 'V2² Helper'}'),
                 subtitle: Text('${agent['agent_id'] ?? '-'} • ${agent['permission_profile'] ?? 'standard'}'),
                 trailing: Chip(label: Text('${health['status'] ?? 'unknown'}')),
               );
@@ -462,7 +462,7 @@ class _CreateDialogState extends State<_CreateDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Create orchestration • V2 helpers'),
+    title: const Text('Create orchestration • V2² helpers'),
     content: SizedBox(width: 560, child: Column(mainAxisSize: MainAxisSize.min, children: [
       TextField(key: const Key('orchestration-objective'), controller: objective, decoration: const InputDecoration(labelText: 'Objective')),
       const SizedBox(height: 10),
