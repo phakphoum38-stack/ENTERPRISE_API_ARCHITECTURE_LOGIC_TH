@@ -11,14 +11,20 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterator
 
 from v2_brain_core import SENSITIVE_KEY_RE, redact_sensitive
 
 
 SECRET_REDACTION_CONTRACT = "brain-secret-redaction-phase-4"
 _REDACTED = "[REDACTED]"
+_ACTIVE_SECRETS: ContextVar[tuple[str, ...]] = ContextVar(
+    "research_os_brain_active_secrets",
+    default=(),
+)
 
 # Common credential shapes are scrubbed even when an adapter returns them under
 # an innocent-looking key such as ``message`` or embeds them in an exception.
@@ -69,6 +75,22 @@ def discover_secret_values(*values: Any, explicit: Iterable[str] = ()) -> tuple[
     return tuple(found)
 
 
+def current_secret_values() -> tuple[str, ...]:
+    return _ACTIVE_SECRETS.get()
+
+
+@contextmanager
+def secret_scope(secret_values: Iterable[str]) -> Iterator[tuple[str, ...]]:
+    """Install ephemeral secrets for the current async/thread context only."""
+
+    merged = discover_secret_values(explicit=(*current_secret_values(), *tuple(secret_values)))
+    token = _ACTIVE_SECRETS.set(merged)
+    try:
+        yield merged
+    finally:
+        _ACTIVE_SECRETS.reset(token)
+
+
 def _sanitize_string(text: str, secret_values: Iterable[str]) -> str:
     safe = text
     # Longest values first prevents a short secret prefix from leaving a suffix.
@@ -79,28 +101,34 @@ def _sanitize_string(text: str, secret_values: Iterable[str]) -> str:
     return safe
 
 
-def sanitize_external(value: Any, *, secret_values: Iterable[str] = (), key: str | None = None) -> Any:
+def sanitize_external(
+    value: Any,
+    *,
+    secret_values: Iterable[str] | None = None,
+    key: str | None = None,
+) -> Any:
     """Sanitize untrusted adapter output/errors before persistence or return."""
 
+    active = current_secret_values() if secret_values is None else tuple(secret_values)
     if key and SENSITIVE_KEY_RE.search(key):
         return _REDACTED
     if isinstance(value, Mapping):
         return {
             str(child_key): sanitize_external(
                 child_value,
-                secret_values=secret_values,
+                secret_values=active,
                 key=str(child_key),
             )
             for child_key, child_value in value.items()
         }
     if isinstance(value, list):
-        return [sanitize_external(item, secret_values=secret_values) for item in value]
+        return [sanitize_external(item, secret_values=active) for item in value]
     if isinstance(value, tuple):
-        return tuple(sanitize_external(item, secret_values=secret_values) for item in value)
+        return tuple(sanitize_external(item, secret_values=active) for item in value)
     if isinstance(value, set):
-        return [sanitize_external(item, secret_values=secret_values) for item in value]
+        return [sanitize_external(item, secret_values=active) for item in value]
     if isinstance(value, str):
-        return _sanitize_string(value, secret_values)
+        return _sanitize_string(value, active)
     return value
 
 
@@ -110,14 +138,19 @@ class SanitizedException:
     message: str
 
 
-def sanitize_exception(exc: BaseException, *, secret_values: Iterable[str] = ()) -> SanitizedException:
+def sanitize_exception(
+    exc: BaseException,
+    *,
+    secret_values: Iterable[str] | None = None,
+) -> SanitizedException:
+    active = current_secret_values() if secret_values is None else tuple(secret_values)
     return SanitizedException(
         error_type=type(exc).__name__,
-        message=_sanitize_string(str(exc), secret_values),
+        message=_sanitize_string(str(exc), active),
     )
 
 
-def sanitize_request_fields(value: Any, *, secret_values: Iterable[str] = ()) -> Any:
+def sanitize_request_fields(value: Any, *, secret_values: Iterable[str] | None = None) -> Any:
     """Apply both legacy key redaction and Phase 4 value-aware scrubbing."""
 
     return sanitize_external(redact_sensitive(value), secret_values=secret_values)
@@ -131,4 +164,5 @@ def redaction_status() -> dict[str, Any]:
         "credential_patterns": len(_PATTERN_RULES),
         "secret_values_persisted": False,
         "scope": "external_output_error_checkpoint_ledger",
+        "ephemeral_scope": "context_local",
     }
