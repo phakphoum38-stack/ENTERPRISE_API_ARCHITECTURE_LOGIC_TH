@@ -3,12 +3,14 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from agent_platform import AgentRegistry, AgentRouter
 from agent_runtime import AgentEventBus, AgentTaskQueue, SharedContextStore
 
 
 class AgentRuntimeTest(unittest.TestCase):
-    def _runtime(self, tmp: str) -> AgentTaskQueue:
+    def _runtime(self, tmp: str, router: AgentRouter | None = None) -> AgentTaskQueue:
         return AgentTaskQueue(
+            router=router,
             event_bus=AgentEventBus(),
             context_store=SharedContextStore(tmp),
         )
@@ -22,6 +24,13 @@ class AgentRuntimeTest(unittest.TestCase):
             self.assertEqual(task["result"]["execution"], "runtime_ready")
             events = runtime.events.list(task_id=task["task_id"])
             self.assertEqual([event["event_type"] for event in events], ["task.queued", "task.started", "task.completed"])
+
+    def test_developer_task_uses_developer_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self._runtime(tmp, AgentRouter(AgentRegistry()))
+            task = runtime.submit("debug code api build", confirmed=True)
+            self.assertEqual(task["selected_agent"], "developer")
+            self.assertEqual(task["status"], "completed")
 
     def test_write_capable_task_waits_for_confirmation(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -44,11 +53,14 @@ class AgentRuntimeTest(unittest.TestCase):
 
     def test_runtime_dashboard_reports_active_components(self):
         with tempfile.TemporaryDirectory() as tmp:
-            runtime = self._runtime(tmp)
+            runtime = self._runtime(tmp, AgentRouter(AgentRegistry()))
             dashboard = runtime.dashboard()
+            self.assertEqual(dashboard["runtime"], "agent_runtime_2.0")
             self.assertEqual(dashboard["event_bus"], "active")
             self.assertEqual(dashboard["task_queue"], "active")
             self.assertEqual(dashboard["shared_context"], "local_persistent")
+            self.assertTrue(dashboard["agent_readiness"]["ready"])
+            self.assertEqual(dashboard["agent_readiness"]["ready_count"], 6)
 
 
 if __name__ == "__main__":
