@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 """Unified Research OS V3 Master Orchestrator.
 
-This module composes the existing V2 governed Brain Runtime, V3 adaptive
-Compound Brain, canonical AgentOrchestrator, Adaptive Software Factory, the
-governed Tool Intelligence layer, a separate Cyber Web Security Standard owner,
-and an explicit File Ownership boundary owner. It does not create a second
-dependency graph, bypass approvals, auto-install discovered software, or eagerly
-materialize the theoretical 6^6 hierarchy.
+The unified integration composes independent owners without moving one owner's
+implementation into another owner's distribution package.
 """
 
 from __future__ import annotations
@@ -20,6 +16,7 @@ from brain_skills import BRAIN, BrainSkillsEngine
 from v2_brain_runtime import BRAIN_RUNTIME, BrainRuntime
 from v2_cyber_web_standard import CYBER_WEB_STANDARD, CyberWebSecurityStandard
 from v2_file_ownership_boundary import FILE_OWNERSHIP, FileOwnershipBoundary
+from v2_owner_separation_contract import OWNER_SEPARATION
 from v2_system_introspection import SystemIntrospection
 from v2_tool_intelligence import ToolIntelligence
 
@@ -52,6 +49,7 @@ class UnifiedMasterOrchestrator:
         self.compound_brain = compound_brain or BRAIN
         self.cyber_web_security = cyber_web_security or CYBER_WEB_STANDARD
         self.file_ownership = file_ownership or FILE_OWNERSHIP
+        self.owner_separation = OWNER_SEPARATION
         self.agent_orchestrator = agent_server.ORCHESTRATOR
         self.operational_registry = agent_server.REGISTRY
         self.intelligence = SystemIntrospection(
@@ -66,8 +64,7 @@ class UnifiedMasterOrchestrator:
 
     def manifest(self) -> dict[str, Any]:
         capacity = self.compound_brain.capacity_snapshot()
-        cyber_boundary = self.cyber_web_security.ownership_boundary()
-        file_boundary = self.file_ownership.cyber_boundary()
+        separation = self.owner_separation.manifest()
         return {
             "contract": UNIFIED_MASTER_CONTRACT,
             "version": UNIFIED_VERSION,
@@ -83,14 +80,11 @@ class UnifiedMasterOrchestrator:
                 "tool_learning": "BrainRuntime.learning",
                 "cyber_web_security": "v2_cyber_web_standard.CyberWebSecurityStandard",
                 "file_ownership": "v2_file_ownership_boundary.FileOwnershipBoundary",
+                "owner_separation": "v2_owner_separation_contract.OwnerSeparationContract",
                 "factory_control": "software_factory.AdaptiveControlPlane",
                 "provider_gateway": "existing provider gateway",
             },
-            "owner_boundaries": {
-                "cyber_web_security": cyber_boundary,
-                "file_ownership": file_boundary,
-                "shared_authority": False,
-            },
+            "owner_boundaries": separation,
             "factory_profiles": [profile.label for profile in SUPPORTED_PROFILES],
             "capacity": capacity,
             "invariants": {
@@ -107,6 +101,7 @@ class UnifiedMasterOrchestrator:
                 "cyber_security_can_grant_file_acl": False,
                 "file_ownership_can_override_cyber_policy": False,
                 "file_ownership_can_disable_security_controls": False,
+                "standalone_owner_package_contains_security_owner": False,
                 "self_modification": False,
                 "automatic_merge_release_deploy": False,
             },
@@ -163,10 +158,7 @@ class UnifiedMasterOrchestrator:
             session_id=session_id,
             context=safe_context,
         )
-        tool_strategy = self.tool_intelligence.plan_for_objective(
-            text,
-            context=safe_context,
-        )
+        tool_strategy = self.tool_intelligence.plan_for_objective(text, context=safe_context)
         if self.tool_intelligence.should_discover(text):
             provider_name = str(safe_context.get("tool_search_provider") or "").strip() or None
             model = str(safe_context.get("tool_search_model") or "").strip() or None
@@ -179,8 +171,8 @@ class UnifiedMasterOrchestrator:
                     model=model,
                 ),
             }
-        factory_plan = self.factory_control.configure_versions(normalized_versions)
 
+        factory_plan = self.factory_control.configure_versions(normalized_versions)
         return {
             "contract": UNIFIED_MASTER_CONTRACT,
             "version": UNIFIED_VERSION,
@@ -191,12 +183,12 @@ class UnifiedMasterOrchestrator:
             "cyber_web_security": {
                 "contract": self.cyber_web_security.manifest()["contract"],
                 "owner": "CyberWebSecurityStandard",
-                "separate_from_file_owner_system": True,
                 "assessment_performed": False,
                 "changes_file_ownership": False,
                 "grants_file_acl": False,
             },
             "file_ownership": self.file_ownership.plan(),
+            "owner_separation": self.owner_separation.manifest(),
             "factory": {
                 "profile": factory_plan.profile.label,
                 "logical_capacity": factory_plan.profile.capacity,
@@ -223,14 +215,9 @@ class UnifiedMasterOrchestrator:
         *,
         deployment_mode: str = "public",
     ) -> dict[str, Any]:
-        """Evaluate web/API security evidence without touching file ownership."""
-        return self.cyber_web_security.assess(
-            evidence,
-            deployment_mode=deployment_mode,
-        )
+        return self.cyber_web_security.assess(evidence, deployment_mode=deployment_mode)
 
     def file_ownership_status(self) -> dict[str, Any]:
-        """Expose the separate file-ownership boundary without mutating files."""
         return self.file_ownership.manifest()
 
     def discover_tools(
@@ -241,7 +228,6 @@ class UnifiedMasterOrchestrator:
         provider_name: str | None = None,
         model: str | None = None,
     ) -> dict[str, Any]:
-        """Research external tool candidates without downloading or executing them."""
         return self.tool_intelligence.discover(
             objective,
             capabilities=capabilities,
@@ -250,11 +236,9 @@ class UnifiedMasterOrchestrator:
         )
 
     def design_tool_adapter(self, candidate: Mapping[str, Any]) -> dict[str, Any]:
-        """Create a reviewable integration plan; never writes adapter code automatically."""
         return self.tool_intelligence.design_adapter(candidate)
 
     def tool_playbook(self, tool_id: str) -> dict[str, Any]:
-        """Summarize structured observed outcomes for an already-registered tool."""
         return self.tool_intelligence.tool_playbook(tool_id)
 
 
