@@ -1,0 +1,66 @@
+name: Research OS V3 Clean Core
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - architecture/v3-clean
+    paths:
+      - 'v3/**'
+      - '.github/workflows/v3-clean-core.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-clean-core-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  core-validation:
+    name: Core validation (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Initialize incremental evidence
+        working-directory: v3
+        run: python scripts/evidence.py --output evidence/progress.json --stage initialized --status passed --data '{"sha":"${{ github.sha }}","os":"${{ runner.os }}"}'
+
+      - name: Run V3 Clean unit tests
+        working-directory: v3
+        run: |
+          python -m unittest discover -s tests -v
+          python scripts/evidence.py --output evidence/progress.json --stage unit_tests --status passed
+
+      - name: Run V3 Clean smoke test
+        working-directory: v3
+        run: |
+          python scripts/smoke.py
+          python scripts/evidence.py --output evidence/progress.json --stage core_smoke --status passed --data '{"max_capacity":46656,"assistant_6x3_capacity":216}'
+
+      - name: Mark core validation passed
+        working-directory: v3
+        run: python scripts/evidence.py --output evidence/progress.json --stage core_validation --status passed
+
+      - name: Upload incremental evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-clean-evidence-${{ runner.os }}-${{ github.sha }}
+          path: v3/evidence/progress.json
+          if-no-files-found: warn
