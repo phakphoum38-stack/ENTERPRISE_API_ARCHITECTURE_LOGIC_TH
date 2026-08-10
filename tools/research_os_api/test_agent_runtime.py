@@ -91,6 +91,16 @@ class AgentRuntimeTest(unittest.TestCase):
             self.assertTrue(plan["hierarchy"]["backpressure_applied"])
             self.assertFalse(plan["requires_external_api_key"])
 
+    def test_runtime_auto_selects_six_cubed_assistant_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self._runtime(tmp, AgentRouter(AgentRegistry()))
+            task = runtime.submit("ขอผู้ช่วย 6^3 จัดทีมเขียนระบบ")
+            plan = task["result"]["brain_plan"]
+            self.assertEqual(plan["assistant_profile"]["mode"], "assistant_6x3")
+            self.assertEqual(plan["hierarchy"]["complexity_level"], 3)
+            self.assertEqual(plan["hierarchy"]["requested_workers"], 6**3)
+            self.assertEqual(plan["cognition"]["mode"], "assistant_6x3")
+
     def test_runtime_dashboard_reports_active_components(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self._runtime(tmp, AgentRouter(AgentRegistry()))
