@@ -35,8 +35,105 @@ jobs:
         shell: bash
         run: PYTHONPATH=owner_special python owner_special/scripts/smoke.py
 
-  owner-bundle:
+  owner-desktop:
     needs: friend-complete
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Windows desktop host
+        working-directory: owner_special/flutter_app
+        shell: pwsh
+        run: flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+      - name: Flutter analyze test and build
+        working-directory: owner_special/flutter_app
+        shell: pwsh
+        run: |
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Start Owner Friend Service
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\owner_special"
+          $dataRoot = "$env:RUNNER_TEMP\research-os-owner-data"
+          $auditPath = "$env:RUNNER_TEMP\owner-friend-audit.jsonl"
+          $service = Start-Process -FilePath python -ArgumentList @(
+            'owner_special/scripts/run_friend_service.py',
+            '--owner-id','owner',
+            '--port','8790',
+            '--data-root',$dataRoot,
+            '--audit-path',$auditPath,
+            '--repository-root',$env:GITHUB_WORKSPACE
+          ) -PassThru
+          "OWNER_FRIEND_PID=$($service.Id)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "OWNER_FRIEND_AUDIT=$auditPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RESEARCH_OS_OWNER_ID=owner" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RESEARCH_OS_OWNER_PROFILE=default" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RESEARCH_OS_OWNER_SESSION=desktop-e2e" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RESEARCH_OS_FRIEND_URL=http://127.0.0.1:8790" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          for ($i = 0; $i -lt 40; $i++) {
+            try {
+              $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8790/owner/health' -TimeoutSec 2
+              if ($health.status -eq 'ok') { exit 0 }
+            } catch {}
+            Start-Sleep -Milliseconds 250
+          }
+          throw 'Owner Friend Service did not become ready'
+      - name: Launch Owner Desktop and prove app-to-service startup
+        shell: pwsh
+        run: |
+          Set-Content -Path $env:OWNER_FRIEND_AUDIT -Value '' -Encoding utf8
+          $exe = Get-ChildItem 'owner_special/flutter_app/build/windows/x64/runner/Release' -Filter '*.exe' -File |
+            Where-Object { $_.Name -notmatch '^(flutter|vc_redist)' } |
+            Select-Object -First 1
+          if ($null -eq $exe) { throw 'Owner Desktop EXE not found' }
+          $app = Start-Process -FilePath $exe.FullName -PassThru
+          try {
+            $proved = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              if (Test-Path $env:OWNER_FRIEND_AUDIT) {
+                $records = @(Get-Content $env:OWNER_FRIEND_AUDIT -ErrorAction SilentlyContinue | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
+                $healthSeen = @($records | Where-Object { $_.path -eq '/owner/health' -and [int]$_.status -eq 200 }).Count -gt 0
+                $statusSeen = @($records | Where-Object { $_.path -eq '/owner/status' -and [int]$_.status -eq 200 }).Count -gt 0
+                if ($healthSeen -and $statusSeen) { $proved = $true; break }
+              }
+              Start-Sleep -Milliseconds 250
+            }
+            if (-not $proved) {
+              if (Test-Path $env:OWNER_FRIEND_AUDIT) { Get-Content $env:OWNER_FRIEND_AUDIT }
+              throw 'Owner Desktop did not prove /owner/health and /owner/status startup requests'
+            }
+          } finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
+          }
+      - name: Cleanup Owner Friend Service
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:OWNER_FRIEND_PID) { Stop-Process -Id ([int]$env:OWNER_FRIEND_PID) -Force -ErrorAction SilentlyContinue }
+      - name: Upload Owner Desktop
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-special-desktop-${{ github.sha }}
+          path: owner_special/flutter_app/build/windows/x64/runner/Release/**
+          if-no-files-found: error
+          retention-days: 30
+
+  owner-bundle:
+    needs: [friend-complete, owner-desktop]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -69,7 +166,11 @@ jobs:
                   'research_os_friend/capabilities.py',
                   'research_os_friend/persistent_memory.py',
                   'research_os_friend/v3_bridge.py',
+                  'research_os_friend/service.py',
                   'research_os_friend/runtime.py',
+                  'flutter_app/lib/main.dart',
+                  'flutter_app/lib/src/owner_api.dart',
+                  'flutter_app/lib/src/friend_app.dart',
               }
               missing = required - names
               if missing:

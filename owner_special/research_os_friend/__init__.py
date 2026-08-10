@@ -13,6 +13,7 @@ from .policy import OwnerPolicy
 from .providers import MockProvider, ProviderRouter
 from .reasoning import DecisionPlanner
 from .runtime import FriendRuntime
+from .service import OWNER_HEADER, PROFILE_HEADER, SESSION_HEADER, OwnerFriendService, default_owner_data_root
 from .skills import Skill, SkillRegistry
 from .tools import Tool, ToolRegistry
 from .v3_bridge import V3Bridge, V3BridgeStatus
@@ -30,11 +31,15 @@ __all__ = [
     "FriendResponse",
     "FriendRuntime",
     "MockProvider",
+    "OWNER_HEADER",
     "OwnerBundleBuilder",
+    "OwnerFriendService",
     "OwnerIdentity",
     "OwnerPolicy",
+    "PROFILE_HEADER",
     "PersistentScopedMemory",
     "ProviderRouter",
+    "SESSION_HEADER",
     "ScaleProfile",
     "ScopedMemory",
     "Skill",
@@ -43,6 +48,7 @@ __all__ = [
     "ToolRegistry",
     "V3Bridge",
     "V3BridgeStatus",
+    "default_owner_data_root",
     "install_builtin_skills",
     "install_builtin_tools",
     "install_friend_complete_capabilities",
