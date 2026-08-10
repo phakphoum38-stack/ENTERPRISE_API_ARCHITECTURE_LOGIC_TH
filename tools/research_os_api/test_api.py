@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import tempfile
@@ -136,6 +137,23 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertIn("mock", payload["providers"])
         self.assertIn("anthropic", payload["providers"])
+
+    def test_oauth_callback_request_log_redacts_query_secrets(self):
+        handler = object.__new__(server.ResearchOSHandler)
+        handler.path = "/v1/google-workspace/oauth/callback?code=secret-code&state=secret-state"
+        handler.command = "GET"
+        handler.request_version = "HTTP/1.1"
+        sink = io.StringIO()
+
+        with patch.object(server.sys, "stderr", sink):
+            handler.log_request(200, 12)
+
+        log_line = sink.getvalue()
+        self.assertIn("/v1/google-workspace/oauth/callback?[REDACTED]", log_line)
+        self.assertNotIn("secret-code", log_line)
+        self.assertNotIn("secret-state", log_line)
+        self.assertNotIn("code=", log_line)
+        self.assertNotIn("state=", log_line)
 
 
 if __name__ == "__main__":
