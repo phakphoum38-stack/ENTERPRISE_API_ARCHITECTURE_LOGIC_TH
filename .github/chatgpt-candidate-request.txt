@@ -1,0 +1,2 @@
+Validate candidate after app-to-service E2E service-audit matcher fix.
+Parent fix commit: 8397cb4444e28173ed1152cc5e27c8af876a377b
