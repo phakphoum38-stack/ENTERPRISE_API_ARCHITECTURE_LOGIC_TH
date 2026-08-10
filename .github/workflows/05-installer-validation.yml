@@ -152,33 +152,28 @@ jobs:
           if (-not $payload.ready) { throw "V2 readiness reported not ready" }
           if (-not $payload.storage.writable) { throw "V2 storage readiness reported not writable" }
 
-      - name: Quiesce V2 runtime before in-place upgrade
+
+      - name: Verify loopback listener and secret-safe Brain provider status
         shell: pwsh
         run: |
-          $service = Get-Service ResearchOSService -ErrorAction SilentlyContinue
-          if ($service) {
-            Write-Host "Stopping ResearchOSService before replacing bundled runtime files."
-            Stop-Service ResearchOSService -Force -ErrorAction Stop
-            $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
+          $listeners = @(Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction Stop)
+          if (-not $listeners) { throw "Research OS API listener was not found" }
+          $unsafe = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1', '::1') })
+          if ($unsafe) {
+            $unsafe | Format-Table -AutoSize | Out-Host
+            throw "Research OS API must listen on loopback only"
           }
-          for ($i = 0; $i -lt 40; $i++) {
-            $listener = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
-            $hostProcess = Get-Process 'ResearchOS.ServiceHost' -ErrorAction SilentlyContinue
-            if (-not $listener -and -not $hostProcess) { break }
-            Start-Sleep -Milliseconds 500
+          $payload = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5
+          foreach ($entry in $payload.providers.PSObject.Properties) {
+            if ($entry.Value.secret_exposed -ne $false) {
+              throw "Provider status exposed a secret flag for $($entry.Name)"
+            }
           }
-          $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
-          foreach ($listener in $listeners) {
-            Write-Host "Stopping lingering listener PID $($listener.OwningProcess)."
-            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+          $serialized = $payload | ConvertTo-Json -Depth 8 -Compress
+          if ($serialized -match '(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\\s+[A-Za-z0-9._-]+') {
+            throw "Provider status response contains credential-like data"
           }
-          Get-Process 'ResearchOS.ServiceHost' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-          Start-Sleep -Seconds 1
-          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw "Port 8787 still listening before upgrade" }
-          if (Get-Process 'ResearchOS.ServiceHost' -ErrorAction SilentlyContinue) { throw "ServiceHost still running before upgrade" }
-          $python = Join-Path $env:ProgramFiles 'Research OS\runtime\python\python.exe'
-          if (-not (Test-Path $python)) { throw "Bundled Python runtime missing before upgrade" }
-          Write-Host "Runtime quiesced; installer may safely replace bundled Python and service files."
+          Write-Host "Loopback listener and secret-safe provider status verified."
 
       - name: Reinstall V2 in-place to exercise upgrade path
         shell: pwsh
@@ -329,9 +324,11 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run 06-release.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ steps.installer-run.outputs.run_id }}"
+        run: gh workflow run 06-release.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ steps.installer-run.outputs.run_id }}" -f source_validation_run="${{ github.run_id }}"
 
-      - name: Record validation-only mode
+      - name: Dispatch validation-only candidate evidence gate
         if: ${{ success() && inputs.dispatch_release != true }}
         shell: pwsh
-        run: Write-Host "Installer validation completed in validation-only mode. Downstream release was not dispatched."
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run research-os-windows-desktop.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ steps.installer-run.outputs.run_id }}" -f source_validation_run="${{ github.run_id }}" -f candidate_only=true

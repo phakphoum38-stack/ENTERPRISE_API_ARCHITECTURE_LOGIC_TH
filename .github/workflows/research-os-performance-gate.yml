@@ -29,9 +29,12 @@ jobs:
       RESEARCH_OS_API_PORT: "8787"
       HOST: 127.0.0.1
       PORT: "8787"
-      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
 
     steps:
+      - name: Configure runtime data directory
+        shell: bash
+        run: echo "RESEARCH_OS_DATA_DIR=$RUNNER_TEMP/ResearchOSData" >> "$GITHUB_ENV"
+
       - name: Checkout validated commit
         uses: actions/checkout@v4
         with:

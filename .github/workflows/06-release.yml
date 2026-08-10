@@ -11,6 +11,10 @@ on:
         description: Installer workflow run ID
         required: false
         type: string
+      source_validation_run:
+        description: Successful Installer Validation workflow run ID
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -24,6 +28,7 @@ jobs:
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       SOURCE_INSTALLER_RUN: ${{ inputs.source_installer_run }}
+      SOURCE_VALIDATION_RUN: ${{ inputs.source_validation_run }}
       V1_ROLLBACK_BASELINE: d05189d151b6bfa65938dad7a812ac104db195f4
     steps:
       - name: Checkout candidate metadata
@@ -37,7 +42,7 @@ jobs:
           git cat-file -e "$V1_ROLLBACK_BASELINE^{commit}"
           echo "Stable V1 rollback baseline: $V1_ROLLBACK_BASELINE"
 
-      - name: Resolve installer build run
+      - name: Resolve and verify installer validation lineage
         id: installer-run
         shell: bash
         env:
@@ -47,8 +52,27 @@ jobs:
           if [ -z "$run_id" ]; then
             run_id="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
           fi
+          validation_run="$SOURCE_VALIDATION_RUN"
           test -n "$run_id" || { echo "No successful installer build found for $TARGET_SHA"; exit 1; }
+          test -n "$validation_run" || { echo "A successful source_validation_run is required"; exit 1; }
+
+          verify_run() {
+            local candidate="$1"
+            local expected="$2"
+            local workflow status conclusion head_sha
+            workflow="$(gh run view "$candidate" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+            status="$(gh run view "$candidate" --repo "${{ github.repository }}" --json status --jq '.status')"
+            conclusion="$(gh run view "$candidate" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+            head_sha="$(gh run view "$candidate" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+            test "$workflow" = "$expected"
+            test "$status" = "completed"
+            test "$conclusion" = "success"
+            test "$head_sha" = "$TARGET_SHA"
+          }
+          verify_run "$run_id" "Research OS Build Installer"
+          verify_run "$validation_run" "Research OS Installer Validation"
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "validation_run=$validation_run" >> "$GITHUB_OUTPUT"
 
       - name: Download verified Setup EXE
         shell: bash
@@ -63,10 +87,11 @@ jobs:
         shell: bash
         env:
           INSTALLER_RUN: ${{ steps.installer-run.outputs.run_id }}
+          VALIDATION_RUN: ${{ steps.installer-run.outputs.validation_run }}
         run: |
           setup="$(find verified-installer -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
           sha256sum "$setup" | tee verified-installer/SHA256SUMS.txt
-          printf 'commit=%s\ninstaller_run=%s\nvalidation=passed\nrollback_baseline=%s\n' "$TARGET_SHA" "$INSTALLER_RUN" "$V1_ROLLBACK_BASELINE" > verified-installer/VERIFIED.txt
+          printf 'commit=%s\\ninstaller_run=%s\\nvalidation_run=%s\\nvalidation=passed\\nrollback_baseline=%s\\n' "$TARGET_SHA" "$INSTALLER_RUN" "$VALIDATION_RUN" "$V1_ROLLBACK_BASELINE" > verified-installer/VERIFIED.txt
           python - <<'PY'
           import hashlib, json, os, re
           from pathlib import Path
@@ -81,11 +106,15 @@ jobs:
               'schema_version': 1,
               'target_sha': os.environ['TARGET_SHA'],
               'source_installer_run': os.environ['INSTALLER_RUN'],
+              'source_validation_run': os.environ['VALIDATION_RUN'],
               'validation': 'passed',
+              'publication': 'actions-artifact-only',
+              'release_created': False,
+              'tag_created': False,
               'components': {
                   'flutter_app': app_version,
                   'installer': installer_version,
-                  'api_contract': 'v2-draft' if '/v2/orchestrations:' in Path('tools/research_os_api/openapi.yaml').read_text(encoding='utf-8') else 'v1',
+                  'api_contract': re.search(r'^\\s*version:\\s*([^\\s]+)', Path('tools/research_os_api/openapi.yaml').read_text(encoding='utf-8'), re.MULTILINE).group(1).strip('\"\\\''),
                   'service_host': 'net8.0-windows',
               },
               'artifacts': [{
@@ -120,6 +149,9 @@ jobs:
           assert actual == item['sha256'], (actual, item['sha256'])
           assert manifest['target_sha'] == os.environ['TARGET_SHA']
           assert manifest['validation'] == 'passed'
+          assert manifest['source_validation_run'] == os.environ['SOURCE_VALIDATION_RUN']
+          assert manifest['publication'] == 'actions-artifact-only'
+          assert manifest['release_created'] is False and manifest['tag_created'] is False
           assert manifest['rollback']['baseline_sha'] == os.environ['V1_ROLLBACK_BASELINE']
           print('Release manifest digest and rollback baseline verified.')
           PY

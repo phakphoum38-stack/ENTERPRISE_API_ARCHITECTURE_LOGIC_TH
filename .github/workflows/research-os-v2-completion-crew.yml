@@ -28,8 +28,11 @@ jobs:
     timeout-minutes: 12
     env:
       RESEARCH_OS_PROVIDER: mock
-      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
     steps:
+      - name: Configure runtime data directory
+        shell: bash
+        run: echo "RESEARCH_OS_DATA_DIR=$RUNNER_TEMP/ResearchOSData" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@v4
 

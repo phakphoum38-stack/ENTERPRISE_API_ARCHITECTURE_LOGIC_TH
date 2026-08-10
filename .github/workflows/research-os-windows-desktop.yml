@@ -61,19 +61,8 @@ jobs:
           set -euo pipefail
           installer_run="$SOURCE_INSTALLER_RUN"
           validation_run="$SOURCE_VALIDATION_RUN"
-          for attempt in $(seq 1 60); do
-            if [ -z "$installer_run" ]; then
-              installer_run="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Installer" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
-            fi
-            if [ -z "$validation_run" ]; then
-              validation_run="$(gh run list --repo "${{ github.repository }}" --workflow "Research OS Installer Validation" --commit "$TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
-            fi
-            if [ -n "$installer_run" ] && [ -n "$validation_run" ]; then break; fi
-            echo "Waiting for candidate evidence: attempt=$attempt installer=${installer_run:-pending} validation=${validation_run:-pending}"
-            sleep 15
-          done
-          test -n "$installer_run" || { echo "No successful installer run for $TARGET_SHA"; exit 1; }
-          test -n "$validation_run" || { echo "No successful installer validation run for $TARGET_SHA"; exit 1; }
+          test -n "$installer_run" || { echo "source_installer_run is required for candidate evidence"; exit 1; }
+          test -n "$validation_run" || { echo "source_validation_run is required for candidate evidence"; exit 1; }
 
           verify_run() {
             local run_id="$1"

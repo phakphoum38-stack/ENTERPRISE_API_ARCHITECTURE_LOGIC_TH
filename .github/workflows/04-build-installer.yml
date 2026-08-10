@@ -138,7 +138,7 @@ jobs:
           name: research-os-installer-${{ env.TARGET_SHA }}
           path: installer/output/Research-OS-Setup-*-x64.exe
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
 
       - name: Dispatch installer validation
         shell: pwsh
@@ -149,10 +149,3 @@ jobs:
           $releaseFlag = if ($env:DISPATCH_RELEASE -eq 'true') { 'true' } else { 'false' }
           gh workflow run 05-installer-validation.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}" -f dispatch_release="$releaseFlag"
 
-      - name: Dispatch validation-only candidate evidence gate
-        if: ${{ inputs.dispatch_release != true }}
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh workflow run research-os-windows-desktop.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}" -f candidate_only=true
