@@ -13,6 +13,8 @@ on:
       - 'v3/tests/test_provider_resilience.py'
       - 'v3/scripts/provider_smoke.py'
       - 'v3/scripts/provider_resilience_smoke.py'
+      - 'v3/ROADMAP.md'
+      - 'v3/ARCHITECTURE.md'
       - '.github/workflows/v3-provider-hardening.yml'
 
 permissions:

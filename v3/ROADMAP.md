@@ -52,3 +52,5 @@
 ## Release readiness rule
 
 A commit is release-ready only when its exact SHA passes the V3 Core, Provider Hardening, Software Factory, and Candidate workflows. Passing evidence from earlier SHAs is retained for audit but is not substituted for final exact-SHA validation.
+
+Provider Hardening is intentionally triggered by final V3 architecture/roadmap changes as well as provider-code changes, so a final documentation-only certification commit can still produce provider evidence for the exact release SHA.
