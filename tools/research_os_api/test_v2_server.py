@@ -9,9 +9,11 @@ import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
 import agent_server
 from agent_orchestrator import AgentOrchestrator
+from providers import ProviderError, ProviderResult
 from v2_server import Provenance, V2ResearchOSHandler, WorkspaceKnowledgeEngine
 
 
@@ -197,6 +199,8 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(planned["plan"]["hierarchy"]["active_workers"], 8)
         self.assertTrue(planned["plan"]["hierarchy"]["backpressure_applied"])
         self.assertFalse(planned["plan"]["requires_external_api_key"])
+        self.assertEqual(planned["plan"]["cognition"]["mode"], "compound_6x6")
+        self.assertEqual(planned["plan"]["cognition"]["hypothesis_branches"], 8)
 
         status, invalid = self.request(
             "/v2/brain/plans",
@@ -205,6 +209,63 @@ class V2CompatibilityTests(unittest.TestCase):
         )
         self.assertEqual(status, 400)
         self.assertEqual(invalid["error"]["code"], "invalid_brain_plan")
+
+    def test_v2_brain_discovers_existing_key_without_returning_secret(self) -> None:
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-existing-key"}):
+            status, payload = self.request("/v2/brain/providers")
+        self.assertEqual(status, 200)
+        openai = payload["providers"]["openai-responses"]
+        self.assertTrue(openai["configured"])
+        self.assertEqual(openai["credential_source"], "OPENAI_API_KEY")
+        self.assertFalse(openai["secret_exposed"])
+        self.assertNotIn("test-existing-key", json.dumps(payload))
+
+    def test_v2_brain_search_uses_compound_plan_and_returns_sources(self) -> None:
+        class FakeSearchProvider:
+            name = "openai-responses"
+
+            def search(self, query, *, system="", model=None):
+                self.query = query
+                self.system = system
+                return ProviderResult(
+                    self.name,
+                    model or "test-model",
+                    "Verified answer",
+                    {},
+                    ({"url": "https://example.com", "title": "Evidence"},),
+                )
+
+        fake = FakeSearchProvider()
+        with patch("v2_server.build_search_provider", return_value=fake):
+            status, payload = self.request(
+                "/v2/brain/search",
+                method="POST",
+                body={
+                    "query": "ค้นข้อมูลล่าสุดพร้อมหลักฐาน",
+                    "complexity_level": 6,
+                    "budget_workers": 12,
+                    "ready_workers": 8,
+                },
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["result"]["text"], "Verified answer")
+        self.assertEqual(payload["result"]["sources"][0]["title"], "Evidence")
+        self.assertEqual(payload["brain_plan"]["cognition"]["mode"], "compound_6x6")
+        self.assertEqual(payload["brain_plan"]["hierarchy"]["active_workers"], 8)
+        self.assertIn("Cite sources", fake.system)
+
+    def test_v2_brain_search_fails_closed_when_provider_is_unavailable(self) -> None:
+        with patch(
+            "v2_server.build_search_provider",
+            side_effect=ProviderError("missing OpenAI API key"),
+        ):
+            status, payload = self.request(
+                "/v2/brain/search",
+                method="POST",
+                body={"query": "current evidence"},
+            )
+        self.assertEqual(status, 503)
+        self.assertEqual(payload["error"]["code"], "brain_provider_unavailable")
 
     def test_v2_errors_have_machine_readable_envelope(self) -> None:
         status, payload = self.request("/v2/orchestrations?page_size=101")
