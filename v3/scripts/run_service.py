@@ -16,7 +16,8 @@ def main() -> int:
     host = os.environ.get("RESEARCH_OS_V3_HOST", "127.0.0.1")
     port = int(os.environ.get("RESEARCH_OS_V3_PORT", "8788"))
     layout = DataLayout.from_environment().ensure()
-    service = V3LocalService(host=host, port=port)
+    audit_path = layout.logs / "http-audit.jsonl"
+    service = V3LocalService(host=host, port=port, audit_path=audit_path)
     print(
         json.dumps(
             {
@@ -25,6 +26,7 @@ def main() -> int:
                 "port": port,
                 "contract": "unified-master-orchestrator-v3-clean",
                 "data_root": str(layout.root),
+                "http_audit": str(audit_path),
             },
             sort_keys=True,
         ),

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import threading
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .contracts import health_contract, master_contract, providers_contract
@@ -19,6 +22,7 @@ class V3LocalService:
         host: str = "127.0.0.1",
         port: int = 8788,
         orchestrator: UnifiedMasterOrchestrator | None = None,
+        audit_path: Path | None = None,
     ) -> None:
         address = ipaddress.ip_address(host)
         if not address.is_loopback:
@@ -26,10 +30,29 @@ class V3LocalService:
         self.host = host
         self.port = port
         self.orchestrator = orchestrator or UnifiedMasterOrchestrator()
+        self.audit_path = audit_path
         self._server: ThreadingHTTPServer | None = None
 
     def build_server(self) -> ThreadingHTTPServer:
         orchestrator = self.orchestrator
+        audit_path = self.audit_path
+        audit_lock = threading.Lock()
+        if audit_path is not None:
+            audit_path.parent.mkdir(parents=True, exist_ok=True)
+
+        def write_audit(method: str, path: str, status: int) -> None:
+            if audit_path is None:
+                return
+            record = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "method": method,
+                "path": path,
+                "status": status,
+            }
+            line = json.dumps(record, sort_keys=True) + "\n"
+            with audit_lock:
+                with audit_path.open("a", encoding="utf-8") as stream:
+                    stream.write(line)
 
         class Handler(BaseHTTPRequestHandler):
             server_version = "ResearchOSV3Clean/1"
@@ -44,6 +67,7 @@ class V3LocalService:
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+                write_audit("GET", urlparse(self.path).path, status)
 
             def do_GET(self) -> None:  # noqa: N802 - stdlib handler contract
                 parsed = urlparse(self.path)

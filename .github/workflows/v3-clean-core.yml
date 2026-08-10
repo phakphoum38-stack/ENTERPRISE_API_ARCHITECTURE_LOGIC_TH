@@ -20,7 +20,7 @@ jobs:
   core-validation:
     name: Core validation (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -32,6 +32,13 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Enable Windows long paths
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -42,6 +49,13 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Set up Flutter
+        if: runner.os == 'Windows'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
 
       - name: Initialize incremental evidence
         working-directory: v3
@@ -63,7 +77,7 @@ jobs:
         working-directory: v3
         run: |
           python scripts/service_smoke.py
-          python scripts/evidence.py --output evidence/progress.json --stage local_service --status passed --data '{"binding":"127.0.0.1","contract":"v3","max_capacity":46656}'
+          python scripts/evidence.py --output evidence/progress.json --stage local_service --status passed --data '{"binding":"127.0.0.1","contract":"v3","max_capacity":46656,"structured_http_audit":true}'
 
       - name: Validate V3 data ownership
         working-directory: v3
@@ -199,6 +213,142 @@ jobs:
           if (-not (Test-Path $marker)) { throw 'V3 data was not preserved after service removal' }
           if ((Get-Content $marker -Raw).Trim() -ne 'preserve-me') { throw 'V3 preserved data changed during service lifecycle' }
           python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_cleanup --status passed --data '{"service_removed":true,"listener_removed":true,"data_preserved":true}'
+
+      - name: Build and test V3 Flutter desktop shell
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Join-Path $env:GITHUB_WORKSPACE 'v3\flutter_app'
+          $work = 'D:\v3flutter'
+          if (Test-Path $work) { Remove-Item $work -Recurse -Force }
+          New-Item -ItemType Directory -Path $work -Force | Out-Null
+          Copy-Item (Join-Path $source '*') $work -Recurse -Force
+
+          Push-Location $work
+          try {
+            flutter create --platforms=windows --project-name=research_os_v3_flutter .
+            if ($LASTEXITCODE -ne 0) { throw 'flutter create failed' }
+            flutter pub get
+            if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+            flutter analyze
+            if ($LASTEXITCODE -ne 0) { throw 'flutter analyze failed' }
+            flutter test
+            if ($LASTEXITCODE -ne 0) { throw 'flutter test failed' }
+            flutter build windows --release
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows release build failed' }
+          }
+          finally {
+            Pop-Location
+          }
+
+          $appExe = Join-Path $work 'build\windows\x64\runner\Release\research_os_v3_flutter.exe'
+          if (-not (Test-Path $appExe)) { throw "V3 Flutter executable not found: $appExe" }
+          $hash = (Get-FileHash $appExe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item $appExe).Length
+          "V3_FLUTTER_EXE=$appExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $data = @{ exe_sha256 = $hash; exe_size = $size; executable = 'research_os_v3_flutter.exe' } | ConvertTo-Json -Compress
+          python v3/scripts/evidence.py --output v3/evidence/progress.json --stage flutter_desktop_build --status passed --data $data
+
+      - name: Validate real Flutter app to V3 service E2E
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path $env:V3_FLUTTER_EXE)) { throw 'V3 Flutter EXE is missing before E2E' }
+
+          $dataDir = Join-Path $env:RUNNER_TEMP 'research-os-v3-app-e2e'
+          if (Test-Path $dataDir) { Remove-Item $dataDir -Recurse -Force }
+          New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+          $audit = Join-Path $dataDir 'logs\http-audit.jsonl'
+          $env:RESEARCH_OS_V3_DATA_DIR = $dataDir
+          $env:RESEARCH_OS_V3_HOST = '127.0.0.1'
+          $env:RESEARCH_OS_V3_PORT = '8788'
+
+          $service = $null
+          $app = $null
+          try {
+            $service = Start-Process -FilePath (Get-Command python).Source `
+              -ArgumentList @('v3/scripts/run_service.py') `
+              -WorkingDirectory $env:GITHUB_WORKSPACE `
+              -PassThru `
+              -WindowStyle Hidden
+
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 40; $attempt++) {
+              try {
+                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8788/health' -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch { }
+              Start-Sleep -Milliseconds 250
+            }
+            if (-not $ready) { throw 'V3 service did not become ready for Flutter E2E' }
+
+            New-Item -ItemType Directory -Path (Split-Path $audit -Parent) -Force | Out-Null
+            Set-Content -Path $audit -Value '' -Encoding utf8
+
+            $app = Start-Process -FilePath $env:V3_FLUTTER_EXE -PassThru
+            $proved = $false
+            $observed = @()
+            for ($attempt = 0; $attempt -lt 50; $attempt++) {
+              if (Test-Path $audit) {
+                $observed = @(
+                  Get-Content $audit -ErrorAction SilentlyContinue |
+                    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                    ForEach-Object { $_ | ConvertFrom-Json }
+                )
+                $healthSeen = @($observed | Where-Object {
+                  $_.method -eq 'GET' -and $_.path -eq '/health' -and [int]$_.status -eq 200
+                }).Count -gt 0
+                $providersSeen = @($observed | Where-Object {
+                  $_.method -eq 'GET' -and $_.path -eq '/v3/providers' -and [int]$_.status -eq 200
+                }).Count -gt 0
+                if ($healthSeen -and $providersSeen) {
+                  $proved = $true
+                  break
+                }
+              }
+              if ($app.HasExited) { break }
+              Start-Sleep -Milliseconds 250
+            }
+
+            if (-not $proved) {
+              if (Test-Path $audit) { Get-Content $audit -ErrorAction SilentlyContinue }
+              throw 'V3 Flutter EXE did not prove startup requests to /health and /v3/providers'
+            }
+
+            $auditText = Get-Content $audit -Raw
+            if ($auditText -match '(?i)authorization|bearer|api[_-]?key|token|secret') {
+              throw 'Structured HTTP audit contains credential-like fields'
+            }
+            foreach ($entry in $observed) {
+              $propertyNames = @($entry.PSObject.Properties.Name | Sort-Object)
+              if (($propertyNames -join ',') -ne 'method,path,status,timestamp') {
+                throw "Unexpected structured audit fields: $($propertyNames -join ',')"
+              }
+            }
+
+            $data = @{
+              executable = 'research_os_v3_flutter.exe'
+              health = 200
+              providers = 200
+              audit_format = 'jsonl'
+              audit_secret_fields = $false
+            } | ConvertTo-Json -Compress
+            python v3/scripts/evidence.py --output v3/evidence/progress.json --stage flutter_app_to_service_e2e --status passed --data $data
+          }
+          finally {
+            if ($app -and -not $app.HasExited) {
+              Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+            }
+            if ($service -and -not $service.HasExited) {
+              Stop-Process -Id $service.Id -Force -ErrorAction SilentlyContinue
+            }
+            $leftovers = @(Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)
+            foreach ($connection in $leftovers) {
+              Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
+            }
+          }
 
       - name: Run V3 Clean smoke test
         working-directory: v3
