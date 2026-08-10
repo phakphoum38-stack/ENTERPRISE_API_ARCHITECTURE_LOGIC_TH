@@ -31,7 +31,7 @@ else {
     }
 }
 
-if (-not $progress.ContainsKey('stages') -or $null -eq $progress['stages']) {
+if ($null -eq $progress['stages']) {
     $progress['stages'] = [ordered]@{}
 }
 
