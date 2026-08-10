@@ -49,6 +49,42 @@ Filename: "{app}\app\{#MyAppExeName}"; Description: "Launch Research OS Owner Sp
 Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\owner_special\scripts\install-owner-service.ps1"" -Action uninstall -Root ""{app}"" -DataDir ""{commonappdata}\ResearchOSOwnerSpecial"""; Flags: runhidden waituntilterminated; RunOnceId: "ResearchOSOwnerFriendServiceUninstall"
 
 [Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  PowerShellExe: String;
+  Parameters: String;
+  ResultCode: Integer;
+begin
+  Result := '';
+  PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  Parameters :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' +
+    '$service = Get-Service -Name ''ResearchOSOwnerFriendService'' -ErrorAction SilentlyContinue; ' +
+    'if ($null -ne $service -and $service.Status -ne ''Stopped'') { ' +
+    'Write-Host ''Stopping ResearchOSOwnerFriendService before file replacement...''; ' +
+    'Stop-Service -Name ''ResearchOSOwnerFriendService'' -Force -ErrorAction Stop; ' +
+    '$service = Get-Service -Name ''ResearchOSOwnerFriendService'' -ErrorAction Stop; ' +
+    '$service.WaitForStatus(''Stopped'', [TimeSpan]::FromSeconds(30)); ' +
+    '$service.Refresh(); ' +
+    'if ($service.Status -ne ''Stopped'') { exit 12 }; ' +
+    '}"';
+
+  Log('Stopping Owner Friend Service before installer file replacement when upgrading.');
+  if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    Result := 'Failed to launch PowerShell while preparing the Owner Friend Service for install/upgrade.';
+    Exit;
+  end;
+
+  if ResultCode <> 0 then
+  begin
+    Result := 'Could not stop ResearchOSOwnerFriendService before installer file replacement. PowerShell exit code: ' + IntToStr(ResultCode);
+    Exit;
+  end;
+
+  Log('Owner Friend Service is stopped or was not installed; file replacement may proceed.');
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then Log('Owner Special install/upgrade preserves ProgramData\ResearchOSOwnerSpecial.');

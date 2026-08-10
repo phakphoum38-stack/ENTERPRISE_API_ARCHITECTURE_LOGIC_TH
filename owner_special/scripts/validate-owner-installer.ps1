@@ -104,9 +104,10 @@ try {
 
     $upgradeLog = Join-Path $env:RUNNER_TEMP 'owner-special-upgrade.log'
     $upgrade = Start-Process -FilePath $SetupPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$upgradeLog") -Wait -PassThru
+    Write-Host "Owner in-place upgrade installer exit code: $($upgrade.ExitCode)"
     if ($upgrade.ExitCode -ne 0) {
         if (Test-Path $upgradeLog) { Get-Content $upgradeLog -Tail 160 | Out-Host }
-        throw 'Owner in-place upgrade failed'
+        throw "Owner in-place upgrade failed: exit code $($upgrade.ExitCode)"
     }
     Wait-OwnerReady
     if (-not (Test-Path $memoryPath)) { throw 'Owner memory missing after upgrade' }

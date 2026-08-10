@@ -28,17 +28,43 @@ function Remove-OwnerService {
     $existing = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
     if ($existing) {
         if ($existing.Status -ne 'Stopped') {
-            Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-            try { $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20)) } catch {}
+            Write-Host "Stopping Owner Friend service before service replacement..."
+            Stop-Service -Name $ServiceName -Force -ErrorAction Stop
+            $existing = Get-Service -Name $ServiceName -ErrorAction Stop
+            $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+            $existing.Refresh()
+            if ($existing.Status -ne 'Stopped') {
+                Show-OwnerServiceDiagnostics
+                throw "Owner Friend service did not stop cleanly: $($existing.Status)"
+            }
         }
+
         sc.exe delete $ServiceName | Out-Null
-        for ($i = 0; $i -lt 40; $i++) {
+        if ($LASTEXITCODE -ne 0) {
+            Show-OwnerServiceDiagnostics
+            throw "Failed to delete Owner Friend service registration: sc.exe exit $LASTEXITCODE"
+        }
+
+        for ($i = 0; $i -lt 60; $i++) {
             if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) { break }
             Start-Sleep -Milliseconds 250
         }
+        if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+            Show-OwnerServiceDiagnostics
+            throw 'Owner Friend service registration remained after delete'
+        }
     }
-    $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
-    foreach ($listener in $listeners) { Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue }
+
+    $listeners = @()
+    for ($i = 0; $i -lt 40; $i++) {
+        $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+        if ($listeners.Count -eq 0) { break }
+        Start-Sleep -Milliseconds 250
+    }
+    if ($listeners.Count -gt 0) {
+        Show-OwnerServiceDiagnostics
+        throw "Owner Friend listener on port $Port remained after service stop/delete"
+    }
 }
 
 if ($Action -eq 'uninstall') {
