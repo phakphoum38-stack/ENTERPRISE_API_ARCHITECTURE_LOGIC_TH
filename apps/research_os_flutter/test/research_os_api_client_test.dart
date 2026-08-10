@@ -81,4 +81,35 @@ void main() {
     final payload = jsonDecode(captured.body) as Map<String, dynamic>;
     expect(payload['provider'], 'gemini');
   });
+
+  test('request header provider supplies fresh service identity headers per request', () async {
+    final captured = <http.Request>[];
+    var sequence = 0;
+    final client = ResearchOSApiClient(
+      baseUrl: 'http://service.example',
+      requestHeadersProvider: () async {
+        sequence += 1;
+        return <String, String>{
+          'X-ResearchOS-Principal': 'research-os-app',
+          'X-ResearchOS-Identity-Timestamp': '1700000000',
+          'X-ResearchOS-Identity-Nonce': 'nonce-request-$sequence-abcdef',
+          'X-ResearchOS-Identity-Signature': 'signature-$sequence',
+        };
+      },
+      client: MockClient((request) async {
+        captured.add(request);
+        return http.Response(jsonEncode(<String, Object?>{'status': 'ok'}), 200);
+      }),
+    );
+
+    await client.getHealth();
+    await client.getBrainCapacity();
+
+    expect(sequence, 2);
+    expect(captured, hasLength(2));
+    expect(captured[0].headers['X-ResearchOS-Principal'], 'research-os-app');
+    expect(captured[0].headers['X-ResearchOS-Identity-Nonce'], 'nonce-request-1-abcdef');
+    expect(captured[1].headers['X-ResearchOS-Identity-Nonce'], 'nonce-request-2-abcdef');
+    expect(captured[0].headers['X-ResearchOS-Identity-Signature'], isNot(equals(captured[1].headers['X-ResearchOS-Identity-Signature'])));
+  });
 }
