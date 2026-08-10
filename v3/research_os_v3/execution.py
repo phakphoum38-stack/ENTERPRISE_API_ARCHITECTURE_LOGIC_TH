@@ -96,6 +96,7 @@ class AtomicExecutionEvidenceStore:
             "active_workers": context.active_workers,
             "queued_tasks": context.queued_tasks,
             "release_inputs_sha256": _sha256(dict(context.release_inputs)),
+            "stage_order": [stage.name for stage in context.plan.stages],
             "stages": {},
         }
         self._write(payload)
@@ -266,6 +267,7 @@ class FactoryExecutionEngine:
             "queued_tasks": queued_tasks,
             "provider": decision.provider,
             "release_inputs_sha256": _sha256(release_inputs),
+            "stage_order": [stage.name for stage in collected],
             "stage_output_sha256": {
                 stage.name: stage.output_sha256 for stage in collected
             },

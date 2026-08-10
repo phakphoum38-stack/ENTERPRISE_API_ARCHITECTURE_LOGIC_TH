@@ -55,18 +55,22 @@ def main() -> int:
             },
         )
 
+        expected_order = ["master", "factory", "team", "tests", "release"]
         assert result.passed
         assert result.logical_capacity == 46656
         assert result.active_workers == 64
         assert result.active_workers < result.logical_capacity
         assert result.queued_tasks > 0
-        assert calls == ["master", "factory", "team", "tests", "release"]
+        assert calls == expected_order
+        assert [stage.name for stage in result.stages] == expected_order
         assert result.release_manifest is not None
+        assert result.release_manifest["stage_order"] == expected_order
         assert len(result.release_manifest["release_sha256"]) == 64
 
         evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
         assert evidence["status"] == "passed"
-        assert list(evidence["stages"]) == calls
+        assert evidence["stage_order"] == expected_order
+        assert set(evidence["stages"]) == set(expected_order)
         assert evidence["release_manifest"]["release_sha256"] == result.release_manifest["release_sha256"]
 
         print(
@@ -78,7 +82,7 @@ def main() -> int:
                     "logical_capacity": result.logical_capacity,
                     "active_workers": result.active_workers,
                     "queued_tasks": result.queued_tasks,
-                    "stages": calls,
+                    "stages": expected_order,
                     "release_sha256": result.release_manifest["release_sha256"],
                     "incremental_evidence": True,
                 },
