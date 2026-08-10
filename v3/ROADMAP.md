@@ -13,15 +13,17 @@
 
 ## Phase 2 - Provider execution
 
-- [ ] OpenAI-compatible adapter behind a strict interface
-- [ ] Provider readiness/connectivity probes
-- [ ] Secret source abstraction (environment/OS secret store)
+- [x] OpenAI-compatible adapter behind a strict interface
+- [x] Provider readiness/connectivity status
+- [x] Environment secret source abstraction
+- [ ] OS-native secret store source
 - [ ] Retry, timeout, circuit breaker, and provider fallback policy
 
 ## Phase 3 - Local service
 
-- [ ] V3 local API service on loopback only
-- [ ] `/health`, `/v3/master`, `/v3/providers`
+- [x] V3 local API service on loopback only
+- [x] `/health`, `/v3/master`, `/v3/providers`
+- [x] Cross-platform local-service smoke validation
 - [ ] Windows Service host
 - [ ] Lifecycle and local data ownership rules
 
