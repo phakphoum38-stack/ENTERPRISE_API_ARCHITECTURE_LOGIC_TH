@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class LocalServiceSecurityTests(unittest.TestCase):
-    def test_packaged_windows_service_is_loopback_only(self):
+    def test_packaged_windows_service_is_loopback_only_by_default(self):
         service_script = (ROOT / "scripts" / "research-os-service.ps1").read_text(
             encoding="utf-8"
         )
@@ -21,6 +21,22 @@ class LocalServiceSecurityTests(unittest.TestCase):
         self.assertNotIn("RESEARCH_OS_API_HOST=0.0.0.0", service_script)
         self.assertIn('?? "127.0.0.1"', service_host)
         self.assertIn('os.getenv("HOST", "127.0.0.1")', render_server)
+
+    def test_non_loopback_primary_api_reuses_signed_identity_boundary(self):
+        render_server = (
+            ROOT / "tools" / "research_os_api" / "render_server.py"
+        ).read_text(encoding="utf-8")
+        service_auth = (
+            ROOT / "tools" / "research_os_api" / "v2_service_auth.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("verify_service_request", render_server)
+        self.assertIn("ServiceExposureAuthError", render_server)
+        self.assertIn("X-ResearchOS-Identity-Signature", render_server)
+        self.assertIn("IdentityAssertionVerifier", service_auth)
+        self.assertIn("is_loopback_host", service_auth)
+        self.assertIn("RESEARCH_OS_IDENTITY_PROXY_SECRET", service_auth)
+        self.assertNotIn("X-ResearchOS-Identity-Secret", render_server)
 
     def test_upgrade_preserves_service_scoped_provider_configuration(self):
         service_script = (ROOT / "scripts" / "research-os-service.ps1").read_text(
