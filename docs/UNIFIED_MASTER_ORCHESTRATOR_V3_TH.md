@@ -58,7 +58,8 @@ Research OS ยังคง local-first:
 
 - ค่าเริ่มต้นของ packaged Windows Service คือ `127.0.0.1`
 - loopback ใช้งานได้โดยไม่ต้องฝัง shared application secret ใน Flutter app
-- หาก HTTP server bind ออกนอก loopback จะ fail closed และต้องมี short-lived signed identity assertion
+- หาก HTTP server bind ออกนอก loopback route ของ API จะ fail closed และต้องมี short-lived signed identity assertion
+- `GET /health` เป็น liveness exception แบบอ่านอย่างเดียวและยังเข้าถึงได้โดยไม่ต้องมี assertion เพื่อให้ service/cloud supervisor ตรวจสถานะได้
 - ใช้ `developer_identity.IdentityAssertionVerifier` เดิม ไม่สร้าง auth verifier ซ้ำ
 - assertion ใช้ principal + timestamp + nonce + HMAC signature
 - nonce replay ถูกปฏิเสธ
@@ -105,7 +106,7 @@ V3 คง API เดิมและเพิ่มมุมมองรวม �
 - explicit `6^6` ต้อง route ไป `compound_6x6`
 - Tool Intelligence external discovery ต้องยังเป็น evidence-backed/review-only
 - loopback primary API ต้องยังทำงานโดยไม่ต้องใช้ signed identity header
-- non-loopback primary API ต้องปฏิเสธ request ที่ไม่มี signed identity
+- non-loopback primary API ต้องเปิด `/health` สำหรับ liveness แต่ปฏิเสธ protected API request ที่ไม่มี signed identity
 - signed identity nonce เดิมต้องใช้ซ้ำไม่ได้
 - Flutter API client ต้องขอ identity headers ใหม่ต่อ request เมื่อเปิด auth provider
 
