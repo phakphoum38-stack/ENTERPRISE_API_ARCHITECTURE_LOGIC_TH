@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Standalone file ownership boundary for Research OS.
 
-This module defines only filesystem/document ownership responsibility. It has no
-network, browser, website, API-security, or external security-policy dependency.
-It is a boundary contract, not an operating-system ACL implementation.
+This module defines filesystem and document ownership responsibility only. It is
+a boundary contract, not an operating-system ACL implementation, and performs no
+owner or permission mutation by itself.
 """
 
 from __future__ import annotations
@@ -34,9 +34,6 @@ class FileOwnershipBoundary:
             "changes_file_owner": False,
             "grants_file_acl": False,
             "reads_private_file_metadata": False,
-            "network_dependency": False,
-            "browser_dependency": False,
-            "website_dependency": False,
             "authorization_source": "dedicated_file_ownership_backend_required",
         }
 
@@ -50,9 +47,6 @@ class FileOwnershipBoundary:
             "acl_change_performed": False,
             "requires_dedicated_backend_for_mutation": True,
             "requires_explicit_authorization_for_mutation": True,
-            "network_used": False,
-            "browser_used": False,
-            "website_used": False,
         }
 
 
