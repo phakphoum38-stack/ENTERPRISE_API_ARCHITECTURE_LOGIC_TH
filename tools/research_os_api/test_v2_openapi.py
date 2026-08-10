@@ -9,6 +9,19 @@ class V2OpenAPIContractTests(unittest.TestCase):
         text = Path(__file__).with_name("openapi.yaml").read_text(encoding="utf-8")
         required = (
             "/v2/health/readiness:",
+            "/v2/providers:",
+            "/v2/master:",
+            "/v2/master/plan:",
+            "/v2/intelligence:",
+            "/v2/intelligence/capabilities:",
+            "/v2/intelligence/agents:",
+            "/v2/intelligence/skills:",
+            "/v2/intelligence/tools:",
+            "/v2/intelligence/permissions:",
+            "/v2/intelligence/architecture:",
+            "/v2/intelligence/project-state:",
+            "/v2/intelligence/health:",
+            "/v2/intelligence/plan:",
             "/v2/agents:",
             "/v2/agents/readiness:",
             "/v2/agents/discover:",
@@ -38,6 +51,17 @@ class V2OpenAPIContractTests(unittest.TestCase):
         )
         missing = [marker for marker in required if marker not in text]
         self.assertEqual(missing, [])
+
+    def test_master_contract_is_planning_only_and_bounded(self) -> None:
+        text = Path(__file__).with_name("openapi.yaml").read_text(encoding="utf-8")
+        for marker in (
+            "Create a planning-only Unified Master plan",
+            "maxItems: 1296",
+            "maximum: 46656",
+            "pattern: '^[A-Za-z0-9._:-]+$'",
+            "required: [api_version, master_plan]",
+        ):
+            self.assertIn(marker, text)
 
     def test_workspace_contract_keeps_provenance_and_cursor_pagination(self) -> None:
         text = Path(__file__).with_name("openapi.yaml").read_text(encoding="utf-8")
