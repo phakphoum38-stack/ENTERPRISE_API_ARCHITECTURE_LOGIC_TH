@@ -276,7 +276,14 @@ jobs:
 
           $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5
           $serialized = @($providers, $master) | ConvertTo-Json -Depth 12 -Compress
-          if ($serialized -match '(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._-]+') {
+          $credentialPattern = '(?i)\bsk-[A-Za-z0-9_-]{8,}|\bBearer\s+[A-Za-z0-9._~+/=-]{8,}'
+          if ('task-runner-phase-8' -match $credentialPattern) {
+            throw "Credential scanner false-positive regression"
+          }
+          if ('sk-candidate-secret-123456789' -notmatch $credentialPattern) {
+            throw "Credential scanner failed to detect provider-key shape"
+          }
+          if ($serialized -match $credentialPattern) {
             throw "Provider or master status contains credential-like data"
           }
 
