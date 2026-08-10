@@ -27,11 +27,22 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
             manifest["owners"]["cyber_web_security"],
             "v2_cyber_web_standard.CyberWebSecurityStandard",
         )
-        self.assertEqual(manifest["owners"]["file_ownership"], "separate_external_owner")
-        boundary = manifest["owner_boundaries"]["cyber_web_vs_file_ownership"]
-        self.assertTrue(boundary["separate_from_file_owner_system"])
-        self.assertFalse(boundary["file_owner_write_authority"])
-        self.assertFalse(boundary["file_acl_grant_authority"])
+        self.assertEqual(
+            manifest["owners"]["file_ownership"],
+            "v2_file_ownership_boundary.FileOwnershipBoundary",
+        )
+
+        cyber_boundary = manifest["owner_boundaries"]["cyber_web_security"]
+        file_boundary = manifest["owner_boundaries"]["file_ownership"]
+        self.assertTrue(cyber_boundary["separate_from_file_owner_system"])
+        self.assertFalse(cyber_boundary["file_owner_write_authority"])
+        self.assertFalse(cyber_boundary["file_acl_grant_authority"])
+        self.assertTrue(file_boundary["separate_from_cyber_web_security"])
+        self.assertFalse(file_boundary["cyber_may_change_file_owner"])
+        self.assertFalse(file_boundary["cyber_may_grant_file_acl"])
+        self.assertFalse(file_boundary["shared_authority"])
+        self.assertFalse(manifest["owner_boundaries"]["shared_authority"])
+
         self.assertFalse(manifest["invariants"]["all_workers_started_by_default"])
         self.assertFalse(manifest["invariants"]["duplicate_dependency_graph"])
         self.assertFalse(manifest["invariants"]["external_tools_auto_downloaded"])
@@ -40,6 +51,8 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
         self.assertTrue(manifest["invariants"]["cyber_security_separate_from_file_ownership"])
         self.assertFalse(manifest["invariants"]["cyber_security_can_change_file_owner"])
         self.assertFalse(manifest["invariants"]["cyber_security_can_grant_file_acl"])
+        self.assertFalse(manifest["invariants"]["file_ownership_can_override_cyber_policy"])
+        self.assertFalse(manifest["invariants"]["file_ownership_can_disable_security_controls"])
         self.assertEqual(
             manifest["invariants"]["canonical_dependency_graph"],
             "AgentOrchestrator",
@@ -74,8 +87,15 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
             result["tool_intelligence"]["required_capabilities"],
         )
         self.assertFalse(result["tool_intelligence"]["execution_performed"])
+
         self.assertTrue(result["cyber_web_security"]["separate_from_file_owner_system"])
         self.assertFalse(result["cyber_web_security"]["changes_file_ownership"])
+        self.assertFalse(result["cyber_web_security"]["grants_file_acl"])
+        self.assertEqual(result["file_ownership"]["owner"], "FileOwnershipBoundary")
+        self.assertFalse(result["file_ownership"]["ownership_change_performed"])
+        self.assertFalse(result["file_ownership"]["acl_change_performed"])
+        self.assertFalse(result["file_ownership"]["cyber_security_involved"])
+
         self.assertFalse(result["execution"]["performed"])
         self.assertFalse(result["execution"]["approval_bypassed"])
         self.assertFalse(result["execution"]["external_tool_installed"])
@@ -83,7 +103,7 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
         self.assertFalse(result["execution"]["file_owner_changed"])
         self.assertFalse(result["execution"]["file_acl_granted"])
 
-    def test_status_exposes_tool_training_and_cyber_security_as_separate_owners(self) -> None:
+    def test_status_exposes_tool_cyber_and_file_ownership_as_separate_owners(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             master = UnifiedMasterOrchestrator(Path(tmp))
             status = master.status()
@@ -103,6 +123,14 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
         self.assertFalse(cyber["boundary"]["file_owner_write_authority"])
         self.assertFalse(cyber["permission_grant_authority"])
 
+        file_ownership = status["file_ownership"]
+        self.assertEqual(file_ownership["owner"], "FileOwnershipBoundary")
+        self.assertEqual(file_ownership["implementation_state"], "boundary_only")
+        self.assertFalse(file_ownership["cyber_security_authority"])
+        self.assertFalse(file_ownership["web_security_policy_authority"])
+        self.assertFalse(file_ownership["changes_file_owner"])
+        self.assertFalse(file_ownership["grants_file_acl"])
+
     def test_cyber_assessment_never_changes_file_owner_or_grants_acl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             master = UnifiedMasterOrchestrator(Path(tmp))
@@ -118,6 +146,17 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
         self.assertFalse(result["changes_file_ownership"])
         self.assertFalse(result["grants_permissions"])
         self.assertTrue(result["boundary"]["separate_from_file_owner_system"])
+
+    def test_file_ownership_status_is_boundary_only_and_does_not_change_cyber_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            master = UnifiedMasterOrchestrator(Path(tmp))
+            status = master.file_ownership_status()
+
+        self.assertEqual(status["owner"], "FileOwnershipBoundary")
+        self.assertEqual(status["implementation_state"], "boundary_only")
+        self.assertFalse(status["web_security_policy_authority"])
+        self.assertFalse(status["cross_owner_contract"]["file_owner_may_override_cyber_policy"])
+        self.assertFalse(status["cross_owner_contract"]["file_owner_may_disable_security_controls"])
 
 
 if __name__ == "__main__":
