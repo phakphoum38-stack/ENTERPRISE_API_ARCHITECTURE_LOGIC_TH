@@ -114,6 +114,12 @@ Release แยกจาก Candidate เสมอ
 - Production code signing ต้องเพิ่มเมื่อมี trusted certificate จริง
 - ห้ามใช้ self-signed certificate เป็น production signing
 
+## Security gates ที่ทำแล้ว
+
+- OAuth callback request logging ต้องไม่บันทึกค่า query ที่มี `code` หรือ `state`
+- HTTP handler ต้อง redact callback query เป็น `?[REDACTED]` ก่อนเขียน persistent request log
+- regression test ต้องตรวจว่าค่า OAuth callback secret ไม่ปรากฏใน log
+
 ## สิ่งที่ยกเลิกจาก workflow เดิม
 
 นำ workflow ย่อยที่เคยรันแยกกันออก เช่น Windows App, ServiceHost, Runtime Smoke, Installer Build, Installer Validation, Branding, Agent Platform, Completion Crew, Performance, Nightly, Pages, Provider Smoke, Gemini E2E, Google Workspace, Production Health และ staging/RC gates
