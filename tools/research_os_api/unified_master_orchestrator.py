@@ -2,10 +2,11 @@
 """Unified Research OS V3 Master Orchestrator.
 
 This module composes the existing V2 governed Brain Runtime, V3 adaptive
-Compound Brain, canonical AgentOrchestrator, Adaptive Software Factory, and the
-governed Tool Intelligence layer. It does not create a second dependency graph,
-bypass approvals, auto-install discovered software, or eagerly materialize the
-theoretical 6^6 hierarchy.
+Compound Brain, canonical AgentOrchestrator, Adaptive Software Factory, the
+governed Tool Intelligence layer, and a separate Cyber Web Security Standard
+owner. It does not create a second dependency graph, bypass approvals,
+auto-install discovered software, or eagerly materialize the theoretical 6^6
+hierarchy.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any, Mapping, Sequence
 import agent_server
 from brain_skills import BRAIN, BrainSkillsEngine
 from v2_brain_runtime import BRAIN_RUNTIME, BrainRuntime
+from v2_cyber_web_standard import CYBER_WEB_STANDARD, CyberWebSecurityStandard
 from v2_system_introspection import SystemIntrospection
 from v2_tool_intelligence import ToolIntelligence
 
@@ -41,10 +43,12 @@ class UnifiedMasterOrchestrator:
         *,
         brain_runtime: BrainRuntime | None = None,
         compound_brain: BrainSkillsEngine | None = None,
+        cyber_web_security: CyberWebSecurityStandard | None = None,
     ) -> None:
         self.repository_root = (repository_root or _REPO_ROOT).resolve()
         self.brain_runtime = brain_runtime or BRAIN_RUNTIME
         self.compound_brain = compound_brain or BRAIN
+        self.cyber_web_security = cyber_web_security or CYBER_WEB_STANDARD
         self.agent_orchestrator = agent_server.ORCHESTRATOR
         self.operational_registry = agent_server.REGISTRY
         self.intelligence = SystemIntrospection(
@@ -59,6 +63,7 @@ class UnifiedMasterOrchestrator:
 
     def manifest(self) -> dict[str, Any]:
         capacity = self.compound_brain.capacity_snapshot()
+        cyber_boundary = self.cyber_web_security.ownership_boundary()
         return {
             "contract": UNIFIED_MASTER_CONTRACT,
             "version": UNIFIED_VERSION,
@@ -72,8 +77,13 @@ class UnifiedMasterOrchestrator:
                 "tool_registry": "BrainRuntime.tools",
                 "tool_intelligence": "v2_tool_intelligence.ToolIntelligence",
                 "tool_learning": "BrainRuntime.learning",
+                "cyber_web_security": "v2_cyber_web_standard.CyberWebSecurityStandard",
+                "file_ownership": "separate_external_owner",
                 "factory_control": "software_factory.AdaptiveControlPlane",
                 "provider_gateway": "existing provider gateway",
+            },
+            "owner_boundaries": {
+                "cyber_web_vs_file_ownership": cyber_boundary,
             },
             "factory_profiles": [profile.label for profile in SUPPORTED_PROFILES],
             "capacity": capacity,
@@ -86,6 +96,9 @@ class UnifiedMasterOrchestrator:
                 "external_tools_auto_downloaded": False,
                 "external_tools_auto_installed": False,
                 "external_tools_auto_executed": False,
+                "cyber_security_separate_from_file_ownership": True,
+                "cyber_security_can_change_file_owner": False,
+                "cyber_security_can_grant_file_acl": False,
                 "self_modification": False,
                 "automatic_merge_release_deploy": False,
             },
@@ -97,6 +110,7 @@ class UnifiedMasterOrchestrator:
             **self.manifest(),
             "brain_runtime": runtime,
             "tool_intelligence": self.tool_intelligence.dashboard(),
+            "cyber_web_security": self.cyber_web_security.manifest(),
             "factory": self.factory_control.summary(),
             "intelligence_health": self.intelligence.health(),
         }
@@ -165,6 +179,13 @@ class UnifiedMasterOrchestrator:
             "compound_brain": compound_plan,
             "governed_brain": governed_plan,
             "tool_intelligence": tool_strategy,
+            "cyber_web_security": {
+                "contract": self.cyber_web_security.manifest()["contract"],
+                "owner": "CyberWebSecurityStandard",
+                "separate_from_file_owner_system": True,
+                "assessment_performed": False,
+                "changes_file_ownership": False,
+            },
             "factory": {
                 "profile": factory_plan.profile.label,
                 "logical_capacity": factory_plan.profile.capacity,
@@ -178,10 +199,24 @@ class UnifiedMasterOrchestrator:
                 "approval_bypassed": False,
                 "external_tool_installed": False,
                 "external_tool_executed": False,
+                "file_owner_changed": False,
+                "file_acl_granted": False,
                 "canonical_dependency_graph": "AgentOrchestrator",
                 "lazy_activation": True,
             },
         }
+
+    def assess_cyber_web_security(
+        self,
+        evidence: Mapping[str, Any],
+        *,
+        deployment_mode: str = "public",
+    ) -> dict[str, Any]:
+        """Evaluate web/API security evidence without touching file ownership."""
+        return self.cyber_web_security.assess(
+            evidence,
+            deployment_mode=deployment_mode,
+        )
 
     def discover_tools(
         self,
