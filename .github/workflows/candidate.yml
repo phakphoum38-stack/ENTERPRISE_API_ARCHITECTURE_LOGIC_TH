@@ -32,6 +32,16 @@ jobs:
           ref: ${{ env.TARGET_SHA }}
           path: src
 
+      - name: Initialize incremental candidate evidence
+        working-directory: src
+        shell: pwsh
+        run: |
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir candidate-evidence `
+            -Stage candidate `
+            -Status started `
+            -DataJson '{"build_policy":"single-windows-runner"}'
+
       - name: Enable Windows long paths
         shell: pwsh
         run: |
@@ -66,6 +76,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "API tests failed" }
           python -m unittest discover -s tests -p "test_adaptive_software_factory*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Adaptive Software Factory tests failed" }
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir candidate-evidence `
+            -Stage api_and_factory_tests `
+            -Status passed `
+            -DataJson '{"python_compile":"passed","api_tests":"passed","software_factory_tests":"passed"}'
 
       - name: Stage Flutter app at short path
         shell: pwsh
@@ -87,9 +102,25 @@ jobs:
           flutter test
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { throw "Flutter Windows build failed" }
-          if (-not (Test-Path "D:\w\build\windows\x64\runner\Release\research_os_flutter.exe")) {
+          $appExe = "D:\w\build\windows\x64\runner\Release\research_os_flutter.exe"
+          if (-not (Test-Path $appExe)) {
             throw "Windows app executable is missing"
           }
+          $appHash = (Get-FileHash $appExe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $appInfo = Get-Item $appExe
+          $data = @{
+            flutter_analyze = 'passed'
+            flutter_tests = 'passed'
+            flutter_build = 'passed'
+            executable = $appInfo.Name
+            sha256 = $appHash
+            size_bytes = $appInfo.Length
+          } | ConvertTo-Json -Compress
+          & "$env:GITHUB_WORKSPACE\src\scripts\candidate-evidence.ps1" `
+            -OutputDir "$env:GITHUB_WORKSPACE\src\candidate-evidence" `
+            -Stage windows_app `
+            -Status passed `
+            -DataJson $data
 
       - name: Publish ServiceHost
         working-directory: src
@@ -99,9 +130,18 @@ jobs:
             -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=true -p:PublishTrimmed=false `
             -o tools/research_os_service/publish
-          if (-not (Test-Path "tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) {
+          $serviceExe = "tools\research_os_service\publish\ResearchOS.ServiceHost.exe"
+          if (-not (Test-Path $serviceExe)) {
             throw "ServiceHost executable is missing"
           }
+          $serviceInfo = Get-Item $serviceExe
+          $serviceHash = (Get-FileHash $serviceExe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $data = @{
+            executable = $serviceInfo.Name
+            sha256 = $serviceHash
+            size_bytes = $serviceInfo.Length
+          } | ConvertTo-Json -Compress
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage service_host_build -Status passed -DataJson $data
 
       - name: Runtime smoke test
         working-directory: src
@@ -127,6 +167,13 @@ jobs:
             if ($master.master.capacity.max_leaf_capacity -ne 46656) {
               throw "Unified Master 6^6 capacity is invalid"
             }
+            $evidence = @{
+              health = 'ok'
+              unified_master = 'passed'
+              assistant_6x3_capacity = 216
+              compound_6x6_capacity = 46656
+            } | ConvertTo-Json -Compress
+            .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage runtime_smoke -Status passed -DataJson $evidence
           }
           finally {
             .\scripts\stop-research-os-local.ps1 -Port 8787 -PidFile "$data\run\research-os-api.pid" -ErrorAction SilentlyContinue
@@ -154,6 +201,13 @@ jobs:
             }
             $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
             if (-not $service -or $service.State -ne 'Running') { throw "ResearchOSService is not running" }
+            $evidence = @{
+              service = 'ResearchOSService'
+              state = $service.State
+              health = 'ok'
+              unified_master_contract = $master.master.contract
+            } | ConvertTo-Json -Compress
+            .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage windows_service_smoke -Status passed -DataJson $evidence
           }
           finally {
             if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
@@ -195,6 +249,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$package\runtime\python" | Out-Null
           Copy-Item "$pythonRoot\*" "$package\runtime\python" -Recurse -Force
           if (-not (Test-Path "$package\runtime\python\python.exe")) { throw "Bundled Python runtime missing" }
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir candidate-evidence `
+            -Stage installer_package `
+            -Status passed `
+            -DataJson '{"software_factory":"included","python_runtime":"included","flutter_app":"included","service_host":"included"}'
 
       - name: Generate installer branding
         working-directory: src
@@ -205,6 +264,7 @@ jobs:
           if (-not (Test-Path "apps\research_os_flutter\assets\branding\research_os.ico")) {
             throw "Installer icon was not generated"
           }
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage installer_branding -Status passed
 
       - name: Install Inno Setup
         shell: pwsh
@@ -220,6 +280,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
           $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
           if (-not $setup) { throw "Setup EXE was not produced" }
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $data = @{
+            name = $setup.Name
+            sha256 = $hash
+            size_bytes = $setup.Length
+          } | ConvertTo-Json -Compress
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage setup_exe_build -Status passed -DataJson $data
 
       - name: Prepare clean installer validation
         working-directory: src
@@ -238,6 +305,7 @@ jobs:
           $data = Join-Path $env:ProgramData 'ResearchOS'
           if (Test-Path $data) { Remove-Item $data -Recurse -Force }
           .\scripts\v2-data-preservation.ps1 -Action Seed -DataDir "$env:ProgramData\ResearchOS"
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage clean_validation_prepared -Status passed
 
       - name: Install validate and upgrade candidate
         working-directory: src
@@ -248,8 +316,14 @@ jobs:
           $log = "$env:RUNNER_TEMP\research-os-install.log"
           $p = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "Installer failed with exit code $($p.ExitCode)" }
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir candidate-evidence `
+            -Stage install `
+            -Status passed `
+            -DataJson '{"exit_code":0}'
 
           .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage install_data_preservation -Status passed
 
           $ready = $false
           for ($i = 0; $i -lt 60; $i++) {
@@ -261,10 +335,20 @@ jobs:
             Start-Sleep -Seconds 1
           }
           if (-not $ready) { throw "Installed candidate did not become ready" }
+          $readyData = @{
+            health = $health.status
+            v2_ready = [bool]$v2.ready
+          } | ConvertTo-Json -Compress
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage installed_readiness -Status passed -DataJson $readyData
 
           $listeners = @(Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction Stop)
           $unsafe = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1', '::1') })
           if ($unsafe) { throw "Research OS API must listen on loopback only" }
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir candidate-evidence `
+            -Stage loopback_binding `
+            -Status passed `
+            -DataJson '{"port":8787,"scope":"loopback-only"}'
 
           $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
           if ($master.master.contract -ne "unified-master-orchestrator-v3") {
@@ -273,12 +357,23 @@ jobs:
           if ($master.master.capacity.assistant_6x3_capacity -ne 216 -or $master.master.capacity.max_leaf_capacity -ne 46656) {
             throw "Installed candidate Unified Master capacity is invalid"
           }
+          $masterData = @{
+            contract = $master.master.contract
+            assistant_6x3_capacity = $master.master.capacity.assistant_6x3_capacity
+            compound_6x6_capacity = $master.master.capacity.max_leaf_capacity
+          } | ConvertTo-Json -Compress
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage installed_unified_master -Status passed -DataJson $masterData
 
           $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5
           $serialized = @($providers, $master) | ConvertTo-Json -Depth 12 -Compress
           if ($serialized -match '(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._-]+') {
             throw "Provider or master status contains credential-like data"
           }
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir candidate-evidence `
+            -Stage credential_redaction `
+            -Status passed `
+            -DataJson '{"credential_like_data":"absent"}'
 
           $serviceLog = Join-Path $env:ProgramData 'ResearchOS\logs\service-api.err.log'
           if (Test-Path $serviceLog) { Clear-Content $serviceLog -ErrorAction SilentlyContinue }
@@ -305,6 +400,11 @@ jobs:
               if (Test-Path $serviceLog) { Get-Content $serviceLog -Tail 100 | Out-Host }
               throw "Installed Flutter app did not prove app-to-service requests to /health and /v1/providers"
             }
+            .\scripts\candidate-evidence.ps1 `
+              -OutputDir candidate-evidence `
+              -Stage app_to_service_e2e `
+              -Status passed `
+              -DataJson '{"health_request":200,"providers_request":200}'
             Write-Host "Installed Flutter app-to-service E2E passed."
           }
           finally {
@@ -314,8 +414,14 @@ jobs:
           $upgradeLog = "$env:RUNNER_TEMP\research-os-upgrade.log"
           $u = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$upgradeLog") -Wait -PassThru
           if ($u.ExitCode -ne 0) { throw "In-place upgrade failed with exit code $($u.ExitCode)" }
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir candidate-evidence `
+            -Stage in_place_upgrade `
+            -Status passed `
+            -DataJson '{"exit_code":0}'
 
           .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage upgrade_data_preservation -Status passed
 
       - name: Uninstall candidate and verify data preservation
         working-directory: src
@@ -331,7 +437,13 @@ jobs:
             Start-Sleep -Milliseconds 500
           }
           if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { throw "ResearchOSService still exists after uninstall" }
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir candidate-evidence `
+            -Stage uninstall `
+            -Status passed `
+            -DataJson '{"service_removed":true}'
           .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+          .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage uninstall_data_preservation -Status passed
 
       - name: Create exact-SHA candidate evidence
         working-directory: src
@@ -343,16 +455,18 @@ jobs:
           Copy-Item $setup.FullName $out -Force
           $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($setup.Name)" | Set-Content "$out\SHA256SUMS.txt" -Encoding utf8
+          .\scripts\candidate-evidence.ps1 `
+            -OutputDir $out `
+            -Stage candidate `
+            -Status passed `
+            -DataJson '{"validation":"passed"}'
+          $progress = Get-Content "$out\progress.json" -Raw | ConvertFrom-Json -AsHashtable
           $manifest = [ordered]@{
-            schema_version = 3
+            schema_version = 4
             target_sha = "$env:TARGET_SHA"
             candidate_run = "${{ github.run_id }}"
             validation = "passed"
             build_policy = "single-windows-runner"
-            app_to_service_e2e = "passed"
-            unified_master = "passed"
-            assistant_6x3_capacity = 216
-            compound_6x6_capacity = 46656
             release_created = $false
             tag_created = $false
             artifact = [ordered]@{
@@ -362,8 +476,9 @@ jobs:
             }
             data_boundary = "C:\ProgramData\ResearchOS"
             upgrade_policy = "preserve-local-data"
+            stages = $progress['stages']
           }
-          $manifest | ConvertTo-Json -Depth 8 | Set-Content "$out\candidate-manifest.json" -Encoding utf8
+          $manifest | ConvertTo-Json -Depth 20 | Set-Content "$out\candidate-manifest.json" -Encoding utf8
 
       - name: Upload verified candidate artifact
         uses: actions/upload-artifact@v4
@@ -371,6 +486,15 @@ jobs:
           name: research-os-verified-candidate-${{ env.TARGET_SHA }}
           path: src/candidate-evidence/**
           if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload incremental candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-candidate-progress-${{ env.TARGET_SHA }}-${{ github.run_id }}
+          path: src/candidate-evidence/progress.json
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Final cleanup
