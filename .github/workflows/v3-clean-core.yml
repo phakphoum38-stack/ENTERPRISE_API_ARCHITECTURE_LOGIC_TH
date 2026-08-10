@@ -20,7 +20,7 @@ jobs:
   core-validation:
     name: Core validation (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +36,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Set up .NET 8
+        if: runner.os == 'Windows'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
       - name: Initialize incremental evidence
         working-directory: v3
@@ -58,6 +64,124 @@ jobs:
         run: |
           python scripts/service_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage local_service --status passed --data '{"binding":"127.0.0.1","contract":"v3","max_capacity":46656}'
+
+      - name: Build V3 Windows ServiceHost
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = Join-Path $env:RUNNER_TEMP 'v3-service-host'
+          if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+          dotnet publish v3/windows_service/ResearchOS.V3.ServiceHost.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:DebugType=None `
+            -o $out
+          if ($LASTEXITCODE -ne 0) { throw 'V3 Windows ServiceHost publish failed' }
+
+          $exe = Join-Path $out 'ResearchOS.V3.ServiceHost.exe'
+          if (-not (Test-Path $exe)) { throw "ServiceHost executable not found: $exe" }
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item $exe).Length
+          $data = @{ exe_sha256 = $hash; exe_size = $size } | ConvertTo-Json -Compress
+          python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_host_build --status passed --data $data
+
+      - name: Validate V3 Windows Service lifecycle
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $serviceName = 'ResearchOSV3CleanCI'
+          $exe = Join-Path $env:RUNNER_TEMP 'v3-service-host\ResearchOS.V3.ServiceHost.exe'
+          $root = (Resolve-Path 'v3').Path
+          $python = (Get-Command python).Source
+          $dataDir = Join-Path $env:RUNNER_TEMP 'research-os-v3-service-data'
+          if (Test-Path $dataDir) { Remove-Item $dataDir -Recurse -Force }
+          New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+
+          $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+          $listener.Start()
+          $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+          $listener.Stop()
+
+          $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+          if ($existing) {
+            if ($existing.Status -ne 'Stopped') { Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue }
+            sc.exe delete $serviceName | Out-Null
+            Start-Sleep -Seconds 1
+          }
+
+          $binaryPath = "`"$exe`" --root `"$root`" --python `"$python`" --port $port --data-dir `"$dataDir`" --service-name `"$serviceName`""
+          $validated = $false
+          try {
+            New-Service -Name $serviceName -BinaryPathName $binaryPath -StartupType Manual | Out-Null
+            Start-Service -Name $serviceName
+
+            $health = $null
+            for ($attempt = 0; $attempt -lt 40; $attempt++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
+                if ($health.status -eq 'ok') { break }
+              } catch { }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $health -or $health.status -ne 'ok') {
+              $outLog = Join-Path $dataDir 'logs\service.out.log'
+              $errLog = Join-Path $dataDir 'logs\service.err.log'
+              if (Test-Path $outLog) { Get-Content $outLog -ErrorAction SilentlyContinue }
+              if (Test-Path $errLog) { Get-Content $errLog -ErrorAction SilentlyContinue }
+              throw 'Windows ServiceHost did not expose /health'
+            }
+
+            $master = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/master?tasks=30" -TimeoutSec 5
+            if ($master.contract -ne 'unified-master-orchestrator-v3-clean') { throw 'Unexpected V3 master contract' }
+            if ($master.scale -ne '6^3' -or [int]$master.maximum_leaf_capacity -ne 216) { throw 'Unexpected V3 adaptive scale result' }
+
+            $providers = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/providers" -TimeoutSec 5
+            if (-not $providers.providers -or $providers.providers[0].secret_exposed -ne $false) {
+              throw 'Provider status contract is missing or exposes a secret'
+            }
+
+            $listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop)
+            if ($listeners.Count -lt 1) { throw 'V3 service has no listening socket' }
+            $badListener = $listeners | Where-Object { $_.LocalAddress -ne '127.0.0.1' }
+            if ($badListener) { throw 'V3 Windows Service is not loopback-only' }
+
+            $data = @{
+              service_name = $serviceName
+              binding = '127.0.0.1'
+              port = $port
+              health = 'ok'
+              master_contract = $master.contract
+              observed_scale = $master.scale
+              observed_capacity = [int]$master.maximum_leaf_capacity
+              secret_exposed = $false
+            } | ConvertTo-Json -Compress
+            python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_lifecycle --status passed --data $data
+            $validated = $true
+          }
+          finally {
+            $svc = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -ne 'Stopped') {
+              Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+              try { $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(15)) } catch { }
+            }
+            if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+              sc.exe delete $serviceName | Out-Null
+              Start-Sleep -Seconds 1
+            }
+            $leftovers = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+            foreach ($connection in $leftovers) {
+              Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          if (-not $validated) { throw 'V3 Windows Service lifecycle validation did not complete' }
+          if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) { throw 'V3 Windows Service was not removed' }
+          if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) { throw 'V3 service listener remained after cleanup' }
+          python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_cleanup --status passed --data '{"service_removed":true,"listener_removed":true}'
 
       - name: Run V3 Clean smoke test
         working-directory: v3
