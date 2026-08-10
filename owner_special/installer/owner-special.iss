@@ -49,40 +49,68 @@ Filename: "{app}\app\{#MyAppExeName}"; Description: "Launch Research OS Owner Sp
 Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\owner_special\scripts\install-owner-service.ps1"" -Action uninstall -Root ""{app}"" -DataDir ""{commonappdata}\ResearchOSOwnerSpecial"""; Flags: runhidden waituntilterminated; RunOnceId: "ResearchOSOwnerFriendServiceUninstall"
 
 [Code]
+function OwnerFriendServiceIsStopped(): Boolean;
+var
+  ResultCode: Integer;
+  CmdExe: String;
+begin
+  CmdExe := ExpandConstant('{cmd}');
+  Result := Exec(
+    CmdExe,
+    '/C sc.exe query ResearchOSOwnerFriendService | findstr /C:"STOPPED" >nul',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode) and (ResultCode = 0);
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
-  PowerShellExe: String;
-  Parameters: String;
-  ResultCode: Integer;
+  ScExe: String;
+  QueryCode: Integer;
+  StopCode: Integer;
+  I: Integer;
 begin
   Result := '';
-  PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-  Parameters :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' +
-    '$service = Get-Service -Name ''ResearchOSOwnerFriendService'' -ErrorAction SilentlyContinue; ' +
-    'if ($null -ne $service -and $service.Status -ne ''Stopped'') { ' +
-    'Write-Host ''Stopping ResearchOSOwnerFriendService before file replacement...''; ' +
-    'Stop-Service -Name ''ResearchOSOwnerFriendService'' -Force -ErrorAction Stop; ' +
-    '$service = Get-Service -Name ''ResearchOSOwnerFriendService'' -ErrorAction Stop; ' +
-    '$service.WaitForStatus(''Stopped'', [TimeSpan]::FromSeconds(30)); ' +
-    '$service.Refresh(); ' +
-    'if ($service.Status -ne ''Stopped'') { exit 12 }; ' +
-    '}"';
+  ScExe := ExpandConstant('{sys}\sc.exe');
 
-  Log('Stopping Owner Friend Service before installer file replacement when upgrading.');
-  if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  Log('Checking Owner Friend Service before installer file replacement.');
+  if not Exec(ScExe, 'query ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, QueryCode) then
   begin
-    Result := 'Failed to launch PowerShell while preparing the Owner Friend Service for install/upgrade.';
+    Result := 'Failed to query ResearchOSOwnerFriendService before install/upgrade.';
     Exit;
   end;
 
-  if ResultCode <> 0 then
+  if QueryCode <> 0 then
   begin
-    Result := 'Could not stop ResearchOSOwnerFriendService before installer file replacement. PowerShell exit code: ' + IntToStr(ResultCode);
+    Log('ResearchOSOwnerFriendService is not registered; clean install may proceed.');
     Exit;
   end;
 
-  Log('Owner Friend Service is stopped or was not installed; file replacement may proceed.');
+  if OwnerFriendServiceIsStopped() then
+  begin
+    Log('ResearchOSOwnerFriendService is already stopped; file replacement may proceed.');
+    Exit;
+  end;
+
+  Log('Stopping ResearchOSOwnerFriendService before installer file replacement.');
+  if not Exec(ScExe, 'stop ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, StopCode) then
+  begin
+    Result := 'Failed to launch service stop command for ResearchOSOwnerFriendService.';
+    Exit;
+  end;
+
+  for I := 1 to 60 do
+  begin
+    if OwnerFriendServiceIsStopped() then
+    begin
+      Log('ResearchOSOwnerFriendService reached STOPPED state; file replacement may proceed.');
+      Exit;
+    end;
+    Sleep(500);
+  end;
+
+  Result := 'ResearchOSOwnerFriendService did not reach STOPPED state within 30 seconds. sc.exe stop exit code: ' + IntToStr(StopCode);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
