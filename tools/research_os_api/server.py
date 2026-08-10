@@ -442,6 +442,20 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             )
         return results
 
+    def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
+        target = self.path
+        parsed = urlsplit(target)
+        if parsed.path == "/v1/google-workspace/oauth/callback" and parsed.query:
+            target = f"{parsed.path}?[REDACTED]"
+        self.log_message(
+            '"%s %s %s" %s %s',
+            self.command,
+            target,
+            self.request_version,
+            str(code),
+            str(size),
+        )
+
     def log_message(self, fmt: str, *args: Any) -> None:
         sys.stderr.write("[research-os-api] " + (fmt % args) + "\n")
 
