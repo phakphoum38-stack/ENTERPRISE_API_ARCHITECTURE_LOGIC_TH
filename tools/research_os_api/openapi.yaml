@@ -213,10 +213,10 @@ paths:
                 $ref: '#/components/schemas/V2BrainCatalog'
   /v2/brain/capacity:
     get:
-      summary: Describe Adaptive 6x6 capacity and bounded active-worker policy
+      summary: Describe Adaptive 6x3 assistant and 6x6 capacity policies
       responses:
         "200":
-          description: Theoretical 6^6 capacity and current activation limits
+          description: Theoretical 6^3 assistant preset, 6^6 ceiling, and current activation limits
           content:
             application/json:
               schema:
@@ -250,6 +250,7 @@ paths:
                   minimum: 1
                   maximum: 6
                   default: 1
+                  description: Omit to allow objective text such as 6^3, 6³, or ผู้ช่วย 6 to select the 6^3 assistant preset automatically.
                 requested_workers:
                   type: integer
                   minimum: 1
@@ -686,7 +687,9 @@ components:
             - architecture
             - branch_factor
             - elastic_tiers
+            - assistant_6x3_capacity
             - max_leaf_capacity
+            - default_assistant_mode
             - max_active_workers
             - activation_mode
             - all_workers_started_by_default
@@ -697,8 +700,17 @@ components:
               const: 6
             elastic_tiers:
               const: 6
+            assistant_6x3_capacity:
+              const: 216
             max_leaf_capacity:
               const: 46656
+            default_assistant_mode:
+              const: assistant_6x3
+            assistant_modes:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
             max_active_workers:
               type: integer
               minimum: 1
@@ -720,6 +732,7 @@ components:
             - plan_id
             - objective
             - selected_skills
+            - assistant_profile
             - hierarchy
             - cognition
             - provider_mode
@@ -735,6 +748,22 @@ components:
               type: array
               items:
                 type: string
+            assistant_profile:
+              type: object
+              required: [mode, branch_factor, elastic_tiers, theoretical_assistants]
+              properties:
+                mode:
+                  enum: [assistant_6x3, compound_6x6]
+                branch_factor:
+                  const: 6
+                elastic_tiers:
+                  type: integer
+                  minimum: 3
+                  maximum: 6
+                theoretical_assistants:
+                  type: integer
+                  enum: [216, 46656]
+              additionalProperties: true
             hierarchy:
               type: object
               additionalProperties: true
@@ -750,7 +779,7 @@ components:
                 - bounded
               properties:
                 mode:
-                  const: compound_6x6
+                  enum: [assistant_6x3, compound_6x6]
                 stages:
                   type: array
                   items:
