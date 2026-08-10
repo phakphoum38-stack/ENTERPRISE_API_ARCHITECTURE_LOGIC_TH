@@ -175,7 +175,7 @@ class AdaptiveHierarchyPolicy:
     def plan(
         self,
         *,
-        complexity_level: int | None = None,
+        complexity_level: int = 1,
         requested_workers: int | None = None,
         budget_workers: int | None = None,
         ready_workers: int | None = None,
@@ -246,7 +246,7 @@ class BrainSkillsEngine:
         self,
         objective: str,
         *,
-        complexity_level: int = 1,
+        complexity_level: int | None = None,
         requested_workers: int | None = None,
         budget_workers: int | None = None,
         ready_workers: int | None = None,
