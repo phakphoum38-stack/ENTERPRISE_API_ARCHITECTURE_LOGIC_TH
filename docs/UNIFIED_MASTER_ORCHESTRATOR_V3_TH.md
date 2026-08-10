@@ -64,7 +64,24 @@ Research OS ยังคง local-first:
 - assertion ใช้ principal + timestamp + nonce + HMAC signature
 - nonce replay ถูกปฏิเสธ
 - Flutter API client รองรับ request-header provider เพื่อรับ signed headers ใหม่ต่อ request โดยไม่ถือ signing secret เอง
-- auth boundary ตัดสินจาก bind address จริงของ HTTP server ไม่เชื่อ environment string เพียงอย่างเดียว
+- auth boundary ตัดสินจาก bind addressจริงของ HTTP server ไม่เชื่อ environment string เพียงอย่างเดียว
+
+## Provider และคีย์เดิม
+
+- Flutter ไม่ hardcode provider ค่ายใดค่ายหนึ่งสำหรับการตอบปกติอีกต่อไป แต่ให้ Service เลือก `RESEARCH_OS_PROVIDER` ที่ตั้งไว้
+- คำสั่งค้นเว็บยังส่งผ่าน `/v2/brain/search` และใช้ search provider ที่กำหนดไว้
+- Windows Service upgrade preserve configuration ของ OpenAI/OpenAI-compatible, Gemini และ Anthropic ที่ระบบรองรับ
+- provider status ส่งกลับเฉพาะสถานะ configured/source name และ `secret_exposed=false` ไม่ส่งค่าคีย์
+- `tools/research_os_api/service_provider_smoke.py` ทดสอบ service จากภายนอก process: health → credential status → live generation → hosted web search เมื่อ OpenAI Responses พร้อม
+- smoke report ไม่พิมพ์ prompt, response text, source URL, provider error body หรือค่า secret
+
+หลังติดตั้งบน Windows สามารถรัน smoke ด้วย:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Research OS\scripts\test-research-os-provider-service.ps1"
+```
+
+คำสั่งนี้ใช้ bundled Python ของ Research OS เมื่อมี และยิงไปที่ `http://127.0.0.1:8787` โดยค่าเริ่มต้น
 
 ## Safety invariants
 
@@ -109,6 +126,9 @@ V3 คง API เดิมและเพิ่มมุมมองรวม �
 - non-loopback primary API ต้องเปิด `/health` สำหรับ liveness แต่ปฏิเสธ protected API request ที่ไม่มี signed identity
 - signed identity nonce เดิมต้องใช้ซ้ำไม่ได้
 - Flutter API client ต้องขอ identity headers ใหม่ต่อ request เมื่อเปิด auth provider
+- Flutter ordinary generation ต้องปล่อยให้ Service เลือก active provider แทนการ hardcode provider
+- installed-service provider smoke ต้องไม่ส่ง prompt/response/secret กลับในรายงาน
+- Candidate packaging ต้องเก็บทั้ง `service_provider_smoke.py` และ PowerShell smoke wrapper ไปกับ Setup
 
 ## Build policy
 
