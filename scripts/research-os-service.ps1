@@ -268,58 +268,81 @@ switch ($Action) {
     if ($LASTEXITCODE -ne 0) { throw 'Failed to create Research OS Windows Service.' }
 
     sc.exe description $ServiceName 'Research OS Local API, Memory, Google Workspace and AI backend service.' | Out-Null
-
-    Set-ServiceEnvironment -PythonPath $python -PreservedProviderEnvironment $preservedProviderEnvironment
-
-    sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
+    sc.exe config $ServiceName start= delayed-auto | Out-Null
+    sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
     sc.exe failureflag $ServiceName 1 | Out-Null
+    Set-ServiceEnvironment -PythonPath $python -PreservedProviderEnvironment $preservedProviderEnvironment
 
     Start-Service -Name $ServiceName
     Wait-ServiceState 'Running' | Out-Null
-    Write-Host "Research OS Service installed and running at http://127.0.0.1:$ApiPort"
-    exit 0
+
+    Write-Host 'Research OS Service installed and started.'
+    Write-Host "Service : $ServiceName"
+    Write-Host "API     : http://127.0.0.1:$ApiPort"
+    Write-Host "Data    : $DataDir"
+    Write-Host "Runtime : $python"
+    Write-Host 'Recovery: restart after 5s, 10s, then 30s'
   }
 
   'uninstall' {
     Require-Admin
     $svc = Get-ServiceSafe
-    if ($svc) {
-      Stop-ResearchOsServiceAndApi
-      sc.exe delete $ServiceName | Out-Null
-      Start-Sleep -Seconds 1
-    }
-    else {
+    if (-not $svc) {
+      # The service may already be gone while a child process from a previous
+      # shutdown is still alive. Clean only positively identified Research OS listeners.
       Stop-ResearchOsApiListener
+      Write-Host 'Research OS Service is not installed.'
+      exit 0
     }
-    Write-Host 'Research OS Service removed.'
-    exit 0
+
+    Stop-ResearchOsServiceAndApi
+    sc.exe delete $ServiceName | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to delete Research OS Service.' }
+
+    $deadline = (Get-Date).AddSeconds(15)
+    do {
+      if (-not (Get-ServiceSafe)) { break }
+      Start-Sleep -Milliseconds 500
+    } while ((Get-Date) -lt $deadline)
+
+    if (Get-ServiceSafe) {
+      throw 'Research OS Service is still registered after delete.'
+    }
+
+    Stop-ResearchOsApiListener
+    foreach ($name in @(
+      'RESEARCH_OS_REPO_ROOT',
+      'RESEARCH_OS_DATA_DIR',
+      'RESEARCH_OS_PYTHON_EXE',
+      'RESEARCH_OS_API_HOST',
+      'RESEARCH_OS_API_PORT'
+    )) {
+      [Environment]::SetEnvironmentVariable($name, $null, 'Machine')
+    }
+    Write-Host 'Research OS Service uninstalled. Local data was preserved.'
   }
 
   'start' {
     Require-Admin
-    $svc = Get-ServiceSafe
-    if (-not $svc) { throw 'Research OS Service is not installed.' }
-    if ($svc.Status -ne 'Running') {
-      Start-Service -Name $ServiceName
-      Wait-ServiceState 'Running' | Out-Null
-    }
-    Write-Host "Research OS Service running at http://127.0.0.1:$ApiPort"
-    exit 0
+    if (-not (Get-ServiceSafe)) { throw 'Research OS Service is not installed.' }
+    Start-Service -Name $ServiceName
+    Wait-ServiceState 'Running' | Out-Null
+    Write-Host 'Research OS Service started.'
   }
 
   'stop' {
     Require-Admin
+    if (-not (Get-ServiceSafe)) { throw 'Research OS Service is not installed.' }
     Stop-ResearchOsServiceAndApi
-    Write-Host 'Research OS Service stopped.'
-    exit 0
+    Write-Host 'Research OS Service stopped and API listener released.'
   }
 
   'restart' {
     Require-Admin
+    if (-not (Get-ServiceSafe)) { throw 'Research OS Service is not installed.' }
     Stop-ResearchOsServiceAndApi
     Start-Service -Name $ServiceName
     Wait-ServiceState 'Running' | Out-Null
-    Write-Host "Research OS Service restarted at http://127.0.0.1:$ApiPort"
-    exit 0
+    Write-Host 'Research OS Service restarted.'
   }
 }
