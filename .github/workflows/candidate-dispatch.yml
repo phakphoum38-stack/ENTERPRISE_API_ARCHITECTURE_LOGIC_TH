@@ -18,7 +18,7 @@ jobs:
       - name: Dispatch exact-SHA Research OS Candidate
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_SHA: eb27e4a3dc82de7db3f72c798e2a36d8d947a95a
+          TARGET_SHA: df012be3e7f7e9728a83f2bfdc3019c2a7dda234
         run: |
           gh workflow run candidate.yml \
             --repo "${{ github.repository }}" \
