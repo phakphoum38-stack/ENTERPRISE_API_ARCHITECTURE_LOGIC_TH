@@ -13,11 +13,13 @@ from .providers import (
 )
 from .secrets import EnvironmentSecretSource
 from .service import V3LocalService
+from .storage import DataLayout
 
 __all__ = [
     "BrainCore",
     "CompletionRequest",
     "CompletionResponse",
+    "DataLayout",
     "EnvironmentSecretSource",
     "MockProvider",
     "OpenAICompatibleProvider",

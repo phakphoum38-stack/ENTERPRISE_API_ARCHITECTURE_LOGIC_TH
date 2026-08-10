@@ -1,8 +1,11 @@
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from research_os_v3 import (
     CompletionRequest,
+    DataLayout,
     OpenAICompatibleProvider,
     ProviderRegistry,
     ScaleTier,
@@ -120,6 +123,20 @@ class V3CleanCoreTests(unittest.TestCase):
     def test_local_service_rejects_non_loopback_binding(self) -> None:
         with self.assertRaisesRegex(ValueError, "must bind to a loopback address"):
             V3LocalService(host="0.0.0.0", port=0)
+
+    def test_data_layout_is_idempotent_and_preserves_existing_data(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            layout = DataLayout(Path(temporary)).ensure()
+            marker = layout.sessions / "existing.txt"
+            marker.write_text("keep", encoding="utf-8")
+
+            second = DataLayout(Path(temporary)).ensure()
+            self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
+            self.assertEqual(
+                set(second.directories()),
+                {"sessions", "database", "artifacts", "logs", "evidence"},
+            )
+            self.assertTrue(all(path.is_dir() for path in second.directories().values()))
 
     def test_master_contract_is_stable(self) -> None:
         decision = self.master.decide(Workload(estimated_leaf_tasks=217))

@@ -65,6 +65,12 @@ jobs:
           python scripts/service_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage local_service --status passed --data '{"binding":"127.0.0.1","contract":"v3","max_capacity":46656}'
 
+      - name: Validate V3 data ownership
+        working-directory: v3
+        run: |
+          python scripts/storage_smoke.py
+          python scripts/evidence.py --output evidence/progress.json --stage data_ownership --status passed --data '{"idempotent":true,"preserves_existing_data":true,"secret_storage":"excluded"}'
+
       - name: Build V3 Windows ServiceHost
         if: runner.os == 'Windows'
         shell: pwsh
@@ -115,6 +121,7 @@ jobs:
 
           $binaryPath = "`"$exe`" --root `"$root`" --python `"$python`" --port $port --data-dir `"$dataDir`" --service-name `"$serviceName`""
           $validated = $false
+          $marker = Join-Path $dataDir 'sessions\service-preservation.marker'
           try {
             New-Service -Name $serviceName -BinaryPathName $binaryPath -StartupType Manual | Out-Null
             Start-Service -Name $serviceName
@@ -134,6 +141,13 @@ jobs:
               if (Test-Path $errLog) { Get-Content $errLog -ErrorAction SilentlyContinue }
               throw 'Windows ServiceHost did not expose /health'
             }
+
+            foreach ($name in @('sessions','database','artifacts','logs','evidence')) {
+              if (-not (Test-Path (Join-Path $dataDir $name) -PathType Container)) {
+                throw "Owned V3 data directory was not created: $name"
+              }
+            }
+            Set-Content -Path $marker -Value 'preserve-me' -Encoding utf8
 
             $master = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/master?tasks=30" -TimeoutSec 5
             if ($master.contract -ne 'unified-master-orchestrator-v3-clean') { throw 'Unexpected V3 master contract' }
@@ -158,6 +172,7 @@ jobs:
               observed_scale = $master.scale
               observed_capacity = [int]$master.maximum_leaf_capacity
               secret_exposed = $false
+              data_layout = @('sessions','database','artifacts','logs','evidence')
             } | ConvertTo-Json -Compress
             python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_lifecycle --status passed --data $data
             $validated = $true
@@ -181,7 +196,9 @@ jobs:
           if (-not $validated) { throw 'V3 Windows Service lifecycle validation did not complete' }
           if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) { throw 'V3 Windows Service was not removed' }
           if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) { throw 'V3 service listener remained after cleanup' }
-          python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_cleanup --status passed --data '{"service_removed":true,"listener_removed":true}'
+          if (-not (Test-Path $marker)) { throw 'V3 data was not preserved after service removal' }
+          if ((Get-Content $marker -Raw).Trim() -ne 'preserve-me') { throw 'V3 preserved data changed during service lifecycle' }
+          python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_cleanup --status passed --data '{"service_removed":true,"listener_removed":true,"data_preserved":true}'
 
       - name: Run V3 Clean smoke test
         working-directory: v3

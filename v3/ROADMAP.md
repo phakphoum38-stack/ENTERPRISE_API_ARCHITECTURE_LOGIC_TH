@@ -24,8 +24,8 @@
 - [x] V3 local API service on loopback only
 - [x] `/health`, `/v3/master`, `/v3/providers`
 - [x] Cross-platform local-service smoke validation
-- [ ] Windows Service host
-- [ ] Lifecycle and local data ownership rules
+- [x] Windows Service host
+- [x] Lifecycle and local data ownership rules
 
 ## Phase 4 - Desktop app
 

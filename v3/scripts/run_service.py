@@ -9,12 +9,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from research_os_v3 import V3LocalService
+from research_os_v3 import DataLayout, V3LocalService
 
 
 def main() -> int:
     host = os.environ.get("RESEARCH_OS_V3_HOST", "127.0.0.1")
     port = int(os.environ.get("RESEARCH_OS_V3_PORT", "8788"))
+    layout = DataLayout.from_environment().ensure()
     service = V3LocalService(host=host, port=port)
     print(
         json.dumps(
@@ -23,6 +24,7 @@ def main() -> int:
                 "host": host,
                 "port": port,
                 "contract": "unified-master-orchestrator-v3-clean",
+                "data_root": str(layout.root),
             },
             sort_keys=True,
         ),
