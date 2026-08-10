@@ -38,9 +38,9 @@ class RenderServiceAuthTests(unittest.TestCase):
         return f"http://127.0.0.1:{server.server_port}"
 
     @staticmethod
-    def request(base: str, headers=None):
+    def request(base: str, path: str, headers=None):
         request = urllib.request.Request(
-            base + "/health",
+            base + path,
             headers=headers or {},
             method="GET",
         )
@@ -53,18 +53,22 @@ class RenderServiceAuthTests(unittest.TestCase):
     def test_loopback_mode_remains_available_without_identity_headers(self) -> None:
         os.environ.pop("RESEARCH_OS_IDENTITY_PROXY_SECRET", None)
         base = self.start_server("127.0.0.1")
-        status, payload = self.request(base)
+        status, payload = self.request(base, "/v2/master")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["api_version"], "v2")
 
-    def test_exposed_mode_requires_valid_fresh_signed_identity(self) -> None:
+    def test_exposed_mode_keeps_liveness_public_but_protects_api(self) -> None:
         secret = "render-service-auth-test-secret-123456"
         os.environ["RESEARCH_OS_IDENTITY_PROXY_SECRET"] = secret
         base = self.start_server("0.0.0.0")
 
-        status, payload = self.request(base)
+        status, payload = self.request(base, "/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "ok")
+
+        status, payload = self.request(base, "/v2/master")
         self.assertEqual(status, 401)
-        self.assertEqual(payload["error"], "service_identity_required")
+        self.assertEqual(payload["error"]["code"], "service_identity_required")
 
         principal = "research-os-app"
         issued_at = int(time.time())
@@ -81,13 +85,13 @@ class RenderServiceAuthTests(unittest.TestCase):
             ),
         }
 
-        status, payload = self.request(base, headers)
+        status, payload = self.request(base, "/v2/master", headers)
         self.assertEqual(status, 200)
-        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["api_version"], "v2")
 
-        status, payload = self.request(base, headers)
+        status, payload = self.request(base, "/v2/master", headers)
         self.assertEqual(status, 401)
-        self.assertEqual(payload["error"], "service_identity_required")
+        self.assertEqual(payload["error"]["code"], "service_identity_required")
 
 
 if __name__ == "__main__":
