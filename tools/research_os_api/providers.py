@@ -17,6 +17,14 @@ from dataclasses import dataclass
 from typing import Any
 
 
+OPENAI_API_KEY_NAMES = ("RESEARCH_OS_OPENAI_API_KEY", "OPENAI_API_KEY")
+GEMINI_API_KEY_NAMES = ("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY")
+ANTHROPIC_API_KEY_NAMES = (
+    "RESEARCH_OS_ANTHROPIC_API_KEY",
+    "ANTHROPIC_API_KEY",
+)
+
+
 @dataclass(frozen=True)
 class ProviderResult:
     provider: str
@@ -224,9 +232,9 @@ def _first_env_name(*names: str) -> str | None:
 def provider_credential_status() -> dict[str, dict[str, Any]]:
     """Describe provider readiness without returning credential contents."""
     aliases = {
-        "openai-responses": ("RESEARCH_OS_OPENAI_API_KEY", "OPENAI_API_KEY"),
-        "gemini": ("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY"),
-        "anthropic": ("RESEARCH_OS_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+        "openai-responses": OPENAI_API_KEY_NAMES,
+        "gemini": GEMINI_API_KEY_NAMES,
+        "anthropic": ANTHROPIC_API_KEY_NAMES,
     }
     status: dict[str, dict[str, Any]] = {}
     for provider, names in aliases.items():
@@ -330,11 +338,11 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
 
 
 def build_provider(name: str | None = None) -> AIProvider:
-    selected = (name or os.getenv("RESEARCH_OS_PROVIDER", "mock")).lower()
+    selected = (name or os.getenv("RESEARCH_OS_PROVIDER", "mock")).strip().lower()
     if selected == "mock":
         return MockProvider()
     if selected in {"openai-responses", "openai-search"}:
-        key = _first_env("RESEARCH_OS_OPENAI_API_KEY", "OPENAI_API_KEY")
+        key = _first_env(*OPENAI_API_KEY_NAMES)
         if not key:
             raise ProviderError(
                 "missing OpenAI API key (set RESEARCH_OS_OPENAI_API_KEY or OPENAI_API_KEY)"
@@ -358,13 +366,15 @@ def build_provider(name: str | None = None) -> AIProvider:
         model = _env_or_default("RESEARCH_OS_OPENAI_MODEL", "local-model")
         return OpenAICompatibleProvider(
             endpoint=endpoint,
-            api_key=_first_env("RESEARCH_OS_OPENAI_API_KEY", "OPENAI_API_KEY"),
+            api_key=_first_env(*OPENAI_API_KEY_NAMES),
             default_model=model,
         )
     if selected == "anthropic":
-        key = os.getenv("RESEARCH_OS_ANTHROPIC_API_KEY")
+        key = _first_env(*ANTHROPIC_API_KEY_NAMES)
         if not key:
-            raise ProviderError("missing RESEARCH_OS_ANTHROPIC_API_KEY")
+            raise ProviderError(
+                "missing Anthropic API key (set RESEARCH_OS_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)"
+            )
         return AnthropicProvider(
             endpoint=_env_or_default(
                 "RESEARCH_OS_ANTHROPIC_ENDPOINT",
@@ -377,7 +387,7 @@ def build_provider(name: str | None = None) -> AIProvider:
             ),
         )
     if selected == "gemini":
-        key = _first_env("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY")
+        key = _first_env(*GEMINI_API_KEY_NAMES)
         if not key:
             raise ProviderError(
                 "missing Gemini API key (set RESEARCH_OS_GEMINI_API_KEY or GEMINI_API_KEY)"

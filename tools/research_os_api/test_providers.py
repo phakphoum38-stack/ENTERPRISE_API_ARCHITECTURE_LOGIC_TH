@@ -70,6 +70,39 @@ class ProviderCredentialDiscoveryTests(unittest.TestCase):
         self.assertEqual(len(result.sources), 1)
         self.assertEqual(result.sources[0]["url"], "https://example.com/source")
 
+
+    def test_research_os_openai_key_takes_precedence_without_exposure(self):
+        env = {
+            "RESEARCH_OS_OPENAI_API_KEY": "preferred-key",
+            "OPENAI_API_KEY": "fallback-key",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            status = providers.provider_credential_status()
+            provider = providers.build_search_provider()
+        self.assertEqual(
+            status["openai-responses"]["credential_source"],
+            "RESEARCH_OS_OPENAI_API_KEY",
+        )
+        self.assertIsInstance(provider, OpenAIResponsesProvider)
+        self.assertNotIn("preferred-key", repr(status))
+        self.assertNotIn("fallback-key", repr(status))
+
+    def test_anthropic_standard_alias_matches_credential_status(self):
+        with patch.dict(
+            os.environ,
+            {
+                "ANTHROPIC_API_KEY": "test-anthropic-key",
+                "RESEARCH_OS_ANTHROPIC_MODEL": "test-model",
+            },
+            clear=True,
+        ):
+            status = providers.provider_credential_status()
+            provider = providers.build_provider("anthropic")
+        self.assertTrue(status["anthropic"]["configured"])
+        self.assertEqual(status["anthropic"]["credential_source"], "ANTHROPIC_API_KEY")
+        self.assertEqual(provider.name, "anthropic")
+        self.assertNotIn("test-anthropic-key", repr(status))
+
     def test_missing_key_fails_closed(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ProviderError):

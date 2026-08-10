@@ -349,12 +349,12 @@ class _ProviderPanel extends StatelessWidget {
             title: Text(entry.key),
             subtitle: Text(
               configured && source.isNotEmpty
-                  ? 'Connected via $source • secret hidden'
+                  ? 'Configured via $source • secret hidden'
                   : configured
-                      ? 'Connected • secret hidden'
+                      ? 'Configured • secret hidden'
                       : 'Not configured',
             ),
-            trailing: Text(configured ? 'Ready' : 'Optional'),
+            trailing: Text(configured ? 'Configured' : 'Optional'),
           );
         }).toList(),
       ),

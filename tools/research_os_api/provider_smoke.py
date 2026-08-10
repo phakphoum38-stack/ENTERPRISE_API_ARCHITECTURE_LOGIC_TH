@@ -9,13 +9,19 @@ import re
 import time
 
 from provider_readiness import inspect_provider
-from providers import ProviderError, build_provider
+from providers import (
+    ANTHROPIC_API_KEY_NAMES,
+    GEMINI_API_KEY_NAMES,
+    OPENAI_API_KEY_NAMES,
+    ProviderError,
+    build_provider,
+)
 
 
 _SECRET_ENV_NAMES = (
-    "RESEARCH_OS_OPENAI_API_KEY",
-    "RESEARCH_OS_ANTHROPIC_API_KEY",
-    "RESEARCH_OS_GEMINI_API_KEY",
+    *OPENAI_API_KEY_NAMES,
+    *ANTHROPIC_API_KEY_NAMES,
+    *GEMINI_API_KEY_NAMES,
 )
 
 
@@ -34,7 +40,7 @@ def _safe_error_message(exc: Exception) -> str:
 
 
 def main() -> int:
-    provider_name = os.getenv("RESEARCH_OS_PROVIDER", "mock").lower()
+    provider_name = os.getenv("RESEARCH_OS_PROVIDER", "mock").strip().lower()
     readiness = inspect_provider(provider_name)
     if not readiness["ready"]:
         print(json.dumps({"provider": provider_name, "ready": False, "missing": readiness["missing"]}, indent=2))
