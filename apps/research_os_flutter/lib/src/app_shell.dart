@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
+import 'features/brain_skills/brain_skills_page.dart';
 import 'features/chat/chat_page.dart';
 import 'features/developer_access/developer_access_page.dart';
 import 'features/github/github_dashboard_page.dart';
@@ -54,6 +55,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
           onApiBaseUrlChanged: widget.onApiBaseUrlChanged,
         ),
         DeveloperAccessPage(),
+        BrainSkillsPage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
