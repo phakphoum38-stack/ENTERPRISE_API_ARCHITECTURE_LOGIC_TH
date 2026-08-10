@@ -38,6 +38,17 @@ ASSISTANT_MODE_KEYWORDS = (
     "216",
 )
 
+MAXIMUM_MODE_KEYWORDS = (
+    "6^6",
+    "6⁶",
+    "6x6",
+    "6×6",
+    "6ยกกำลัง6",
+    "6ยกกำลังหก",
+    "compound6",
+    "46656",
+)
+
 
 def assistant_mode_catalog() -> list[dict[str, Any]]:
     return [
@@ -307,9 +318,15 @@ class BrainSkillsEngine:
         objective: str,
         complexity_level: int | None,
     ) -> dict[str, Any]:
-        requested_by_objective = BrainSkillsEngine._requests_assistant_6x3(objective)
+        requested_mode = BrainSkillsEngine._requested_mode(objective)
+        requested_by_objective = requested_mode is not None
         if complexity_level is None:
-            level = ASSISTANT_TIERS if requested_by_objective else 1
+            if requested_mode == MAXIMUM_ASSISTANT_MODE:
+                level = ELASTIC_TIERS
+            elif requested_mode == DEFAULT_ASSISTANT_MODE:
+                level = ASSISTANT_TIERS
+            else:
+                level = 1
         else:
             level = int(complexity_level)
         mode = DEFAULT_ASSISTANT_MODE if level <= ASSISTANT_TIERS else MAXIMUM_ASSISTANT_MODE
@@ -322,6 +339,7 @@ class BrainSkillsEngine:
                 else "Adaptive 6^6 Compound Brain"
             ),
             "requested_by_objective": requested_by_objective,
+            "requested_mode_by_objective": requested_mode,
             "branch_factor": BRANCH_FACTOR,
             "elastic_tiers": mode_tiers,
             "complexity_level": level,
@@ -334,9 +352,17 @@ class BrainSkillsEngine:
         }
 
     @staticmethod
-    def _requests_assistant_6x3(objective: str) -> bool:
+    def _requested_mode(objective: str) -> str | None:
         normalized = "".join(objective.casefold().split())
-        return any(keyword in normalized for keyword in ASSISTANT_MODE_KEYWORDS)
+        if any(keyword in normalized for keyword in MAXIMUM_MODE_KEYWORDS):
+            return MAXIMUM_ASSISTANT_MODE
+        if any(keyword in normalized for keyword in ASSISTANT_MODE_KEYWORDS):
+            return DEFAULT_ASSISTANT_MODE
+        return None
+
+    @staticmethod
+    def _requests_assistant_6x3(objective: str) -> bool:
+        return BrainSkillsEngine._requested_mode(objective) == DEFAULT_ASSISTANT_MODE
 
     @staticmethod
     def _compound_cognition(
@@ -403,4 +429,3 @@ def default_brain_skill_registry() -> BrainSkillRegistry:
 
 
 BRAIN = BrainSkillsEngine()
-
