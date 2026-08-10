@@ -23,12 +23,17 @@ class OwnerBundleBuilder:
         files = [self.root / name for name in self.INCLUDED_ROOT_FILES]
         files.extend(sorted((self.root / "research_os_friend").glob("*.py")))
         files.extend(sorted((self.root / "scripts").glob("*.py")))
+        files.extend(sorted((self.root / "scripts").glob("*.ps1")))
         files.extend(sorted((self.root / "tests").glob("*.py")))
 
         flutter_root = self.root / "flutter_app"
         files.extend(flutter_root / name for name in self.INCLUDED_FLUTTER_ROOT_FILES)
         files.extend(sorted((flutter_root / "lib").rglob("*.dart")))
         files.extend(sorted((flutter_root / "test").rglob("*.dart")))
+
+        files.extend(sorted((self.root / "windows_service").glob("*.cs")))
+        files.extend(sorted((self.root / "windows_service").glob("*.csproj")))
+        files.extend(sorted((self.root / "installer").glob("*.iss")))
 
         unique: dict[str, Path] = {}
         for path in files:
@@ -48,9 +53,9 @@ class OwnerBundleBuilder:
             inventory.append({"path": relative, "sha256": self._sha256(data), "bytes": len(data)})
 
         bundle_manifest = {
-            "schema_version": 2,
+            "schema_version": 3,
             "edition": "owner-special",
-            "bundle": "Friend Complete",
+            "bundle": "Friend Complete V1.3",
             "content_policy": "owned source and architecture files only; generated builds and runtime owner data are external",
             "files": inventory,
         }
@@ -67,9 +72,4 @@ class OwnerBundleBuilder:
             info.external_attr = 0o644 << 16
             archive.writestr(info, manifest_bytes)
 
-        return {
-            "path": str(destination),
-            "sha256": self._sha256(destination.read_bytes()),
-            "files": len(inventory) + 1,
-            "source_only": True,
-        }
+        return {"path": str(destination), "sha256": self._sha256(destination.read_bytes()), "files": len(inventory) + 1, "source_only": True}
