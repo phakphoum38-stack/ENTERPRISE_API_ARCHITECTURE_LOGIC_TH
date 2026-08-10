@@ -14,8 +14,8 @@
 ## Phase 2 - Provider execution
 
 - [x] OpenAI-compatible adapter behind a strict interface
-- [x] Provider readiness/connectivity status
-- [x] Environment secret source abstraction
+- [x] Provider readiness/connectivity probes
+- [x] Secret source abstraction for environment-backed credentials
 - [ ] OS-native secret store source
 - [ ] Retry, timeout, circuit breaker, and provider fallback policy
 
@@ -23,16 +23,16 @@
 
 - [x] V3 local API service on loopback only
 - [x] `/health`, `/v3/master`, `/v3/providers`
-- [x] Cross-platform local-service smoke validation
 - [x] Windows Service host
 - [x] Lifecycle and local data ownership rules
 
 ## Phase 4 - Desktop app
 
-- [ ] Flutter shell consuming V3 contracts only
-- [ ] Startup app-to-service probe
-- [ ] Chat/conversation shell and side navigation
-- [ ] Provider/settings UI without exposing secrets
+- [x] Flutter shell consuming V3 contracts only
+- [x] Startup app-to-service probe
+- [x] Chat/conversation shell and side navigation
+- [x] Provider/settings status UI without exposing secrets
+- [ ] Windows EXE + real app-to-service E2E evidence
 
 ## Phase 5 - Software Factory execution
 
