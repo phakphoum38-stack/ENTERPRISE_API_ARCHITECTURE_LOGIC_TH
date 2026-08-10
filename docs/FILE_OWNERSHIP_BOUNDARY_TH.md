@@ -4,7 +4,7 @@
 
 ## เป้าหมาย
 
-แยกระบบเจ้าของไฟล์ออกจาก Cyber Web Security อย่างชัดเจน เพื่อไม่ให้มาตรฐานเว็บไซต์/API กลายเป็นแหล่งอำนาจของ filesystem ownership หรือ ACL โดยไม่ตั้งใจ
+กำหนดขอบเขตระบบเจ้าของไฟล์ให้เป็นโมดูลเฉพาะทางที่ดูแลเฉพาะ file ownership, filesystem ACL, document ownership และ storage authorization handoff โดยไม่พ่วง subsystem อื่นเข้ามาในชุดเจ้าของไฟล์
 
 ## Owner
 
@@ -12,16 +12,16 @@
 
 Owner: `FileOwnershipBoundary`
 
-Contract: `research-os-file-ownership-boundary-v1`
+Contract: `research-os-file-ownership-boundary-v2`
 
-## ขอบเขตที่ owner นี้ถือ
+## ขอบเขต
 
 - file ownership policy boundary
 - filesystem ACL boundary
 - document ownership boundary
 - storage authorization handoff
 
-## สิ่งที่ยังไม่ทำ
+## สถานะ implementation
 
 Owner ปัจจุบันเป็น `boundary_only` จึงยังไม่ใช่ Windows/Linux ACL backend และไม่อ้างว่ามีสิทธิ์เปลี่ยน owner จริง
 
@@ -29,45 +29,28 @@ Owner ปัจจุบันเป็น `boundary_only` จึงยังไ
 - ไม่ grant/revoke ACL
 - ไม่อ่าน private file metadata เอง
 - ไม่แก้ document ownership
-- ไม่ใช้ Cyber Web Security เป็น authorization source
 
-หากเพิ่มการเปลี่ยน owner/ACL ในอนาคต ต้องมี dedicated backend, explicit authorization, audit evidence และ test แยกจาก Cyber Web Security
+หากเพิ่มการเปลี่ยน owner/ACL ในอนาคต ต้องมี dedicated backend, explicit authorization, audit evidence และ regression tests ของระบบเจ้าของไฟล์เอง
 
-## Cyber Web Security boundary
+## Standalone distribution
 
-Cyber Web Security และ File Ownership เป็นคนละ owner:
+ชุดที่นำไปใช้เป็น File Owner Package ใช้ exact allowlist และมี runtime เพียง:
 
-| Responsibility | CyberWebSecurityStandard | FileOwnershipBoundary |
-|---|---:|---:|
-| HTTPS / TLS / Certificates | Owner | No |
-| CSP / HSTS / CORS | Owner | No |
-| API input/auth/session security | Owner | No |
-| Secret-safe logging | Owner | No |
-| File ownership policy boundary | No | Owner |
-| Filesystem ACL boundary | No | Owner |
-| Document ownership boundary | No | Owner |
-| Change actual file owner today | No | No — dedicated backend required |
-| Grant actual filesystem ACL today | No | No — dedicated backend required |
+- `tools/research_os_api/v2_file_ownership_boundary.py`
 
-## Cross-owner invariants
+ไฟล์ประกอบจาก subsystem อื่นไม่ถูก copy เข้า package นี้
 
-- `separate_from_cyber_web_security = true`
-- `shared_authority = false`
-- `cyber_may_change_file_owner = false`
-- `cyber_may_grant_file_acl = false`
-- `file_owner_may_override_cyber_policy = false`
-- `file_owner_may_disable_security_controls = false`
+## Invariants
 
-## Unified Master
-
-`UnifiedMasterOrchestrator` compose ทั้งสอง owner แต่ไม่รวม authority ของสองระบบเข้าด้วยกัน
-
-`status()` แสดง `cyber_web_security` และ `file_ownership` เป็นคนละส่วน
-
-`plan()` แสดงแผนของแต่ละ owner แยกกัน และยืนยันว่า planning ไม่เปลี่ยน file owner หรือ ACL
+- `implementation_state = boundary_only`
+- `operating_system_acl_backend = false`
+- `changes_file_owner = false`
+- `grants_file_acl = false`
+- `reads_private_file_metadata = false`
+- mutation ในอนาคตต้องใช้ dedicated backend
+- mutation ในอนาคตต้องมี explicit authorization
 
 ## Testing
 
-- `test_v2_cyber_web_standard.py` ตรวจว่า Cyber ไม่มี file-owner/ACL authority
-- `test_v2_file_ownership_boundary.py` ตรวจว่า File Ownership ไม่มี Cyber authority และไม่มี mutation backend โดยปริยาย
-- `test_unified_master_orchestrator.py` ตรวจ cross-owner invariants ทั้งสองทิศทาง
+- `test_v2_file_ownership_boundary.py` ตรวจ contract และ read-only boundary
+- `test_v2_owner_package.py` ตรวจ exact allowlist, dependency isolation และ export contents
