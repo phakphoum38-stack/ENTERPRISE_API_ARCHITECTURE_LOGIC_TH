@@ -102,10 +102,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Dispatch runtime smoke validation chain
+      - name: Dispatch final candidate validation chain
+        if: github.event_name != 'pull_request'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Write-Host "Dispatching validation-only chain for $env:TARGET_SHA on ref $env:TARGET_REF"
+          Write-Host "Dispatching one final validation-only chain for $env:TARGET_SHA on ref $env:TARGET_REF"
           gh workflow run 03-runtime-smoke-test.yml --repo "${{ github.repository }}" --ref "$env:TARGET_REF" -f target_sha="$env:TARGET_SHA" -f source_service_run="${{ github.run_id }}" -f dispatch_release=false
