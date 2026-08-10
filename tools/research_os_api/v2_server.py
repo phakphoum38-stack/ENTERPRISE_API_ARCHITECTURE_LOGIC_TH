@@ -93,7 +93,10 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
                 body = self._read_json()
                 plan = BRAIN.plan(
                     str(body.get("objective") or ""),
-                    complexity_level=int(body.get("complexity_level", 1)),
+                    complexity_level=self._optional_int(
+                        body.get("complexity_level"),
+                        "complexity_level",
+                    ),
                     requested_workers=self._optional_int(
                         body.get("requested_workers"),
                         "requested_workers",
