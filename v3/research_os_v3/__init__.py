@@ -12,6 +12,7 @@ from .providers import (
     ProviderStatus,
 )
 from .secrets import EnvironmentSecretSource
+from .service import V3LocalService
 
 __all__ = [
     "BrainCore",
@@ -27,6 +28,7 @@ __all__ = [
     "ScaleTier",
     "SoftwareFactory",
     "UnifiedMasterOrchestrator",
+    "V3LocalService",
     "Workload",
     "health_contract",
     "master_contract",
