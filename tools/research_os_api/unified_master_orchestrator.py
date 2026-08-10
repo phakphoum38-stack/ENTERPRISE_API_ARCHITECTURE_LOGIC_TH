@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Unified Research OS V3 Master Orchestrator.
-
-The unified integration composes independent owners without moving one owner's
-implementation into another owner's distribution package.
-"""
+"""Unified Research OS V3 Master Orchestrator."""
 
 from __future__ import annotations
 
@@ -14,9 +10,7 @@ from typing import Any, Mapping, Sequence
 import agent_server
 from brain_skills import BRAIN, BrainSkillsEngine
 from v2_brain_runtime import BRAIN_RUNTIME, BrainRuntime
-from v2_cyber_web_standard import CYBER_WEB_STANDARD, CyberWebSecurityStandard
 from v2_file_ownership_boundary import FILE_OWNERSHIP, FileOwnershipBoundary
-from v2_owner_separation_contract import OWNER_SEPARATION
 from v2_system_introspection import SystemIntrospection
 from v2_tool_intelligence import ToolIntelligence
 
@@ -41,15 +35,12 @@ class UnifiedMasterOrchestrator:
         *,
         brain_runtime: BrainRuntime | None = None,
         compound_brain: BrainSkillsEngine | None = None,
-        cyber_web_security: CyberWebSecurityStandard | None = None,
         file_ownership: FileOwnershipBoundary | None = None,
     ) -> None:
         self.repository_root = (repository_root or _REPO_ROOT).resolve()
         self.brain_runtime = brain_runtime or BRAIN_RUNTIME
         self.compound_brain = compound_brain or BRAIN
-        self.cyber_web_security = cyber_web_security or CYBER_WEB_STANDARD
         self.file_ownership = file_ownership or FILE_OWNERSHIP
-        self.owner_separation = OWNER_SEPARATION
         self.agent_orchestrator = agent_server.ORCHESTRATOR
         self.operational_registry = agent_server.REGISTRY
         self.intelligence = SystemIntrospection(
@@ -64,7 +55,6 @@ class UnifiedMasterOrchestrator:
 
     def manifest(self) -> dict[str, Any]:
         capacity = self.compound_brain.capacity_snapshot()
-        separation = self.owner_separation.manifest()
         return {
             "contract": UNIFIED_MASTER_CONTRACT,
             "version": UNIFIED_VERSION,
@@ -78,13 +68,10 @@ class UnifiedMasterOrchestrator:
                 "tool_registry": "BrainRuntime.tools",
                 "tool_intelligence": "v2_tool_intelligence.ToolIntelligence",
                 "tool_learning": "BrainRuntime.learning",
-                "cyber_web_security": "v2_cyber_web_standard.CyberWebSecurityStandard",
                 "file_ownership": "v2_file_ownership_boundary.FileOwnershipBoundary",
-                "owner_separation": "v2_owner_separation_contract.OwnerSeparationContract",
                 "factory_control": "software_factory.AdaptiveControlPlane",
                 "provider_gateway": "existing provider gateway",
             },
-            "owner_boundaries": separation,
             "factory_profiles": [profile.label for profile in SUPPORTED_PROFILES],
             "capacity": capacity,
             "invariants": {
@@ -96,12 +83,6 @@ class UnifiedMasterOrchestrator:
                 "external_tools_auto_downloaded": False,
                 "external_tools_auto_installed": False,
                 "external_tools_auto_executed": False,
-                "cyber_security_separate_from_file_ownership": True,
-                "cyber_security_can_change_file_owner": False,
-                "cyber_security_can_grant_file_acl": False,
-                "file_ownership_can_override_cyber_policy": False,
-                "file_ownership_can_disable_security_controls": False,
-                "standalone_owner_package_contains_security_owner": False,
                 "self_modification": False,
                 "automatic_merge_release_deploy": False,
             },
@@ -113,7 +94,6 @@ class UnifiedMasterOrchestrator:
             **self.manifest(),
             "brain_runtime": runtime,
             "tool_intelligence": self.tool_intelligence.dashboard(),
-            "cyber_web_security": self.cyber_web_security.manifest(),
             "file_ownership": self.file_ownership.manifest(),
             "factory": self.factory_control.summary(),
             "intelligence_health": self.intelligence.health(),
@@ -180,15 +160,7 @@ class UnifiedMasterOrchestrator:
             "compound_brain": compound_plan,
             "governed_brain": governed_plan,
             "tool_intelligence": tool_strategy,
-            "cyber_web_security": {
-                "contract": self.cyber_web_security.manifest()["contract"],
-                "owner": "CyberWebSecurityStandard",
-                "assessment_performed": False,
-                "changes_file_ownership": False,
-                "grants_file_acl": False,
-            },
             "file_ownership": self.file_ownership.plan(),
-            "owner_separation": self.owner_separation.manifest(),
             "factory": {
                 "profile": factory_plan.profile.label,
                 "logical_capacity": factory_plan.profile.capacity,
@@ -208,14 +180,6 @@ class UnifiedMasterOrchestrator:
                 "lazy_activation": True,
             },
         }
-
-    def assess_cyber_web_security(
-        self,
-        evidence: Mapping[str, Any],
-        *,
-        deployment_mode: str = "public",
-    ) -> dict[str, Any]:
-        return self.cyber_web_security.assess(evidence, deployment_mode=deployment_mode)
 
     def file_ownership_status(self) -> dict[str, Any]:
         return self.file_ownership.manifest()
