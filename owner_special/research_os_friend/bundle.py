@@ -10,6 +10,7 @@ class OwnerBundleBuilder:
     """Build a portable source bundle containing only owned architecture files."""
 
     INCLUDED_ROOT_FILES = ("OWNER_MANIFEST.json", "README.md", "pyproject.toml")
+    INCLUDED_FLUTTER_ROOT_FILES = ("pubspec.yaml", "analysis_options.yaml")
 
     def __init__(self, owner_special_root: Path) -> None:
         self.root = Path(owner_special_root).resolve()
@@ -23,7 +24,17 @@ class OwnerBundleBuilder:
         files.extend(sorted((self.root / "research_os_friend").glob("*.py")))
         files.extend(sorted((self.root / "scripts").glob("*.py")))
         files.extend(sorted((self.root / "tests").glob("*.py")))
-        return [path for path in files if path.is_file()]
+
+        flutter_root = self.root / "flutter_app"
+        files.extend(flutter_root / name for name in self.INCLUDED_FLUTTER_ROOT_FILES)
+        files.extend(sorted((flutter_root / "lib").rglob("*.dart")))
+        files.extend(sorted((flutter_root / "test").rglob("*.dart")))
+
+        unique: dict[str, Path] = {}
+        for path in files:
+            if path.is_file():
+                unique[path.relative_to(self.root).as_posix()] = path
+        return [unique[name] for name in sorted(unique)]
 
     def build(self, destination: Path) -> dict[str, object]:
         destination = Path(destination)
@@ -37,10 +48,10 @@ class OwnerBundleBuilder:
             inventory.append({"path": relative, "sha256": self._sha256(data), "bytes": len(data)})
 
         bundle_manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "edition": "owner-special",
             "bundle": "Friend Complete",
-            "content_policy": "source and architecture files only; runtime owner data is external",
+            "content_policy": "owned source and architecture files only; generated builds and runtime owner data are external",
             "files": inventory,
         }
         manifest_bytes = (json.dumps(bundle_manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
