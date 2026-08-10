@@ -8,8 +8,12 @@ from typing import Any, Iterable
 
 
 BRANCH_FACTOR = 6
+ASSISTANT_TIERS = 3
 ELASTIC_TIERS = 6
+ASSISTANT_LEAF_CAPACITY = BRANCH_FACTOR**ASSISTANT_TIERS
 MAX_LEAF_CAPACITY = BRANCH_FACTOR**ELASTIC_TIERS
+DEFAULT_ASSISTANT_MODE = "assistant_6x3"
+MAXIMUM_ASSISTANT_MODE = "compound_6x6"
 DEFAULT_ACTIVE_WORKER_LIMIT = 36
 HARD_ACTIVE_WORKER_LIMIT = 1296
 MAX_HYPOTHESIS_BRANCHES = 36
@@ -21,6 +25,55 @@ COGNITIVE_STAGES = (
     "safety_verify",
     "synthesize",
 )
+
+ASSISTANT_MODE_KEYWORDS = (
+    "6^3",
+    "6³",
+    "6x3",
+    "6×3",
+    "6ยกกำลัง3",
+    "6ยกกำลังสาม",
+    "ผู้ช่วย6",
+    "assistant6",
+    "216",
+)
+
+
+def assistant_mode_catalog() -> list[dict[str, Any]]:
+    return [
+        {
+            "mode": DEFAULT_ASSISTANT_MODE,
+            "label": "Adaptive 6^3 Assistant Crew",
+            "branch_factor": BRANCH_FACTOR,
+            "elastic_tiers": ASSISTANT_TIERS,
+            "theoretical_assistants": ASSISTANT_LEAF_CAPACITY,
+            "recommended_max_active_workers": DEFAULT_ACTIVE_WORKER_LIMIT,
+            "activation_mode": "demand_budget_readiness",
+            "all_workers_started_by_default": False,
+            "recommended_for": [
+                "large feature planning",
+                "repository triage",
+                "multi-tab product work",
+                "release checklist preparation",
+            ],
+        },
+        {
+            "mode": MAXIMUM_ASSISTANT_MODE,
+            "label": "Adaptive 6^6 Compound Brain",
+            "branch_factor": BRANCH_FACTOR,
+            "elastic_tiers": ELASTIC_TIERS,
+            "theoretical_assistants": MAX_LEAF_CAPACITY,
+            "recommended_max_active_workers": HARD_ACTIVE_WORKER_LIMIT,
+            "activation_mode": "demand_budget_readiness",
+            "all_workers_started_by_default": False,
+            "recommended_for": [
+                "deep research",
+                "large-scale architecture",
+                "multi-platform validation",
+                "release-blocker analysis",
+            ],
+        },
+    ]
 
 
 @dataclass(frozen=True)
@@ -106,7 +159,10 @@ class AdaptiveHierarchyPolicy:
             "branch_factor": BRANCH_FACTOR,
             "elastic_tiers": ELASTIC_TIERS,
             "tier_leaf_capacity": tier_capacity,
+            "assistant_6x3_capacity": ASSISTANT_LEAF_CAPACITY,
             "max_leaf_capacity": MAX_LEAF_CAPACITY,
+            "default_assistant_mode": DEFAULT_ASSISTANT_MODE,
+            "assistant_modes": assistant_mode_catalog(),
             "max_active_workers": self.max_active_workers,
             "hard_active_worker_limit": HARD_ACTIVE_WORKER_LIMIT,
             "activation_mode": "demand_budget_readiness",
@@ -119,7 +175,7 @@ class AdaptiveHierarchyPolicy:
     def plan(
         self,
         *,
-        complexity_level: int = 1,
+        complexity_level: int | None = None,
         requested_workers: int | None = None,
         budget_workers: int | None = None,
         ready_workers: int | None = None,
@@ -198,12 +254,19 @@ class BrainSkillsEngine:
         objective = objective.strip()
         if not objective:
             raise ValueError("objective is required")
+        assistant_profile = self._assistant_profile(objective, complexity_level)
         hierarchy = self.policy.plan(
-            complexity_level=complexity_level,
+            complexity_level=int(assistant_profile["complexity_level"]),
             requested_workers=requested_workers,
             budget_workers=budget_workers,
             ready_workers=ready_workers,
         )
+        assistant_profile = {
+            **assistant_profile,
+            "requested_workers": hierarchy["requested_workers"],
+            "active_workers": hierarchy["active_workers"],
+            "backpressure_applied": hierarchy["backpressure_applied"],
+        }
         selected_skills = self.registry.route(objective)
         cognition = self._compound_cognition(
             objective,
@@ -214,6 +277,7 @@ class BrainSkillsEngine:
             "plan_id": str(uuid.uuid4()),
             "objective": objective,
             "selected_skills": selected_skills,
+            "assistant_profile": assistant_profile,
             "hierarchy": hierarchy,
             "cognition": cognition,
             "provider_mode": "local_or_configured_provider",
@@ -225,16 +289,54 @@ class BrainSkillsEngine:
     def research_instructions(self, plan: dict[str, Any]) -> str:
         """Build bounded quality instructions without exposing hidden reasoning."""
         cognition = plan.get("cognition", {})
+        profile = plan.get("assistant_profile", {})
+        mode = str(profile.get("mode") or MAXIMUM_ASSISTANT_MODE)
         branches = int(cognition.get("hypothesis_branches", 1))
         critic_passes = int(cognition.get("critic_passes", 1))
         return (
-            "Use a bounded compound-research process. Decompose the request, gather "
+            f"Use a bounded {mode} compound-research process. Decompose the request, gather "
             f"current evidence, compare up to {branches} plausible hypotheses, run "
             f"{critic_passes} critic passes for conflicts and missing evidence, apply "
             "safety checks, then synthesize a concise answer. Cite sources near claims, "
             "separate facts from inference, disclose material uncertainty, and do not "
             "reveal private chain-of-thought."
         )
+
+    @staticmethod
+    def _assistant_profile(
+        objective: str,
+        complexity_level: int | None,
+    ) -> dict[str, Any]:
+        requested_by_objective = BrainSkillsEngine._requests_assistant_6x3(objective)
+        if complexity_level is None:
+            level = ASSISTANT_TIERS if requested_by_objective else 1
+        else:
+            level = int(complexity_level)
+        mode = DEFAULT_ASSISTANT_MODE if level <= ASSISTANT_TIERS else MAXIMUM_ASSISTANT_MODE
+        mode_tiers = ASSISTANT_TIERS if mode == DEFAULT_ASSISTANT_MODE else ELASTIC_TIERS
+        return {
+            "mode": mode,
+            "label": (
+                "Adaptive 6^3 Assistant Crew"
+                if mode == DEFAULT_ASSISTANT_MODE
+                else "Adaptive 6^6 Compound Brain"
+            ),
+            "requested_by_objective": requested_by_objective,
+            "branch_factor": BRANCH_FACTOR,
+            "elastic_tiers": mode_tiers,
+            "complexity_level": level,
+            "theoretical_assistants": BRANCH_FACTOR**mode_tiers,
+            "candidate_capacity": (
+                BRANCH_FACTOR**level if 1 <= level <= ELASTIC_TIERS else None
+            ),
+            "all_workers_started_by_default": False,
+            "activation_mode": "adaptive_demand_budget_readiness",
+        }
+
+    @staticmethod
+    def _requests_assistant_6x3(objective: str) -> bool:
+        normalized = "".join(objective.casefold().split())
+        return any(keyword in normalized for keyword in ASSISTANT_MODE_KEYWORDS)
 
     @staticmethod
     def _compound_cognition(
@@ -246,6 +348,7 @@ class BrainSkillsEngine:
         complexity = int(hierarchy["complexity_level"])
         active_workers = int(hierarchy["active_workers"])
         candidate_capacity = BRANCH_FACTOR**complexity
+        mode = DEFAULT_ASSISTANT_MODE if complexity <= ASSISTANT_TIERS else MAXIMUM_ASSISTANT_MODE
         hypotheses = min(
             MAX_HYPOTHESIS_BRANCHES,
             active_workers,
@@ -269,7 +372,7 @@ class BrainSkillsEngine:
         )
         evidence_required = "knowledge" in selected_skills or time_sensitive
         return {
-            "mode": "compound_6x6",
+            "mode": mode,
             "stages": list(COGNITIVE_STAGES),
             "candidate_capacity": candidate_capacity,
             "hypothesis_branches": hypotheses,
