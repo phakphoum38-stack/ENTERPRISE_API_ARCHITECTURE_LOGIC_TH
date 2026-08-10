@@ -1,0 +1,29 @@
+name: ChatGPT Candidate Bridge
+
+on:
+  push:
+    branches:
+      - integration/unified-master-orchestrator-v3
+    paths:
+      - ".github/chatgpt-candidate-request.txt"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch-candidate:
+    name: Dispatch exact-SHA Windows Candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch Research OS Candidate for this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          gh workflow run candidate.yml \
+            --repo "${{ github.repository }}" \
+            --ref "integration/unified-master-orchestrator-v3" \
+            -f target_sha="$TARGET_SHA"
+          echo "Candidate dispatched for $TARGET_SHA"
