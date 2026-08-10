@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+# Bootstrap the packaged Owner Special source root deterministically. This mirrors
+# the certified V3 service entrypoint and does not depend on PYTHONPATH being
+# honored by a relocated/bundled Python runtime or by the Windows SCM process.
+OWNER_SPECIAL_ROOT = Path(__file__).resolve().parents[1]
+if str(OWNER_SPECIAL_ROOT) not in sys.path:
+    sys.path.insert(0, str(OWNER_SPECIAL_ROOT))
 
 from research_os_friend import OwnerFriendService
 

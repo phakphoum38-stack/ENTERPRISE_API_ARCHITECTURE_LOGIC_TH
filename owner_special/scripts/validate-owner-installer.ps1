@@ -6,6 +6,27 @@ $dataRoot = Join-Path $env:ProgramData 'ResearchOSOwnerSpecial'
 $audit = Join-Path $dataRoot 'service\audit.jsonl'
 $headers = @{'X-Research-OS-Owner'='owner'; 'X-Research-OS-Profile'='default'; 'X-Research-OS-Session'='installer-e2e'}
 
+function Show-OwnerDiagnostics {
+    Write-Host '=== Installed Owner Special diagnostics ==='
+    $service = Get-Service $serviceName -ErrorAction SilentlyContinue
+    if ($service) {
+        Write-Host ((($service | Format-List Name,Status,StartType) | Out-String).Trim())
+        sc.exe queryex $serviceName | Out-Host
+    } else { Write-Host 'Service is not registered.' }
+    foreach ($name in @('service.err.log','service.out.log')) {
+        $path = Join-Path $dataRoot "service\logs\$name"
+        Write-Host "--- $path ---"
+        if (Test-Path $path) { Get-Content $path -Tail 160 | Out-Host } else { Write-Host '<missing>' }
+    }
+    $python = Join-Path $appRoot 'runtime\python\python.exe'
+    if (Test-Path $python) {
+        Write-Host "Bundled Python: $python"
+        & $python --version 2>&1 | Out-Host
+    } else { Write-Host "Bundled Python missing: $python" }
+    $entrypoint = Join-Path $appRoot 'owner_special\scripts\run_friend_service.py'
+    Write-Host "Friend entrypoint exists: $(Test-Path $entrypoint) ($entrypoint)"
+}
+
 function Wait-OwnerReady {
     for ($i=0; $i -lt 80; $i++) {
         try {
@@ -14,6 +35,7 @@ function Wait-OwnerReady {
         } catch {}
         Start-Sleep -Milliseconds 500
     }
+    Show-OwnerDiagnostics
     throw 'Installed Owner Friend Service did not become ready'
 }
 
@@ -25,8 +47,12 @@ $env:RESEARCH_OS_MOCK_PROVIDER_KEY = 'ci-owner-provider-key'
 $mock = Start-Process -FilePath python -ArgumentList @('owner_special/scripts/mock_openai_provider.py','--port','18991') -PassThru
 try {
     Start-Sleep -Seconds 1
-    $install = Start-Process -FilePath $SetupPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
-    if ($install.ExitCode -ne 0) { throw "Owner installer failed: $($install.ExitCode)" }
+    $setupLog = Join-Path $env:RUNNER_TEMP 'owner-special-setup.log'
+    $install = Start-Process -FilePath $SetupPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$setupLog") -Wait -PassThru
+    if ($install.ExitCode -ne 0) {
+        if (Test-Path $setupLog) { Get-Content $setupLog -Tail 160 | Out-Host }
+        throw "Owner installer failed: $($install.ExitCode)"
+    }
     Wait-OwnerReady
 
     $service = Get-Service $serviceName -ErrorAction Stop
@@ -76,8 +102,12 @@ try {
         if (-not $proved) { throw 'Installed Owner Desktop did not prove health/status/provider startup requests' }
     } finally { if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue } }
 
-    $upgrade = Start-Process -FilePath $SetupPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
-    if ($upgrade.ExitCode -ne 0) { throw 'Owner in-place upgrade failed' }
+    $upgradeLog = Join-Path $env:RUNNER_TEMP 'owner-special-upgrade.log'
+    $upgrade = Start-Process -FilePath $SetupPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$upgradeLog") -Wait -PassThru
+    if ($upgrade.ExitCode -ne 0) {
+        if (Test-Path $upgradeLog) { Get-Content $upgradeLog -Tail 160 | Out-Host }
+        throw 'Owner in-place upgrade failed'
+    }
     Wait-OwnerReady
     if (-not (Test-Path $memoryPath)) { throw 'Owner memory missing after upgrade' }
     $afterUpgrade = (Get-FileHash $memoryPath -Algorithm SHA256).Hash
@@ -95,6 +125,9 @@ try {
     New-Item -ItemType Directory -Force -Path $evidenceDir | Out-Null
     $setupHash = (Get-FileHash $SetupPath -Algorithm SHA256).Hash.ToLowerInvariant()
     @{validation='passed'; setup_sha256=$setupHash; helper_logical_capacity=1000000; max_active_workers=128; provider='openai-compatible'; provider_connected=$true; memory_preserved=$true; service_name=$serviceName} | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $evidenceDir 'owner-v1.3-validation.json') -Encoding utf8
+} catch {
+    Show-OwnerDiagnostics
+    throw
 } finally {
     if ($mock -and -not $mock.HasExited) { Stop-Process -Id $mock.Id -Force -ErrorAction SilentlyContinue }
 }
