@@ -32,13 +32,13 @@
 - [x] Startup app-to-service probe
 - [x] Chat/conversation shell and side navigation
 - [x] Provider/settings status UI without exposing secrets
-- [ ] Windows EXE + real app-to-service E2E evidence
+- [x] Windows EXE + real app-to-service E2E evidence
 
 ## Phase 5 - Software Factory execution
 
-- [ ] Master -> Factory -> Team -> Tests -> Release execution engine
-- [ ] Adaptive allocation; never pre-spawn maximum capacity
-- [ ] Evidence per stage and reproducible release inputs
+- [x] Master -> Factory -> Team -> Tests -> Release execution engine
+- [x] Adaptive allocation; never pre-spawn maximum capacity
+- [x] Incremental evidence per stage and reproducible release inputs
 
 ## Phase 6 - Installer and candidate
 
