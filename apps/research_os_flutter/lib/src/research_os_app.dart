@@ -24,23 +24,47 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
 
   Future<void> _loadApiEndpoint() async {
     final url = await ApiEndpointStore.load();
-    if (!mounted) return;
+    final client = ResearchOSApiClient(baseUrl: url);
+    if (!mounted) {
+      client.close();
+      return;
+    }
     setState(() {
       _apiBaseUrl = url;
-      _apiClient = ResearchOSApiClient(baseUrl: url);
+      _apiClient = client;
     });
+    await _primeApiConnectivity(client);
+  }
+
+  Future<void> _primeApiConnectivity(ResearchOSApiClient client) async {
+    try {
+      await Future.wait<Map<String, dynamic>>(
+        <Future<Map<String, dynamic>>>[
+          client.getHealth(),
+          client.getProviders(),
+        ],
+      );
+    } on Object {
+      // Startup connectivity is best-effort. The Home and System Monitor pages
+      // surface availability and provide normal retry behavior to the user.
+    }
   }
 
   Future<void> _changeApiEndpoint(String value) async {
     final normalized = ApiEndpointStore.normalize(value);
     await ApiEndpointStore.save(normalized);
     final previous = _apiClient;
-    if (!mounted) return;
+    final client = ResearchOSApiClient(baseUrl: normalized);
+    if (!mounted) {
+      client.close();
+      return;
+    }
     setState(() {
       _apiBaseUrl = normalized;
-      _apiClient = ResearchOSApiClient(baseUrl: normalized);
+      _apiClient = client;
     });
     previous?.close();
+    await _primeApiConnectivity(client);
   }
 
   ThemeData _buildTheme(Brightness brightness) {
