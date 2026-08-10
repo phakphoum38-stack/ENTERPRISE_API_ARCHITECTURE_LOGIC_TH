@@ -178,7 +178,9 @@ class AgentTaskQueue:
             merged_context = {**shared, **task.context}
             brain_plan = BRAIN.plan(
                 task.objective,
-                complexity_level=int(merged_context.get("brain_complexity_level", 1)),
+                complexity_level=self._optional_int(
+                    merged_context.get("brain_complexity_level")
+                ),
                 requested_workers=self._optional_int(
                     merged_context.get("brain_requested_workers")
                 ),
