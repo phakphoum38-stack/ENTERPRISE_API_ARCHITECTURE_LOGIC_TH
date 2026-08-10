@@ -1,0 +1,27 @@
+name: Research OS Candidate Trigger
+
+on:
+  push:
+    branches:
+      - integration/unified-master-orchestrator-v3
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    name: Dispatch exact-SHA candidate
+    if: contains(github.event.head_commit.message, '[candidate]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch candidate workflow for this exact SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+          TARGET_REF: ${{ github.ref_name }}
+        run: |
+          gh workflow run candidate.yml \
+            --repo "${{ github.repository }}" \
+            --ref "$TARGET_REF" \
+            -f target_sha="$TARGET_SHA"
