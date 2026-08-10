@@ -1,6 +1,16 @@
 name: Research OS Runtime Smoke Test
 
 on:
+  pull_request:
+    paths:
+      - "scripts/research-os-service.ps1"
+      - "tools/research_os_service/**"
+      - "tools/research_os_api/**"
+      - "installer/**"
+      - ".github/workflows/03-runtime-smoke-test.yml"
+      - ".github/workflows/04-build-installer.yml"
+      - ".github/workflows/05-installer-validation.yml"
+      - ".github/workflows/research-os-windows-desktop.yml"
   workflow_dispatch:
     inputs:
       target_sha:
@@ -27,8 +37,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+      TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
       SOURCE_RUN_ID: ${{ inputs.source_service_run }}
+      CHAIN_REF: ${{ github.head_ref || github.ref_name }}
     steps:
       - name: Checkout tested revision
         uses: actions/checkout@v4
@@ -53,7 +64,12 @@ jobs:
         run: |
           $runId = "$env:SOURCE_RUN_ID"
           if (-not $runId) {
-            $runId = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Service Host" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+            for ($i = 0; $i -lt 60; $i++) {
+              $runId = gh run list --repo "${{ github.repository }}" --workflow "Research OS Build Service Host" --commit "$env:TARGET_SHA" --status success --limit 20 --json databaseId --jq '.[0].databaseId'
+              if ($runId) { break }
+              Write-Host "Waiting for successful ServiceHost run for $env:TARGET_SHA (attempt $($i + 1)/60)"
+              Start-Sleep -Seconds 10
+            }
           }
           if (-not $runId) { throw "No successful ServiceHost run found for $env:TARGET_SHA" }
           "run_id=$runId" >> $env:GITHUB_OUTPUT
@@ -160,4 +176,4 @@ jobs:
           DISPATCH_RELEASE: ${{ inputs.dispatch_release }}
         run: |
           $releaseFlag = if ($env:DISPATCH_RELEASE -eq 'true') { 'true' } else { 'false' }
-          gh workflow run 04-build-installer.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f dispatch_release="$releaseFlag"
+          gh workflow run 04-build-installer.yml --repo "${{ github.repository }}" --ref "$env:CHAIN_REF" -f target_sha="$env:TARGET_SHA" -f dispatch_release="$releaseFlag"
