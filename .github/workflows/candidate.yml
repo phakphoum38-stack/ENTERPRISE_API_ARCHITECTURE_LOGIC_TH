@@ -253,6 +253,37 @@ jobs:
             throw "Provider status contains credential-like data"
           }
 
+          $serviceLog = Join-Path $env:ProgramData 'ResearchOS\logs\service-api.err.log'
+          if (Test-Path $serviceLog) { Clear-Content $serviceLog -ErrorAction SilentlyContinue }
+          $installedApp = Join-Path $env:ProgramFiles 'Research OS\app\research_os_flutter.exe'
+          if (-not (Test-Path $installedApp)) { throw "Installed Flutter app executable is missing" }
+
+          $app = Start-Process -FilePath $installedApp -PassThru
+          try {
+            $appConnected = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              if ($app.HasExited) { throw "Installed Flutter app exited before app-to-service E2E completed" }
+              if (Test-Path $serviceLog) {
+                $requestLog = Get-Content $serviceLog -Raw -ErrorAction SilentlyContinue
+                $sawHealth = $requestLog -match '"GET /health HTTP/1\.[01]" 200'
+                $sawProviders = $requestLog -match '"GET /v1/providers HTTP/1\.[01]" 200'
+                if ($sawHealth -and $sawProviders) {
+                  $appConnected = $true
+                  break
+                }
+              }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $appConnected) {
+              if (Test-Path $serviceLog) { Get-Content $serviceLog -Tail 100 | Out-Host }
+              throw "Installed Flutter app did not prove app-to-service requests to /health and /v1/providers"
+            }
+            Write-Host "Installed Flutter app-to-service E2E passed."
+          }
+          finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
+          }
+
           $upgradeLog = "$env:RUNNER_TEMP\research-os-upgrade.log"
           $u = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$upgradeLog") -Wait -PassThru
           if ($u.ExitCode -ne 0) { throw "In-place upgrade failed with exit code $($u.ExitCode)" }
@@ -291,6 +322,7 @@ jobs:
             candidate_run = "${{ github.run_id }}"
             validation = "passed"
             build_policy = "single-windows-runner"
+            app_to_service_e2e = "passed"
             release_created = $false
             tag_created = $false
             artifact = [ordered]@{
