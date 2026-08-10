@@ -34,3 +34,55 @@ jobs:
       - name: Friend Complete smoke
         shell: bash
         run: PYTHONPATH=owner_special python owner_special/scripts/smoke.py
+
+  owner-bundle:
+    needs: friend-complete
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build Owner Bundle
+        shell: bash
+        run: PYTHONPATH=owner_special python owner_special/scripts/build_bundle.py
+      - name: Verify Owner Bundle
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import zipfile
+          from pathlib import Path
+
+          dist = Path('owner_special/dist')
+          archive_path = dist / 'Research-OS-Owner-Special-Friend-Complete.zip'
+          result = json.loads((dist / 'bundle-result.json').read_text(encoding='utf-8'))
+          if not archive_path.is_file() or not result.get('source_only'):
+              raise SystemExit('Owner Bundle was not created correctly')
+          with zipfile.ZipFile(archive_path) as archive:
+              names = set(archive.namelist())
+              required = {
+                  'OWNER_MANIFEST.json',
+                  'BUNDLE_MANIFEST.json',
+                  'research_os_friend/brain.py',
+                  'research_os_friend/capabilities.py',
+                  'research_os_friend/persistent_memory.py',
+                  'research_os_friend/v3_bridge.py',
+                  'research_os_friend/runtime.py',
+              }
+              missing = required - names
+              if missing:
+                  raise SystemExit(f'Missing Owner Bundle files: {sorted(missing)}')
+          print(result)
+          PY
+      - name: Upload Owner Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-special-friend-complete-${{ github.sha }}
+          path: |
+            owner_special/dist/Research-OS-Owner-Special-Friend-Complete.zip
+            owner_special/dist/BUNDLE_SHA256.txt
+            owner_special/dist/bundle-result.json
+          if-no-files-found: error
+          retention-days: 30
