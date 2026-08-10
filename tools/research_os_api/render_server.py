@@ -16,8 +16,10 @@ class CloudResearchOSHandler(V2ResearchOSHandler):
 
     def _authorize_exposure(self) -> bool:
         try:
+            bind_host = str(self.server.server_address[0])
             verify_service_request(
                 {name: value for name, value in self.headers.items()},
+                bind_host=bind_host,
             )
             return True
         except ServiceExposureAuthError as exc:
