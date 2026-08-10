@@ -38,7 +38,7 @@ class LocalServiceSecurityTests(unittest.TestCase):
         self.assertIn("RESEARCH_OS_IDENTITY_PROXY_SECRET", service_auth)
         self.assertNotIn("X-ResearchOS-Identity-Secret", render_server)
 
-    def test_upgrade_preserves_service_scoped_provider_configuration(self):
+    def test_upgrade_preserves_all_supported_service_provider_configuration(self):
         service_script = (ROOT / "scripts" / "research-os-service.ps1").read_text(
             encoding="utf-8"
         )
@@ -48,6 +48,25 @@ class LocalServiceSecurityTests(unittest.TestCase):
 
         self.assertIn("Get-PreservedProviderEnvironment", service_script)
         self.assertIn("PreservedProviderEnvironment", service_script)
+        for name in (
+            "RESEARCH_OS_PROVIDER",
+            "RESEARCH_OS_SEARCH_PROVIDER",
+            "RESEARCH_OS_OPENAI_API_KEY",
+            "OPENAI_API_KEY",
+            "RESEARCH_OS_OPENAI_ENDPOINT",
+            "RESEARCH_OS_OPENAI_MODEL",
+            "RESEARCH_OS_OPENAI_RESPONSES_ENDPOINT",
+            "RESEARCH_OS_OPENAI_RESPONSES_MODEL",
+            "RESEARCH_OS_GEMINI_API_KEY",
+            "GEMINI_API_KEY",
+            "RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE",
+            "RESEARCH_OS_GEMINI_MODEL",
+            "RESEARCH_OS_ANTHROPIC_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "RESEARCH_OS_ANTHROPIC_ENDPOINT",
+            "RESEARCH_OS_ANTHROPIC_MODEL",
+        ):
+            self.assertIn(f"'{name}'", service_script)
         self.assertIn("function PrepareToInstall", installer)
         self.assertIn("-Action stop", installer)
 
