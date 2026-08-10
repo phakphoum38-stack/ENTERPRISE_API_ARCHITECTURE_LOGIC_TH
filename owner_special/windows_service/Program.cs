@@ -108,32 +108,74 @@ sealed class OwnerFriendWorker : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        await StopChildAsync(cancellationToken);
+        // Let BackgroundService cancel ExecuteAsync first so a deliberate child exit
+        // cannot be misclassified as an unexpected runtime failure.
         await base.StopAsync(cancellationToken);
+
+        // Never let a cancelled service-shutdown token skip child cleanup. The SCM
+        // must not observe a completed service stop while packaged python.exe is
+        // still alive and holding installer files open.
         await StopChildAsync(CancellationToken.None);
     }
 
     private async Task StopChildAsync(CancellationToken token)
     {
-        await _stopLock.WaitAsync(token);
+        // Child cleanup is a shutdown invariant. Do not allow a caller cancellation
+        // token to bypass the lock and leave bundled python.exe behind.
+        await _stopLock.WaitAsync(CancellationToken.None);
         try
         {
             var process = _process;
             if (process is null) return;
-            try
+
+            if (!process.HasExited)
             {
-                if (!process.HasExited)
+                _logger.LogInformation("Stopping Owner Friend child PID {Pid}", process.Id);
+                try
                 {
                     process.Kill(entireProcessTree: true);
-                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-                    timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                }
+                catch (InvalidOperationException)
+                {
+                    if (!process.HasExited) throw;
+                }
+
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try
+                {
                     await process.WaitForExitAsync(timeout.Token);
                 }
+                catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+                {
+                    if (!process.HasExited)
+                    {
+                        _logger.LogWarning("Owner Friend child PID {Pid} did not exit after the first kill; forcing the process tree again", process.Id);
+                        process.Kill(entireProcessTree: true);
+                        using var forceTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                        try
+                        {
+                            await process.WaitForExitAsync(forceTimeout.Token);
+                        }
+                        catch (OperationCanceledException) when (forceTimeout.IsCancellationRequested)
+                        {
+                            if (!process.HasExited)
+                                throw new TimeoutException($"Owner Friend child PID {process.Id} remained alive after forced shutdown");
+                        }
+                    }
+                }
             }
-            catch { try { process.Kill(entireProcessTree: true); } catch { } }
-            finally { try { process.Dispose(); } catch { } _process = null; }
+
+            if (!process.HasExited)
+                throw new InvalidOperationException($"Owner Friend child PID {process.Id} remained alive during service shutdown");
+
+            _logger.LogInformation("Owner Friend child PID {Pid} exited; packaged Python is released", process.Id);
+            process.Dispose();
+            _process = null;
         }
-        finally { _stopLock.Release(); }
+        finally
+        {
+            _stopLock.Release();
+        }
     }
 
     private static async Task PumpAsync(StreamReader reader, string path, CancellationToken token)
