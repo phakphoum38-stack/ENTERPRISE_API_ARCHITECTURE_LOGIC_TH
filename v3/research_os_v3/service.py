@@ -66,8 +66,11 @@ class V3LocalService:
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(body)
+                # Record the request before completing the response so a client that
+                # has received the full body can deterministically observe its audit
+                # entry. The audit contract intentionally stores no headers/query data.
                 write_audit("GET", urlparse(self.path).path, status)
+                self.wfile.write(body)
 
             def do_GET(self) -> None:  # noqa: N802 - stdlib handler contract
                 parsed = urlparse(self.path)
