@@ -212,7 +212,6 @@ class ResearchOSApiClient {
       return searchWebWithBrain(searchQuery);
     }
     return _postJson('/v1/ai/generate', <String, Object?>{
-      'provider': 'gemini',
       'prompt': prompt,
     });
   }
@@ -230,7 +229,6 @@ class ResearchOSApiClient {
       return searchWebWithBrain(searchQuery);
     }
     return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
-      'provider': 'gemini',
       'question': question,
     });
   }
