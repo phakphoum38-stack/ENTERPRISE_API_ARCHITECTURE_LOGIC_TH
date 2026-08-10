@@ -4,7 +4,7 @@
 This script verifies the installed/local service from outside the service process:
 health, provider credential visibility, live generation, and hosted web search when
 an OpenAI Responses credential is configured. It never prints prompts, replies,
-credential values, or provider error bodies.
+credential values, source URLs, or provider error bodies.
 """
 from __future__ import annotations
 
@@ -28,17 +28,20 @@ def _request_json(
     payload: dict[str, Any] | None = None,
     timeout: float = 75.0,
 ) -> tuple[int, dict[str, Any]]:
-    url = urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
-    data = None
-    headers = {"Accept": "application/json"}
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
+        url = urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
+        data = None
+        headers = {"Accept": "application/json"}
+        if payload is not None:
+            data = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(url, data=data, headers=headers, method=method)
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read().decode("utf-8", errors="replace")
-            parsed = json.loads(body) if body else {}
+            try:
+                parsed = json.loads(body) if body else {}
+            except json.JSONDecodeError:
+                parsed = {}
             return int(response.status), parsed if isinstance(parsed, dict) else {}
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
@@ -47,6 +50,8 @@ def _request_json(
         except json.JSONDecodeError:
             parsed = {}
         return int(exc.code), parsed if isinstance(parsed, dict) else {}
+    except (OSError, urllib.error.URLError, ValueError):
+        return 0, {}
 
 
 def _error_code(payload: dict[str, Any]) -> str | None:
@@ -81,7 +86,6 @@ def _select_real_provider(providers: dict[str, dict[str, Any]]) -> str | None:
 def run(base_url: str | None = None) -> tuple[int, dict[str, Any]]:
     base = (base_url or os.getenv("RESEARCH_OS_SMOKE_BASE_URL") or _DEFAULT_BASE_URL).strip()
     report: dict[str, Any] = {
-        "service_url": base,
         "health_ok": False,
         "credential_status_ok": False,
         "real_provider_configured": False,
@@ -97,11 +101,7 @@ def run(base_url: str | None = None) -> tuple[int, dict[str, Any]]:
         "secret_safe": True,
     }
 
-    try:
-        health_status, health = _request_json(base, "/health", timeout=10.0)
-    except (OSError, urllib.error.URLError, json.JSONDecodeError, ValueError):
-        report["failure_stage"] = "health"
-        return 3, report
+    health_status, health = _request_json(base, "/health", timeout=10.0)
     report["health_ok"] = health_status == 200 and health.get("status") == "ok"
     if not report["health_ok"]:
         report["failure_stage"] = "health"
@@ -170,7 +170,10 @@ def run(base_url: str | None = None) -> tuple[int, dict[str, Any]]:
             search_status == 200 and str(result.get("text") or "").strip()
         )
         report["web_search_sources_received"] = bool(isinstance(sources, list) and sources)
-        if not report["web_search_response_received"]:
+        if not (
+            report["web_search_response_received"]
+            and report["web_search_sources_received"]
+        ):
             report["failure_stage"] = "web_search"
             report["http_status"] = search_status
             report["error_code"] = _error_code(searched)
