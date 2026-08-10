@@ -12,6 +12,15 @@ ELASTIC_TIERS = 6
 MAX_LEAF_CAPACITY = BRANCH_FACTOR**ELASTIC_TIERS
 DEFAULT_ACTIVE_WORKER_LIMIT = 36
 HARD_ACTIVE_WORKER_LIMIT = 1296
+MAX_HYPOTHESIS_BRANCHES = 36
+COGNITIVE_STAGES = (
+    "decompose",
+    "retrieve_evidence",
+    "branch_hypotheses",
+    "cross_critique",
+    "safety_verify",
+    "synthesize",
+)
 
 
 @dataclass(frozen=True)
@@ -102,6 +111,9 @@ class AdaptiveHierarchyPolicy:
             "hard_active_worker_limit": HARD_ACTIVE_WORKER_LIMIT,
             "activation_mode": "demand_budget_readiness",
             "all_workers_started_by_default": False,
+            "intelligence_mode": "compound_branch_critic_synthesis",
+            "cognitive_stages": list(COGNITIVE_STAGES),
+            "max_hypothesis_branches": MAX_HYPOTHESIS_BRANCHES,
         }
 
     def plan(
@@ -192,14 +204,82 @@ class BrainSkillsEngine:
             budget_workers=budget_workers,
             ready_workers=ready_workers,
         )
+        selected_skills = self.registry.route(objective)
+        cognition = self._compound_cognition(
+            objective,
+            selected_skills=selected_skills,
+            hierarchy=hierarchy,
+        )
         return {
             "plan_id": str(uuid.uuid4()),
             "objective": objective,
-            "selected_skills": self.registry.route(objective),
+            "selected_skills": selected_skills,
             "hierarchy": hierarchy,
+            "cognition": cognition,
             "provider_mode": "local_or_configured_provider",
             "requires_external_api_key": False,
+            "provider_execution_requires_credentials": True,
             "writes_require_approval": True,
+        }
+
+    def research_instructions(self, plan: dict[str, Any]) -> str:
+        """Build bounded quality instructions without exposing hidden reasoning."""
+        cognition = plan.get("cognition", {})
+        branches = int(cognition.get("hypothesis_branches", 1))
+        critic_passes = int(cognition.get("critic_passes", 1))
+        return (
+            "Use a bounded compound-research process. Decompose the request, gather "
+            f"current evidence, compare up to {branches} plausible hypotheses, run "
+            f"{critic_passes} critic passes for conflicts and missing evidence, apply "
+            "safety checks, then synthesize a concise answer. Cite sources near claims, "
+            "separate facts from inference, disclose material uncertainty, and do not "
+            "reveal private chain-of-thought."
+        )
+
+    @staticmethod
+    def _compound_cognition(
+        objective: str,
+        *,
+        selected_skills: list[str],
+        hierarchy: dict[str, Any],
+    ) -> dict[str, Any]:
+        complexity = int(hierarchy["complexity_level"])
+        active_workers = int(hierarchy["active_workers"])
+        candidate_capacity = BRANCH_FACTOR**complexity
+        hypotheses = min(
+            MAX_HYPOTHESIS_BRANCHES,
+            active_workers,
+            candidate_capacity,
+        )
+        critic_passes = min(BRANCH_FACTOR, max(1, complexity))
+        quorum = max(1, math.ceil(hypotheses * 2 / 3))
+        text = objective.casefold()
+        time_sensitive = any(
+            token in text
+            for token in (
+                "latest",
+                "current",
+                "today",
+                "news",
+                "ล่าสุด",
+                "ปัจจุบัน",
+                "วันนี้",
+                "ข่าว",
+            )
+        )
+        evidence_required = "knowledge" in selected_skills or time_sensitive
+        return {
+            "mode": "compound_6x6",
+            "stages": list(COGNITIVE_STAGES),
+            "candidate_capacity": candidate_capacity,
+            "hypothesis_branches": hypotheses,
+            "critic_passes": critic_passes,
+            "consensus_quorum": quorum,
+            "evidence_required": evidence_required,
+            "web_search_recommended": evidence_required or time_sensitive,
+            "confidence_threshold": 0.75,
+            "bounded": True,
+            "hidden_reasoning_exposed": False,
         }
 
 
