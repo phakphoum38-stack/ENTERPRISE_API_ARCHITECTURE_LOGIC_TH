@@ -102,11 +102,20 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Dispatch final candidate validation chain
-        if: github.event_name != 'pull_request'
+      - name: Dispatch final candidate validation chain only after writing is complete
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Write-Host "Dispatching one final validation-only chain for $env:TARGET_SHA on ref $env:TARGET_REF"
+          $eventName = "${{ github.event_name }}"
+          $commitMessage = (git log -1 --pretty=%B).Trim()
+          $manualDispatch = $eventName -eq "workflow_dispatch"
+          $finalCandidate = $commitMessage -match '\[candidate\]'
+
+          if (-not $manualDispatch -and -not $finalCandidate) {
+            Write-Host "Core CI only. Full candidate build is intentionally deferred until a final [candidate] commit."
+            exit 0
+          }
+
+          Write-Host "Final candidate requested for $env:TARGET_SHA on ref $env:TARGET_REF"
           gh workflow run 03-runtime-smoke-test.yml --repo "${{ github.repository }}" --ref "$env:TARGET_REF" -f target_sha="$env:TARGET_SHA" -f source_service_run="${{ github.run_id }}" -f dispatch_release=false
