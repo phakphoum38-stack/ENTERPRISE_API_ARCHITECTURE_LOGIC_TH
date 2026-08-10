@@ -2,6 +2,25 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+typedef ResearchOSRequestHeadersProvider = Future<Map<String, String>> Function();
+
+class _RequestHeaderClient extends http.BaseClient {
+  _RequestHeaderClient(this._inner, this._provider);
+
+  final http.Client _inner;
+  final ResearchOSRequestHeadersProvider _provider;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final headers = await _provider();
+    request.headers.addAll(headers);
+    return _inner.send(request);
+  }
+
+  @override
+  void close() => _inner.close();
+}
+
 class ResearchOSApiException implements Exception {
   const ResearchOSApiException(this.message);
 
@@ -12,8 +31,16 @@ class ResearchOSApiException implements Exception {
 }
 
 class ResearchOSApiClient {
-  ResearchOSApiClient({required this.baseUrl, http.Client? client})
-      : _client = client ?? http.Client();
+  ResearchOSApiClient({
+    required this.baseUrl,
+    http.Client? client,
+    ResearchOSRequestHeadersProvider? requestHeadersProvider,
+  }) : _client = requestHeadersProvider == null
+            ? (client ?? http.Client())
+            : _RequestHeaderClient(
+                client ?? http.Client(),
+                requestHeadersProvider,
+              );
 
   final String baseUrl;
   final http.Client _client;
