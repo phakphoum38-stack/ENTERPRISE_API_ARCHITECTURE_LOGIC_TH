@@ -387,8 +387,8 @@ jobs:
               if ($app.HasExited) { throw "Installed Flutter app exited before app-to-service E2E completed" }
               if (Test-Path $serviceLog) {
                 $requestLog = Get-Content $serviceLog -Raw -ErrorAction SilentlyContinue
-                $sawHealth = $requestLog -match '"GET /health HTTP/1\.[01]" 200'
-                $sawProviders = $requestLog -match '"GET /v1/providers HTTP/1\.[01]" 200'
+                $sawHealth = $requestLog -match '(?m)(?:\bpath=/health(?:\s|$)|"GET /health HTTP/1\.[01]" 200)'
+                $sawProviders = $requestLog -match '(?m)(?:\bpath=/v1/providers(?:\s|$)|"GET /v1/providers HTTP/1\.[01]" 200)'
                 if ($sawHealth -and $sawProviders) {
                   $appConnected = $true
                   break
