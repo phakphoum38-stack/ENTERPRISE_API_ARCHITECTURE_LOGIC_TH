@@ -2,9 +2,10 @@
 """Unified Research OS V3 Master Orchestrator.
 
 This module composes the existing V2 governed Brain Runtime, V3 adaptive
-Compound Brain, canonical AgentOrchestrator, and Adaptive Software Factory.
-It does not create a second dependency graph, bypass approvals, or eagerly
-materialize the theoretical 6^6 hierarchy.
+Compound Brain, canonical AgentOrchestrator, Adaptive Software Factory, and the
+governed Tool Intelligence layer. It does not create a second dependency graph,
+bypass approvals, auto-install discovered software, or eagerly materialize the
+theoretical 6^6 hierarchy.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import agent_server
 from brain_skills import BRAIN, BrainSkillsEngine
 from v2_brain_runtime import BRAIN_RUNTIME, BrainRuntime
 from v2_system_introspection import SystemIntrospection
+from v2_tool_intelligence import ToolIntelligence
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
@@ -49,6 +51,10 @@ class UnifiedMasterOrchestrator:
             self.brain_runtime,
             self.operational_registry,
         )
+        self.tool_intelligence = ToolIntelligence(
+            self.brain_runtime.tools,
+            self.brain_runtime.learning,
+        )
         self.factory_control = AdaptiveControlPlane(self.repository_root)
 
     def manifest(self) -> dict[str, Any]:
@@ -63,6 +69,9 @@ class UnifiedMasterOrchestrator:
                 "governed_brain_core": "v2_brain_runtime.BRAIN_RUNTIME",
                 "compound_brain": "brain_skills.BRAIN",
                 "agent_dependency_graph": "agent_server.ORCHESTRATOR",
+                "tool_registry": "BrainRuntime.tools",
+                "tool_intelligence": "v2_tool_intelligence.ToolIntelligence",
+                "tool_learning": "BrainRuntime.learning",
                 "factory_control": "software_factory.AdaptiveControlPlane",
                 "provider_gateway": "existing provider gateway",
             },
@@ -74,6 +83,9 @@ class UnifiedMasterOrchestrator:
                 "lazy_activation": True,
                 "all_workers_started_by_default": False,
                 "writes_require_approval": True,
+                "external_tools_auto_downloaded": False,
+                "external_tools_auto_installed": False,
+                "external_tools_auto_executed": False,
                 "self_modification": False,
                 "automatic_merge_release_deploy": False,
             },
@@ -84,6 +96,7 @@ class UnifiedMasterOrchestrator:
         return {
             **self.manifest(),
             "brain_runtime": runtime,
+            "tool_intelligence": self.tool_intelligence.dashboard(),
             "factory": self.factory_control.summary(),
             "intelligence_health": self.intelligence.health(),
         }
@@ -114,6 +127,7 @@ class UnifiedMasterOrchestrator:
                 f"versions must not exceed {_MAX_ACTIVE_VERSION_FACTORIES} active factories per request"
             )
 
+        safe_context = dict(context or {})
         compound_plan = self.compound_brain.plan(
             text,
             complexity_level=complexity_level,
@@ -124,8 +138,24 @@ class UnifiedMasterOrchestrator:
         governed_plan = self.intelligence.plan(
             text,
             session_id=session_id,
-            context=dict(context or {}),
+            context=safe_context,
         )
+        tool_strategy = self.tool_intelligence.plan_for_objective(
+            text,
+            context=safe_context,
+        )
+        if self.tool_intelligence.should_discover(text):
+            provider_name = str(safe_context.get("tool_search_provider") or "").strip() or None
+            model = str(safe_context.get("tool_search_model") or "").strip() or None
+            tool_strategy = {
+                **tool_strategy,
+                "external_discovery": self.tool_intelligence.discover(
+                    text,
+                    capabilities=tool_strategy.get("required_capabilities") or (),
+                    provider_name=provider_name,
+                    model=model,
+                ),
+            }
         factory_plan = self.factory_control.configure_versions(normalized_versions)
 
         return {
@@ -134,6 +164,7 @@ class UnifiedMasterOrchestrator:
             "objective": text,
             "compound_brain": compound_plan,
             "governed_brain": governed_plan,
+            "tool_intelligence": tool_strategy,
             "factory": {
                 "profile": factory_plan.profile.label,
                 "logical_capacity": factory_plan.profile.capacity,
@@ -145,10 +176,36 @@ class UnifiedMasterOrchestrator:
             "execution": {
                 "performed": False,
                 "approval_bypassed": False,
+                "external_tool_installed": False,
+                "external_tool_executed": False,
                 "canonical_dependency_graph": "AgentOrchestrator",
                 "lazy_activation": True,
             },
         }
+
+    def discover_tools(
+        self,
+        objective: str,
+        *,
+        capabilities: Sequence[str] = (),
+        provider_name: str | None = None,
+        model: str | None = None,
+    ) -> dict[str, Any]:
+        """Research external tool candidates without downloading or executing them."""
+        return self.tool_intelligence.discover(
+            objective,
+            capabilities=capabilities,
+            provider_name=provider_name,
+            model=model,
+        )
+
+    def design_tool_adapter(self, candidate: Mapping[str, Any]) -> dict[str, Any]:
+        """Create a reviewable integration plan; never writes adapter code automatically."""
+        return self.tool_intelligence.design_adapter(candidate)
+
+    def tool_playbook(self, tool_id: str) -> dict[str, Any]:
+        """Summarize structured observed outcomes for an already-registered tool."""
+        return self.tool_intelligence.tool_playbook(tool_id)
 
 
 MASTER = UnifiedMasterOrchestrator()
