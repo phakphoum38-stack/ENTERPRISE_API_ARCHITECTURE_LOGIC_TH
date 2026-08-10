@@ -3,10 +3,10 @@
 
 This module composes the existing V2 governed Brain Runtime, V3 adaptive
 Compound Brain, canonical AgentOrchestrator, Adaptive Software Factory, the
-governed Tool Intelligence layer, and a separate Cyber Web Security Standard
-owner. It does not create a second dependency graph, bypass approvals,
-auto-install discovered software, or eagerly materialize the theoretical 6^6
-hierarchy.
+governed Tool Intelligence layer, a separate Cyber Web Security Standard owner,
+and an explicit File Ownership boundary owner. It does not create a second
+dependency graph, bypass approvals, auto-install discovered software, or eagerly
+materialize the theoretical 6^6 hierarchy.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ import agent_server
 from brain_skills import BRAIN, BrainSkillsEngine
 from v2_brain_runtime import BRAIN_RUNTIME, BrainRuntime
 from v2_cyber_web_standard import CYBER_WEB_STANDARD, CyberWebSecurityStandard
+from v2_file_ownership_boundary import FILE_OWNERSHIP, FileOwnershipBoundary
 from v2_system_introspection import SystemIntrospection
 from v2_tool_intelligence import ToolIntelligence
 
@@ -44,11 +45,13 @@ class UnifiedMasterOrchestrator:
         brain_runtime: BrainRuntime | None = None,
         compound_brain: BrainSkillsEngine | None = None,
         cyber_web_security: CyberWebSecurityStandard | None = None,
+        file_ownership: FileOwnershipBoundary | None = None,
     ) -> None:
         self.repository_root = (repository_root or _REPO_ROOT).resolve()
         self.brain_runtime = brain_runtime or BRAIN_RUNTIME
         self.compound_brain = compound_brain or BRAIN
         self.cyber_web_security = cyber_web_security or CYBER_WEB_STANDARD
+        self.file_ownership = file_ownership or FILE_OWNERSHIP
         self.agent_orchestrator = agent_server.ORCHESTRATOR
         self.operational_registry = agent_server.REGISTRY
         self.intelligence = SystemIntrospection(
@@ -64,6 +67,7 @@ class UnifiedMasterOrchestrator:
     def manifest(self) -> dict[str, Any]:
         capacity = self.compound_brain.capacity_snapshot()
         cyber_boundary = self.cyber_web_security.ownership_boundary()
+        file_boundary = self.file_ownership.cyber_boundary()
         return {
             "contract": UNIFIED_MASTER_CONTRACT,
             "version": UNIFIED_VERSION,
@@ -78,12 +82,14 @@ class UnifiedMasterOrchestrator:
                 "tool_intelligence": "v2_tool_intelligence.ToolIntelligence",
                 "tool_learning": "BrainRuntime.learning",
                 "cyber_web_security": "v2_cyber_web_standard.CyberWebSecurityStandard",
-                "file_ownership": "separate_external_owner",
+                "file_ownership": "v2_file_ownership_boundary.FileOwnershipBoundary",
                 "factory_control": "software_factory.AdaptiveControlPlane",
                 "provider_gateway": "existing provider gateway",
             },
             "owner_boundaries": {
-                "cyber_web_vs_file_ownership": cyber_boundary,
+                "cyber_web_security": cyber_boundary,
+                "file_ownership": file_boundary,
+                "shared_authority": False,
             },
             "factory_profiles": [profile.label for profile in SUPPORTED_PROFILES],
             "capacity": capacity,
@@ -99,6 +105,8 @@ class UnifiedMasterOrchestrator:
                 "cyber_security_separate_from_file_ownership": True,
                 "cyber_security_can_change_file_owner": False,
                 "cyber_security_can_grant_file_acl": False,
+                "file_ownership_can_override_cyber_policy": False,
+                "file_ownership_can_disable_security_controls": False,
                 "self_modification": False,
                 "automatic_merge_release_deploy": False,
             },
@@ -111,6 +119,7 @@ class UnifiedMasterOrchestrator:
             "brain_runtime": runtime,
             "tool_intelligence": self.tool_intelligence.dashboard(),
             "cyber_web_security": self.cyber_web_security.manifest(),
+            "file_ownership": self.file_ownership.manifest(),
             "factory": self.factory_control.summary(),
             "intelligence_health": self.intelligence.health(),
         }
@@ -185,7 +194,9 @@ class UnifiedMasterOrchestrator:
                 "separate_from_file_owner_system": True,
                 "assessment_performed": False,
                 "changes_file_ownership": False,
+                "grants_file_acl": False,
             },
+            "file_ownership": self.file_ownership.plan(),
             "factory": {
                 "profile": factory_plan.profile.label,
                 "logical_capacity": factory_plan.profile.capacity,
@@ -217,6 +228,10 @@ class UnifiedMasterOrchestrator:
             evidence,
             deployment_mode=deployment_mode,
         )
+
+    def file_ownership_status(self) -> dict[str, Any]:
+        """Expose the separate file-ownership boundary without mutating files."""
+        return self.file_ownership.manifest()
 
     def discover_tools(
         self,
