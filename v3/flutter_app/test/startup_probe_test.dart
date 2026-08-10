@@ -5,6 +5,7 @@ import 'package:research_os_v3_flutter/src/startup_probe.dart';
 class FakeApi implements V3Api {
   int healthCalls = 0;
   int providerCalls = 0;
+  int userCalls = 0;
 
   @override
   Future<Map<String, dynamic>> health() async {
@@ -35,10 +36,21 @@ class FakeApi implements V3Api {
       ],
     };
   }
+
+  @override
+  Future<Map<String, dynamic>> user() async {
+    userCalls++;
+    return {
+      'user_id': 'alice',
+      'profile_id': 'default',
+      'scope': 'users/alice/profiles/default',
+      'isolated': true,
+    };
+  }
 }
 
 void main() {
-  test('startup probe proves health and provider routes', () async {
+  test('startup probe proves health user isolation and provider routes', () async {
     final api = FakeApi();
 
     final connected = await StartupProbe(
@@ -49,6 +61,7 @@ void main() {
 
     expect(connected, isTrue);
     expect(api.healthCalls, 1);
+    expect(api.userCalls, 1);
     expect(api.providerCalls, 1);
   });
 }

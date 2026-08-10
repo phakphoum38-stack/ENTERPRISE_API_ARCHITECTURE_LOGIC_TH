@@ -11,6 +11,11 @@ from urllib.parse import parse_qs, urlparse
 from .contracts import health_contract, master_contract, providers_contract
 from .models import Workload
 from .orchestrator import UnifiedMasterOrchestrator
+from .storage import DataLayout
+from .user_context import UserContext
+
+USER_HEADER = "X-Research-OS-User"
+PROFILE_HEADER = "X-Research-OS-Profile"
 
 
 class V3LocalService:
@@ -23,6 +28,7 @@ class V3LocalService:
         port: int = 8788,
         orchestrator: UnifiedMasterOrchestrator | None = None,
         audit_path: Path | None = None,
+        data_layout: DataLayout | None = None,
     ) -> None:
         address = ipaddress.ip_address(host)
         if not address.is_loopback:
@@ -31,10 +37,12 @@ class V3LocalService:
         self.port = port
         self.orchestrator = orchestrator or UnifiedMasterOrchestrator()
         self.audit_path = audit_path
+        self.data_layout = (data_layout or DataLayout.from_environment()).ensure()
         self._server: ThreadingHTTPServer | None = None
 
     def build_server(self) -> ThreadingHTTPServer:
         orchestrator = self.orchestrator
+        data_layout = self.data_layout
         audit_path = self.audit_path
         audit_lock = threading.Lock()
         if audit_path is not None:
@@ -66,11 +74,29 @@ class V3LocalService:
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                # Record the request before completing the response so a client that
-                # has received the full body can deterministically observe its audit
-                # entry. The audit contract intentionally stores no headers/query data.
                 write_audit("GET", urlparse(self.path).path, status)
                 self.wfile.write(body)
+
+            def _required_user_context(self) -> UserContext | None:
+                user_id = self.headers.get(USER_HEADER)
+                if not user_id:
+                    self._write_json(
+                        400,
+                        {
+                            "error": "missing user context",
+                            "required_header": USER_HEADER,
+                        },
+                    )
+                    return None
+                profile_id = self.headers.get(PROFILE_HEADER, "default")
+                try:
+                    return UserContext(user_id=user_id, profile_id=profile_id)
+                except ValueError as exc:
+                    self._write_json(
+                        400,
+                        {"error": "invalid user context", "detail": str(exc)},
+                    )
+                    return None
 
             def do_GET(self) -> None:  # noqa: N802 - stdlib handler contract
                 parsed = urlparse(self.path)
@@ -93,6 +119,22 @@ class V3LocalService:
                         return
                     decision = orchestrator.decide(workload)
                     self._write_json(200, master_contract(decision))
+                    return
+                if parsed.path == "/v3/user":
+                    context = self._required_user_context()
+                    if context is None:
+                        return
+                    user_layout = data_layout.for_user(context).ensure()
+                    self._write_json(
+                        200,
+                        {
+                            "user_id": context.user_id,
+                            "profile_id": context.profile_id,
+                            "scope": f"users/{context.user_id}/profiles/{context.profile_id}",
+                            "isolated": True,
+                            "directories": sorted(user_layout.directories()),
+                        },
+                    )
                     return
                 self._write_json(404, {"error": "not found"})
 

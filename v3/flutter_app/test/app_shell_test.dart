@@ -26,6 +26,14 @@ class FakeApi implements V3Api {
           },
         ],
       };
+
+  @override
+  Future<Map<String, dynamic>> user() async => {
+        'user_id': 'alice',
+        'profile_id': 'default',
+        'scope': 'users/alice/profiles/default',
+        'isolated': true,
+      };
 }
 
 void main() {

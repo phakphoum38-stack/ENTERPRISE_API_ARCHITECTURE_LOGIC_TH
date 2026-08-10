@@ -31,8 +31,9 @@ from .secrets import (
     WindowsCredentialManagerSecretSource,
     default_secret_source,
 )
-from .service import V3LocalService
-from .storage import DataLayout
+from .service import PROFILE_HEADER, USER_HEADER, V3LocalService
+from .storage import DataLayout, UserDataLayout
+from .user_context import UserContext, safe_local_user_id
 
 __all__ = [
     "AtomicExecutionEvidenceStore",
@@ -50,6 +51,7 @@ __all__ = [
     "MockProvider",
     "OpenAICompatibleProvider",
     "OrchestrationDecision",
+    "PROFILE_HEADER",
     "ProviderRegistry",
     "ProviderStatus",
     "ProviderUnavailableError",
@@ -59,7 +61,10 @@ __all__ = [
     "SoftwareFactory",
     "StageEvidence",
     "StageHandler",
+    "USER_HEADER",
     "UnifiedMasterOrchestrator",
+    "UserContext",
+    "UserDataLayout",
     "V3LocalService",
     "WindowsCredentialManagerSecretSource",
     "Workload",
@@ -67,4 +72,5 @@ __all__ = [
     "health_contract",
     "master_contract",
     "providers_contract",
+    "safe_local_user_id",
 ]

@@ -19,12 +19,17 @@
 - [x] OS-native secret store source (Windows Credential Manager)
 - [x] Retry, timeout, circuit breaker, and provider fallback policy
 
-## Phase 3 - Local service
+## Phase 3 - Local service and user isolation
 
 - [x] V3 local API service on loopback only
 - [x] `/health`, `/v3/master`, `/v3/providers`
 - [x] Windows Service host
 - [x] Lifecycle and local data ownership rules
+- [x] Validated `UserContext` and profile context
+- [x] Per-user/profile data scopes under `users/<user-id>/profiles/<profile-id>/`
+- [x] Cross-user and cross-profile isolation tests
+- [x] `/v3/user` context contract with path-traversal rejection
+- [x] Desktop startup probe carries user/profile context
 
 ## Phase 4 - Desktop app
 
@@ -53,4 +58,4 @@
 
 A commit is release-ready only when its exact SHA passes the V3 Core, Provider Hardening, Software Factory, and Candidate workflows. Passing evidence from earlier SHAs is retained for audit but is not substituted for final exact-SHA validation.
 
-Provider Hardening is intentionally triggered by final V3 architecture/roadmap changes as well as provider-code changes, so a final documentation-only certification commit can still produce provider evidence for the exact release SHA.
+Provider Hardening and Factory Execution are intentionally triggered by this roadmap, so the final user-isolation certification SHA receives evidence from every primary V3 validation workflow.

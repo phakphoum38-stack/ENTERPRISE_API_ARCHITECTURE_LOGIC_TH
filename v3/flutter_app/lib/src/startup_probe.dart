@@ -17,9 +17,12 @@ final class StartupProbe {
     for (var attempt = 0; attempt < attempts; attempt++) {
       try {
         final health = await api.health();
+        final user = await api.user();
         final providers = await api.providers();
         final providerList = providers['providers'];
-        if (health['status'] == 'ok' && providerList is List) {
+        if (health['status'] == 'ok' &&
+            user['isolated'] == true &&
+            providerList is List) {
           return true;
         }
       } catch (_) {
