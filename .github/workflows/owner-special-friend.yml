@@ -1,0 +1,36 @@
+name: Owner Special Friend Complete
+
+on:
+  push:
+    branches:
+      - 'owner-special/**'
+    paths:
+      - 'owner_special/**'
+      - '.github/workflows/owner-special-friend.yml'
+  pull_request:
+    paths:
+      - 'owner_special/**'
+      - '.github/workflows/owner-special-friend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  friend-complete:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests
+        shell: bash
+        run: PYTHONPATH=owner_special python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
+      - name: Friend Complete smoke
+        shell: bash
+        run: PYTHONPATH=owner_special python owner_special/scripts/smoke.py

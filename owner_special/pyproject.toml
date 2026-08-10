@@ -1,0 +1,8 @@
+[project]
+name = "research-os-friend-owner"
+version = "1.0.0"
+description = "Research OS Owner Special Friend Complete runtime"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
