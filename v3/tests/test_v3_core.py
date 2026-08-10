@@ -1,6 +1,9 @@
+import json
 import unittest
 
 from research_os_v3 import (
+    CompletionRequest,
+    OpenAICompatibleProvider,
     ProviderRegistry,
     ScaleTier,
     UnifiedMasterOrchestrator,
@@ -8,6 +11,32 @@ from research_os_v3 import (
     master_contract,
     providers_contract,
 )
+
+
+class StaticSecretSource:
+    def __init__(self, values: dict[str, str]) -> None:
+        self.values = values
+
+    def get(self, name: str) -> str | None:
+        return self.values.get(name)
+
+
+class FakeTransport:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def post_json(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        payload: dict[str, object],
+        timeout: float,
+    ) -> dict[str, object]:
+        self.calls.append(
+            {"url": url, "headers": headers, "payload": payload, "timeout": timeout}
+        )
+        return {"choices": [{"message": {"content": "provider-ok"}}]}
 
 
 class V3CleanCoreTests(unittest.TestCase):
@@ -48,6 +77,44 @@ class V3CleanCoreTests(unittest.TestCase):
         self.assertFalse(provider["secret_exposed"])
         self.assertNotIn("api_key", provider)
         self.assertNotIn("token", provider)
+
+    def test_openai_compatible_provider_uses_secret_without_exposing_it(self) -> None:
+        secret = "candidate-provider-secret"
+        transport = FakeTransport()
+        provider = OpenAICompatibleProvider(
+            base_url="https://provider.example/v1",
+            model="example-model",
+            secret_source=StaticSecretSource({"OPENAI_API_KEY": secret}),
+            transport=transport,
+            timeout=5.0,
+        )
+
+        before = provider.status()
+        self.assertTrue(before.ready)
+        self.assertFalse(before.connected)
+        safe_status = before.to_safe_dict()
+        self.assertNotIn(secret, json.dumps(safe_status, sort_keys=True))
+        self.assertEqual(safe_status["metadata"]["credential_source"], "OPENAI_API_KEY")
+
+        response = provider.complete(CompletionRequest(prompt="hello"))
+        self.assertEqual(response.text, "provider-ok")
+        self.assertEqual(response.provider, "openai-compatible")
+        self.assertEqual(len(transport.calls), 1)
+        call = transport.calls[0]
+        self.assertEqual(call["url"], "https://provider.example/v1/chat/completions")
+        self.assertEqual(call["headers"]["Authorization"], f"Bearer {secret}")
+        self.assertEqual(call["payload"]["model"], "example-model")
+        self.assertTrue(provider.status().connected)
+        self.assertNotIn(secret, json.dumps(provider.status().to_safe_dict(), sort_keys=True))
+
+    def test_openai_compatible_provider_requires_credential(self) -> None:
+        provider = OpenAICompatibleProvider(
+            secret_source=StaticSecretSource({}),
+            transport=FakeTransport(),
+        )
+        self.assertFalse(provider.status().ready)
+        with self.assertRaisesRegex(RuntimeError, "missing provider credential"):
+            provider.complete(CompletionRequest(prompt="hello"))
 
     def test_master_contract_is_stable(self) -> None:
         decision = self.master.decide(Workload(estimated_leaf_tasks=217))
