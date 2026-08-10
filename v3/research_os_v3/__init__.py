@@ -19,15 +19,29 @@ from .providers import (
     ProviderRegistry,
     ProviderStatus,
 )
-from .secrets import EnvironmentSecretSource
+from .resilience import (
+    CircuitBreakerPolicy,
+    CircuitOpenError,
+    ProviderUnavailableError,
+    RetryPolicy,
+)
+from .secrets import (
+    CompositeSecretSource,
+    EnvironmentSecretSource,
+    WindowsCredentialManagerSecretSource,
+    default_secret_source,
+)
 from .service import V3LocalService
 from .storage import DataLayout
 
 __all__ = [
     "AtomicExecutionEvidenceStore",
     "BrainCore",
+    "CircuitBreakerPolicy",
+    "CircuitOpenError",
     "CompletionRequest",
     "CompletionResponse",
+    "CompositeSecretSource",
     "DataLayout",
     "EnvironmentSecretSource",
     "FactoryExecutionContext",
@@ -38,6 +52,8 @@ __all__ = [
     "OrchestrationDecision",
     "ProviderRegistry",
     "ProviderStatus",
+    "ProviderUnavailableError",
+    "RetryPolicy",
     "ScaleProfile",
     "ScaleTier",
     "SoftwareFactory",
@@ -45,7 +61,9 @@ __all__ = [
     "StageHandler",
     "UnifiedMasterOrchestrator",
     "V3LocalService",
+    "WindowsCredentialManagerSecretSource",
     "Workload",
+    "default_secret_source",
     "health_contract",
     "master_contract",
     "providers_contract",
