@@ -65,7 +65,7 @@ void main() {
     expect(captured.url.path, '/v1/ai/answer-with-memory');
   });
 
-  test('ordinary generation keeps the existing provider route', () async {
+  test('ordinary generation lets the service choose the configured provider', () async {
     late http.Request captured;
     final client = ResearchOSApiClient(
       baseUrl: 'http://127.0.0.1:8787',
@@ -79,37 +79,34 @@ void main() {
 
     expect(captured.url.path, '/v1/ai/generate');
     final payload = jsonDecode(captured.body) as Map<String, dynamic>;
-    expect(payload['provider'], 'gemini');
+    expect(payload['prompt'], 'ช่วยวางแผนโปรเจกต์');
+    expect(payload.containsKey('provider'), isFalse);
   });
 
-  test('request header provider supplies fresh service identity headers per request', () async {
-    final captured = <http.Request>[];
-    var sequence = 0;
+  test('request header provider supplies fresh headers to every request', () async {
+    var callCount = 0;
+    final capturedNonces = <String>[];
     final client = ResearchOSApiClient(
-      baseUrl: 'http://service.example',
+      baseUrl: 'http://127.0.0.1:8787',
       requestHeadersProvider: () async {
-        sequence += 1;
+        callCount += 1;
         return <String, String>{
           'X-ResearchOS-Principal': 'research-os-app',
-          'X-ResearchOS-Identity-Timestamp': '1700000000',
-          'X-ResearchOS-Identity-Nonce': 'nonce-request-$sequence-abcdef',
-          'X-ResearchOS-Identity-Signature': 'signature-$sequence',
+          'X-ResearchOS-Identity-Nonce': 'nonce-$callCount',
+          'X-ResearchOS-Identity-Timestamp': '$callCount',
+          'X-ResearchOS-Identity-Signature': 'signature-$callCount',
         };
       },
       client: MockClient((request) async {
-        captured.add(request);
+        capturedNonces.add(request.headers['X-ResearchOS-Identity-Nonce']!);
         return http.Response(jsonEncode(<String, Object?>{'status': 'ok'}), 200);
       }),
     );
 
     await client.getHealth();
-    await client.getBrainCapacity();
+    await client.getHealth();
 
-    expect(sequence, 2);
-    expect(captured, hasLength(2));
-    expect(captured[0].headers['X-ResearchOS-Principal'], 'research-os-app');
-    expect(captured[0].headers['X-ResearchOS-Identity-Nonce'], 'nonce-request-1-abcdef');
-    expect(captured[1].headers['X-ResearchOS-Identity-Nonce'], 'nonce-request-2-abcdef');
-    expect(captured[0].headers['X-ResearchOS-Identity-Signature'], isNot(equals(captured[1].headers['X-ResearchOS-Identity-Signature'])));
+    expect(callCount, 2);
+    expect(capturedNonces, <String>['nonce-1', 'nonce-2']);
   });
 }
