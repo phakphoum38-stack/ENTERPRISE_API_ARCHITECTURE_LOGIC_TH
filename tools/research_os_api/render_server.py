@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
+from urllib.parse import urlsplit
 
 from v2_server import V2ResearchOSHandler
 from v2_service_auth import ServiceExposureAuthError, verify_service_request
@@ -15,6 +16,8 @@ class CloudResearchOSHandler(V2ResearchOSHandler):
     """Primary Research OS handler with V1 compatibility and V2 namespace."""
 
     def _authorize_exposure(self) -> bool:
+        if urlsplit(self.path).path == "/health":
+            return True
         try:
             bind_host = str(self.server.server_address[0])
             verify_service_request(
