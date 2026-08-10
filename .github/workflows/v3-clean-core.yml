@@ -53,6 +53,12 @@ jobs:
           python scripts/provider_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage provider_adapter --status passed --data '{"secret_exposed":false,"transport":"fake-no-network"}'
 
+      - name: Run V3 local service smoke
+        working-directory: v3
+        run: |
+          python scripts/service_smoke.py
+          python scripts/evidence.py --output evidence/progress.json --stage local_service --status passed --data '{"binding":"127.0.0.1","contract":"v3","max_capacity":46656}'
+
       - name: Run V3 Clean smoke test
         working-directory: v3
         run: |
