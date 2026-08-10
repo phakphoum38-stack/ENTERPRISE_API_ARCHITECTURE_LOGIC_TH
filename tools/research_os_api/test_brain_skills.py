@@ -1,6 +1,7 @@
 import unittest
 
 from brain_skills import (
+    ASSISTANT_LEAF_CAPACITY,
     BRAIN,
     MAX_LEAF_CAPACITY,
     AdaptiveHierarchyPolicy,
@@ -13,10 +14,34 @@ class BrainSkillsTests(unittest.TestCase):
         snapshot = BRAIN.capacity_snapshot()
         self.assertEqual(snapshot["branch_factor"], 6)
         self.assertEqual(snapshot["elastic_tiers"], 6)
+        self.assertEqual(snapshot["assistant_6x3_capacity"], 6**3)
+        self.assertEqual(snapshot["assistant_6x3_capacity"], ASSISTANT_LEAF_CAPACITY)
         self.assertEqual(snapshot["max_leaf_capacity"], 6**6)
         self.assertEqual(snapshot["max_leaf_capacity"], MAX_LEAF_CAPACITY)
+        self.assertEqual(snapshot["default_assistant_mode"], "assistant_6x3")
+        modes = {item["mode"]: item for item in snapshot["assistant_modes"]}
+        self.assertEqual(
+            modes["assistant_6x3"]["theoretical_assistants"],
+            ASSISTANT_LEAF_CAPACITY,
+        )
         self.assertFalse(snapshot["all_workers_started_by_default"])
         self.assertLess(snapshot["max_active_workers"], snapshot["max_leaf_capacity"])
+
+    def test_assistant_six_cubed_mode_is_named_and_bounded(self):
+        engine = BrainSkillsEngine(policy=AdaptiveHierarchyPolicy(max_active_workers=36))
+        plan = engine.plan("ขอผู้ช่วย 6^3 สำหรับจัดงานโปรเจกต์ใหญ่")
+        self.assertEqual(plan["assistant_profile"]["mode"], "assistant_6x3")
+        self.assertTrue(plan["assistant_profile"]["requested_by_objective"])
+        self.assertEqual(
+            plan["assistant_profile"]["theoretical_assistants"],
+            ASSISTANT_LEAF_CAPACITY,
+        )
+        self.assertEqual(plan["hierarchy"]["complexity_level"], 3)
+        self.assertEqual(plan["hierarchy"]["requested_workers"], 6**3)
+        self.assertEqual(plan["hierarchy"]["active_workers"], 36)
+        self.assertTrue(plan["hierarchy"]["backpressure_applied"])
+        self.assertEqual(plan["cognition"]["mode"], "assistant_6x3")
+        self.assertEqual(plan["cognition"]["candidate_capacity"], 6**3)
 
     def test_plan_applies_budget_readiness_and_backpressure(self):
         engine = BrainSkillsEngine(policy=AdaptiveHierarchyPolicy(max_active_workers=36))
