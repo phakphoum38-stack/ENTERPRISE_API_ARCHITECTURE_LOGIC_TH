@@ -19,10 +19,6 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
         self.assertEqual(manifest["factory_profiles"], ["1^3", "3^3", "6^3", "6^6"])
         self.assertEqual(manifest["capacity"]["assistant_6x3_capacity"], 216)
         self.assertEqual(manifest["capacity"]["max_leaf_capacity"], 46656)
-        self.assertEqual(
-            manifest["owners"]["file_ownership"],
-            "v2_file_ownership_boundary.FileOwnershipBoundary",
-        )
         self.assertFalse(manifest["invariants"]["all_workers_started_by_default"])
         self.assertFalse(manifest["invariants"]["duplicate_dependency_graph"])
         self.assertEqual(
@@ -30,7 +26,7 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
             "AgentOrchestrator",
         )
 
-    def test_plan_combines_brain_tools_owner_and_factory_planning(self) -> None:
+    def test_plan_combines_brain_tools_and_factory_planning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             master = UnifiedMasterOrchestrator(Path(tmp))
             result = master.plan(
@@ -46,24 +42,20 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
             "assistant_6x3",
         )
         self.assertFalse(result["tool_intelligence"]["execution_performed"])
-        self.assertEqual(result["file_ownership"]["owner"], "FileOwnershipBoundary")
-        self.assertFalse(result["file_ownership"]["ownership_change_performed"])
-        self.assertFalse(result["file_ownership"]["acl_change_performed"])
         self.assertFalse(result["execution"]["performed"])
-        self.assertFalse(result["execution"]["file_owner_changed"])
-        self.assertFalse(result["execution"]["file_acl_granted"])
+        self.assertFalse(result["execution"]["approval_bypassed"])
+        self.assertFalse(result["execution"]["external_tool_installed"])
+        self.assertFalse(result["execution"]["external_tool_executed"])
 
-    def test_status_exposes_file_owner_as_standalone_boundary(self) -> None:
+    def test_status_exposes_brain_tools_factory_and_health(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             master = UnifiedMasterOrchestrator(Path(tmp))
             status = master.status()
 
-        file_ownership = status["file_ownership"]
-        self.assertEqual(file_ownership["contract"], "research-os-file-ownership-boundary-v2")
-        self.assertEqual(file_ownership["owner"], "FileOwnershipBoundary")
-        self.assertEqual(file_ownership["implementation_state"], "boundary_only")
-        self.assertFalse(file_ownership["changes_file_owner"])
-        self.assertFalse(file_ownership["grants_file_acl"])
+        self.assertIn("brain_runtime", status)
+        self.assertIn("tool_intelligence", status)
+        self.assertIn("factory", status)
+        self.assertIn("intelligence_health", status)
 
 
 if __name__ == "__main__":
