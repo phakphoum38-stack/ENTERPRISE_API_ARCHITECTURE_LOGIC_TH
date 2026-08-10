@@ -83,7 +83,10 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
-  Future<Map<String, dynamic>> answerWithMemory(String question) async =>
+  Future<Map<String, dynamic>> answerWithMemory(
+    String question, {
+    String? webSearchQuery,
+  }) async =>
       <String, dynamic>{
         'text': 'คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด',
         'memory_hits': <Map<String, dynamic>>[
@@ -92,7 +95,10 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
-  Future<Map<String, dynamic>> generateText(String prompt) async =>
+  Future<Map<String, dynamic>> generateText(
+    String prompt, {
+    String? webSearchQuery,
+  }) async =>
       <String, dynamic>{'text': 'คำตอบจาก Gemini โดยตรง'};
 
   @override
