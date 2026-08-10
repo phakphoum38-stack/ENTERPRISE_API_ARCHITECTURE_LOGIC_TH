@@ -33,6 +33,35 @@ class BrainSkillsTests(unittest.TestCase):
         self.assertIn("coordination", plan["selected_skills"])
         self.assertIn("tool_selection", plan["selected_skills"])
         self.assertFalse(plan["requires_external_api_key"])
+        cognition = plan["cognition"]
+        self.assertEqual(cognition["mode"], "compound_6x6")
+        self.assertEqual(cognition["candidate_capacity"], 6**6)
+        self.assertEqual(cognition["hypothesis_branches"], 8)
+        self.assertEqual(cognition["critic_passes"], 6)
+        self.assertTrue(cognition["evidence_required"])
+        self.assertTrue(cognition["web_search_recommended"])
+        self.assertTrue(cognition["bounded"])
+        self.assertFalse(cognition["hidden_reasoning_exposed"])
+
+    def test_compound_intelligence_stays_bounded_at_large_capacity(self):
+        engine = BrainSkillsEngine(policy=AdaptiveHierarchyPolicy(max_active_workers=1296))
+        plan = engine.plan(
+            "ค้นข้อมูลล่าสุดพร้อมหลักฐาน",
+            complexity_level=6,
+            requested_workers=46656,
+            ready_workers=1296,
+        )
+        cognition = plan["cognition"]
+        self.assertEqual(plan["hierarchy"]["active_workers"], 1296)
+        self.assertEqual(cognition["hypothesis_branches"], 36)
+        self.assertEqual(cognition["consensus_quorum"], 24)
+        self.assertTrue(cognition["web_search_recommended"])
+
+    def test_research_instructions_require_sources_without_exposing_chain_of_thought(self):
+        plan = BRAIN.plan("current research evidence", complexity_level=2)
+        instructions = BRAIN.research_instructions(plan)
+        self.assertIn("Cite sources", instructions)
+        self.assertIn("do not reveal private chain-of-thought", instructions)
 
     def test_catalog_contains_guarded_brain_skills(self):
         catalog = BRAIN.catalog()
