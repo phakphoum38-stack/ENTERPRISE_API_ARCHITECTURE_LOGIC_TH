@@ -1,16 +1,6 @@
 name: Research OS Runtime Smoke Test
 
 on:
-  pull_request:
-    paths:
-      - "scripts/research-os-service.ps1"
-      - "tools/research_os_service/**"
-      - "tools/research_os_api/**"
-      - "installer/**"
-      - ".github/workflows/03-runtime-smoke-test.yml"
-      - ".github/workflows/04-build-installer.yml"
-      - ".github/workflows/05-installer-validation.yml"
-      - ".github/workflows/research-os-windows-desktop.yml"
   workflow_dispatch:
     inputs:
       target_sha:
@@ -31,15 +21,19 @@ permissions:
   contents: read
   actions: write
 
+concurrency:
+  group: research-os-runtime-smoke-${{ inputs.target_sha || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   runtime-smoke:
     name: Runtime and service smoke test
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       SOURCE_RUN_ID: ${{ inputs.source_service_run }}
-      CHAIN_REF: ${{ github.head_ref || github.ref_name }}
+      CHAIN_REF: ${{ github.ref_name }}
     steps:
       - name: Checkout tested revision
         uses: actions/checkout@v4
@@ -169,7 +163,7 @@ jobs:
             }
           }
 
-      - name: Dispatch installer build
+      - name: Dispatch installer build once for exact SHA
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
