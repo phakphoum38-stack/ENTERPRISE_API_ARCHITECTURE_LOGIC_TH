@@ -64,15 +64,78 @@ begin
     ResultCode) and (ResultCode = 0);
 end;
 
+function OwnerBundledPythonHasExited(): Boolean;
+var
+  ResultCode: Integer;
+  PowerShellExe: String;
+  PythonPath: String;
+  EscapedPythonPath: String;
+  CommandLine: String;
+begin
+  PythonPath := ExpandConstant('{app}\runtime\python\python.exe');
+  if not FileExists(PythonPath) then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  EscapedPythonPath := StringChangeEx(PythonPath, '''', '''''', True);
+  PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  CommandLine :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' +
+    '$target=[IO.Path]::GetFullPath(''''' + EscapedPythonPath + '''''); ' +
+    '$running=@(Get-CimInstance Win32_Process -Filter ''''Name = ''''''python.exe'''''''''''' | ' +
+    'Where-Object { $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $target) }); ' +
+    'if ($running.Count -eq 0) { exit 0 } else { exit 10 }"';
+
+  if not Exec(
+    PowerShellExe,
+    CommandLine,
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode) then
+  begin
+    Log('Could not launch bundled Python ownership check; refusing file replacement until runtime ownership is proven clear.');
+    Result := False;
+    Exit;
+  end;
+
+  if (ResultCode <> 0) and (ResultCode <> 10) then
+    Log('Bundled Python ownership check returned unexpected exit code ' + IntToStr(ResultCode) + '.');
+  Result := ResultCode = 0;
+end;
+
+function WaitForOwnerBundledPythonExit(): Boolean;
+var
+  I: Integer;
+begin
+  for I := 1 to 60 do
+  begin
+    if OwnerBundledPythonHasExited() then
+    begin
+      Log('Bundled Owner Python runtime is no longer running; file replacement may proceed.');
+      Result := True;
+      Exit;
+    end;
+    Sleep(500);
+  end;
+
+  Log('Bundled Owner Python runtime remained active after 30 seconds.');
+  Result := False;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ScExe: String;
   QueryCode: Integer;
   StopCode: Integer;
   I: Integer;
+  ServiceStopped: Boolean;
 begin
   Result := '';
   ScExe := ExpandConstant('{sys}\sc.exe');
+  ServiceStopped := False;
 
   Log('Checking Owner Friend Service before installer file replacement.');
   if not Exec(ScExe, 'query ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, QueryCode) then
@@ -83,34 +146,46 @@ begin
 
   if QueryCode <> 0 then
   begin
-    Log('ResearchOSOwnerFriendService is not registered; clean install may proceed.');
-    Exit;
-  end;
-
-  if OwnerFriendServiceIsStopped() then
+    Log('ResearchOSOwnerFriendService is not registered; checking for any orphaned bundled Python runtime before file replacement.');
+    ServiceStopped := True;
+  end
+  else if OwnerFriendServiceIsStopped() then
   begin
-    Log('ResearchOSOwnerFriendService is already stopped; file replacement may proceed.');
-    Exit;
-  end;
-
-  Log('Stopping ResearchOSOwnerFriendService before installer file replacement.');
-  if not Exec(ScExe, 'stop ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, StopCode) then
+    Log('ResearchOSOwnerFriendService is already stopped; checking bundled Python runtime ownership before file replacement.');
+    ServiceStopped := True;
+  end
+  else
   begin
-    Result := 'Failed to launch service stop command for ResearchOSOwnerFriendService.';
-    Exit;
-  end;
-
-  for I := 1 to 60 do
-  begin
-    if OwnerFriendServiceIsStopped() then
+    Log('Stopping ResearchOSOwnerFriendService before installer file replacement.');
+    if not Exec(ScExe, 'stop ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, StopCode) then
     begin
-      Log('ResearchOSOwnerFriendService reached STOPPED state; file replacement may proceed.');
+      Result := 'Failed to launch service stop command for ResearchOSOwnerFriendService.';
       Exit;
     end;
-    Sleep(500);
+
+    for I := 1 to 60 do
+    begin
+      if OwnerFriendServiceIsStopped() then
+      begin
+        Log('ResearchOSOwnerFriendService reached STOPPED state; waiting for bundled Python runtime to exit.');
+        ServiceStopped := True;
+        Break;
+      end;
+      Sleep(500);
+    end;
+
+    if not ServiceStopped then
+    begin
+      Result := 'ResearchOSOwnerFriendService did not reach STOPPED state within 30 seconds. sc.exe stop exit code: ' + IntToStr(StopCode);
+      Exit;
+    end;
   end;
 
-  Result := 'ResearchOSOwnerFriendService did not reach STOPPED state within 30 seconds. sc.exe stop exit code: ' + IntToStr(StopCode);
+  if not WaitForOwnerBundledPythonExit() then
+  begin
+    Result := 'ResearchOSOwnerFriendService is stopped, but the bundled runtime\python\python.exe process is still active after 30 seconds. Upgrade was stopped to prevent Access denied (code 5) during file replacement.';
+    Exit;
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
