@@ -21,7 +21,7 @@ class CloudResearchOSHandler(V2ResearchOSHandler):
         try:
             bind_host = str(self.server.server_address[0])
             verify_service_request(
-                {name: value for name, value in self.headers.items()},
+                self.headers,
                 bind_host=bind_host,
             )
             return True
