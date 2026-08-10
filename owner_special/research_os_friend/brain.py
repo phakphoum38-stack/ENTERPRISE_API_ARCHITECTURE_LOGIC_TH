@@ -7,6 +7,8 @@ class FriendBrain:
     """Adaptive logical-capacity selector; workers are activated lazily."""
 
     def select_scale(self, request: FriendRequest) -> ScaleProfile:
+        if request.helper_budget >= 1_000_000:
+            return ScaleProfile.FAST_MILLION
         score = max(1, request.complexity) + max(1, request.risk) + max(1, request.parallelism)
         if score <= 5:
             return ScaleProfile.ONE_CUBED
@@ -26,6 +28,8 @@ class FriendBrain:
             capabilities.append("decompose")
         if request.parallelism >= 3:
             capabilities.append("parallel-route")
+        if request.helper_budget >= 1_000_000:
+            capabilities.append("million-helper-routing")
         if request.risk >= 4:
             capabilities.append("extra-validation")
         return tuple(capabilities)

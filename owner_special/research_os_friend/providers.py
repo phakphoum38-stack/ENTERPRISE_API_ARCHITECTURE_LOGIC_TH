@@ -28,10 +28,28 @@ class ProviderRouter:
             raise ValueError(f"duplicate provider: {provider.name}")
         self._providers.append(provider)
 
+    def set_primary(self, provider: Provider) -> None:
+        self._providers = [existing for existing in self._providers if existing.name != provider.name]
+        self._providers.insert(0, provider)
+
+    def remove(self, name: str) -> None:
+        self._providers = [provider for provider in self._providers if provider.name != name]
+
     def primary(self) -> Provider:
         if not self._providers:
             raise RuntimeError("no provider configured")
         return self._providers[0]
+
+    def complete(self, *, prompt: str, context: tuple[str, ...]) -> tuple[str, str]:
+        if not self._providers:
+            raise RuntimeError("no provider configured")
+        errors: list[str] = []
+        for provider in self._providers:
+            try:
+                return provider.name, provider.complete(prompt=prompt, context=context)
+            except Exception as exc:
+                errors.append(f"{provider.name}:{type(exc).__name__}")
+        raise RuntimeError("all providers failed: " + ",".join(errors))
 
     def names(self) -> tuple[str, ...]:
         return tuple(provider.name for provider in self._providers)

@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 
 class SecretStore(Protocol):
     backend: str
-
     def read(self) -> str | None: ...
     def write(self, value: str) -> None: ...
 
@@ -48,31 +47,22 @@ class WindowsDpapiSecretStore:
         self.path = Path(path).resolve()
         self._crypt32 = ctypes.WinDLL("Crypt32.dll", use_last_error=True)
         self._kernel32 = ctypes.WinDLL("Kernel32.dll", use_last_error=True)
-        self._crypt32.CryptProtectData.argtypes = [
-            ctypes.POINTER(_DataBlob), wintypes.LPCWSTR, ctypes.POINTER(_DataBlob), ctypes.c_void_p,
-            ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(_DataBlob),
-        ]
-        self._crypt32.CryptProtectData.restype = wintypes.BOOL
-        self._crypt32.CryptUnprotectData.argtypes = [
-            ctypes.POINTER(_DataBlob), ctypes.POINTER(wintypes.LPWSTR), ctypes.POINTER(_DataBlob), ctypes.c_void_p,
-            ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(_DataBlob),
-        ]
-        self._crypt32.CryptUnprotectData.restype = wintypes.BOOL
+        self._kernel32.LocalFree.argtypes = [ctypes.c_void_p]
+        self._kernel32.LocalFree.restype = ctypes.c_void_p
 
     @staticmethod
-    def _blob(data: bytes) -> tuple[_DataBlob, ctypes.Array[ctypes.c_char]]:
+    def _blob(data: bytes) -> tuple[_DataBlob, object]:
         buffer = ctypes.create_string_buffer(data)
-        blob = _DataBlob(len(data), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte)))
-        return blob, buffer
+        return _DataBlob(len(data), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte))), buffer
 
     def write(self, value: str) -> None:
-        raw = value.encode("utf-8")
-        source, keepalive = self._blob(raw)
+        source, keepalive = self._blob(value.encode("utf-8"))
         protected = _DataBlob()
-        if not self._crypt32.CryptProtectData(
+        ok = self._crypt32.CryptProtectData(
             ctypes.byref(source), "Research OS Owner Special", None, None, None,
             self.CRYPTPROTECT_LOCAL_MACHINE, ctypes.byref(protected),
-        ):
+        )
+        if not ok:
             raise ctypes.WinError(ctypes.get_last_error())
         try:
             encrypted = ctypes.string_at(protected.pbData, protected.cbData)
@@ -87,19 +77,16 @@ class WindowsDpapiSecretStore:
     def read(self) -> str | None:
         if not self.path.is_file():
             return None
-        encrypted = self.path.read_bytes()
-        source, keepalive = self._blob(encrypted)
+        source, keepalive = self._blob(self.path.read_bytes())
         plain = _DataBlob()
-        description = wintypes.LPWSTR()
-        if not self._crypt32.CryptUnprotectData(
-            ctypes.byref(source), ctypes.byref(description), None, None, None, 0, ctypes.byref(plain)
-        ):
+        ok = self._crypt32.CryptUnprotectData(
+            ctypes.byref(source), None, None, None, None, 0, ctypes.byref(plain)
+        )
+        if not ok:
             raise ctypes.WinError(ctypes.get_last_error())
         try:
             return ctypes.string_at(plain.pbData, plain.cbData).decode("utf-8")
         finally:
-            if description:
-                self._kernel32.LocalFree(description)
             self._kernel32.LocalFree(plain.pbData)
             del keepalive
 
@@ -119,11 +106,7 @@ class ProviderSettingsStore:
         if not self.path.is_file():
             return ProviderConfig()
         payload = json.loads(self.path.read_text(encoding="utf-8"))
-        return ProviderConfig(
-            enabled=bool(payload.get("enabled", False)),
-            base_url=str(payload.get("base_url", "")),
-            model=str(payload.get("model", "")),
-        )
+        return ProviderConfig(bool(payload.get("enabled", False)), str(payload.get("base_url", "")), str(payload.get("model", "")))
 
     def save(self, config: ProviderConfig) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -155,8 +138,7 @@ class UrllibJsonTransport:
 
     def post_json(self, url: str, *, headers: dict[str, str], payload: dict[str, object], timeout: float) -> dict[str, object]:
         body = json.dumps(payload).encode("utf-8")
-        merged = {**headers, "Content-Type": "application/json"}
-        return self._open(urllib.request.Request(url, data=body, headers=merged, method="POST"), timeout)
+        return self._open(urllib.request.Request(url, data=body, headers={**headers, "Content-Type": "application/json"}, method="POST"), timeout)
 
 
 @dataclass
@@ -199,19 +181,10 @@ class OpenAICompatibleProvider:
 
 
 class ProviderManager:
-    def __init__(
-        self,
-        data_root: Path,
-        owner_id: str,
-        *,
-        secret_store: SecretStore | None = None,
-        transport: JsonTransport | None = None,
-    ) -> None:
+    def __init__(self, data_root: Path, owner_id: str, *, secret_store: SecretStore | None = None, transport: JsonTransport | None = None) -> None:
         owner_root = Path(data_root).resolve() / "owners" / owner_id / "provider"
         self.settings = ProviderSettingsStore(owner_root / "settings.json")
-        if secret_store is None:
-            secret_store = WindowsDpapiSecretStore(owner_root / "provider-key.dpapi") if os.name == "nt" else MemorySecretStore()
-        self.secret_store = secret_store
+        self.secret_store = secret_store or (WindowsDpapiSecretStore(owner_root / "provider-key.dpapi") if os.name == "nt" else MemorySecretStore())
         self.transport = transport or UrllibJsonTransport()
 
     @staticmethod
@@ -231,7 +204,7 @@ class ProviderManager:
             self.secret_store.write(api_key.strip())
         if enabled and not self.secret_store.read():
             raise ValueError("api_key is required before enabling provider")
-        self.settings.save(ProviderConfig(enabled=bool(enabled), base_url=normalized_url, model=normalized_model))
+        self.settings.save(ProviderConfig(bool(enabled), normalized_url, normalized_model))
         return self.safe_status()
 
     def provider(self) -> OpenAICompatibleProvider | None:

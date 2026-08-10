@@ -10,6 +10,7 @@ class ScaleProfile(str, Enum):
     THREE_CUBED = "3^3"
     SIX_CUBED = "6^3"
     SIX_TO_SIX = "6^6"
+    FAST_MILLION = "fast-1m"
 
     @property
     def logical_capacity(self) -> int:
@@ -18,6 +19,7 @@ class ScaleProfile(str, Enum):
             ScaleProfile.THREE_CUBED: 27,
             ScaleProfile.SIX_CUBED: 216,
             ScaleProfile.SIX_TO_SIX: 46656,
+            ScaleProfile.FAST_MILLION: 1_000_000,
         }[self]
 
 
@@ -30,6 +32,7 @@ class FriendRequest:
     complexity: int = 1
     risk: int = 1
     parallelism: int = 1
+    helper_budget: int = 0
     requested_skills: tuple[str, ...] = ()
     requested_tools: tuple[str, ...] = ()
 
