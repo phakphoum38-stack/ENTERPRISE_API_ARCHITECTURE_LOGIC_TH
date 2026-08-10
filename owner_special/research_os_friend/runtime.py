@@ -4,23 +4,29 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .brain import FriendBrain
+from .capabilities import CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
 from .evidence import EvidenceRecorder
 from .identity import OwnerIdentity
 from .memory import ScopedMemory
 from .models import FriendRequest, FriendResponse
 from .orchestrator import FriendOrchestrator
+from .persistent_memory import PersistentScopedMemory
 from .policy import OwnerPolicy
 from .providers import MockProvider, ProviderRouter
 from .reasoning import DecisionPlanner
 from .skills import SkillRegistry
 from .tools import ToolRegistry
+from .v3_bridge import V3Bridge
 
 
 @dataclass
 class FriendRuntime:
     owner: OwnerIdentity
     orchestrator: FriendOrchestrator
+    capabilities: CapabilityRegistry
+    bridge: V3Bridge
+    data_root: Path | None = None
 
     @classmethod
     def create_owner_special(
@@ -29,12 +35,26 @@ class FriendRuntime:
         *,
         display_name: str = "Owner",
         evidence_path: Path | None = None,
+        data_root: Path | None = None,
+        repository_root: Path | None = None,
     ) -> "FriendRuntime":
         owner = OwnerIdentity(owner_id=owner_id, display_name=display_name)
         skills = install_builtin_skills(SkillRegistry())
         tools = install_builtin_tools(ToolRegistry())
         providers = ProviderRouter()
         providers.register(MockProvider())
+        capabilities = install_friend_complete_capabilities()
+        bridge = V3Bridge(repository_root)
+
+        normalized_root = Path(data_root).resolve() if data_root is not None else None
+        if normalized_root is None:
+            memory: ScopedMemory = ScopedMemory()
+        else:
+            owner_root = normalized_root / "owners" / owner.owner_id
+            memory = PersistentScopedMemory(owner_root / "memory" / "memory.json")
+            if evidence_path is None:
+                evidence_path = owner_root / "evidence" / "events.jsonl"
+
         orchestrator = FriendOrchestrator(
             owner=owner,
             brain=FriendBrain(),
@@ -42,16 +62,23 @@ class FriendRuntime:
             skills=skills,
             tools=tools,
             providers=providers,
-            memory=ScopedMemory(),
+            memory=memory,
             policy=OwnerPolicy(),
             evidence=EvidenceRecorder(evidence_path),
         )
-        return cls(owner=owner, orchestrator=orchestrator)
+        return cls(
+            owner=owner,
+            orchestrator=orchestrator,
+            capabilities=capabilities,
+            bridge=bridge,
+            data_root=normalized_root,
+        )
 
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
 
     def architecture(self) -> dict[str, object]:
+        persistence = "disk" if isinstance(self.orchestrator.memory, PersistentScopedMemory) else "memory"
         return {
             "edition": self.owner.edition,
             "owner_id": self.owner.owner_id,
@@ -59,7 +86,11 @@ class FriendRuntime:
             "skills": self.orchestrator.skills.names(),
             "tools": self.orchestrator.tools.names(),
             "providers": self.orchestrator.providers.names(),
+            "capabilities": self.capabilities.names(),
+            "capability_manifest": self.capabilities.snapshot(),
             "memory_scope": "owner/profile/session",
+            "memory_persistence": persistence,
             "reasoning_storage": "high-level-summary-only",
             "evidence": "credential-redacted",
+            "v3_bridge": self.bridge.snapshot(),
         }
