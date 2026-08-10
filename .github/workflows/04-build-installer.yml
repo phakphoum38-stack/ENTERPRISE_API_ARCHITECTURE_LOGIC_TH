@@ -17,6 +17,10 @@ permissions:
   contents: read
   actions: write
 
+concurrency:
+  group: research-os-build-installer-${{ inputs.target_sha || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   build-installer:
     name: Build Setup EXE from verified components
@@ -148,4 +152,3 @@ jobs:
         run: |
           $releaseFlag = if ($env:DISPATCH_RELEASE -eq 'true') { 'true' } else { 'false' }
           gh workflow run 05-installer-validation.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f target_sha="$env:TARGET_SHA" -f source_installer_run="${{ github.run_id }}" -f dispatch_release="$releaseFlag"
-
