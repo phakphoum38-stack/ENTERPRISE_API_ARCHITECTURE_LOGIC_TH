@@ -177,6 +177,8 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(capacity["api_version"], "v2")
         self.assertEqual(capacity["capacity"]["branch_factor"], 6)
         self.assertEqual(capacity["capacity"]["elastic_tiers"], 6)
+        self.assertEqual(capacity["capacity"]["assistant_6x3_capacity"], 6**3)
+        self.assertEqual(capacity["capacity"]["default_assistant_mode"], "assistant_6x3")
         self.assertEqual(capacity["capacity"]["max_leaf_capacity"], 6**6)
         self.assertFalse(capacity["capacity"]["all_workers_started_by_default"])
 
@@ -201,6 +203,17 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertFalse(planned["plan"]["requires_external_api_key"])
         self.assertEqual(planned["plan"]["cognition"]["mode"], "compound_6x6")
         self.assertEqual(planned["plan"]["cognition"]["hypothesis_branches"], 8)
+
+        status, assistant = self.request(
+            "/v2/brain/plans",
+            method="POST",
+            body={"objective": "ขอผู้ช่วย 6^3 สำหรับจัดงานโปรเจกต์ใหญ่"},
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(assistant["plan"]["assistant_profile"]["mode"], "assistant_6x3")
+        self.assertEqual(assistant["plan"]["hierarchy"]["complexity_level"], 3)
+        self.assertEqual(assistant["plan"]["hierarchy"]["requested_workers"], 6**3)
+        self.assertEqual(assistant["plan"]["cognition"]["mode"], "assistant_6x3")
 
         status, invalid = self.request(
             "/v2/brain/plans",
