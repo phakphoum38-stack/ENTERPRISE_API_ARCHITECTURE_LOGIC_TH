@@ -43,6 +43,21 @@ class BrainSkillsTests(unittest.TestCase):
         self.assertEqual(plan["cognition"]["mode"], "assistant_6x3")
         self.assertEqual(plan["cognition"]["candidate_capacity"], 6**3)
 
+    def test_explicit_six_to_the_sixth_command_routes_to_compound_mode(self):
+        engine = BrainSkillsEngine(policy=AdaptiveHierarchyPolicy(max_active_workers=36))
+        plan = engine.plan("ใช้สมอง 6^6 วิเคราะห์เชิงลึก")
+        profile = plan["assistant_profile"]
+        self.assertEqual(profile["mode"], "compound_6x6")
+        self.assertTrue(profile["requested_by_objective"])
+        self.assertEqual(profile["requested_mode_by_objective"], "compound_6x6")
+        self.assertEqual(profile["theoretical_assistants"], MAX_LEAF_CAPACITY)
+        self.assertEqual(plan["hierarchy"]["complexity_level"], 6)
+        self.assertEqual(plan["hierarchy"]["requested_workers"], MAX_LEAF_CAPACITY)
+        self.assertEqual(plan["hierarchy"]["active_workers"], 36)
+        self.assertTrue(plan["hierarchy"]["backpressure_applied"])
+        self.assertEqual(plan["cognition"]["mode"], "compound_6x6")
+        self.assertEqual(plan["cognition"]["candidate_capacity"], MAX_LEAF_CAPACITY)
+
     def test_plan_applies_budget_readiness_and_backpressure(self):
         engine = BrainSkillsEngine(policy=AdaptiveHierarchyPolicy(max_active_workers=36))
         plan = engine.plan(
