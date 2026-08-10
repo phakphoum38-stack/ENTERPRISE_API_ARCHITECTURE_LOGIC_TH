@@ -10,6 +10,9 @@ class LocalServiceSecurityTests(unittest.TestCase):
         service_script = (ROOT / "scripts" / "research-os-service.ps1").read_text(
             encoding="utf-8"
         )
+        local_launcher = (ROOT / "scripts" / "start-research-os-local.ps1").read_text(
+            encoding="utf-8"
+        )
         service_host = (
             ROOT / "tools" / "research_os_service" / "Program.cs"
         ).read_text(encoding="utf-8")
@@ -19,6 +22,8 @@ class LocalServiceSecurityTests(unittest.TestCase):
 
         self.assertIn("RESEARCH_OS_API_HOST=127.0.0.1", service_script)
         self.assertNotIn("RESEARCH_OS_API_HOST=0.0.0.0", service_script)
+        self.assertIn('[string]$HostAddress = "127.0.0.1"', local_launcher)
+        self.assertNotIn('[string]$HostAddress = "0.0.0.0"', local_launcher)
         self.assertIn('?? "127.0.0.1"', service_host)
         self.assertIn('os.getenv("HOST", "127.0.0.1")', render_server)
 
