@@ -7,6 +7,7 @@ from .brain import FriendBrain
 from .capabilities import CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
 from .evidence import EvidenceRecorder
+from .helpers import HelperScheduler
 from .identity import OwnerIdentity
 from .memory import ScopedMemory
 from .models import FriendRequest, FriendResponse
@@ -26,18 +27,11 @@ class FriendRuntime:
     orchestrator: FriendOrchestrator
     capabilities: CapabilityRegistry
     bridge: V3Bridge
+    helpers: HelperScheduler
     data_root: Path | None = None
 
     @classmethod
-    def create_owner_special(
-        cls,
-        owner_id: str,
-        *,
-        display_name: str = "Owner",
-        evidence_path: Path | None = None,
-        data_root: Path | None = None,
-        repository_root: Path | None = None,
-    ) -> "FriendRuntime":
+    def create_owner_special(cls, owner_id: str, *, display_name: str = "Owner", evidence_path: Path | None = None, data_root: Path | None = None, repository_root: Path | None = None) -> "FriendRuntime":
         owner = OwnerIdentity(owner_id=owner_id, display_name=display_name)
         skills = install_builtin_skills(SkillRegistry())
         tools = install_builtin_tools(ToolRegistry())
@@ -45,7 +39,6 @@ class FriendRuntime:
         providers.register(MockProvider())
         capabilities = install_friend_complete_capabilities()
         bridge = V3Bridge(repository_root)
-
         normalized_root = Path(data_root).resolve() if data_root is not None else None
         if normalized_root is None:
             memory: ScopedMemory = ScopedMemory()
@@ -54,25 +47,8 @@ class FriendRuntime:
             memory = PersistentScopedMemory(owner_root / "memory" / "memory.json")
             if evidence_path is None:
                 evidence_path = owner_root / "evidence" / "events.jsonl"
-
-        orchestrator = FriendOrchestrator(
-            owner=owner,
-            brain=FriendBrain(),
-            planner=DecisionPlanner(),
-            skills=skills,
-            tools=tools,
-            providers=providers,
-            memory=memory,
-            policy=OwnerPolicy(),
-            evidence=EvidenceRecorder(evidence_path),
-        )
-        return cls(
-            owner=owner,
-            orchestrator=orchestrator,
-            capabilities=capabilities,
-            bridge=bridge,
-            data_root=normalized_root,
-        )
+        orchestrator = FriendOrchestrator(owner=owner, brain=FriendBrain(), planner=DecisionPlanner(), skills=skills, tools=tools, providers=providers, memory=memory, policy=OwnerPolicy(), evidence=EvidenceRecorder(evidence_path))
+        return cls(owner=owner, orchestrator=orchestrator, capabilities=capabilities, bridge=bridge, helpers=HelperScheduler(), data_root=normalized_root)
 
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
@@ -82,7 +58,8 @@ class FriendRuntime:
         return {
             "edition": self.owner.edition,
             "owner_id": self.owner.owner_id,
-            "brain_profiles": {"1^3": 1, "3^3": 27, "6^3": 216, "6^6": 46656},
+            "brain_profiles": {"1^3": 1, "3^3": 27, "6^3": 216, "6^6": 46656, "fast-1m": 1_000_000},
+            "helper_scheduler": {"max_logical_helpers": self.helpers.MAX_LOGICAL_HELPERS, "max_active_workers": self.helpers.MAX_ACTIVE_WORKERS, "activation": "bounded-adaptive"},
             "skills": self.orchestrator.skills.names(),
             "tools": self.orchestrator.tools.names(),
             "providers": self.orchestrator.providers.names(),
