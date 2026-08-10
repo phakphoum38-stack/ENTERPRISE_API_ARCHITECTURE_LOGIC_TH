@@ -22,10 +22,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: Unit tests
+      - name: Run owner_special/tests/test_*.py
         shell: bash
         run: PYTHONPATH=owner_special python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
-      - name: Friend Complete smoke
+      - name: Run owner_special/scripts/smoke.py
         shell: bash
         run: PYTHONPATH=owner_special python owner_special/scripts/smoke.py
 
@@ -39,11 +39,11 @@ jobs:
         with: {python-version: '3.12'}
       - uses: subosito/flutter-action@v2
         with: {channel: stable, cache: true}
-      - name: Generate Windows desktop host
+      - name: Generate owner_special/flutter_app/windows
         working-directory: owner_special/flutter_app
         shell: pwsh
         run: flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
-      - name: Flutter analyze test and build
+      - name: Analyze test build owner_special/flutter_app
         working-directory: owner_special/flutter_app
         shell: pwsh
         run: |
@@ -51,7 +51,7 @@ jobs:
           flutter analyze; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           flutter test; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           flutter build windows --release; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Start Owner Friend Service
+      - name: Run owner_special/scripts/run_friend_service.py
         shell: pwsh
         run: |
           $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\owner_special"
@@ -66,7 +66,7 @@ jobs:
           "RESEARCH_OS_FRIEND_URL=http://127.0.0.1:8790" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           for ($i=0; $i -lt 40; $i++) { try { $h=Invoke-RestMethod 'http://127.0.0.1:8790/owner/health' -TimeoutSec 2; if ($h.status -eq 'ok') { exit 0 } } catch {}; Start-Sleep -Milliseconds 250 }
           throw 'Owner Friend Service did not become ready'
-      - name: Launch Owner Desktop and prove startup boundaries
+      - name: Launch owner_special/flutter_app/build/windows/x64/runner/Release/research_os_owner_special.exe
         shell: pwsh
         run: |
           Set-Content $env:OWNER_FRIEND_AUDIT '' -Encoding utf8
@@ -84,11 +84,11 @@ jobs:
             }
             if (-not $proved) { throw 'Owner Desktop startup E2E failed' }
           } finally { if (-not $app.HasExited) { Stop-Process $app.Id -Force -ErrorAction SilentlyContinue } }
-      - name: Cleanup Owner Friend Service
+      - name: Cleanup owner_special/scripts/run_friend_service.py
         if: always()
         shell: pwsh
         run: if ($env:OWNER_FRIEND_PID) { Stop-Process ([int]$env:OWNER_FRIEND_PID) -Force -ErrorAction SilentlyContinue }
-      - name: Upload Owner Desktop
+      - name: Upload owner_special/flutter_app/build/windows/x64/runner/Release
         uses: actions/upload-artifact@v4
         with:
           name: owner-special-desktop-${{ github.sha }}
@@ -110,18 +110,18 @@ jobs:
         with:
           name: owner-special-desktop-${{ github.sha }}
           path: owner_special/installer/desktop
-      - name: Publish Owner ServiceHost
+      - name: Publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj
         shell: pwsh
         run: |
           dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish
           if ($LASTEXITCODE -ne 0) { throw 'Owner ServiceHost publish failed' }
-      - name: Stage Owner installer package
+      - name: Run owner_special/scripts/stage-owner-installer.ps1
         shell: pwsh
         run: .\owner_special\scripts\stage-owner-installer.ps1 -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\installer\desktop" -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
-      - name: Install Inno Setup
+      - name: Install Inno Setup for owner_special/installer/owner-special.iss
         shell: pwsh
         run: choco install innosetup --no-progress -y
-      - name: Build Owner Setup EXE
+      - name: Build owner_special/installer/owner-special.iss
         working-directory: owner_special/installer
         shell: pwsh
         run: |
@@ -129,16 +129,16 @@ jobs:
           & $iscc '.\owner-special.iss'
           if ($LASTEXITCODE -ne 0) { throw 'Owner Setup compilation failed' }
           if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe')) { throw 'Owner Setup EXE missing' }
-      - name: Validate clean install + provider + Turbo 1M
+      - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase clean
         shell: pwsh
         run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
-      - name: Validate in-place upgrade + memory preservation
+      - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase upgrade
         shell: pwsh
         run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
-      - name: Validate uninstall + data preservation
+      - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase uninstall
         shell: pwsh
         run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
-      - name: Upload Owner Installer
+      - name: Upload owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.0-x64.exe
         uses: actions/upload-artifact@v4
         with:
           name: owner-special-setup-${{ github.sha }}
@@ -156,10 +156,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: Build Owner Bundle
+      - name: Run owner_special/scripts/build_bundle.py
         shell: bash
         run: PYTHONPATH=owner_special python owner_special/scripts/build_bundle.py
-      - name: Verify Owner Bundle
+      - name: Verify owner_special/dist/Research-OS-Owner-Special-Friend-Complete.zip
         shell: bash
         run: |
           python - <<'PY'
@@ -175,7 +175,7 @@ jobs:
               if missing: raise SystemExit(f'Missing Owner Bundle files: {sorted(missing)}')
           print(result)
           PY
-      - name: Upload Owner Bundle
+      - name: Upload owner_special/dist outputs
         uses: actions/upload-artifact@v4
         with:
           name: owner-special-friend-complete-${{ github.sha }}
