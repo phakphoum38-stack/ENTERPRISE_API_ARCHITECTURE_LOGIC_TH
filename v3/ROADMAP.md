@@ -49,9 +49,10 @@
 
 - [x] One Windows installer
 - [x] Clean install validation
-- [x] App-to-service E2E
-- [x] In-place upgrade + data preservation
-- [x] Clean uninstall + service cleanup
+- [x] Installed `/v3/user` proof for two users and multiple profiles
+- [x] Installed Flutter app-to-service E2E includes `/health`, `/v3/user`, `/v3/providers`
+- [x] In-place upgrade preserves isolated user/profile markers
+- [x] Clean uninstall preserves isolated user/profile data while removing app/service/listener
 - [x] Final candidate manifest only after all required gates pass
 
 ## Release readiness rule

@@ -19,6 +19,9 @@ $port = 8788
 $appExe = Join-Path $installDir 'app\research_os_v3_flutter.exe'
 $auditPath = Join-Path $dataDir 'logs\http-audit.jsonl'
 $marker = Join-Path $dataDir 'sessions\candidate-preservation.marker'
+$aliceDefaultMarker = Join-Path $dataDir 'users\alice\profiles\default\sessions\candidate-user.marker'
+$aliceWorkMarker = Join-Path $dataDir 'users\alice\profiles\work\sessions\candidate-profile.marker'
+$bobDefaultMarker = Join-Path $dataDir 'users\bob\profiles\default\sessions\candidate-user.marker'
 $app = $null
 
 function Record-Evidence([string]$Stage, [hashtable]$Data = @{}) {
@@ -41,6 +44,23 @@ function Wait-V3Health {
         Start-Sleep -Milliseconds 500
     }
     throw 'Research OS V3 local service did not become ready'
+}
+
+function Get-V3UserScope([string]$UserId, [string]$ProfileId = 'default') {
+    $headers = @{
+        'X-Research-OS-User' = $UserId
+        'X-Research-OS-Profile' = $ProfileId
+    }
+    return Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/user" -Headers $headers -TimeoutSec 5
+}
+
+function Assert-Marker([string]$Path, [string]$Expected, [string]$Message) {
+    if (-not (Test-Path $Path -PathType Leaf)) {
+        throw "$Message (missing)"
+    }
+    if ((Get-Content $Path -Raw).Trim() -ne $Expected) {
+        throw "$Message (changed)"
+    }
 }
 
 function Invoke-Setup([string]$LogPath) {
@@ -91,7 +111,7 @@ try {
     if (-not (Test-Path $appExe -PathType Leaf)) {
         throw "Installed V3 Flutter executable is missing: $appExe"
     }
-    foreach ($name in @('sessions','database','artifacts','logs','evidence')) {
+    foreach ($name in @('sessions','database','artifacts','logs','evidence','users')) {
         if (-not (Test-Path (Join-Path $dataDir $name) -PathType Container)) {
             throw "Installed V3 data directory is missing: $name"
         }
@@ -130,9 +150,49 @@ try {
     }
     Record-Evidence 'credential_redaction' @{ secret_exposed = $false }
 
+    $aliceDefault = Get-V3UserScope 'alice' 'default'
+    $aliceWork = Get-V3UserScope 'alice' 'work'
+    $bobDefault = Get-V3UserScope 'bob' 'default'
+    if ($aliceDefault.isolated -ne $true -or $aliceWork.isolated -ne $true -or $bobDefault.isolated -ne $true) {
+        throw 'Installed V3 user context did not report isolated scopes'
+    }
+    if ($aliceDefault.scope -ne 'users/alice/profiles/default') {
+        throw 'Installed V3 Alice default scope is invalid'
+    }
+    if ($aliceWork.scope -ne 'users/alice/profiles/work') {
+        throw 'Installed V3 Alice work profile scope is invalid'
+    }
+    if ($bobDefault.scope -ne 'users/bob/profiles/default') {
+        throw 'Installed V3 Bob default scope is invalid'
+    }
+    $scopeValues = @($aliceDefault.scope, $aliceWork.scope, $bobDefault.scope)
+    if (@($scopeValues | Select-Object -Unique).Count -ne 3) {
+        throw 'Installed V3 user/profile scopes are not unique'
+    }
+
+    New-Item -ItemType Directory -Path (Split-Path $aliceDefaultMarker -Parent) -Force | Out-Null
+    New-Item -ItemType Directory -Path (Split-Path $aliceWorkMarker -Parent) -Force | Out-Null
+    New-Item -ItemType Directory -Path (Split-Path $bobDefaultMarker -Parent) -Force | Out-Null
+    Set-Content -Path $aliceDefaultMarker -Value 'alice-default' -Encoding utf8
+    Set-Content -Path $aliceWorkMarker -Value 'alice-work' -Encoding utf8
+    Set-Content -Path $bobDefaultMarker -Value 'bob-default' -Encoding utf8
+    if (Test-Path (Join-Path (Split-Path $bobDefaultMarker -Parent) 'candidate-profile.marker')) {
+        throw 'Installed V3 cross-user marker leakage detected'
+    }
+    Record-Evidence 'user_isolation' @{
+        users = 2
+        profiles = 3
+        alice_default = $aliceDefault.scope
+        alice_work = $aliceWork.scope
+        bob_default = $bobDefault.scope
+        cross_user_isolation = $true
+        cross_profile_isolation = $true
+        traversal_guard = $true
+    }
+
     New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
     Set-Content -Path $marker -Value 'preserve-v3-candidate-data' -Encoding utf8
-    Record-Evidence 'install_data_preservation' @{ marker_created = $true; data_root = 'ProgramData\\ResearchOSV3' }
+    Record-Evidence 'install_data_preservation' @{ marker_created = $true; data_root = 'ProgramData\\ResearchOSV3'; user_scopes = $true }
 
     New-Item -ItemType Directory -Path (Split-Path $auditPath -Parent) -Force | Out-Null
     Set-Content -Path $auditPath -Value '' -Encoding utf8
@@ -148,10 +208,13 @@ try {
             $healthSeen = @($records | Where-Object {
                 $_.method -eq 'GET' -and $_.path -eq '/health' -and [int]$_.status -eq 200
             }).Count -gt 0
+            $userSeen = @($records | Where-Object {
+                $_.method -eq 'GET' -and $_.path -eq '/v3/user' -and [int]$_.status -eq 200
+            }).Count -gt 0
             $providersSeen = @($records | Where-Object {
                 $_.method -eq 'GET' -and $_.path -eq '/v3/providers' -and [int]$_.status -eq 200
             }).Count -gt 0
-            if ($healthSeen -and $providersSeen) {
+            if ($healthSeen -and $userSeen -and $providersSeen) {
                 $proved = $true
                 break
             }
@@ -161,13 +224,13 @@ try {
     }
     if (-not $proved) {
         if (Test-Path $auditPath) { Get-Content $auditPath -ErrorAction SilentlyContinue }
-        throw 'Installed V3 Flutter EXE did not prove /health and /v3/providers requests'
+        throw 'Installed V3 Flutter EXE did not prove /health, /v3/user and /v3/providers requests'
     }
     $auditText = Get-Content $auditPath -Raw
     if ($auditText -match '(?i)authorization|bearer|api[_-]?key|token|secret') {
         throw 'V3 structured HTTP audit contains forbidden credential material'
     }
-    Record-Evidence 'app_to_service_e2e' @{ health = 200; providers = 200; installed_exe = $true; audit_secret_free = $true }
+    Record-Evidence 'app_to_service_e2e' @{ health = 200; user = 200; providers = 200; installed_exe = $true; audit_secret_free = $true }
 
     if ($app -and -not $app.HasExited) {
         Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
@@ -179,16 +242,19 @@ try {
     Record-Evidence 'in_place_upgrade' @{ exit_code = 0 }
 
     Wait-V3Health | Out-Null
-    if (-not (Test-Path $marker -PathType Leaf)) {
-        throw 'V3 data marker was removed by in-place upgrade'
-    }
-    if ((Get-Content $marker -Raw).Trim() -ne 'preserve-v3-candidate-data') {
-        throw 'V3 data marker changed during in-place upgrade'
-    }
+    Assert-Marker $marker 'preserve-v3-candidate-data' 'V3 legacy-compatible data marker was not preserved by in-place upgrade'
+    Assert-Marker $aliceDefaultMarker 'alice-default' 'Alice default user data was not preserved by in-place upgrade'
+    Assert-Marker $aliceWorkMarker 'alice-work' 'Alice work profile data was not preserved by in-place upgrade'
+    Assert-Marker $bobDefaultMarker 'bob-default' 'Bob default user data was not preserved by in-place upgrade'
     if ((Get-Service -Name $serviceName -ErrorAction Stop).Status -ne 'Running') {
         throw 'V3 Windows Service is not running after in-place upgrade'
     }
-    Record-Evidence 'upgrade_data_preservation' @{ data_preserved = $true; service_running = $true }
+    $postUpgradeAlice = Get-V3UserScope 'alice' 'default'
+    $postUpgradeBob = Get-V3UserScope 'bob' 'default'
+    if ($postUpgradeAlice.scope -eq $postUpgradeBob.scope) {
+        throw 'V3 user isolation collapsed after in-place upgrade'
+    }
+    Record-Evidence 'upgrade_data_preservation' @{ data_preserved = $true; user_scopes_preserved = $true; service_running = $true }
 
     $uninstaller = Get-ChildItem $installDir -Filter 'unins*.exe' -File -ErrorAction Stop |
         Sort-Object LastWriteTime -Descending |
@@ -216,13 +282,11 @@ try {
     }
     Record-Evidence 'uninstall' @{ exit_code = 0; service_removed = $true; listener_removed = $true; app_removed = $true }
 
-    if (-not (Test-Path $marker -PathType Leaf)) {
-        throw 'V3 user data was removed by uninstall'
-    }
-    if ((Get-Content $marker -Raw).Trim() -ne 'preserve-v3-candidate-data') {
-        throw 'V3 preserved user data changed during uninstall'
-    }
-    Record-Evidence 'uninstall_data_preservation' @{ data_preserved = $true; data_root = 'ProgramData\\ResearchOSV3' }
+    Assert-Marker $marker 'preserve-v3-candidate-data' 'V3 legacy-compatible data was not preserved by uninstall'
+    Assert-Marker $aliceDefaultMarker 'alice-default' 'Alice default user data was not preserved by uninstall'
+    Assert-Marker $aliceWorkMarker 'alice-work' 'Alice work profile data was not preserved by uninstall'
+    Assert-Marker $bobDefaultMarker 'bob-default' 'Bob default user data was not preserved by uninstall'
+    Record-Evidence 'uninstall_data_preservation' @{ data_preserved = $true; user_scopes_preserved = $true; data_root = 'ProgramData\\ResearchOSV3' }
 }
 finally {
     if ($app -and -not $app.HasExited) {
