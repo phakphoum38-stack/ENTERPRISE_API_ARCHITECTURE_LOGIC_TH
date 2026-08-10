@@ -1,0 +1,3 @@
+Research OS V3 Candidate request
+Reason: validate installed Flutter app local-service startup probe and complete exact-SHA Windows Candidate.
+Requested by: ChatGPT GitHub bridge
