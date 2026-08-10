@@ -201,6 +201,248 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/providers:
+    get:
+      summary: Return the provider gateway report without exposing credential values
+      responses:
+        "200":
+          description: Safe provider gateway status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /v2/master:
+    get:
+      summary: Return the Unified Master status, capacity, tool intelligence, factory, and health views
+      responses:
+        "200":
+          description: Unified Master status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [api_version, master]
+                properties:
+                  api_version:
+                    const: v2
+                  master:
+                    type: object
+                    additionalProperties: true
+  /v2/master/plan:
+    post:
+      summary: Create a planning-only Unified Master plan without executing tools or bypassing approval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective]
+              properties:
+                objective:
+                  type: string
+                  minLength: 1
+                session_id:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  pattern: '^[A-Za-z0-9._:-]+$'
+                context:
+                  type: object
+                  additionalProperties: true
+                complexity_level:
+                  type: integer
+                  minimum: 1
+                  maximum: 6
+                requested_workers:
+                  type: integer
+                  minimum: 1
+                  maximum: 46656
+                budget_workers:
+                  type: integer
+                  minimum: 1
+                ready_workers:
+                  type: integer
+                  minimum: 1
+                versions:
+                  type: array
+                  maxItems: 1296
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Planning-only Unified Master response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [api_version, master_plan]
+                properties:
+                  api_version:
+                    const: v2
+                  master_plan:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid or unsafe planning request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/intelligence:
+    get:
+      summary: Return the governed system-introspection manifest
+      responses:
+        "200":
+          description: Intelligence manifest
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /v2/intelligence/capabilities:
+    get:
+      summary: Return governed capability graph information
+      responses:
+        "200":
+          description: Capability view
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /v2/intelligence/agents:
+    get:
+      summary: Discover introspected agents by scope, capability, permission, and readiness
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: capability
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: ready_only
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Agent intelligence view
+  /v2/intelligence/skills:
+    get:
+      summary: Discover governed skills by capability, permission, and readiness
+      parameters:
+        - name: capability
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: ready_only
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Skill intelligence view
+  /v2/intelligence/tools:
+    get:
+      summary: Discover registered tools by capability, permission, and readiness
+      parameters:
+        - name: capability
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: ready_only
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Tool intelligence view
+  /v2/intelligence/permissions:
+    get:
+      summary: Return the governed permission model
+      responses:
+        "200":
+          description: Permission view
+  /v2/intelligence/architecture:
+    get:
+      summary: Return the current governed architecture view
+      responses:
+        "200":
+          description: Architecture view
+  /v2/intelligence/project-state:
+    get:
+      summary: Return the current project-state view
+      responses:
+        "200":
+          description: Project-state view
+  /v2/intelligence/health:
+    get:
+      summary: Return intelligence subsystem health
+      responses:
+        "200":
+          description: Intelligence health view
+  /v2/intelligence/plan:
+    post:
+      summary: Create a sanitized governed intelligence plan without executing it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective]
+              properties:
+                objective:
+                  type: string
+                  minLength: 1
+                session_id:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  pattern: '^[A-Za-z0-9._:-]+$'
+                context:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Governed intelligence plan
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Invalid or unsafe planning request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
   /v2/brain/skills:
     get:
       summary: List provider-neutral Brain Skills from the shared V3 registry
