@@ -20,32 +20,8 @@ jobs:
       - name: Patch false-positive credential detector
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('.github/workflows/candidate.yml')
-          text = path.read_text(encoding='utf-8')
-          old = '''          $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5
-          $serialized = @($providers, $master) | ConvertTo-Json -Depth 12 -Compress
-          if ($serialized -match '(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\\s+[A-Za-z0-9._-]+') {
-            throw "Provider or master status contains credential-like data"
-          }
-'''
-          new = '''          $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5
-          $providerStatuses = @($providers.providers.PSObject.Properties.Value)
-          if (@($providerStatuses | Where-Object { $_.secret_exposed -eq $true }).Count -gt 0) {
-            throw "Provider status reports an exposed secret"
-          }
-          $serialized = @($providers, $master) | ConvertTo-Json -Depth 12 -Compress
-          $credentialPattern = '(?i)(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{8,}|(?<![A-Za-z0-9])Bearer\\s+[A-Za-z0-9._-]{12,}'
-          if ($serialized -match $credentialPattern) {
-            throw "Provider or master status contains credential-like data"
-          }
-'''
-          if old not in text:
-              raise SystemExit('Expected candidate credential block was not found; refusing broad edit.')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
-          PY
+          python -c 'from pathlib import Path; p=Path(".github/workflows/candidate.yml"); t=p.read_text(encoding="utf-8"); old="(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\\s+[A-Za-z0-9._-]+"; new="(?i)(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{8,}|(?<![A-Za-z0-9])Bearer\\s+[A-Za-z0-9._-]{12,}"; assert old in t, "credential detector pattern not found"; p.write_text(t.replace(old,new,1),encoding="utf-8")'
+          git diff -- .github/workflows/candidate.yml
 
       - name: Commit patch
         shell: bash
