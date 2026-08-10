@@ -1,6 +1,6 @@
 param(
   [string]$DataDir = "$env:USERPROFILE\ResearchOSData",
-  [string]$HostAddress = "0.0.0.0",
+  [string]$HostAddress = "127.0.0.1",
   [int]$Port = 8787,
   [ValidateSet("gemini", "mock", "local", "openai-compatible", "anthropic")]
   [string]$Provider = "gemini",
@@ -42,8 +42,11 @@ Write-Host ""
 Write-Host "Research OS Local API"
 Write-Host "Data directory : $DataDir"
 Write-Host "Provider       : $Provider"
+Write-Host "Bind address   : $HostAddress"
 Write-Host "Local URL      : http://127.0.0.1:$Port"
-Write-Host "LAN URL        : http://<WINDOWS-IP>:$Port"
+if ($HostAddress -ne "127.0.0.1" -and $HostAddress -ne "localhost" -and $HostAddress -ne "::1") {
+  Write-Host "Exposed mode   : signed identity is required for protected API routes"
+}
 Write-Host ""
 Write-Host "Secrets are NOT stored by this script."
 Write-Host "Set GEMINI_API_KEY / RESEARCH_OS_GEMINI_API_KEY in your Windows environment when ready."
