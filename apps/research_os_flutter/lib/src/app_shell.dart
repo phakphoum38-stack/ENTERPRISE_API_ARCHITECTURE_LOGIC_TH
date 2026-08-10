@@ -34,7 +34,7 @@ class ResearchOSAppShell extends StatefulWidget {
 
 class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
   int _selectedIndex = 0;
-  bool _sidebarExpanded = true;
+  bool _sidebarExpanded = false;
 
   List<Widget> get _pages => <Widget>[
         HomePage(apiClient: widget.apiClient),
@@ -58,6 +58,17 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   void _select(int index) => setState(() => _selectedIndex = index);
 
+  void _toggleSidebar() {
+    setState(() => _sidebarExpanded = !_sidebarExpanded);
+  }
+
+  void _selectFromSidebar(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _sidebarExpanded = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = researchNavigationItems
@@ -68,31 +79,50 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         if (constraints.maxWidth >= 920) {
           return Scaffold(
             body: SafeArea(
-              child: Row(
+              child: Stack(
                 children: <Widget>[
-                  ResearchSidebar(
-                    expanded: _sidebarExpanded,
-                    selectedIndex: _selectedIndex,
-                    onToggle: () =>
-                        setState(() => _sidebarExpanded = !_sidebarExpanded),
-                    onSelected: _select,
-                  ),
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: Theme.of(context).dividerColor,
-                  ),
-                  Expanded(
-                    child: Column(
-                      children: <Widget>[
-                        Expanded(
-                          child: IndexedStack(
-                            index: _selectedIndex,
-                            children: _pages,
+                  Positioned.fill(
+                    left: ResearchSidebar.compactWidth,
+                    child: SizedBox.expand(
+                      key: const Key('desktop-content-pane'),
+                      child: Column(
+                        children: <Widget>[
+                          Expanded(
+                            child: IndexedStack(
+                              index: _selectedIndex,
+                              children: _pages,
+                            ),
                           ),
-                        ),
-                        const ResearchStatusBar(),
-                      ],
+                          const ResearchStatusBar(),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_sidebarExpanded)
+                    Positioned.fill(
+                      left: ResearchSidebar.expandedWidth,
+                      child: GestureDetector(
+                        key: const Key('desktop-sidebar-dismiss'),
+                        behavior: HitTestBehavior.translucent,
+                        onTap: _toggleSidebar,
+                      ),
+                    ),
+                  Positioned(
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    child: Material(
+                      elevation: _sidebarExpanded ? 12 : 0,
+                      shadowColor: Theme.of(context).shadowColor,
+                      shape: Border(
+                        right: BorderSide(color: Theme.of(context).dividerColor),
+                      ),
+                      child: ResearchSidebar(
+                        expanded: _sidebarExpanded,
+                        selectedIndex: _selectedIndex,
+                        onToggle: _toggleSidebar,
+                        onSelected: _selectFromSidebar,
+                      ),
                     ),
                   ),
                 ],
