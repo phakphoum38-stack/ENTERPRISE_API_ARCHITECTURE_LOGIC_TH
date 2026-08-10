@@ -22,6 +22,8 @@ class ResearchOSApiClient {
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
+  Future<Map<String, dynamic>> getBrainProviders() =>
+      _getJson('/v2/brain/providers');
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
@@ -166,18 +168,113 @@ class ResearchOSApiClient {
     return _decode(response);
   }
 
-  Future<Map<String, dynamic>> generateText(String prompt) {
+  Future<Map<String, dynamic>> generateText(
+    String prompt, {
+    String? webSearchQuery,
+  }) {
+    final searchQuery = webSearchQuery?.trim().isNotEmpty == true
+        ? webSearchQuery!.trim()
+        : shouldUseWebSearch(prompt)
+            ? _latestUserPrompt(prompt)
+            : null;
+    if (searchQuery != null) {
+      return searchWebWithBrain(searchQuery);
+    }
     return _postJson('/v1/ai/generate', <String, Object?>{
       'provider': 'gemini',
       'prompt': prompt,
     });
   }
 
-  Future<Map<String, dynamic>> answerWithMemory(String question) {
+  Future<Map<String, dynamic>> answerWithMemory(
+    String question, {
+    String? webSearchQuery,
+  }) {
+    final searchQuery = webSearchQuery?.trim().isNotEmpty == true
+        ? webSearchQuery!.trim()
+        : shouldUseWebSearch(question)
+            ? _latestUserPrompt(question)
+            : null;
+    if (searchQuery != null) {
+      return searchWebWithBrain(searchQuery);
+    }
     return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
       'provider': 'gemini',
       'question': question,
     });
+  }
+
+  Future<Map<String, dynamic>> searchWebWithBrain(
+    String query, {
+    int complexityLevel = 3,
+  }) async {
+    final response = await _postJson('/v2/brain/search', <String, Object?>{
+      'query': query.trim(),
+      'complexity_level': complexityLevel,
+    });
+    final rawResult = response['result'];
+    if (rawResult is! Map) return response;
+    final result = Map<String, dynamic>.from(rawResult);
+    final text = (result['text'] ?? '').toString().trim();
+    final sources = result['sources'];
+    final renderedSources = sources is List
+        ? sources
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .where((item) => (item['url'] ?? '').toString().trim().isNotEmpty)
+            .take(8)
+            .map((item) {
+              final url = (item['url'] ?? '').toString().trim();
+              final title = (item['title'] ?? url)
+                  .toString()
+                  .replaceAll('[', '')
+                  .replaceAll(']', '')
+                  .trim();
+              return '- [${title.isEmpty ? url : title}]($url)';
+            })
+            .toList()
+        : <String>[];
+    final answer = renderedSources.isEmpty
+        ? text
+        : '$text\n\n### Sources\n${renderedSources.join('\n')}';
+    return <String, dynamic>{
+      ...response,
+      'text': answer,
+      'sources': sources,
+      'provider': result['provider'],
+      'model': result['model'],
+    };
+  }
+
+  static bool shouldUseWebSearch(String prompt) {
+    final value = _latestUserPrompt(prompt).toLowerCase();
+    if (value.isEmpty) return false;
+    const explicitSearchTerms = <String>[
+      'เรียก api',
+      'เรียกapi',
+      'ใช้ api',
+      'ใช้api',
+      'ค้นเว็บ',
+      'ค้นหาเว็บ',
+      'ค้นทางเว็บ',
+      'web search',
+      'search the web',
+      'search web',
+      'ข้อมูลล่าสุด',
+      'ข่าวล่าสุด',
+      'current information',
+      'latest information',
+      'latest news',
+    ];
+    return explicitSearchTerms.any(value.contains);
+  }
+
+  static String _latestUserPrompt(String prompt) {
+    final value = prompt.trim();
+    const marker = '\nUser: ';
+    final index = value.lastIndexOf(marker);
+    if (index < 0) return value;
+    return value.substring(index + marker.length).trim();
   }
 
   Future<Map<String, dynamic>> commitMemory(
