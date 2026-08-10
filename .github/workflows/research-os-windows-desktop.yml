@@ -67,15 +67,24 @@ jobs:
           verify_run() {
             local run_id="$1"
             local expected="$2"
-            local workflow status conclusion head_sha
-            workflow="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
-            status="$(gh run view "$run_id" --repo "${{ github.repository }}" --json status --jq '.status')"
-            conclusion="$(gh run view "$run_id" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
-            head_sha="$(gh run view "$run_id" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
-            test "$workflow" = "$expected" || { echo "Unexpected workflow: $workflow"; exit 1; }
-            test "$status" = "completed" || { echo "Run $run_id is not completed"; exit 1; }
-            test "$conclusion" = "success" || { echo "Run $run_id did not succeed"; exit 1; }
-            test "$head_sha" = "$TARGET_SHA" || { echo "Run $run_id SHA $head_sha != $TARGET_SHA"; exit 1; }
+            local payload workflow status conclusion head_sha
+            for attempt in $(seq 1 40); do
+              payload="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName,status,conclusion,headSha)"
+              workflow="$(jq -r '.workflowName' <<<"$payload")"
+              status="$(jq -r '.status' <<<"$payload")"
+              conclusion="$(jq -r '.conclusion // ""' <<<"$payload")"
+              head_sha="$(jq -r '.headSha' <<<"$payload")"
+              test "$workflow" = "$expected" || { echo "Unexpected workflow: $workflow"; exit 1; }
+              test "$head_sha" = "$TARGET_SHA" || { echo "Run $run_id SHA $head_sha != $TARGET_SHA"; exit 1; }
+              if [ "$status" = "completed" ]; then
+                test "$conclusion" = "success" || { echo "Run $run_id did not succeed"; exit 1; }
+                return 0
+              fi
+              echo "Waiting for exact run $run_id to complete (attempt $attempt/40)"
+              sleep 3
+            done
+            echo "Run $run_id did not complete within 120 seconds"
+            exit 1
           }
           verify_run "$installer_run" "Research OS Build Installer"
           verify_run "$validation_run" "Research OS Installer Validation"
