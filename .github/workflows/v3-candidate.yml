@@ -1,0 +1,243 @@
+name: Research OS V3 Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to validate
+        required: false
+        type: string
+  push:
+    branches:
+      - architecture/v3-clean
+    paths:
+      - 'v3/**'
+      - '.github/workflows/v3-candidate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-v3-candidate-${{ inputs.target_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[candidate]')
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+
+    steps:
+      - name: Checkout exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Initialize incremental candidate evidence
+        working-directory: v3
+        shell: pwsh
+        run: |
+          python scripts/evidence.py --output evidence/candidate-progress.json --stage candidate --status passed --data '{"state":"started","target_sha":"${{ env.TARGET_SHA }}"}'
+
+      - name: Validate V3 source before packaging
+        working-directory: v3
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'V3 source unit tests failed' }
+          python scripts/factory_execution_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'V3 factory execution smoke failed' }
+          python scripts/evidence.py --output evidence/candidate-progress.json --stage source_validation --status passed --data '{"unit_tests":true,"factory_execution":true}'
+
+      - name: Build and test V3 Flutter Windows app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'D:\v3candidate'
+          $work = Join-Path $root 'flutter'
+          if (Test-Path $root) { Remove-Item $root -Recurse -Force }
+          New-Item -ItemType Directory -Path $work -Force | Out-Null
+          Copy-Item "$env:GITHUB_WORKSPACE\v3\flutter_app\*" $work -Recurse -Force
+          Push-Location $work
+          try {
+            flutter create --platforms=windows --project-name=research_os_v3_flutter .
+            if ($LASTEXITCODE -ne 0) { throw 'flutter create failed' }
+            flutter pub get
+            if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+            flutter analyze
+            if ($LASTEXITCODE -ne 0) { throw 'flutter analyze failed' }
+            flutter test
+            if ($LASTEXITCODE -ne 0) { throw 'flutter test failed' }
+            flutter build windows --release
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows release build failed' }
+          }
+          finally {
+            Pop-Location
+          }
+          $release = Join-Path $work 'build\windows\x64\runner\Release'
+          $exe = Join-Path $release 'research_os_v3_flutter.exe'
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "V3 Flutter executable missing: $exe" }
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item $exe).Length
+          $data = @{ exe_sha256 = $hash; exe_size = $size } | ConvertTo-Json -Compress
+          python v3/scripts/evidence.py --output v3/evidence/candidate-progress.json --stage windows_app --status passed --data $data
+
+      - name: Build V3 Windows ServiceHost
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'D:\v3candidate\service'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          dotnet publish v3/windows_service/ResearchOS.V3.ServiceHost.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:DebugType=None `
+            -o $out
+          if ($LASTEXITCODE -ne 0) { throw 'V3 ServiceHost publish failed' }
+          $exe = Join-Path $out 'ResearchOS.V3.ServiceHost.exe'
+          if (-not (Test-Path $exe -PathType Leaf)) { throw 'V3 ServiceHost executable missing' }
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item $exe).Length
+          $data = @{ exe_sha256 = $hash; exe_size = $size } | ConvertTo-Json -Compress
+          python v3/scripts/evidence.py --output v3/evidence/candidate-progress.json --stage service_host_build --status passed --data $data
+
+      - name: Stage one Windows installer package
+        shell: pwsh
+        run: |
+          .\v3\scripts\stage_candidate.ps1 `
+            -FlutterReleaseDir 'D:\v3candidate\flutter\build\windows\x64\runner\Release' `
+            -ServiceHostDir 'D:\v3candidate\service' `
+            -FlutterIconPath 'D:\v3candidate\flutter\windows\runner\resources\app_icon.ico'
+          $files = @(Get-ChildItem v3\installer\package -File -Recurse)
+          $bytes = ($files | Measure-Object -Property Length -Sum).Sum
+          $data = @{ files = $files.Count; bytes = [long]$bytes; bundled_python = $true } | ConvertTo-Json -Compress
+          python v3/scripts/evidence.py --output v3/evidence/candidate-progress.json --stage installer_package --status passed --data $data
+
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build single V3 Setup EXE
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = 'v3\installer\output'
+          if (Test-Path $output) { Remove-Item $output -Recurse -Force }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc -PathType Leaf)) { throw "Inno Setup compiler not found: $iscc" }
+          & $iscc 'v3\installer\research-os-v3.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'V3 Inno Setup compilation failed' }
+          $setup = Get-ChildItem $output -Filter 'Research-OS-V3-Setup-*-x64.exe' -File | Select-Object -First 1
+          if (-not $setup) { throw 'Research OS V3 Setup EXE was not produced' }
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = $setup.Length
+          "V3_SETUP_EXE=$($setup.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $data = @{ filename = $setup.Name; sha256 = $hash; size = [long]$size } | ConvertTo-Json -Compress
+          python v3/scripts/evidence.py --output v3/evidence/candidate-progress.json --stage setup_exe_build --status passed --data $data
+
+      - name: Clean install E2E upgrade and uninstall validation
+        shell: pwsh
+        run: |
+          .\v3\scripts\candidate_validate.ps1 `
+            -SetupPath $env:V3_SETUP_EXE `
+            -EvidencePath 'v3\evidence\candidate-progress.json'
+
+      - name: Create final exact-SHA candidate manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $progressPath = 'v3\evidence\candidate-progress.json'
+          $progress = Get-Content $progressPath -Raw | ConvertFrom-Json -AsHashtable
+          $progress['candidate_status'] = 'passed'
+          $progress['target_sha'] = $env:TARGET_SHA
+          $progress['run_id'] = '${{ github.run_id }}'
+          $progress | ConvertTo-Json -Depth 30 | Set-Content $progressPath -Encoding utf8
+
+          $setup = Get-Item $env:V3_SETUP_EXE
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = [ordered]@{
+            schema_version = 1
+            target_sha = $env:TARGET_SHA
+            candidate_run = '${{ github.run_id }}'
+            validation = 'passed'
+            build_policy = 'single-windows-runner'
+            installer = [ordered]@{
+              filename = $setup.Name
+              sha256 = $hash
+              size = [long]$setup.Length
+            }
+            service = [ordered]@{
+              name = 'ResearchOSV3Service'
+              binding = '127.0.0.1'
+              port = 8788
+            }
+            data_boundary = 'ProgramData\\ResearchOSV3'
+            upgrade_policy = 'in-place-preserve-data'
+            uninstall_policy = 'remove-app-and-service-preserve-data'
+            stages = $progress['stages']
+          }
+          $manifest | ConvertTo-Json -Depth 30 | Set-Content 'v3\evidence\candidate-manifest.json' -Encoding utf8
+          "$hash  $($setup.Name)" | Set-Content 'v3\evidence\SHA256SUMS.txt' -Encoding ascii
+
+      - name: Upload verified V3 candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-verified-candidate-${{ env.TARGET_SHA }}
+          path: |
+            v3/installer/output/Research-OS-V3-Setup-*-x64.exe
+            v3/evidence/candidate-manifest.json
+            v3/evidence/SHA256SUMS.txt
+            v3/evidence/candidate-progress.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Final candidate cleanup
+        if: always()
+        shell: pwsh
+        run: |
+          $serviceName = 'ResearchOSV3Service'
+          $script = Join-Path $env:ProgramFiles 'Research OS V3\scripts\v3-service.ps1'
+          if (Test-Path $script -PathType Leaf) {
+            try { & $script -Action uninstall } catch { }
+          }
+          $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+          if ($service -and $service.Status -ne 'Stopped') { Stop-Service $serviceName -Force -ErrorAction SilentlyContinue }
+          if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) { sc.exe delete $serviceName | Out-Null }
+          foreach ($listener in @(Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)) {
+            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload incremental V3 candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-candidate-progress-${{ env.TARGET_SHA }}-${{ github.run_id }}
+          path: v3/evidence/candidate-progress.json
+          if-no-files-found: warn
+          retention-days: 30
