@@ -40,15 +40,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile API modules
+      - name: Compile unified Python modules
         run: |
-          python -m compileall -q tools/research_os_api tools/research_curator
+          python -m compileall -q tools/research_os_api tools/research_curator software_factory
 
-      - name: Run API unit tests
+      - name: Run API and software factory unit tests
         run: |
           export RESEARCH_OS_DATA_DIR="$RUNNER_TEMP/ResearchOSData"
           export RESEARCH_OS_CONVERSATION_STORE="$RUNNER_TEMP/ResearchOSData/sessions/conversations.json"
           python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+          python -m unittest discover -s tests -p "test_adaptive_software_factory*.py" -v
 
       - name: Set up Flutter
         if: ${{ inputs.include_flutter == true }}

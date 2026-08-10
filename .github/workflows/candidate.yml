@@ -54,15 +54,18 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Run API compile and tests
+      - name: Run API and unified factory tests
         working-directory: src
         shell: pwsh
         run: |
           $env:RESEARCH_OS_DATA_DIR = "$env:RUNNER_TEMP\ResearchOSData"
           $env:RESEARCH_OS_CONVERSATION_STORE = "$env:RUNNER_TEMP\ResearchOSData\sessions\conversations.json"
-          python -m compileall -q tools/research_os_api tools/research_curator
+          python -m compileall -q tools/research_os_api tools/research_curator software_factory
+          if ($LASTEXITCODE -ne 0) { throw "Python compile failed" }
           python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "API tests failed" }
+          python -m unittest discover -s tests -p "test_adaptive_software_factory*.py" -v
+          if ($LASTEXITCODE -ne 0) { throw "Adaptive Software Factory tests failed" }
 
       - name: Stage Flutter app at short path
         shell: pwsh
@@ -117,6 +120,13 @@ jobs:
               Start-Sleep -Milliseconds 500
             }
             if (-not $ready) { throw "Local API did not become ready" }
+            $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
+            if ($master.master.capacity.assistant_6x3_capacity -ne 216) {
+              throw "Unified Master 6^3 capacity is invalid"
+            }
+            if ($master.master.capacity.max_leaf_capacity -ne 46656) {
+              throw "Unified Master 6^6 capacity is invalid"
+            }
           }
           finally {
             .\scripts\stop-research-os-local.ps1 -Port 8787 -PidFile "$data\run\research-os-api.pid" -ErrorAction SilentlyContinue
@@ -138,6 +148,10 @@ jobs:
               Start-Sleep -Milliseconds 500
             }
             if (-not $ready) { throw "Windows Service API did not become ready" }
+            $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
+            if ($master.master.contract -ne "unified-master-orchestrator-v3") {
+              throw "Windows Service Unified Master contract is missing"
+            }
             $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
             if (-not $service -or $service.State -ne 'Running') { throw "ResearchOSService is not running" }
           }
@@ -159,6 +173,11 @@ jobs:
           Copy-Item "tools\research_os_service\publish\*" "$package\tools\research_os_service\publish" -Recurse -Force
           New-Item -ItemType Directory -Force -Path "$package\tools\research_os_api" | Out-Null
           Copy-Item "tools\research_os_api\*.py" "$package\tools\research_os_api" -Force
+          New-Item -ItemType Directory -Force -Path "$package\software_factory" | Out-Null
+          Copy-Item "software_factory\*.py" "$package\software_factory" -Force
+          if (-not (Test-Path "$package\software_factory\__init__.py")) {
+            throw "Unified Software Factory package is missing"
+          }
           New-Item -ItemType Directory -Force -Path "$package\tools\research_curator" | Out-Null
           Copy-Item "tools\research_curator\*" "$package\tools\research_curator" -Recurse -Force
           if (Test-Path "apps\research_os_web") {
@@ -247,10 +266,18 @@ jobs:
           $unsafe = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1', '::1') })
           if ($unsafe) { throw "Research OS API must listen on loopback only" }
 
+          $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
+          if ($master.master.contract -ne "unified-master-orchestrator-v3") {
+            throw "Installed candidate Unified Master contract is missing"
+          }
+          if ($master.master.capacity.assistant_6x3_capacity -ne 216 -or $master.master.capacity.max_leaf_capacity -ne 46656) {
+            throw "Installed candidate Unified Master capacity is invalid"
+          }
+
           $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5
-          $serialized = $providers | ConvertTo-Json -Depth 8 -Compress
+          $serialized = @($providers, $master) | ConvertTo-Json -Depth 12 -Compress
           if ($serialized -match '(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._-]+') {
-            throw "Provider status contains credential-like data"
+            throw "Provider or master status contains credential-like data"
           }
 
           $serviceLog = Join-Path $env:ProgramData 'ResearchOS\logs\service-api.err.log'
@@ -317,12 +344,15 @@ jobs:
           $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($setup.Name)" | Set-Content "$out\SHA256SUMS.txt" -Encoding utf8
           $manifest = [ordered]@{
-            schema_version = 2
+            schema_version = 3
             target_sha = "$env:TARGET_SHA"
             candidate_run = "${{ github.run_id }}"
             validation = "passed"
             build_policy = "single-windows-runner"
             app_to_service_e2e = "passed"
+            unified_master = "passed"
+            assistant_6x3_capacity = 216
+            compound_6x6_capacity = 46656
             release_created = $false
             tag_created = $false
             artifact = [ordered]@{
