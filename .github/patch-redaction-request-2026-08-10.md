@@ -1,0 +1,1 @@
+One-time maintenance request: patch the candidate credential detector so `sk-` must begin at a token boundary and provider `secret_exposed` is checked structurally before serialized secret-pattern scanning.
