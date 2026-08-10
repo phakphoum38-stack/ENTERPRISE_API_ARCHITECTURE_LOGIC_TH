@@ -16,8 +16,8 @@
 - [x] OpenAI-compatible adapter behind a strict interface
 - [x] Provider readiness/connectivity probes
 - [x] Secret source abstraction for environment-backed credentials
-- [ ] OS-native secret store source
-- [ ] Retry, timeout, circuit breaker, and provider fallback policy
+- [x] OS-native secret store source (Windows Credential Manager)
+- [x] Retry, timeout, circuit breaker, and provider fallback policy
 
 ## Phase 3 - Local service
 
@@ -42,9 +42,13 @@
 
 ## Phase 6 - Installer and candidate
 
-- [ ] One Windows installer
-- [ ] Clean install validation
-- [ ] App-to-service E2E
-- [ ] In-place upgrade + data preservation
-- [ ] Clean uninstall + service cleanup
-- [ ] Final candidate manifest only after all required gates pass
+- [x] One Windows installer
+- [x] Clean install validation
+- [x] App-to-service E2E
+- [x] In-place upgrade + data preservation
+- [x] Clean uninstall + service cleanup
+- [x] Final candidate manifest only after all required gates pass
+
+## Release readiness rule
+
+A commit is release-ready only when its exact SHA passes the V3 Core, Provider Hardening, Software Factory, and Candidate workflows. Passing evidence from earlier SHAs is retained for audit but is not substituted for final exact-SHA validation.
