@@ -47,6 +47,27 @@ class UnifiedMasterOrchestratorTests(unittest.TestCase):
         self.assertFalse(result["execution"]["external_tool_installed"])
         self.assertFalse(result["execution"]["external_tool_executed"])
 
+    def test_explicit_6x6_keeps_tool_intelligence_planning_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            master = UnifiedMasterOrchestrator(Path(tmp))
+            result = master.plan(
+                "ใช้สมอง 6^6 วิเคราะห์เชิงลึกและวางแผนเครื่องมือสำหรับ API",
+                context={"required_tool_capabilities": ["api_integration", "testing"]},
+                versions=(UNIFIED_VERSION,),
+            )
+
+        self.assertEqual(
+            result["compound_brain"]["assistant_profile"]["mode"],
+            "compound_6x6",
+        )
+        self.assertEqual(
+            result["compound_brain"]["assistant_profile"]["theoretical_assistants"],
+            46656,
+        )
+        self.assertFalse(result["tool_intelligence"]["execution_performed"])
+        self.assertFalse(result["execution"]["external_tool_installed"])
+        self.assertFalse(result["execution"]["external_tool_executed"])
+
     def test_status_exposes_brain_tools_factory_and_health(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             master = UnifiedMasterOrchestrator(Path(tmp))
