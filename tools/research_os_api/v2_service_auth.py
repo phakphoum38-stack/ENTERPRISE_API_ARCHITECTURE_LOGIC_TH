@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import threading
 from collections.abc import Mapping
 
 from developer_identity import (
@@ -20,6 +21,11 @@ from developer_identity import (
 
 class ServiceExposureAuthError(PermissionError):
     """Raised when a non-loopback service request cannot be authenticated."""
+
+
+_VERIFIER_LOCK = threading.RLock()
+_VERIFIER: IdentityAssertionVerifier | None = None
+_VERIFIER_CONFIG: tuple[str, int] | None = None
 
 
 def is_loopback_host(host: str | None) -> bool:
@@ -40,6 +46,19 @@ def service_bind_host(default: str = "127.0.0.1") -> str:
         or os.environ.get("HOST")
         or default
     ).strip()
+
+
+def _verifier(secret: str, max_age_seconds: int) -> IdentityAssertionVerifier:
+    global _VERIFIER, _VERIFIER_CONFIG
+    config = (secret, int(max_age_seconds))
+    with _VERIFIER_LOCK:
+        if _VERIFIER is None or _VERIFIER_CONFIG != config:
+            _VERIFIER = IdentityAssertionVerifier(
+                secret,
+                max_age_seconds=max_age_seconds,
+            )
+            _VERIFIER_CONFIG = config
+        return _VERIFIER
 
 
 def verify_service_request(
@@ -76,11 +95,7 @@ def verify_service_request(
             ) from exc
 
     try:
-        verifier = IdentityAssertionVerifier(
-            configured_secret,
-            max_age_seconds=max_age_seconds,
-        )
-        return verifier.verify(headers)
+        return _verifier(configured_secret, max_age_seconds).verify(headers)
     except IdentityAssertionError as exc:
         raise ServiceExposureAuthError(str(exc)) from exc
 
