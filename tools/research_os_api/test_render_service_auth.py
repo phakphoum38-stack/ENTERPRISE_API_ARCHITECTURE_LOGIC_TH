@@ -17,29 +17,30 @@ from render_server import CloudResearchOSHandler
 
 class RenderServiceAuthTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.original_host = os.environ.get("RESEARCH_OS_API_HOST")
         self.original_secret = os.environ.get("RESEARCH_OS_IDENTITY_PROXY_SECRET")
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), CloudResearchOSHandler)
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self.thread.start()
-        self.base = f"http://127.0.0.1:{self.server.server_port}"
+        self.started: list[tuple[ThreadingHTTPServer, threading.Thread]] = []
 
     def tearDown(self) -> None:
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=2)
-        if self.original_host is None:
-            os.environ.pop("RESEARCH_OS_API_HOST", None)
-        else:
-            os.environ["RESEARCH_OS_API_HOST"] = self.original_host
+        for server, thread in reversed(self.started):
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
         if self.original_secret is None:
             os.environ.pop("RESEARCH_OS_IDENTITY_PROXY_SECRET", None)
         else:
             os.environ["RESEARCH_OS_IDENTITY_PROXY_SECRET"] = self.original_secret
 
-    def request(self, headers=None):
+    def start_server(self, bind_host: str) -> str:
+        server = ThreadingHTTPServer((bind_host, 0), CloudResearchOSHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.started.append((server, thread))
+        return f"http://127.0.0.1:{server.server_port}"
+
+    @staticmethod
+    def request(base: str, headers=None):
         request = urllib.request.Request(
-            self.base + "/health",
+            base + "/health",
             headers=headers or {},
             method="GET",
         )
@@ -50,18 +51,18 @@ class RenderServiceAuthTests(unittest.TestCase):
             return exc.code, json.loads(exc.read().decode("utf-8"))
 
     def test_loopback_mode_remains_available_without_identity_headers(self) -> None:
-        os.environ["RESEARCH_OS_API_HOST"] = "127.0.0.1"
         os.environ.pop("RESEARCH_OS_IDENTITY_PROXY_SECRET", None)
-        status, payload = self.request()
+        base = self.start_server("127.0.0.1")
+        status, payload = self.request(base)
         self.assertEqual(status, 200)
         self.assertEqual(payload["status"], "ok")
 
     def test_exposed_mode_requires_valid_fresh_signed_identity(self) -> None:
         secret = "render-service-auth-test-secret-123456"
-        os.environ["RESEARCH_OS_API_HOST"] = "0.0.0.0"
         os.environ["RESEARCH_OS_IDENTITY_PROXY_SECRET"] = secret
+        base = self.start_server("0.0.0.0")
 
-        status, payload = self.request()
+        status, payload = self.request(base)
         self.assertEqual(status, 401)
         self.assertEqual(payload["error"], "service_identity_required")
 
@@ -80,11 +81,11 @@ class RenderServiceAuthTests(unittest.TestCase):
             ),
         }
 
-        status, payload = self.request(headers)
+        status, payload = self.request(base, headers)
         self.assertEqual(status, 200)
         self.assertEqual(payload["status"], "ok")
 
-        status, payload = self.request(headers)
+        status, payload = self.request(base, headers)
         self.assertEqual(status, 401)
         self.assertEqual(payload["error"], "service_identity_required")
 
