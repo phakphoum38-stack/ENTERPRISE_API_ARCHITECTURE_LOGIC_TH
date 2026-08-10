@@ -10,7 +10,6 @@ from typing import Any, Mapping, Sequence
 import agent_server
 from brain_skills import BRAIN, BrainSkillsEngine
 from v2_brain_runtime import BRAIN_RUNTIME, BrainRuntime
-from v2_file_ownership_boundary import FILE_OWNERSHIP, FileOwnershipBoundary
 from v2_system_introspection import SystemIntrospection
 from v2_tool_intelligence import ToolIntelligence
 
@@ -35,12 +34,10 @@ class UnifiedMasterOrchestrator:
         *,
         brain_runtime: BrainRuntime | None = None,
         compound_brain: BrainSkillsEngine | None = None,
-        file_ownership: FileOwnershipBoundary | None = None,
     ) -> None:
         self.repository_root = (repository_root or _REPO_ROOT).resolve()
         self.brain_runtime = brain_runtime or BRAIN_RUNTIME
         self.compound_brain = compound_brain or BRAIN
-        self.file_ownership = file_ownership or FILE_OWNERSHIP
         self.agent_orchestrator = agent_server.ORCHESTRATOR
         self.operational_registry = agent_server.REGISTRY
         self.intelligence = SystemIntrospection(
@@ -68,7 +65,6 @@ class UnifiedMasterOrchestrator:
                 "tool_registry": "BrainRuntime.tools",
                 "tool_intelligence": "v2_tool_intelligence.ToolIntelligence",
                 "tool_learning": "BrainRuntime.learning",
-                "file_ownership": "v2_file_ownership_boundary.FileOwnershipBoundary",
                 "factory_control": "software_factory.AdaptiveControlPlane",
                 "provider_gateway": "existing provider gateway",
             },
@@ -94,7 +90,6 @@ class UnifiedMasterOrchestrator:
             **self.manifest(),
             "brain_runtime": runtime,
             "tool_intelligence": self.tool_intelligence.dashboard(),
-            "file_ownership": self.file_ownership.manifest(),
             "factory": self.factory_control.summary(),
             "intelligence_health": self.intelligence.health(),
         }
@@ -160,7 +155,6 @@ class UnifiedMasterOrchestrator:
             "compound_brain": compound_plan,
             "governed_brain": governed_plan,
             "tool_intelligence": tool_strategy,
-            "file_ownership": self.file_ownership.plan(),
             "factory": {
                 "profile": factory_plan.profile.label,
                 "logical_capacity": factory_plan.profile.capacity,
@@ -174,15 +168,10 @@ class UnifiedMasterOrchestrator:
                 "approval_bypassed": False,
                 "external_tool_installed": False,
                 "external_tool_executed": False,
-                "file_owner_changed": False,
-                "file_acl_granted": False,
                 "canonical_dependency_graph": "AgentOrchestrator",
                 "lazy_activation": True,
             },
         }
-
-    def file_ownership_status(self) -> dict[str, Any]:
-        return self.file_ownership.manifest()
 
     def discover_tools(
         self,
