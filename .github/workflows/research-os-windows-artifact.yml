@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FRIEND_REF: e8005d0cf650069dd0204f1a4d00a5d10f712c8e
+  FRIEND_REF: 4a2d38602cdc1266e54bb1b5a9d7fdee0777a286
 
 jobs:
   build:
@@ -140,10 +140,15 @@ jobs:
         run: |
           $friendRoot = Join-Path $env:GITHUB_WORKSPACE "friend_source"
           $env:PYTHONPATH = Join-Path $friendRoot "owner_special"
-          python -m unittest discover -s "$friendRoot\owner_special\tests" -p "test_*.py" -v
-          if ($LASTEXITCODE -ne 0) { throw "Friend Complete Python tests failed." }
-          python "$friendRoot\owner_special\scripts\smoke.py"
-          if ($LASTEXITCODE -ne 0) { throw "Friend Complete smoke failed." }
+          Push-Location $friendRoot
+          try {
+            python -m unittest discover -s "owner_special\tests" -p "test_*.py" -v
+            if ($LASTEXITCODE -ne 0) { throw "Friend Complete Python tests failed." }
+            python "owner_special\scripts\smoke.py"
+            if ($LASTEXITCODE -ne 0) { throw "Friend Complete smoke failed." }
+          } finally {
+            Pop-Location
+          }
 
       - name: Build and UI-test branded Friend desktop and ServiceHost
         shell: pwsh
@@ -336,8 +341,13 @@ jobs:
             for ($i=0; $i -lt 80; $i++) {
               try {
                 $health = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 2
-                $status = Invoke-RestMethod "http://127.0.0.1:8790/owner/status" -TimeoutSec 2
-                $provider = Invoke-RestMethod "http://127.0.0.1:8790/owner/provider" -TimeoutSec 2
+                $headers = @{
+                  "X-Research-OS-Owner" = "owner"
+                  "X-Research-OS-Profile" = "default"
+                  "X-Research-OS-Session" = "package-smoke"
+                }
+                $status = Invoke-RestMethod "http://127.0.0.1:8790/owner/status" -Headers $headers -TimeoutSec 2
+                $provider = Invoke-RestMethod "http://127.0.0.1:8790/owner/provider" -Headers $headers -TimeoutSec 2
                 if ($health.status -eq "ok" -and $status -and $provider) { $ready = $true; break }
               } catch {}
               Start-Sleep -Milliseconds 500
