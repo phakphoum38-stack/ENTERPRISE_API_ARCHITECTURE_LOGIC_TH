@@ -66,7 +66,9 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= 920) {
+          final scheme = Theme.of(context).colorScheme;
           return Scaffold(
+            backgroundColor: scheme.surface,
             body: SafeArea(
               child: Row(
                 children: <Widget>[
@@ -80,19 +82,16 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                   VerticalDivider(
                     width: 1,
                     thickness: 1,
-                    color: Theme.of(context).dividerColor,
+                    color: Theme.of(context).dividerColor.withValues(alpha: .55),
                   ),
                   Expanded(
-                    child: Column(
-                      children: <Widget>[
-                        Expanded(
-                          child: IndexedStack(
-                            index: _selectedIndex,
-                            children: _pages,
-                          ),
-                        ),
-                        const ResearchStatusBar(),
-                      ],
+                    child: ColoredBox(
+                      key: const Key('desktop-main-pane'),
+                      color: scheme.surface,
+                      child: IndexedStack(
+                        index: _selectedIndex,
+                        children: _pages,
+                      ),
                     ),
                   ),
                 ],
