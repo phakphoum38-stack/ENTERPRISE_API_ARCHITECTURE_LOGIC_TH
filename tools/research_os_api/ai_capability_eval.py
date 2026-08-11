@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Live Research OS AI capability benchmark.
 
-The benchmark exercises the public Research OS AI API instead of calling a
-vendor SDK directly. It records only pass/fail metadata and latency; full model
-responses and secrets are intentionally not written to logs or reports.
+This benchmark exercises the public Research OS AI API rather than a vendor SDK.
+It deliberately separates model-answer failures from provider/infrastructure
+failures so a temporary HTTP error is never scored as a reasoning mistake.
+Full model replies and secrets are not written to logs or reports.
 """
 
 from __future__ import annotations
@@ -21,6 +22,15 @@ from typing import Callable
 
 BASE_URL = os.getenv("RESEARCH_OS_EVAL_BASE_URL", "http://127.0.0.1:8787").rstrip("/")
 REPORT_PATH = Path(os.getenv("RESEARCH_OS_EVAL_REPORT", "ai-capability-report.json"))
+CASE_COOLDOWN_SECONDS = float(os.getenv("RESEARCH_OS_EVAL_CASE_COOLDOWN", "2"))
+CASE_MAX_ATTEMPTS = int(os.getenv("RESEARCH_OS_EVAL_CASE_ATTEMPTS", "2"))
+
+
+class ProviderUnavailable(RuntimeError):
+    def __init__(self, error_class: str, attempts: int):
+        super().__init__(error_class)
+        self.error_class = error_class
+        self.attempts = attempts
 
 
 def _clean(text: str) -> str:
@@ -34,7 +44,7 @@ def _compact(text: str) -> str:
     return re.sub(r"\s+", "", _clean(text))
 
 
-def _post(path: str, payload: dict[str, object]) -> tuple[dict[str, object], int]:
+def _request_once(path: str, payload: dict[str, object]) -> tuple[dict[str, object], int]:
     request = urllib.request.Request(
         f"{BASE_URL}{path}",
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -45,6 +55,44 @@ def _post(path: str, payload: dict[str, object]) -> tuple[dict[str, object], int
     with urllib.request.urlopen(request, timeout=90) as response:
         result = json.loads(response.read().decode("utf-8"))
     return result, round((time.monotonic() - started) * 1000)
+
+
+def _safe_http_error_class(exc: urllib.error.HTTPError) -> str:
+    code = f"HTTP_{exc.code}"
+    try:
+        raw = exc.read().decode("utf-8", errors="replace")
+        payload = json.loads(raw)
+        if isinstance(payload, dict):
+            error = str(payload.get("error", "")).strip()
+            if error and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", error):
+                return f"{code}_{error}"
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        pass
+    return code
+
+
+def _post(path: str, payload: dict[str, object]) -> tuple[dict[str, object], int, int]:
+    last_error = "provider_unavailable"
+    started = time.monotonic()
+    for attempt in range(1, CASE_MAX_ATTEMPTS + 1):
+        try:
+            result, _ = _request_once(path, payload)
+            elapsed_ms = round((time.monotonic() - started) * 1000)
+            return result, elapsed_ms, attempt
+        except urllib.error.HTTPError as exc:
+            last_error = _safe_http_error_class(exc)
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_error = type(exc).__name__
+        except (json.JSONDecodeError, ValueError) as exc:
+            last_error = type(exc).__name__
+
+        if attempt < CASE_MAX_ATTEMPTS:
+            # The provider adapter already performs bounded retries internally.
+            # This longer scenario-level pause handles a quota/service recovery
+            # window without turning a temporary outage into an ability failure.
+            time.sleep(8.0)
+
+    raise ProviderUnavailable(last_error, CASE_MAX_ATTEMPTS)
 
 
 @dataclass(frozen=True)
@@ -60,11 +108,6 @@ class EvalCase:
 def _exact(expected: str) -> Callable[[str], bool]:
     expected_compact = _compact(expected).casefold()
     return lambda text: _compact(text).casefold() == expected_compact
-
-
-def _contains(expected: str) -> Callable[[str], bool]:
-    expected_folded = expected.casefold()
-    return lambda text: expected_folded in _clean(text).casefold()
 
 
 def _valid_json_constraint(text: str) -> bool:
@@ -199,9 +242,11 @@ def main() -> int:
     provider = "unknown"
     model = "unknown"
 
-    for case in CASES:
+    for index, case in enumerate(CASES):
+        if index:
+            time.sleep(CASE_COOLDOWN_SECONDS)
         try:
-            payload, elapsed_ms = _post(case.path, case.payload)
+            payload, elapsed_ms, attempts = _post(case.path, case.payload)
             provider = str(payload.get("provider") or provider)
             model = str(payload.get("model") or model)
             text = str(payload.get("text") or payload.get("answer") or "")
@@ -210,52 +255,85 @@ def main() -> int:
                 {
                     "name": case.name,
                     "category": case.category,
+                    "evaluated": True,
                     "passed": passed,
                     "critical": case.critical,
                     "elapsed_ms": elapsed_ms,
+                    "attempts": attempts,
                     "response_received": bool(text.strip()),
+                    "infrastructure_error": False,
                 }
             )
-        except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+        except ProviderUnavailable as exc:
             results.append(
                 {
                     "name": case.name,
                     "category": case.category,
+                    "evaluated": False,
                     "passed": False,
                     "critical": case.critical,
                     "elapsed_ms": None,
+                    "attempts": exc.attempts,
                     "response_received": False,
-                    "error_type": type(exc).__name__,
+                    "infrastructure_error": True,
+                    "error_class": exc.error_class,
                 }
             )
 
-    passed_count = sum(1 for result in results if result["passed"])
+    evaluated = [result for result in results if result["evaluated"]]
+    passed_count = sum(1 for result in evaluated if result["passed"])
+    evaluated_count = len(evaluated)
+    provider_errors = len(results) - evaluated_count
+    ability_score = round(100 * passed_count / evaluated_count) if evaluated_count else 0
+    coverage = round(100 * evaluated_count / len(results))
     critical_failed = [
         str(result["name"])
-        for result in results
+        for result in evaluated
         if result["critical"] and not result["passed"]
     ]
-    score = round(100 * passed_count / len(results))
+    critical_unavailable = [
+        str(result["name"])
+        for result in results
+        if result["critical"] and not result["evaluated"]
+    ]
     latencies = [
         int(result["elapsed_ms"])
-        for result in results
+        for result in evaluated
         if isinstance(result.get("elapsed_ms"), int)
     ]
     median_latency = round(statistics.median(latencies)) if latencies else None
     pass_threshold = 80
-    overall_passed = score >= pass_threshold and not critical_failed
+    capability_passed = ability_score >= pass_threshold and not critical_failed
+    reliability_passed = provider_errors == 0 and not critical_unavailable
+    overall_passed = capability_passed and reliability_passed
+    if overall_passed:
+        result_kind = "PASS"
+    elif not reliability_passed and not capability_passed:
+        result_kind = "FAIL_CAPABILITY_AND_RELIABILITY"
+    elif not reliability_passed:
+        result_kind = "FAIL_RELIABILITY"
+    else:
+        result_kind = "FAIL_CAPABILITY"
 
     report = {
-        "benchmark": "research-os-live-ai-capability-v1",
+        "benchmark": "research-os-live-ai-capability-v2",
         "provider": provider,
         "model": model,
-        "score": score,
+        "score": ability_score,
+        "ability_score": ability_score,
+        "coverage_percent": coverage,
         "pass_threshold": pass_threshold,
         "passed_cases": passed_count,
+        "evaluated_cases": evaluated_count,
         "total_cases": len(results),
+        "provider_errors": provider_errors,
         "critical_failures": critical_failed,
+        "critical_unavailable": critical_unavailable,
         "median_latency_ms": median_latency,
+        "capability_passed": capability_passed,
+        "reliability_passed": reliability_passed,
         "overall_passed": overall_passed,
+        "result_kind": result_kind,
         "responses_logged": False,
         "cases": results,
     }
@@ -264,14 +342,23 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    print(f"AI_CAPABILITY_SCORE={score}")
-    print(f"AI_CAPABILITY_PASSED={passed_count}/{len(results)}")
+    print(f"AI_CAPABILITY_SCORE={ability_score}")
+    print(f"AI_CAPABILITY_EVALUATED={evaluated_count}/{len(results)}")
+    print(f"AI_CAPABILITY_PASSED={passed_count}/{evaluated_count or 0}")
+    print(f"AI_CAPABILITY_PROVIDER_ERRORS={provider_errors}")
     print(f"AI_CAPABILITY_CRITICAL_FAILURES={len(critical_failed)}")
+    print(f"AI_CAPABILITY_CRITICAL_UNAVAILABLE={len(critical_unavailable)}")
     print(f"AI_CAPABILITY_MEDIAN_LATENCY_MS={median_latency}")
-    print(f"AI_CAPABILITY_RESULT={'PASS' if overall_passed else 'FAIL'}")
+    print(f"AI_CAPABILITY_RESULT={result_kind}")
     for result in results:
-        state = "PASS" if result["passed"] else "FAIL"
-        print(f"  {state} {result['category']}/{result['name']} ({result.get('elapsed_ms')} ms)")
+        if not result["evaluated"]:
+            state = "INFRA"
+        else:
+            state = "PASS" if result["passed"] else "FAIL"
+        print(
+            f"  {state} {result['category']}/{result['name']} "
+            f"({result.get('elapsed_ms')} ms, attempts={result.get('attempts')})"
+        )
 
     return 0 if overall_passed else 1
 
