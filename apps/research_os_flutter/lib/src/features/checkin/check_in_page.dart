@@ -121,6 +121,20 @@ class _CheckInPageState extends State<CheckInPage> {
     return '${hours}ชม. ${remain}น.';
   }
 
+  Widget _checkInButton(Map<String, dynamic>? active) => FilledButton.icon(
+        key: const Key('checkin-button'),
+        onPressed: active == null ? _checkIn : null,
+        icon: const Icon(Icons.login_rounded),
+        label: const Text('เช็คอิน'),
+      );
+
+  Widget _checkOutButton(Map<String, dynamic>? active) => OutlinedButton.icon(
+        key: const Key('checkout-button'),
+        onPressed: active == null ? null : _checkOut,
+        icon: const Icon(Icons.logout_rounded),
+        label: const Text('เช็คเอาต์'),
+      );
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -235,13 +249,24 @@ class _CheckInPageState extends State<CheckInPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    if (compact)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: _actionButtons(active),
-                      )
-                    else
-                      Row(children: _actionButtons(active)),
+                    if (compact) ...<Widget>[
+                      SizedBox(
+                        width: double.infinity,
+                        child: _checkInButton(active),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: _checkOutButton(active),
+                      ),
+                    ] else
+                      Row(
+                        children: <Widget>[
+                          Expanded(child: _checkInButton(active)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _checkOutButton(active)),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -274,26 +299,6 @@ class _CheckInPageState extends State<CheckInPage> {
     );
   }
 
-  List<Widget> _actionButtons(Map<String, dynamic>? active) {
-    final checkInButton = FilledButton.icon(
-      key: const Key('checkin-button'),
-      onPressed: active == null ? _checkIn : null,
-      icon: const Icon(Icons.login_rounded),
-      label: const Text('เช็คอิน'),
-    );
-    final checkOutButton = OutlinedButton.icon(
-      key: const Key('checkout-button'),
-      onPressed: active == null ? null : _checkOut,
-      icon: const Icon(Icons.logout_rounded),
-      label: const Text('เช็คเอาต์'),
-    );
-    return <Widget>[
-      Expanded(child: checkInButton),
-      const SizedBox(width: 12, height: 12),
-      Expanded(child: checkOutButton),
-    ];
-  }
-
   Widget _historyCard(Map<String, dynamic> record) {
     final start = _dateFrom(record['check_in']);
     final end = _dateFrom(record['check_out']);
@@ -312,7 +317,9 @@ class _CheckInPageState extends State<CheckInPage> {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
-          note.isEmpty ? 'ระยะเวลา ${_duration(record)}' : 'ระยะเวลา ${_duration(record)} • $note',
+          note.isEmpty
+              ? 'ระยะเวลา ${_duration(record)}'
+              : 'ระยะเวลา ${_duration(record)} • $note',
         ),
         trailing: Text(end == null ? 'ACTIVE' : 'DONE'),
       ),
