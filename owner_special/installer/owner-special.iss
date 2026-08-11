@@ -69,8 +69,9 @@ var
   ResultCode: Integer;
   PowerShellExe: String;
   PythonPath: String;
-  EscapedPythonPath: String;
-  CommandLine: String;
+  CheckerPath: String;
+  CheckerScript: String;
+  Parameters: String;
 begin
   PythonPath := ExpandConstant('{app}\runtime\python\python.exe');
   if not FileExists(PythonPath) then
@@ -79,32 +80,64 @@ begin
     Exit;
   end;
 
-  EscapedPythonPath := PythonPath;
-  StringChangeEx(EscapedPythonPath, '''', '''''', True);
+  { Write a tiny checker to {tmp} so PowerShell parsing does not depend on deeply
+    nested -Command quoting inside Pascal Script. Exit 0 = released, 10 = exact
+    packaged python.exe still running, 20 = checker failure. }
+  CheckerPath := ExpandConstant('{tmp}\research-os-owner-python-check.ps1');
+  CheckerScript :=
+    'param([Parameter(Mandatory=$true)][string]$Target)' + #13#10 +
+    '$ErrorActionPreference = ''Stop''' + #13#10 +
+    'try {' + #13#10 +
+    '  $targetFull = [IO.Path]::GetFullPath($Target)' + #13#10 +
+    '  $running = @(Get-CimInstance Win32_Process | Where-Object {' + #13#10 +
+    '    $_.Name -ieq ''python.exe'' -and $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $targetFull)' + #13#10 +
+    '  })' + #13#10 +
+    '  if ($running.Count -eq 0) { exit 0 }' + #13#10 +
+    '  exit 10' + #13#10 +
+    '} catch {' + #13#10 +
+    '  Write-Error $_' + #13#10 +
+    '  exit 20' + #13#10 +
+    '}' + #13#10;
+
+  if not SaveStringToFile(CheckerPath, CheckerScript, False) then
+  begin
+    Log('Could not create bundled Python ownership checker; refusing file replacement.');
+    Result := False;
+    Exit;
+  end;
+
   PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-  CommandLine :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' +
-    '$target=[IO.Path]::GetFullPath(''''' + EscapedPythonPath + '''''); ' +
-    '$running=@(Get-CimInstance Win32_Process -Filter ''''Name = ''''''python.exe'''''''''''' | ' +
-    'Where-Object { $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $target) }); ' +
-    'if ($running.Count -eq 0) { exit 0 } else { exit 10 }"';
+  Parameters :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + CheckerPath +
+    '" -Target "' + PythonPath + '"';
 
   if not Exec(
     PowerShellExe,
-    CommandLine,
+    Parameters,
     '',
     SW_HIDE,
     ewWaitUntilTerminated,
     ResultCode) then
   begin
-    Log('Could not launch bundled Python ownership check; refusing file replacement until runtime ownership is proven clear.');
+    Log('Could not launch bundled Python ownership checker; refusing file replacement.');
     Result := False;
     Exit;
   end;
 
-  if (ResultCode <> 0) and (ResultCode <> 10) then
-    Log('Bundled Python ownership check returned unexpected exit code ' + IntToStr(ResultCode) + '.');
-  Result := ResultCode = 0;
+  if ResultCode = 0 then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  if ResultCode = 10 then
+  begin
+    Result := False;
+    Exit;
+  end;
+
+  Log('Bundled Python ownership checker failed with exit code ' + IntToStr(ResultCode) + '.');
+  Result := False;
 end;
 
 function WaitForOwnerBundledPythonExit(): Boolean;
