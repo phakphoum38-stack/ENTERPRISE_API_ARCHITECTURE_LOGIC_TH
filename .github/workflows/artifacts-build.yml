@@ -1,0 +1,271 @@
+name: Research OS Artifact Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to build
+        required: false
+        type: string
+      build_windows:
+        description: Build Windows EXE and installer
+        required: false
+        default: true
+        type: boolean
+      build_ios:
+        description: Build unsigned iOS IPA
+        required: false
+        default: true
+        type: boolean
+      build_website:
+        description: Build website bundle
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-artifacts-${{ inputs.target_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  website:
+    if: ${{ inputs.build_website == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build Flutter web
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter create --platforms=web .
+          flutter pub get
+          flutter test test/research_os_api_client_test.dart test/widget_test.dart
+          flutter build web --release --dart-define=RESEARCH_OS_API_BASE_URL=http://127.0.0.1:8787
+
+      - name: Stage website bundle
+        run: |
+          mkdir -p artifact/website-static artifact/flutter-web
+          cp -R apps/research_os_web/. artifact/website-static/
+          cp -R apps/research_os_flutter/build/web/. artifact/flutter-web/
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest = {
+              "artifact": "research-os-website",
+              "target_sha": os.environ["TARGET_SHA"],
+              "parts": ["website-static", "flutter-web"],
+              "api_base_default": "http://127.0.0.1:8787",
+          }
+          Path("artifact/manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+          PY
+
+      - name: Upload website artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-website-${{ env.TARGET_SHA }}
+          path: artifact/**
+          if-no-files-found: error
+          retention-days: 30
+
+  windows:
+    if: ${{ inputs.build_windows == true }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+      RESEARCH_OS_PROVIDER: mock
+      RESEARCH_OS_SYNC_KEY: artifact-build-test-key
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          path: src
+
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' `
+            -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Run backend sanity checks
+        working-directory: src
+        shell: pwsh
+        run: |
+          python -m compileall -q tools/research_os_api tools/research_curator
+          Push-Location tools\research_os_api
+          python -m unittest test_browser_use_cloud test_api.ResearchOSAPITests.test_browser_use_status_is_backend_key_gated
+          Pop-Location
+          if ($LASTEXITCODE -ne 0) { throw "Backend sanity checks failed" }
+
+      - name: Build Windows Flutter EXE
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE 'src\apps\research_os_flutter'
+          $short = 'D:\w'
+          if (Test-Path $short) { Remove-Item $short -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $short | Out-Null
+          Copy-Item (Join-Path $source '*') $short -Recurse -Force
+          Set-Location $short
+          flutter create --platforms=windows --project-name=research_os_flutter .
+          python "$env:GITHUB_WORKSPACE\src\scripts\apply-research-os-branding.py" --app-root "D:\w" --platform windows
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build windows --release
+          if (-not (Test-Path "D:\w\build\windows\x64\runner\Release\research_os_flutter.exe")) {
+            throw "Windows app executable is missing"
+          }
+
+      - name: Publish ServiceHost
+        working-directory: src
+        shell: pwsh
+        run: |
+          dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:PublishTrimmed=false `
+            -o tools/research_os_service/publish
+          if (-not (Test-Path "tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) {
+            throw "ServiceHost executable is missing"
+          }
+
+      - name: Stage installer package
+        working-directory: src
+        shell: pwsh
+        run: |
+          $package = Join-Path $PWD "installer\package"
+          if (Test-Path $package) { Remove-Item $package -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path "$package\app" | Out-Null
+          Copy-Item "D:\w\build\windows\x64\runner\Release\*" "$package\app" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_os_service\publish" | Out-Null
+          Copy-Item "tools\research_os_service\publish\*" "$package\tools\research_os_service\publish" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_os_api" | Out-Null
+          Copy-Item "tools\research_os_api\*.py" "$package\tools\research_os_api" -Force
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_curator" | Out-Null
+          Copy-Item "tools\research_curator\*" "$package\tools\research_curator" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "$package\apps\research_os_web" | Out-Null
+          Copy-Item "apps\research_os_web\*" "$package\apps\research_os_web" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "$package\scripts" | Out-Null
+          Copy-Item "scripts\*research-os*.ps1" "$package\scripts" -Force
+          Copy-Item "scripts\v2-data-preservation.ps1" "$package\scripts" -Force -ErrorAction SilentlyContinue
+          $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim()
+          New-Item -ItemType Directory -Force -Path "$package\runtime\python" | Out-Null
+          Copy-Item "$pythonRoot\*" "$package\runtime\python" -Recurse -Force
+          if (-not (Test-Path "$package\runtime\python\python.exe")) { throw "Bundled Python runtime missing" }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer EXE
+        working-directory: src
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found" }
+          & $iscc "installer\research-os.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+          $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Setup EXE was not produced" }
+
+      - name: Stage Windows artifacts
+        working-directory: src
+        shell: pwsh
+        run: |
+          $out = "artifacts-windows"
+          New-Item -ItemType Directory -Force -Path "$out\windows-release" | Out-Null
+          Copy-Item "D:\w\build\windows\x64\runner\Release\*" "$out\windows-release" -Recurse -Force
+          Copy-Item "installer\output\Research-OS-Setup-*-x64.exe" "$out" -Force
+          $zip = Join-Path $PWD "research-os-windows-release-$env:TARGET_SHA.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "$out\windows-release\*" -DestinationPath $zip -Force
+          Copy-Item $zip "$out" -Force
+          Get-ChildItem "$out" -Recurse -File | Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLowerInvariant())  $($_.Path)" } |
+            Set-Content "$out\SHA256SUMS.txt" -Encoding utf8
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-windows-${{ env.TARGET_SHA }}
+          path: src/artifacts-windows/**
+          if-no-files-found: error
+          retention-days: 30
+
+  ios:
+    if: ${{ inputs.build_ios == true }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build unsigned iOS app
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter create --platforms=ios --project-name=research_os_flutter .
+          flutter pub get
+          flutter test test/research_os_api_client_test.dart test/widget_test.dart
+          flutter build ios --release --no-codesign --dart-define=RESEARCH_OS_API_BASE_URL=http://127.0.0.1:8787
+          test -d build/ios/iphoneos/Runner.app
+
+      - name: Package unsigned IPA
+        working-directory: apps/research_os_flutter
+        run: |
+          rm -rf Payload artifacts-ios
+          mkdir -p Payload artifacts-ios
+          cp -R build/ios/iphoneos/Runner.app Payload/Runner.app
+          /usr/bin/zip -qry "artifacts-ios/research-os-unsigned-${TARGET_SHA}.ipa" Payload
+          shasum -a 256 "artifacts-ios/research-os-unsigned-${TARGET_SHA}.ipa" > artifacts-ios/SHA256SUMS.txt
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-ios-unsigned-${{ env.TARGET_SHA }}
+          path: apps/research_os_flutter/artifacts-ios/**
+          if-no-files-found: error
+          retention-days: 30
