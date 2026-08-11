@@ -111,9 +111,12 @@ void main() {
         tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
     expect(before, 300);
 
-    await tester.tap(
-      find.byKey(const Key('desktop-recent-chat-chat-recent-2')),
+    final recent = find.byKey(
+      const Key('desktop-recent-chat-chat-recent-2'),
     );
+    await tester.ensureVisible(recent);
+    await tester.pumpAndSettle();
+    await tester.tap(recent);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.byKey(const Key('minimal-chat-page')), findsOneWidget);
