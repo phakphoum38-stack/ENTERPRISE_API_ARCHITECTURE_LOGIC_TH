@@ -30,6 +30,14 @@ class ResearchOSApiClient {
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
       _getJson('/v1/knowledge/graph');
+
+  Future<Map<String, dynamic>> getGoogleIdentityStatus() =>
+      _getJson('/v1/auth/google/status');
+  Future<Map<String, dynamic>> startGoogleIdentitySignIn() =>
+      _postJson('/v1/auth/google/start', const <String, Object?>{});
+  Future<Map<String, dynamic>> signOutGoogleIdentity() =>
+      _postJson('/v1/auth/google/signout', const <String, Object?>{});
+
   Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() =>
       _getJson('/v1/google-workspace/dashboard');
   Future<Map<String, dynamic>> getGoogleWorkspaceOAuthStatus() =>
