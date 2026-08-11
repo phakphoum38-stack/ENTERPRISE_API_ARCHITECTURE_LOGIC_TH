@@ -42,18 +42,16 @@ jobs:
           }
           flutter build windows --release
 
-          $release = Get-ChildItem -Path "build\windows" -Directory -Recurse |
-            Where-Object { $_.Name -eq "Release" } |
+          $exe = Get-ChildItem -Path "build\windows" -Filter "research_os_flutter.exe" -File -Recurse |
             Select-Object -First 1
-          if (-not $release) {
-            throw "Windows Release directory was not produced."
+          if (-not $exe) {
+            $exe = Get-ChildItem -Path "build\windows" -Filter "*.exe" -File -Recurse |
+              Select-Object -First 1
           }
-
-          $exe = Get-ChildItem -Path $release.FullName -Filter "*.exe" -File |
-            Select-Object -First 1
           if (-not $exe) {
             throw "Research OS Windows executable was not produced."
           }
+          $release = $exe.Directory
 
           $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
@@ -67,7 +65,8 @@ jobs:
           $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  Research-OS-Windows-x64.zip" | Set-Content -Path "$zip.sha256" -Encoding ascii
 
-          Write-Host "WINDOWS_EXE=$($exe.Name)"
+          Write-Host "WINDOWS_EXE=$($exe.FullName)"
+          Write-Host "WINDOWS_RELEASE_DIR=$($release.FullName)"
           Write-Host "WINDOWS_ZIP=$zip"
           Write-Host "WINDOWS_SHA256=$hash"
 
