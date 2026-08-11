@@ -1,0 +1,118 @@
+name: Research OS iOS IPA
+
+on:
+  push:
+    branches:
+      - 'fix/ios-chat-responsive'
+    paths:
+      - 'apps/research_os_flutter/**'
+      - 'scripts/apply-research-os-branding.py'
+      - '.github/workflows/research-os-ios-ipa.yml'
+  pull_request:
+    paths:
+      - 'apps/research_os_flutter/**'
+      - 'scripts/apply-research-os-branding.py'
+      - '.github/workflows/research-os-ios-ipa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-unsigned-ipa:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate iOS target
+        working-directory: apps/research_os_flutter
+        run: flutter create . --platforms=ios --org com.phakphoum38 --project-name research_os_flutter
+
+      - name: Apply Research OS branding
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/research-os-ios-branding"
+          "$RUNNER_TEMP/research-os-ios-branding/bin/python" -m pip install --disable-pip-version-check pillow
+          "$RUNNER_TEMP/research-os-ios-branding/bin/python" scripts/apply-research-os-branding.py --app-root apps/research_os_flutter --platform ios
+
+      - name: Set iOS identity
+        working-directory: apps/research_os_flutter
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          project = Path('ios/Runner.xcodeproj/project.pbxproj')
+          text = project.read_text(encoding='utf-8')
+          out = []
+          for line in text.splitlines():
+              if 'PRODUCT_BUNDLE_IDENTIFIER =' in line:
+                  indent = line[:len(line) - len(line.lstrip())]
+                  current = line.split('=', 1)[1].strip().rstrip(';')
+                  if 'RunnerTests' in current:
+                      line = f'{indent}PRODUCT_BUNDLE_IDENTIFIER = com.phakphoum38.researchos.RunnerTests;'
+                  else:
+                      line = f'{indent}PRODUCT_BUNDLE_IDENTIFIER = com.phakphoum38.researchos;'
+              out.append(line)
+          project.write_text('\n'.join(out) + '\n', encoding='utf-8')
+          PY
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Research OS" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName Research OS" ios/Runner/Info.plist || true
+
+      - name: Flutter analyze and test
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Build unsigned iOS app
+        working-directory: apps/research_os_flutter
+        run: >-
+          flutter build ios --release --no-codesign
+          --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
+
+      - name: Verify iOS app and branding
+        working-directory: apps/research_os_flutter
+        shell: bash
+        run: |
+          APP="build/ios/iphoneos/Runner.app"
+          test -d "$APP"
+          test -f ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          DISPLAY_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist")
+          echo "Bundle ID: $BUNDLE_ID"
+          echo "Display name: $DISPLAY_NAME"
+          test "$BUNDLE_ID" = "com.phakphoum38.researchos"
+          test "$DISPLAY_NAME" = "Research OS"
+
+      - name: Package unsigned IPA
+        working-directory: apps/research_os_flutter
+        shell: bash
+        run: |
+          rm -rf build/unsigned_ipa
+          mkdir -p build/unsigned_ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/unsigned_ipa/Payload/ResearchOS.app
+          cd build/unsigned_ipa
+          zip -qry ../Research-OS-iOS-responsive-unsigned.ipa Payload
+          cd ..
+          shasum -a 256 Research-OS-iOS-responsive-unsigned.ipa | tee Research-OS-iOS-responsive-unsigned.ipa.sha256
+          test -s Research-OS-iOS-responsive-unsigned.ipa
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Research-OS-iOS-responsive-${{ github.sha }}
+          path: |
+            apps/research_os_flutter/build/Research-OS-iOS-responsive-unsigned.ipa
+            apps/research_os_flutter/build/Research-OS-iOS-responsive-unsigned.ipa.sha256
+          if-no-files-found: error
+          retention-days: 30
