@@ -38,6 +38,11 @@ void main() {
   });
 
   testWidgets('chat sends replies keeps context and restores session', (tester) async {
+    tester.view.physicalSize = const Size(1440, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final apiClient = ChatFlowApiClient();
 
     await tester.pumpWidget(
@@ -82,8 +87,19 @@ void main() {
     expect(raw, isNotNull);
     final sessions = jsonDecode(raw!) as List<dynamic>;
     expect(sessions, isNotEmpty);
-    final messages = (sessions.first as Map<String, dynamic>)['messages'] as List<dynamic>;
+    final session = Map<String, dynamic>.from(sessions.first as Map);
+    final messages = session['messages'] as List<dynamic>;
     expect(messages, hasLength(4));
+    expect((messages[0] as Map)['text'], 'สวัสดีเพื่อน ทดสอบแชทตัวเอง');
+    expect(
+      (messages[1] as Map)['text'],
+      'สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว',
+    );
+    expect((messages[2] as Map)['text'], 'จำคำตอบรอบแรกได้ไหม');
+    expect(
+      (messages[3] as Map)['text'],
+      'จำได้ครับ รอบแรกผมตอบว่าระบบแชทตอบกลับได้แล้ว',
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
