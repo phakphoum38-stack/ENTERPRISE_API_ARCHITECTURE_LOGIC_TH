@@ -3,6 +3,7 @@ name: Research OS iOS IPA
 on:
   push:
     branches:
+      - 'feat/chatgpt-style-desktop-shell'
       - 'fix/ios-chat-responsive'
     paths:
       - 'apps/research_os_flutter/**'
@@ -17,6 +18,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: research-os-ios-ipa-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-ios-unsigned-ipa:
@@ -67,12 +72,16 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Research OS" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleName Research OS" ios/Runner/Info.plist || true
 
-      - name: Flutter analyze and test
+      - name: Flutter analyze and full test
         working-directory: apps/research_os_flutter
         run: |
           flutter pub get
           flutter analyze
           flutter test
+
+      - name: Prove Check-in iPhone flow
+        working-directory: apps/research_os_flutter
+        run: flutter test test/check_in_page_test.dart --reporter expanded
 
       - name: Build unsigned iOS app
         working-directory: apps/research_os_flutter
