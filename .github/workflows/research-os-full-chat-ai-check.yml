@@ -1,0 +1,214 @@
+name: Research OS Full Chat + AI Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/chatgpt-style-desktop-shell
+    paths:
+      - "apps/research_os_flutter/**"
+      - "tools/research_os_api/**"
+      - ".github/workflows/research-os-full-chat-ai-check.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-full-chat-ai-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-chat-contract:
+    name: Flutter chat UI + client contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Analyze and test chat
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test test/desktop_shell_test.dart
+          flutter test test/chat_flow_test.dart
+          flutter test test/api_client_provider_routing_test.dart
+
+  api-memory-provider-contract:
+    name: Local API + memory + provider contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile chat and provider modules
+        run: |
+          python -m py_compile tools/research_os_api/providers.py
+          python -m py_compile tools/research_os_api/provider_readiness.py
+          python -m py_compile tools/research_os_api/provider_smoke.py
+          python -m py_compile tools/research_os_api/ai_capability_eval.py
+          python -m py_compile tools/research_os_api/server.py
+      - name: Run focused API, memory, provider and conversation tests
+        working-directory: tools/research_os_api
+        run: |
+          python -m unittest test_api test_provider_readiness test_conversation_store -v
+
+  windows-chat-build:
+    name: Windows desktop release build
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build Research OS Windows desktop
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          flutter pub get
+          flutter config --enable-windows-desktop
+          flutter build windows --release
+          $exe = Get-ChildItem -Path "build\windows" -Filter "*.exe" -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Windows Research OS executable was not produced." }
+          Write-Host "Windows executable produced: $($exe.FullName)"
+
+  live-ai-capability:
+    name: Live Gemini chat + reasoning + wit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - flutter-chat-contract
+      - api-memory-provider-contract
+    env:
+      RESEARCH_OS_PROVIDER: gemini
+      RESEARCH_OS_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      RESEARCH_OS_GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+      RESEARCH_OS_API_HOST: 127.0.0.1
+      RESEARCH_OS_API_PORT: "8787"
+      RESEARCH_OS_API_BASE_URL: http://127.0.0.1:8787
+      RESEARCH_OS_EXPECTED_PROVIDER: gemini
+      RESEARCH_OS_EVAL_BASE_URL: http://127.0.0.1:8787
+      RESEARCH_OS_EVAL_REPORT: ai-capability-report.json
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate live API key
+        shell: bash
+        run: |
+          if [ -z "${RESEARCH_OS_GEMINI_API_KEY}" ]; then
+            echo "::error::Missing repository secret GEMINI_API_KEY"
+            exit 1
+          fi
+
+      - name: Start Local Research OS API
+        shell: bash
+        run: |
+          python tools/research_os_api/server.py \
+            --host "${RESEARCH_OS_API_HOST}" \
+            --port "${RESEARCH_OS_API_PORT}" \
+            > /tmp/research-os-full-chat-api.log 2>&1 &
+          echo $! > /tmp/research-os-full-chat-api.pid
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+
+          url = "http://127.0.0.1:8787/health"
+          last_error = None
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen(url, timeout=2) as response:
+                      payload = json.load(response)
+                  if payload.get("status") == "ok":
+                      print("LOCAL_API_READY=true")
+                      raise SystemExit(0)
+              except Exception as exc:
+                  last_error = exc
+                  time.sleep(1)
+          raise SystemExit(f"Local API did not become ready: {type(last_error).__name__}")
+          PY
+
+      - name: Live provider connectivity smoke
+        run: python tools/research_os_api/provider_smoke.py
+
+      - name: Flutter client to Local API to Gemini E2E
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter pub get
+          dart run tool/chat_service_e2e.dart
+
+      - name: Reasoning, judgment, context and wit benchmark
+        run: python tools/research_os_api/ai_capability_eval.py
+
+      - name: Write capability summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f ai-capability-report.json ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          report = json.loads(Path("ai-capability-report.json").read_text(encoding="utf-8"))
+          print("# Research OS Full Chat + AI Capability")
+          print()
+          print(f"- Provider: `{report['provider']}`")
+          print(f"- Model: `{report['model']}`")
+          print(f"- Capability score: **{report['score']}/100**")
+          print(f"- Passed: **{report['passed_cases']}/{report['total_cases']}**")
+          print(f"- Critical failures: **{len(report['critical_failures'])}**")
+          print(f"- Median latency: **{report['median_latency_ms']} ms**")
+          print(f"- Overall: **{'PASS' if report['overall_passed'] else 'FAIL'}**")
+          print()
+          print("| Category | Case | Result | Latency |")
+          print("|---|---|---:|---:|")
+          for case in report["cases"]:
+              result = "PASS" if case["passed"] else "FAIL"
+              latency = case.get("elapsed_ms")
+              print(f"| {case['category']} | {case['name']} | {result} | {latency} ms |")
+          print()
+          print("Full model replies and API secrets are not written to this report.")
+          PY
+          else
+            echo "# Research OS Full Chat + AI Capability" >> "$GITHUB_STEP_SUMMARY"
+            echo "Capability report was not produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload capability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-ai-capability-report
+          path: ai-capability-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Show redacted API log on failure
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f /tmp/research-os-full-chat-api.log ]; then
+            sed -E 's/(key=)[^&[:space:]]+/\1***/g; s/(AIza)[A-Za-z0-9_-]+/\1***/g; s/(Bearer )[A-Za-z0-9._-]+/\1***/g' /tmp/research-os-full-chat-api.log | tail -n 200
+          fi
+
+      - name: Stop Local Research OS API
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/research-os-full-chat-api.pid ]; then
+            kill "$(cat /tmp/research-os-full-chat-api.pid)" 2>/dev/null || true
+          fi
