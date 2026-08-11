@@ -1,0 +1,89 @@
+name: Owner Special Installer Quick Check
+
+on:
+  push:
+    branches: ['debug/owner-installer-guard']
+    paths:
+      - 'owner_special/installer/owner-special.iss'
+      - '.github/workflows/owner-special-installer-quick.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  owner-installer-upgrade-check:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Reuse owner-special desktop artifact from Run 31448967448
+        uses: actions/download-artifact@v4
+        with:
+          name: owner-special-desktop-3176ec00e37a258ab3cafbaa100fc5a449428af5
+          path: owner_special/installer/desktop
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 31448967448
+
+      - name: Publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj
+        shell: pwsh
+        run: |
+          dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish
+          if ($LASTEXITCODE -ne 0) { throw 'Owner ServiceHost publish failed' }
+
+      - name: Stage only owner_special installer inputs
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\stage-owner-installer.ps1 `
+            -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\installer\desktop" `
+            -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build only owner_special/installer/owner-special.iss
+        working-directory: owner_special/installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc '.\owner-special.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'owner-special.iss compilation failed' }
+          if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe')) { throw 'Setup.exe missing' }
+
+      - name: Establish clean installed baseline
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 `
+            -Phase clean `
+            -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+
+      - name: Targeted in-place upgrade validation
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 `
+            -Phase upgrade `
+            -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+
+      - name: Show upgrade diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'owner-special-upgrade.log'
+          if (Test-Path $log) { Get-Content $log -Tail 250 }
+          sc.exe queryex ResearchOSOwnerFriendService 2>&1 | Out-Host
+          $python = 'C:\Program Files\Research OS Owner Special\runtime\python\python.exe'
+          Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $python)
+          } | Select-Object ProcessId, Name, ExecutablePath, CommandLine | Format-List | Out-Host
