@@ -32,10 +32,6 @@ jobs:
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       RESEARCH_OS_PROVIDER: mock
-      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
-      RESEARCH_OS_CONVERSATION_STORE: ${{ runner.temp }}/ResearchOSData/sessions/conversations.json
-      BROWSER_USE_API_BASE: ${{ inputs.connect_cloud == true && 'https://api.browser-use.com' || 'http://127.0.0.1:8799' }}
-      BROWSER_USE_API_KEY: ${{ inputs.connect_cloud == true && secrets.BROWSER_USE_API_KEY || 'browser-use-ci-simulator-key' }}
       CONNECT_CLOUD: ${{ inputs.connect_cloud }}
       PROXY_COUNTRY_CODE: ${{ inputs.proxy_country_code || 'us' }}
     steps:
@@ -48,6 +44,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Configure runner paths
+        shell: bash
+        run: |
+          echo "RESEARCH_OS_DATA_DIR=$RUNNER_TEMP/ResearchOSData" >> "$GITHUB_ENV"
+          echo "RESEARCH_OS_CONVERSATION_STORE=$RUNNER_TEMP/ResearchOSData/sessions/conversations.json" >> "$GITHUB_ENV"
+
+      - name: Require Browser Use Cloud secret for real-cloud mode
+        if: ${{ inputs.connect_cloud == true }}
+        shell: bash
+        env:
+          REAL_BROWSER_USE_API_KEY: ${{ secrets.BROWSER_USE_API_KEY }}
+        run: |
+          if [ -z "$REAL_BROWSER_USE_API_KEY" ]; then
+            echo "BROWSER_USE_API_KEY GitHub Secret is required when connect_cloud=true."
+            exit 1
+          fi
 
       - name: Validate backend connector
         working-directory: tools/research_os_api
@@ -72,6 +85,9 @@ jobs:
           exit 1
 
       - name: Start Research OS API
+        env:
+          BROWSER_USE_API_BASE: ${{ inputs.connect_cloud == true && 'https://api.browser-use.com' || 'http://127.0.0.1:8799' }}
+          BROWSER_USE_API_KEY: ${{ inputs.connect_cloud == true && secrets.BROWSER_USE_API_KEY || 'browser-use-ci-simulator-key' }}
         run: |
           python tools/research_os_api/server.py --host 127.0.0.1 --port 8787 > "$RUNNER_TEMP/research-os-api.log" 2>&1 &
           echo "RESEARCH_OS_API_PID=$!" >> "$GITHUB_ENV"
@@ -126,10 +142,6 @@ jobs:
 
       - name: Connect and stop Browser Use session
         run: |
-          if [ -z "${BROWSER_USE_API_KEY}" ]; then
-            echo "BROWSER_USE_API_KEY GitHub Secret is required when connect_cloud=true."
-            exit 1
-          fi
           python - <<'PY'
           import json
           import os
