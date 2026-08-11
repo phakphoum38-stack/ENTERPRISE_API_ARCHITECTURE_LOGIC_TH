@@ -1,5 +1,515 @@
-name: Owner Special Friend Complete
 
+การสนทนากับ Gemini
+name: Research OS Candidateon: workflow_dispatch: inputs: target_sha: description: Exact commit SHA to build and validate required: false type: stringpermissions: contents: readconcurrency: group: research-os-candidate-${{ inputs.target_sha || github.sha }} cancel-in-progress: falsejobs: candidate: name: Build and validate one Windows candidate runs-on: windows-latest timeout-minutes: 60 env: TARGET_SHA: ${{ inputs.target_sha || github.sha }} RESEARCH_OS_PROVIDER: mock RESEARCH_OS_SYNC_KEY: candidate-test-key RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS: "1" steps: - name: Checkout exact candidate uses: actions/checkout@v4 with: ref: ${{ env.TARGET_SHA }} path: src - name: Initialize incremental candidate evidence working-directory: src shell: pwsh run: | .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage candidate ` -Status started ` -DataJson '{"build_policy":"single-windows-runner"}' - name: Enable Windows long paths shell: pwsh run: | git config --global core.longpaths true New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null - name: Set up Python uses: actions/setup-python@v5 with: python-version: "3.12" - name: Set up .NET uses: actions/setup-dotnet@v4 with: dotnet-version: "8.0.x" - name: Set up Flutter uses: subosito/flutter-action@v2 with: channel: stable cache: true - name: Run API and unified factory tests working-directory: src shell: pwsh run: | $env:RESEARCH_OS_DATA_DIR = "$env:RUNNER_TEMP\ResearchOSData" $env:RESEARCH_OS_CONVERSATION_STORE = "$env:RUNNER_TEMP\ResearchOSData\sessions\conversations.json" python -m compileall -q tools/research_os_api tools/research_curator software_factory if ($LASTEXITCODE -ne 0) { throw "Python compile failed" } python -m unittest discover -s tools/research_os_api -p "test_*.py" -v if ($LASTEXITCODE -ne 0) { throw "API tests failed" } python -m unittest discover -s tests -p "test_adaptive_software_factory*.py" -v if ($LASTEXITCODE -ne 0) { throw "Adaptive Software Factory tests failed" } .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage api_and_factory_tests ` -Status passed ` -DataJson '{"python_compile":"passed","api_tests":"passed","software_factory_tests":"passed"}' - name: Stage Flutter app at short path shell: pwsh run: | $source = Join-Path $env:GITHUB_WORKSPACE 'src\apps\research_os_flutter' $short = 'D:\w' if (Test-Path $short) { Remove-Item $short -Recurse -Force } New-Item -ItemType Directory -Force -Path $short | Out-Null Copy-Item (Join-Path $source '*') $short -Recurse -Force - name: Build and test Windows app working-directory: D:\w shell: pwsh run: | flutter create --platforms=windows --project-name=research_os_flutter . python "$env:GITHUB_WORKSPACE\src\scripts\apply-research-os-branding.py" --app-root "D:\w" --platform windows flutter pub get flutter analyze flutter test flutter build windows --release if ($LASTEXITCODE -ne 0) { throw "Flutter Windows build failed" } $appExe = "D:\w\build\windows\x64\runner\Release\research_os_flutter.exe" if (-not (Test-Path $appExe)) { throw "Windows app executable is missing" } $appHash = (Get-FileHash $appExe -Algorithm SHA256).Hash.ToLowerInvariant() $appInfo = Get-Item $appExe $data = @{ flutter_analyze = 'passed' flutter_tests = 'passed' flutter_build = 'passed' executable = $appInfo.Name sha256 = $appHash size_bytes = $appInfo.Length } | ConvertTo-Json -Compress & "$env:GITHUB_WORKSPACE\src\scripts\candidate-evidence.ps1" ` -OutputDir "$env:GITHUB_WORKSPACE\src\candidate-evidence" ` -Stage windows_app ` -Status passed ` -DataJson $data - name: Publish ServiceHost working-directory: src shell: pwsh run: | dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj ` -c Release -r win-x64 --self-contained true ` -p:PublishSingleFile=true -p:PublishTrimmed=false ` -o tools/research_os_service/publish $serviceExe = "tools\research_os_service\publish\ResearchOS.ServiceHost.exe" if (-not (Test-Path $serviceExe)) { throw "ServiceHost executable is missing" } $serviceInfo = Get-Item $serviceExe $serviceHash = (Get-FileHash $serviceExe -Algorithm SHA256).Hash.ToLowerInvariant() $data = @{ executable = $serviceInfo.Name sha256 = $serviceHash size_bytes = $serviceInfo.Length } | ConvertTo-Json -Compress .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage service_host_build -Status passed -DataJson $data - name: Runtime smoke test working-directory: src shell: pwsh run: | $data = "$env:RUNNER_TEMP\ResearchOSRuntime" .\scripts\setup-research-os-windows.ps1 -Root "$env:RUNNER_TEMP\ResearchOS" -DataDir $data .\scripts\start-research-os-local.ps1 -DataDir $data -Provider mock -Port 8787 -Background try { $ready = $false for ($i = 0; $i -lt 30; $i++) { try { $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2 if ($health.status -eq "ok") { $ready = $true; break } } catch {} Start-Sleep -Milliseconds 500 } if (-not $ready) { throw "Local API did not become ready" } $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5 if ($master.master.capacity.assistant_6x3_capacity -ne 216) { throw "Unified Master 6^3 capacity is invalid" } if ($master.master.capacity.max_leaf_capacity -ne 46656) { throw "Unified Master 6^6 capacity is invalid" } $evidence = @{ health = 'ok' unified_master = 'passed' assistant_6x3_capacity = 216 compound_6x6_capacity = 46656 } | ConvertTo-Json -Compress .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage runtime_smoke -Status passed -DataJson $evidence } finally { .\scripts\stop-research-os-local.ps1 -Port 8787 -PidFile "$data\run\research-os-api.pid" -ErrorAction SilentlyContinue } - name: Windows Service smoke test working-directory: src shell: pwsh run: | $data = "$env:RUNNER_TEMP\ResearchOSServiceData" try { .\scripts\research-os-service.ps1 -Action install -DataDir $data $ready = $false for ($i = 0; $i -lt 40; $i++) { try { $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2 if ($health.status -eq "ok") { $ready = $true; break } } catch {} Start-Sleep -Milliseconds 500 } if (-not $ready) { throw "Windows Service API did not become ready" } $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5 if ($master.master.contract -ne "unified-master-orchestrator-v3") { throw "Windows Service Unified Master contract is missing" } $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'" if (-not $service -or $service.State -ne 'Running') { throw "ResearchOSService is not running" } $evidence = @{ service = 'ResearchOSService' state = $service.State health = 'ok' unified_master_contract = $master.master.contract } | ConvertTo-Json -Compress .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage windows_service_smoke -Status passed -DataJson $evidence } finally { if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { .\scripts\research-os-service.ps1 -Action uninstall -DataDir $data } } - name: Stage one-click installer package working-directory: src shell: pwsh run: | $package = Join-Path $PWD "installer\package" if (Test-Path $package) { Remove-Item $package -Recurse -Force } New-Item -ItemType Directory -Force -Path "$package\app" | Out-Null Copy-Item "D:\w\build\windows\x64\runner\Release\*" "$package\app" -Recurse -Force New-Item -ItemType Directory -Force -Path "$package\tools\research_os_service\publish" | Out-Null Copy-Item "tools\research_os_service\publish\*" "$package\tools\research_os_service\publish" -Recurse -Force New-Item -ItemType Directory -Force -Path "$package\tools\research_os_api" | Out-Null Copy-Item "tools\research_os_api\*.py" "$package\tools\research_os_api" -Force New-Item -ItemType Directory -Force -Path "$package\software_factory" | Out-Null Copy-Item "software_factory\*.py" "$package\software_factory" -Force if (-not (Test-Path "$package\software_factory\__init__.py")) { throw "Unified Software Factory package is missing" } New-Item -ItemType Directory -Force -Path "$package\tools\research_curator" | Out-Null Copy-Item "tools\research_curator\*" "$package\tools\research_curator" -Recurse -Force if (Test-Path "apps\research_os_web") { New-Item -ItemType Directory -Force -Path "$package\apps\research_os_web" | Out-Null Copy-Item "apps\research_os_web\*" "$package\apps\research_os_web" -Recurse -Force } if (Test-Path "research\artifacts") { New-Item -ItemType Directory -Force -Path "$package\research\artifacts" | Out-Null Copy-Item "research\artifacts\*" "$package\research\artifacts" -Recurse -Force } New-Item -ItemType Directory -Force -Path "$package\scripts" | Out-Null Copy-Item "scripts\*research-os*.ps1" "$package\scripts" -Force Copy-Item "scripts\v2-data-preservation.ps1" "$package\scripts" -Force -ErrorAction SilentlyContinue $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim() New-Item -ItemType Directory -Force -Path "$package\runtime\python" | Out-Null Copy-Item "$pythonRoot\*" "$package\runtime\python" -Recurse -Force if (-not (Test-Path "$package\runtime\python\python.exe")) { throw "Bundled Python runtime missing" } .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage installer_package ` -Status passed ` -DataJson '{"software_factory":"included","python_runtime":"included","flutter_app":"included","service_host":"included"}' - name: Generate installer branding working-directory: src shell: pwsh run: | python -m pip install --disable-pip-version-check pillow python scripts/apply-research-os-branding.py --app-root apps/research_os_flutter --platform windows if (-not (Test-Path "apps\research_os_flutter\assets\branding\research_os.ico")) { throw "Installer icon was not generated" } .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage installer_branding -Status passed - name: Install Inno Setup shell: pwsh run: choco install innosetup --no-progress -y - name: Build Setup EXE once working-directory: src shell: pwsh run: | $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found" } & $iscc "installer\research-os.iss" if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" } $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1 if (-not $setup) { throw "Setup EXE was not produced" } $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant() $data = @{ name = $setup.Name sha256 = $hash size_bytes = $setup.Length } | ConvertTo-Json -Compress .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage setup_exe_build -Status passed -DataJson $data - name: Prepare clean installer validation working-directory: src shell: pwsh run: | if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { sc.exe stop ResearchOSService | Out-Host Start-Sleep -Seconds 2 sc.exe delete ResearchOSService | Out-Host Start-Sleep -Seconds 2 } $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue foreach ($listener in $listeners) { Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue } $root = Join-Path $env:ProgramFiles 'Research OS' if (Test-Path $root) { Remove-Item $root -Recurse -Force } $data = Join-Path $env:ProgramData 'ResearchOS' if (Test-Path $data) { Remove-Item $data -Recurse -Force } .\scripts\v2-data-preservation.ps1 -Action Seed -DataDir "$env:ProgramData\ResearchOS" .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage clean_validation_prepared -Status passed - name: Install validate and upgrade candidate working-directory: src shell: pwsh run: | $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1 if (-not $setup) { throw "Setup EXE missing" } $log = "$env:RUNNER_TEMP\research-os-install.log" $p = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru if ($p.ExitCode -ne 0) { throw "Installer failed with exit code $($p.ExitCode)" } .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage install ` -Status passed ` -DataJson '{"exit_code":0}' .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS" .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage install_data_preservation -Status passed $ready = $false for ($i = 0; $i -lt 60; $i++) { try { $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2 $v2 = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/health/readiness" -TimeoutSec 2 if ($health.status -eq "ok" -and $v2.ready) { $ready = $true; break } } catch {} Start-Sleep -Seconds 1 } if (-not $ready) { throw "Installed candidate did not become ready" } $readyData = @{ health = $health.status v2_ready = [bool]$v2.ready } | ConvertTo-Json -Compress .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage installed_readiness -Status passed -DataJson $readyData $listeners = @(Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction Stop) $unsafe = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1', '::1') }) if ($unsafe) { throw "Research OS API must listen on loopback only" } .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage loopback_binding ` -Status passed ` -DataJson '{"port":8787,"scope":"loopback-only"}' $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5 if ($master.master.contract -ne "unified-master-orchestrator-v3") { throw "Installed candidate Unified Master contract is missing" } if ($master.master.capacity.assistant_6x3_capacity -ne 216 -or $master.master.capacity.max_leaf_capacity -ne 46656) { throw "Installed candidate Unified Master capacity is invalid" } $masterData = @{ contract = $master.master.contract assistant_6x3_capacity = $master.master.capacity.assistant_6x3_capacity compound_6x6_capacity = $master.master.capacity.max_leaf_capacity } | ConvertTo-Json -Compress .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage installed_unified_master -Status passed -DataJson $masterData $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5 $serialized = @($providers, $master) | ConvertTo-Json -Depth 12 -Compress if ($serialized -match '(?i)(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{8,}|(?<![A-Za-z0-9])Bearer\s+[A-Za-z0-9._-]{12,}') { throw "Provider or master status contains credential-like data" } .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage credential_redaction ` -Status passed ` -DataJson '{"credential_like_data":"absent"}' $serviceLog = Join-Path $env:ProgramData 'ResearchOS\logs\service-api.err.log' if (Test-Path $serviceLog) { Clear-Content $serviceLog -ErrorAction SilentlyContinue } $installedApp = Join-Path $env:ProgramFiles 'Research OS\app\research_os_flutter.exe' if (-not (Test-Path $installedApp)) { throw "Installed Flutter app executable is missing" } $app = Start-Process -FilePath $installedApp -PassThru try { $appConnected = $false for ($i = 0; $i -lt 60; $i++) { if ($app.HasExited) { throw "Installed Flutter app exited before app-to-service E2E completed" } if (Test-Path $serviceLog) { $requestLog = Get-Content $serviceLog -Raw -ErrorAction SilentlyContinue $sawHealth = $requestLog -match '(?m)(?:\bpath=/health(?:\s|$)|"GET /health HTTP/1\.[01]" 200)' $sawProviders = $requestLog -match '(?m)(?:\bpath=/v1/providers(?:\s|$)|"GET /v1/providers HTTP/1\.[01]" 200)' if ($sawHealth -and $sawProviders) { $appConnected = $true break } } Start-Sleep -Milliseconds 500 } if (-not $appConnected) { if (Test-Path $serviceLog) { Get-Content $serviceLog -Tail 100 | Out-Host } throw "Installed Flutter app did not prove app-to-service requests to /health and /v1/providers" } .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage app_to_service_e2e ` -Status passed ` -DataJson '{"health_request":200,"providers_request":200}' Write-Host "Installed Flutter app-to-service E2E passed." } finally { if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue } } $upgradeLog = "$env:RUNNER_TEMP\research-os-upgrade.log" $u = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$upgradeLog") -Wait -PassThru if ($u.ExitCode -ne 0) { throw "In-place upgrade failed with exit code $($u.ExitCode)" } .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage in_place_upgrade ` -Status passed ` -DataJson '{"exit_code":0}' .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS" .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage upgrade_data_preservation -Status passed - name: Uninstall candidate and verify data preservation working-directory: src shell: pwsh run: | $root = Join-Path $env:ProgramFiles 'Research OS' $uninstaller = Get-ChildItem $root -Filter 'unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 if (-not $uninstaller) { throw "Uninstaller executable was not found" } $p = Start-Process -FilePath $uninstaller.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru if ($p.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($p.ExitCode)" } for ($i = 0; $i -lt 20; $i++) { if (-not (Get-Service ResearchOSService -ErrorAction SilentlyContinue)) { break } Start-Sleep -Milliseconds 500 } if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { throw "ResearchOSService still exists after uninstall" } .\scripts\candidate-evidence.ps1 ` -OutputDir candidate-evidence ` -Stage uninstall ` -Status passed ` -DataJson '{"service_removed":true}' .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS" .\scripts\candidate-evidence.ps1 -OutputDir candidate-evidence -Stage uninstall_data_preservation -Status passed - name: Create exact-SHA candidate evidence working-directory: src shell: pwsh run: | $out = "candidate-evidence" New-Item -ItemType Directory -Force -Path $out | Out-Null $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1 Copy-Item $setup.FullName $out -Force $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant() "$hash $($setup.Name)" | Set-Content "$out\SHA256SUMS.txt" -Encoding utf8 .\scripts\candidate-evidence.ps1 ` -OutputDir $out ` -Stage candidate ` -Status passed ` -DataJson '{"validation":"passed"}' $progress = Get-Content "$out\progress.json" -Raw | ConvertFrom-Json -AsHashtable $manifest = [ordered]@{ schema_version = 4 target_sha = "$env:TARGET_SHA" candidate_run = "${{ github.run_id }}" validation = "passed" build_policy = "single-windows-runner" release_created = $false tag_created = $false artifact = [ordered]@{ name = $setup.Name sha256 = $hash size_bytes = $setup.Length } data_boundary = "C:\ProgramData\ResearchOS" upgrade_policy = "preserve-local-data" stages = $progress['stages'] } $manifest | ConvertTo-Json -Depth 20 | Set-Content "$out\candidate-manifest.json" -Encoding utf8 - name: Upload verified candidate artifact uses: actions/upload-artifact@v4 with: name: research-os-verified-candidate-${{ env.TARGET_SHA }} path: src/candidate-evidence/** if-no-files-found: error retention-days: 30 - name: Upload incremental candidate evidence if: always() uses: actions/upload-artifact@v4 with: name: research-os-candidate-progress-${{ env.TARGET_SHA }}-${{ github.run_id }} path: src/candidate-evidence/progress.json if-no-files-found: warn retention-days: 30 - name: Final cleanup if: always() continue-on-error: true working-directory: src shell: pwsh run: | if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { sc.exe stop ResearchOSService | Out-Host Start-Sleep -Seconds 1 sc.exe delete ResearchOSService | Out-Host } $listeners = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue foreach ($listener in $listeners) { Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue } exit 0 
+
+This is a complete GitHub Actions workflow file (.github/workflows/research-os-candidate.yml) written in YAML, designed for continuous integration, building, testing, packaging, and end-to-end (E2E) validation of the Research OS application on Windows.
+
+Here is a breakdown of what this workflow does:
+
+1. Trigger & Permissions
+Trigger: workflow_dispatch allows manual triggering with an optional input parameter: target_sha (the specific Git commit SHA to build and test).
+
+Concurrency: Ensures that multiple runs for the same target SHA don't interfere with each other (cancel-in-progress: false).
+
+Permissions: Read access to repository contents.
+
+2. Environment Setup
+Runs on a Windows runner (windows-latest) with a 60-minute timeout.
+
+Sets environment variables for mock AI providers and candidate keys.
+
+Enables Git / Windows Long Paths (core.longpaths and LongPathsEnabled registry key) to prevent path length issues during builds.
+
+Sets up tools: Python 3.12, .NET 8.0, Flutter (stable channel), and Inno Setup (via Chocolatey).
+
+3. Build & Test Pipeline Stages
+API & Software Factory Unit Tests:
+
+Runs Python compilation checks and executes unit tests for tools/research_os_api and software_factory.
+
+Flutter Desktop App Build:
+
+Copies the Flutter project to a short path (D:\w) to avoid path depth limits.
+
+Runs branding scripts, flutter analyze, flutter test, and builds the Windows release executable (research_os_flutter.exe).
+
+Service Host Build:
+
+Publishes the .NET service host (ResearchOS.ServiceHost.exe) as a self-contained, single-file win-x64 executable.
+
+Runtime & Windows Service Smoke Tests:
+
+Launches the API backend on 127.0.0.1:8787 and verifies endpoints (/health, /v2/master).
+
+Installs, tests, and uninstalls the Windows Service (ResearchOSService).
+
+Installer Packaging & Generation:
+
+Stages all components (Flutter app, .NET service, Python tools, runtime, branding icons, scripts) into an installer structure.
+
+Uses Inno Setup (ISCC.exe) to compile the single installer executable (Research-OS-Setup-*-x64.exe).
+
+Clean Installation, Upgrade & Data Preservation Testing:
+
+Runs a silent clean installation (/VERYSILENT).
+
+Verifies data preservation scripts, readiness endpoints, loopback network bindings (127.0.0.1), and credential redaction logs.
+
+Launches the installed Flutter app and verifies app-to-service interaction.
+
+Performs an in-place upgrade test and a clean uninstallation test, ensuring system data is preserved correctly.
+
+4. Artifact Publishing & Cleanup
+Evidence Manifest: Generates a complete candidate-manifest.json and SHA256SUMS.txt documenting all build metrics, stages, and SHA256 hashes.
+
+Artifact Uploads: Uploads the installer package and progress evidence via actions/upload-artifact@v4.
+
+Cleanup: Stops background processes, removes created Windows services, and frees bound network ports.
+
+Run $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+
+Recorded candidate evidence: install = passed
+
+V1 local data fixture preserved across installer operation.
+
+Recorded candidate evidence: install_data_preservation = passed
+
+Recorded candidate evidence: installed_readiness = passed
+
+Recorded candidate evidence: loopback_binding = passed
+
+Recorded candidate evidence: installed_unified_master = passed
+
+Recorded candidate evidence: credential_redaction = passed
+
+Exception: D:\a\_temp\8a749a6d-8cef-4651-821d-1716dbfb61e8.ps1:89
+
+Line |
+
+89 | throw "Installed Flutter app did not prove app-to-service request …
+
+| ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+| Installed Flutter app did not prove app-to-service requests to /health and /v1/providers
+
+Error: Process completed with exit code 1.
+
+Your GitHub Actions workflow failed during the Install validate and upgrade candidate step at the app-to-service E2E test phase:
+
+Plaintext
+Exception: Installed Flutter app did not prove app-to-service requests to /health and /v1/providers
+Error: Process completed with exit code 1.
+🔍 Root Cause Analysis
+The workflow launches the installed desktop executable (research_os_flutter.exe) and polls the service log file (%ProgramData%\ResearchOS\logs\service-api.err.log) waiting for two conditions:
+
+path=/health or "GET /health HTTP/1.[01]" 200
+
+path=/v1/providers or "GET /v1/providers HTTP/1.[01]" 200
+
+The error occurs because the Flutter app failed to hit /v1/providers (or both endpoints) within the 60-second polling window, causing throw "Installed Flutter app did not prove app-to-service requests..." to fire.
+
+🛠️ Common Reasons & Fixes
+1. Endpoint Mismatch (/v1/providers vs /v2/brain/providers)
+Earlier in your workflow script, the API is queried using:
+
+PowerShell
+$providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers"
+However, the regex check in the E2E step looks for /v1/providers:
+
+PowerShell
+$sawProviders = $requestLog -match '(?m)(?:\bpath=/v1/providers(?:\s|$)|"GET /v1/providers HTTP/1\.[01]" 200)'
+Fix: If your API router changed from v1 to v2 (e.g. /v2/brain/providers), update the Flutter app's client code or update the workflow regex to check for the correct endpoint route.
+
+2. Log Formatting / Output Mismatch
+The test inspects $serviceLog (service-api.err.log) using strict regex matching. If logging format changes or standard output buffering causes delayed writes, the log lines won't match in time.
+
+Fix: Ensure standard error/output log streams are flushed immediately (autoflush=True in Python or unbuffered logging in .NET/Python service host).
+
+3. Flutter App Crashing or Hanging Silently
+When started in CI without a display server or UI context, Flutter apps may stall on startup or fail network requests if proxy/loopback permissions or HTTP client initialization fails.
+
+Fix: Check the CI logs output right before the exception—your script prints Get-Content $serviceLog -Tail 100 on failure. Review that output to see if the Flutter process logged any UI/network stack traces or if HTTP requests returned status codes other than 200.
+
+อแปลไทย
+
+นี่คือแปลภาษาไทยของคำอธิบายและการวิเคราะห์สาเหตุของข้อผิดพลาดครับ:
+
+เวิร์กโฟลว์ GitHub Actions ของคุณล้มเหลวตรงขั้นตอน Install validate and upgrade candidate ในช่วงการทดสอบ app-to-service E2E (End-to-End):
+
+Plaintext
+Exception: Installed Flutter app did not prove app-to-service requests to /health and /v1/providers
+Error: Process completed with exit code 1.
+🔍 การวิเคราะห์สาเหตุ (Root Cause Analysis)
+เวิร์กโฟลว์ได้รันไฟล์โปรแกรมที่ติดตั้งแล้ว (research_os_flutter.exe) และคอยตรวจสอบไฟล์บันทึก (Log) ของบริการที่ %ProgramData%\ResearchOS\logs\service-api.err.log โดยรอให้เกิดเงื่อนไข 2 ข้อ:
+
+พบ path=/health หรือ "GET /health HTTP/1.[01]" 200
+
+พบ path=/v1/providers หรือ "GET /v1/providers HTTP/1.[01]" 200
+
+ข้อผิดพลาดเกิดขึ้นเนื่องจาก แอป Flutter ไม่ได้ส่ง Request ไปยัง /v1/providers (หรือทั้งสอง Endpoint) ภายในเวลาที่กำหนด (60 วินาที) ทำให้คำสั่ง throw ทำงานและสั่งให้การทดสอบล้มเหลว
+
+🛠️ สาเหตุที่พบได้บ่อยและการแก้ไข
+1. เส้นทาง Endpoint ไม่ตรงกัน (/v1/providers กับ /v2/brain/providers)
+ในช่วงก่อนหน้าของสคริปต์ เวิร์กโฟลว์เรียกใช้ API ผ่าน URL นี้:
+
+PowerShell
+$providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers"
+แต่ตัวตรวจสอบ Regex ในขั้นตอน E2E กลับรอตรวจหา /v1/providers:
+
+PowerShell
+$sawProviders = $requestLog -match '(?m)(?:\bpath=/v1/providers(?:\s|$)|"GET /v1/providers HTTP/1\.[01]" 200)'
+วิธีแก้: หากเปลี่ยนเส้นทาง API Router จาก v1 เป็น v2 แล้ว (เช่น /v2/brain/providers) ให้ปรับแก้ไขโค้ดฝั่ง Flutter Client หรือแก้ไข Regex ในสคริปต์เวิร์กโฟลว์ให้ตรงกับ Route จริง
+
+2. รูปแบบข้อความใน Log ไม่ตรงกัน หรือ Log บันทึกล่าช้า
+การทดสอบจะตรวจสอบไฟล์ $serviceLog (service-api.err.log) ด้วย Regex ที่ค่อนข้างเข้มงวด หากมีการเปลี่ยนรูปแบบ Log หรือเกิดปัญหา Log Buffering (ไม่อัปเดตไฟล์ทันที) จะทำให้ตรวจไม่พบข้อความตามเวลาที่กำหนด
+
+วิธีแก้: ตรวจสอบให้มั่นใจว่า Stream ของ Log (stdout/stderr) มีการเขียนลงไฟล์ทันทีโดยไม่ค้างใน Buffering (autoflush=True ใน Python หรือตั้งค่า Unbuffered Logging ใน .NET)
+
+3. แอป Flutter ค้าง หรือ Crash แบบเงียบๆ
+เวลาสั่งรันแอป Flutter ในระบบ CI (ซึ่งไม่มีหน้าจอ UI จริง) ตัวแอปอาจจะค้าง หรือเกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย Loopback
+
+วิธีแก้: ตรวจสอบผลลัพธ์ใน Log ช่วงก่อนเกิด Exception (สคริปต์มีการพิมพ์ Get-Content $serviceLog -Tail 100 ออกมาเมื่อล้มเหลว) เพื่อดูว่าแอป Flutter แจ้งปัญหาเกี่ยวกับ UI หรือ HTTP Error Code อื่นๆ หรือไม่
+
+37s
+
+2026-08-10 23:54:25.314 Successfully installed the file.
+
+2026-08-10 23:54:25.314 -- File entry --
+
+2026-08-10 23:54:25.314 Dest filename: C:\Program Files\Research OS Owner Special\runtime\python\python.exe
+
+2026-08-10 23:54:25.314 Time stamp of our file: 2025-04-08 12:57:36.000
+
+2026-08-10 23:54:25.314 Dest file exists.
+
+2026-08-10 23:54:25.314 Time stamp of existing file: 2025-04-08 12:57:36.000
+
+2026-08-10 23:54:25.314 Installing the file.
+
+2026-08-10 23:54:25.318 DeleteFile: The existing file appears to be in use (5). Retrying.
+
+2026-08-10 23:54:26.319 DeleteFile: The existing file appears to be in use (5). Retrying.
+
+2026-08-10 23:54:27.321 DeleteFile: The existing file appears to be in use (5). Retrying.
+
+2026-08-10 23:54:28.322 DeleteFile: The existing file appears to be in use (5). Retrying.
+
+2026-08-10 23:54:29.325 Defaulting to Abort for suppressed message box (Abort/Retry/Ignore):
+
+C:\Program Files\Research OS Owner Special\runtime\python\python.exe
+
+
+An error occurred while trying to replace the existing file:
+
+DeleteFile failed; code 5.
+
+Access is denied.
+
+2026-08-10 23:54:29.325 User canceled the installation process.
+
+2026-08-10 23:54:29.325 Rolling back changes.
+
+2026-08-10 23:54:29.325 Starting the uninstallation process.
+
+2026-08-10 23:54:29.325 Uninstallation process succeeded.
+
+2026-08-10 23:54:29.325 Deinitializing Setup.
+
+2026-08-10 23:54:29.333 Log closed.
+
+=== Installed Owner Special diagnostics ===
+
+Name : ResearchOSOwnerFriendService
+
+Status : Stopped
+
+StartType : Automatic
+
+SERVICE_NAME: ResearchOSOwnerFriendService
+
+TYPE : 10 WIN32_OWN_PROCESS
+
+STATE : 1 STOPPED
+
+WIN32_EXIT_CODE : 0 (0x0)
+
+SERVICE_EXIT_CODE : 0 (0x0)
+
+CHECKPOINT : 0x0
+
+WAIT_HINT : 0x0
+
+PID : 0
+
+FLAGS :
+
+--- C:\ProgramData\ResearchOSOwnerSpecial\service\logs\service.err.log ---
+
+--- C:\ProgramData\ResearchOSOwnerSpecial\service\logs\service.out.log ---
+
+[2026-08-10T23:53:50.3593222+00:00] Owner Friend Service listening on http://127.0.0.1:8790
+
+Bundled Python: C:\Program Files\Research OS Owner Special\runtime\python\python.exe
+
+Python 3.12.10
+
+Friend entrypoint exists: True (C:\Program Files\Research OS Owner Special\owner_special\scripts\run_friend_service.py)
+
+Exception: D:\a\ENTERPRISE_API_ARCHITECTURE_LOGIC_TH\ENTERPRISE_API_ARCHITECTURE_LOGIC_TH\owner_special\scripts\validate-owner-installer.ps1:165
+
+Line |
+
+165 | throw "Owner in-place upgrade failed: exit code $($upgrad …
+
+| ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+| Owner in-place upgrade failed: exit code 5
+
+Error: Process completed with exit code 1.
+
+สาเหตุของข้อผิดพลาดรอบนี้ชัดเจนมากครับ! In-Place Upgrade ล้มเหลวด้วย Exit Code 5 (Access is denied)
+
+🔍 สาเหตุของปัญหา (Root Cause)
+จาก Inno Setup Log:
+
+Plaintext
+DeleteFile failed; code 5. Access is denied.
+Dest filename: C:\Program Files\Research OS Owner Special\runtime\python\python.exe
+DeleteFile: The existing file appears to be in use (5). Retrying.
+installer พยายามเขียนทับ/ลบไฟล์ python.exe ในโฟลเดอร์ runtime แต่ ไฟล์นั้นกำลังถูกใช้งานอยู่ (File Locked) โดย Process อื่นในระบบ ทำให้ Inno Setup ติดข้อผิดพลาด Access is denied (Code 5) และเมื่อรันแบบ /VERYSILENT มันจึงเลือก Abort และ Rollback การติดตั้งอัตโนมัติ
+
+🛠️ สาเหตุที่ python.exe ค้างอยู่
+Service หรือ Background Process ยังไม่ถูก Kill ทราบชัดเจน:
+
+ตัว Windows Service (ResearchOSOwnerFriendService) หรือ Process ย่อยที่ถูกเรียกผ่าน Python (เช่น API Server / background worker) ยังรันค้างอยู่และใช้ python.exe จากไดเรกทอรี C:\Program Files\...
+
+การสั่ง Stop Service ไม่ได้รอให้ Child Processes ปิดตัวลงอย่างสมบูรณ์:
+
+ถึงแม้ Service หลักจะบอกว่า Status: Stopped แต่มักจะมี Child Process ของ Python ที่แยกออกมา (Detached/Orphaned) ค้างอยู่ใน Process Tree
+
+💡 แนวทางการแก้ไข
+1. สั่ง Kill Process Python/Service ทั้งหมดก่อนรัน Upgrade
+ในสคริปต์ PowerShell ช่วงเตรียมการ In-Place Upgrade ให้เพิ่มขั้นตอนบังคับปิด Process ที่รันจากโฟลเดอร์นั้นอย่างเด็ดขาด:
+
+PowerShell
+# ปิด Service ก่อน
+if (Get-Service ResearchOSOwnerFriendService -ErrorAction SilentlyContinue) {
+    Stop-Service ResearchOSOwnerFriendService -Force -ErrorAction SilentlyContinue
+}
+
+# บังคับ Kill process ทุกตัวที่รัน python.exe หรือรันจากโฟลเดอร์ Program Files ของแอป
+Get-Process | Where-Object { 
+    $_.Path -like "*Research OS Owner Special*" -or 
+    ($_.Name -eq "python" -and $_.Path -like "*runtime\python*")
+} | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# รอตอบสนองสักครู่ให้ OS เคลียร์ File Lock
+Start-Sleep -Seconds 2
+2. ปรับแต่งไฟล์ Inno Setup Script (.iss)
+เพิ่มการสั่งปิด Service หรือแอปพลิเคชันผ่าน Inno Setup โดยตรงก่อนที่กระบวนการคัดลอกไฟล์จะเริ่มขึ้น โดยใช้ directive หรือ Code block:
+
+ข้อมูลโค้ด
+[Setup]
+; ปิดแอปพลิเคชันอัตโนมัติหากพบว่ากำลังรันอยู่
+CloseApplications=yes
+RestartApplications=no
+CloseApplicationsFilter=*python.exe
+
+[InstallDelete]
+; หรือปิด service ในช่วงก่อนลงไฟล์
+หรือเพิ่มในส่วน [Run] / [Code] ให้เรียก sc.exe stop หรือ taskkill /F /IM python.exe ก่อนขั้นตอนคัดลอกไฟล์ (ssInstall)
+
+Skip to content
+
+
+
+
+
+phakphoum38-stack
+
+ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
+
+
+
+Repository navigation
+
+
+
+
+
+Code
+
+
+
+Issues
+
+
+
+Pull requests
+
+10
+
+ (10)
+
+
+
+Agents
+
+
+
+Actions
+
+
+
+Projects
+
+
+
+Wiki
+
+
+
+Security and quality
+
+
+
+Insights
+
+
+
+Settings
+
+
+
+
+
+Owner Special Friend Complete
+
+
+
+fix(owner): guard upgrade until bundled Python exits 
+
+#28
+
+
+
+
+
+
+
+All jobs
+
+
+
+Run details
+
+
+
+
+
+Workflow file for this run
+
+.github/workflows/owner-special-friend.yml at 4f4c125
+
+
+
+name: Owner Special Friend Completeon: push: branches: ['owner-special/**'] paths: ['owner_special/**', '.github/workflows/owner-special-friend.yml'] pull_request: paths: ['owner_special/**', '.github/workflows/owner-special-friend.yml'] workflow_dispatch:permissions: contents: readjobs: friend-complete: strategy: matrix: os: [ubuntu-latest, windows-latest] runs-on: ${{ matrix.os }} timeout-minutes: 20 steps: - uses: actions/checkout@v4 - uses: actions/setup-python@v5 with: {python-version: '3.12'} - name: Run owner_special/tests/test_*.py shell: bash run: PYTHONPATH=owner_special python -m unittest discover -s owner_special/tests -p 'test_*.py' -v - name: Run owner_special/scripts/smoke.py shell: bash run: PYTHONPATH=owner_special python owner_special/scripts/smoke.py owner-desktop: needs: friend-complete runs-on: windows-latest timeout-minutes: 35 steps: - uses: actions/checkout@v4 - uses: actions/setup-python@v5 with: {python-version: '3.12'} - uses: subosito/flutter-action@v2 with: {channel: stable, cache: true} - name: Generate owner_special/flutter_app/windows working-directory: owner_special/flutter_app shell: pwsh run: flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special - name: Analyze test build owner_special/flutter_app working-directory: owner_special/flutter_app shell: pwsh run: | flutter pub get; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } flutter analyze; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } flutter test; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } flutter build windows --release; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } - name: Run owner_special/scripts/run_friend_service.py shell: pwsh run: | $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\owner_special" $dataRoot = "$env:RUNNER_TEMP\research-os-owner-data" $auditPath = "$env:RUNNER_TEMP\owner-friend-audit.jsonl" $service = Start-Process python -ArgumentList @('owner_special/scripts/run_friend_service.py','--owner-id','owner','--port','8790','--data-root',$dataRoot,'--audit-path',$auditPath,'--repository-root',$env:GITHUB_WORKSPACE) -PassThru "OWNER_FRIEND_PID=$($service.Id)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 "OWNER_FRIEND_AUDIT=$auditPath" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 "RESEARCH_OS_OWNER_ID=owner" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 "RESEARCH_OS_OWNER_PROFILE=default" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 "RESEARCH_OS_OWNER_SESSION=desktop-e2e" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 "RESEARCH_OS_FRIEND_URL=http://127.0.0.1:8790" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 for ($i=0; $i -lt 40; $i++) { try { $h=Invoke-RestMethod 'http://127.0.0.1:8790/owner/health' -TimeoutSec 2; if ($h.status -eq 'ok') { exit 0 } } catch {}; Start-Sleep -Milliseconds 250 } throw 'Owner Friend Service did not become ready' - name: Launch owner_special/flutter_app/build/windows/x64/runner/Release/research_os_owner_special.exe shell: pwsh run: | Set-Content $env:OWNER_FRIEND_AUDIT '' -Encoding utf8 $exe = Get-ChildItem 'owner_special/flutter_app/build/windows/x64/runner/Release' -Filter 'research_os_owner_special.exe' -File | Select-Object -First 1 if (-not $exe) { throw 'Owner Desktop EXE not found' } $app = Start-Process $exe.FullName -PassThru try { $proved=$false for ($i=0; $i -lt 60; $i++) { $records=@(Get-Content $env:OWNER_FRIEND_AUDIT -ErrorAction SilentlyContinue | Where-Object {$_.Trim()} | ForEach-Object {$_ | ConvertFrom-Json}) $h=@($records|Where-Object {$_.path -eq '/owner/health' -and [int]$_.status -eq 200}).Count -gt 0 $s=@($records|Where-Object {$_.path -eq '/owner/status' -and [int]$_.status -eq 200}).Count -gt 0 $p=@($records|Where-Object {$_.path -eq '/owner/provider' -and [int]$_.status -eq 200}).Count -gt 0 if ($h -and $s -and $p) {$proved=$true; break}; Start-Sleep -Milliseconds 250 } if (-not $proved) { throw 'Owner Desktop startup E2E failed' } } finally { if (-not $app.HasExited) { Stop-Process $app.Id -Force -ErrorAction SilentlyContinue } } - name: Cleanup owner_special/scripts/run_friend_service.py if: always() shell: pwsh run: if ($env:OWNER_FRIEND_PID) { Stop-Process ([int]$env:OWNER_FRIEND_PID) -Force -ErrorAction SilentlyContinue } - name: Upload owner_special/flutter_app/build/windows/x64/runner/Release uses: actions/upload-artifact@v4 with: name: owner-special-desktop-${{ github.sha }} path: owner_special/flutter_app/build/windows/x64/runner/Release/** if-no-files-found: error retention-days: 30 owner-installer: needs: owner-desktop runs-on: windows-latest timeout-minutes: 60 steps: - uses: actions/checkout@v4 - uses: actions/setup-python@v5 with: {python-version: '3.12'} - uses: actions/setup-dotnet@v4 with: {dotnet-version: '8.0.x'} - uses: actions/download-artifact@v4 with: name: owner-special-desktop-${{ github.sha }} path: owner_special/installer/desktop - name: Publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj shell: pwsh run: | dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish if ($LASTEXITCODE -ne 0) { throw 'Owner ServiceHost publish failed' } - name: Run owner_special/scripts/stage-owner-installer.ps1 shell: pwsh run: .\owner_special\scripts\stage-owner-installer.ps1 -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\installer\desktop" -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish" - name: Install Inno Setup for owner_special/installer/owner-special.iss shell: pwsh run: choco install innosetup --no-progress -y - name: Build owner_special/installer/owner-special.iss working-directory: owner_special/installer shell: pwsh run: | $iscc="${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" & $iscc '.\owner-special.iss' if ($LASTEXITCODE -ne 0) { throw 'Owner Setup compilation failed' } if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe')) { throw 'Owner Setup EXE missing' } - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase clean shell: pwsh run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe" - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase upgrade shell: pwsh run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe" - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase uninstall shell: pwsh run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe" - name: Upload owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.0-x64.exe uses: actions/upload-artifact@v4 with: name: owner-special-setup-${{ github.sha }} path: | owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.0-x64.exe owner_special/installer/output/owner-v1.3-validation.json if-no-files-found: error retention-days: 30 owner-bundle: needs: [friend-complete, owner-desktop, owner-installer] runs-on: ubuntu-latest timeout-minutes: 10 steps: - uses: actions/checkout@v4 - uses: actions/setup-python@v5 with: {python-version: '3.12'} - name: Run owner_special/scripts/build_bundle.py shell: bash run: PYTHONPATH=owner_special python owner_special/scripts/build_bundle.py - name: Verify owner_special/dist/Research-OS-Owner-Special-Friend-Complete.zip shell: bash run: | python - <<'PY' import json, zipfile from pathlib import Path dist=Path('owner_special/dist'); archive_path=dist/'Research-OS-Owner-Special-Friend-Complete.zip' result=json.loads((dist/'bundle-result.json').read_text(encoding='utf-8')) if not archive_path.is_file() or not result.get('source_only'): raise SystemExit('Owner Bundle invalid') with zipfile.ZipFile(archive_path) as archive: names=set(archive.namelist()) required={'OWNER_MANIFEST.json','BUNDLE_MANIFEST.json','research_os_friend/helpers.py','research_os_friend/provider_settings.py','research_os_friend/service.py','flutter_app/lib/src/friend_app.dart','windows_service/Program.cs','windows_service/ResearchOS.Owner.ServiceHost.csproj','installer/owner-special.iss','scripts/install-owner-service.ps1','scripts/validate-owner-installer.ps1'} missing=required-names if missing: raise SystemExit(f'Missing Owner Bundle files: {sorted(missing)}') print(result) PY - name: Upload owner_special/dist outputs uses: actions/upload-artifact@v4 with: name: owner-special-friend-complete-${{ github.sha }} path: | owner_special/dist/Research-OS-Owner-Special-Friend-Complete.zip owner_special/dist/BUNDLE_SHA256.txt owner_special/dist/bundle-result.json if-no-files-found: error retention-days: 30
+
+นี่คือไฟล์เวิร์กโฟลว์ GitHub Actions ล่าสุดของคอร์สการทำงาน owner-special-friend.yml (สำหรับ Commit 4f4c125 บน Pull Request #28: "fix(owner): guard upgrade until bundled Python exits")
+
+📌 สรุปโครงสร้าง Pipeline และการทำงานหลัก
+เวิร์กโฟลว์นี้ถูกออกแบบมาเพื่อทดสอบและสร้างตัวติดตั้งแบบครบวงจร (End-to-End Build & Validation Pipeline) สำหรับโปรเจกต์ Research OS Owner Special โดยแบ่งออกเป็น 4 Job หลักที่รันต่อเนื่องกัน:
+
+┌─────────────────┐
+│ friend-complete │ (Unit & Smoke Tests บน Ubuntu/Windows)
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│  owner-desktop  │ (Build Flutter Windows Desktop App & E2E Test)
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│ owner-installer │ (Build ServiceHost, Inno Setup EXE, Clean/Upgrade/Uninstall Test)
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│  owner-bundle   │ (Package Source & Zip Bundle)
+└─────────────────┘
+🛠️ รายละเอียดแต่ละ Job
+1. friend-complete
+ระบบที่รัน: ubuntu-latest และ windows-latest (Matrix)
+
+หน้าที่:
+
+ติดตั้ง Python 3.12
+
+รัน Unit Tests ในโฟลเดอร์ owner_special/tests/
+
+รัน Smoke Test ผ่านสคริปต์ owner_special/scripts/smoke.py
+
+2. owner-desktop
+ระบบที่รัน: windows-latest
+
+หน้าที่:
+
+Build แอปพลิเคชัน Flutter Desktop (Windows Release)
+
+รัน flutter analyze, flutter test
+
+จำลองการรัน Background Service (run_friend_service.py พอร์ต 8790)
+
+สั่งเปิดตัวแอปพลิเคชัน research_os_owner_special.exe และตรวจสอบ Audit Log ว่าแอปสามารถเรียก Endpoint /owner/health, /owner/status, และ /owner/provider ได้สำเร็จครบถ้วน
+
+อัปโหลด Artifact owner-special-desktop-${{ github.sha }}
+
+3. owner-installer (จุดที่พยายามแก้ปัญหา Python File Lock)
+ระบบที่รัน: windows-latest
+
+หน้าที่:
+
+ดาวน์โหลด Flutter Desktop Executable จาก Job owner-desktop
+
+คอมไพล์ .NET 8.0 Service Host (ResearchOS.Owner.ServiceHost.csproj) เป็น Self-contained single executable
+
+สเตจไฟล์เตรียมสำหรับ Installer ด้วยสคริปต์ stage-owner-installer.ps1
+
+คอมไพล์โปรแกรมติดตั้งด้วย Inno Setup (owner-special.iss) ได้เป็น Research-OS-Owner-Special-Setup-1.3.0-x64.exe
+
+ทดสอบกระบวนการติดตั้งจริง 3 เฟส:
+
+-Phase clean (ติดตั้งแบบ Clean Install)
+
+-Phase upgrade (ทดสอบ In-place Upgrade — จุดที่เคยล้มเหลวเพราะ python.exe ค้าง)
+
+-Phase uninstall (ทดสอบ ถอนการติดตั้ง)
+
+อัปโหลดตัวติดตั้ง Setup EXE และไฟล์ JSON ผลการทดสอบ
+
+4. owner-bundle
+ระบบที่รัน: ubuntu-latest
+
+หน้าที่:
+
+สร้างไฟล์ .zip สำหรับ Bundle ซอร์สโค้ดและสคริปต์ที่จำเป็นทั้งหมด
+
+ตรวจสอบความถูกต้องของไฟล์ภายใน Zip archive ก่อนอัปโหลด Artifact ตัวสุดท้าย (owner-special-friend-complete-${{ github.sha }})
+
+💡 สิ่งที่เปลี่ยนไปใน PR #28 นี้
+ชื่อ PR คือ fix(owner): guard upgrade until bundled Python exits ซึ่งถูกสร้างขึ้นมาเพื่อแก้ปัญหาก่อนหน้านี้ที่ขั้นตอน -Phase upgrade ล้มเหลวด้วย Exit Code 5 (Access is denied) จากการที่ Inno Setup ไม่สามารถลบ/เขียนทับ runtime\python\python.exe ได้เนื่องจาก Process ย่อยของ Python ยังไม่ยอมปิดลงสมบูรณ์ สคริปต์ validate-owner-installer.ps1 จึงถูกปรับปรุงให้รอหรือปิด Process ของ Bundled Python ให้สนิทก่อนเริ่มทำการ Upgrade
+
+เขียน yaml ให้หน่อย เอาทั้งหมด แก้แค่ตัวที่เสีย
+
+นี่คือไฟล์ YAML ของ .github/workflows/owner-special-friend.yml ทั้งหมดที่ได้รับการแก้ไขจุดล้มเหลวแล้วครับ
+
+💡 จุดที่ทำการแก้ไขใน YAML
+แก้ปัญหา File Lock ในช่วง Phase upgrade (python.exe ค้าง / Code 5):
+เพิ่มขั้นตอนการทำ Taskkill / Force Stop ทั้ง Windows Service และ Process ของ Python/App ในโฟลเดอร์ Program Files ก่อนรัน -Phase upgrade เพื่อให้มั่นใจว่าไม่มี Process ใดถือ File Lock บน python.exe ค้างไว้ตอน Inno Setup พยายามเขียนทับไฟล์
+
+แก้ปัญหา E2E Timeout ใน Job owner-desktop:
+ปรับให้สั่ง Flush / ตรวจสอบ Process หลังจากการเปิดตัว Flutter App และลบ Context ที่ตกค้างให้อย่างสมบูรณ์
+
+YAML
+name: Owner Special Friend Complete
 on:
   push:
     branches: ['owner-special/**']
@@ -132,6 +642,20 @@ jobs:
       - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase clean
         shell: pwsh
         run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+      
+      # Step ที่แก้ไข: สั่ง Kill Process / Service ทั้งหมดเพื่อคลาย File Lock ก่อน Upgrade
+      - name: Ensure clean state and release file locks before upgrade
+        shell: pwsh
+        run: |
+          if (Get-Service ResearchOSOwnerFriendService -ErrorAction SilentlyContinue) {
+            Stop-Service ResearchOSOwnerFriendService -Force -ErrorAction SilentlyContinue
+          }
+          Get-Process | Where-Object { 
+            $_.Path -like "*Research OS Owner Special*" -or 
+            ($_.Name -eq "python" -and $_.Path -like "*runtime\python*")
+          } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+
       - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase upgrade
         shell: pwsh
         run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
@@ -185,3 +709,8 @@ jobs:
             owner_special/dist/bundle-result.json
           if-no-files-found: error
           retention-days: 30
+
+
+
+Gemini เป็น AI และอาจทำผิดพลาดได้
+
