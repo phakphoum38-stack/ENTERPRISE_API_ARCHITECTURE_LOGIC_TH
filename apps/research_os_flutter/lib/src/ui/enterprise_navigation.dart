@@ -9,6 +9,13 @@ class ResearchNavItem {
   final int index;
 }
 
+class ResearchRecentChat {
+  const ResearchRecentChat({required this.id, required this.title});
+
+  final String id;
+  final String title;
+}
+
 const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('Workspace', 'Home', Icons.home_outlined, 0),
   ResearchNavItem('Workspace', 'AI Chat', Icons.edit_square, 1),
@@ -27,20 +34,37 @@ class ResearchSidebar extends StatelessWidget {
   const ResearchSidebar({
     required this.expanded,
     required this.selectedIndex,
+    required this.recentChats,
     required this.onToggle,
     required this.onSelected,
+    required this.onNewChat,
+    required this.onRecentChatSelected,
     super.key,
   });
 
   final bool expanded;
   final int selectedIndex;
+  final List<ResearchRecentChat> recentChats;
   final VoidCallback onToggle;
   final ValueChanged<int> onSelected;
+  final Future<void> Function() onNewChat;
+  final Future<void> Function(String id) onRecentChatSelected;
 
   List<Widget> _entries(BuildContext context) {
     final widgets = <Widget>[];
     String? section;
     for (final item in researchNavigationItems) {
+      if (expanded &&
+          section == 'Workspace' &&
+          item.section != section &&
+          recentChats.isNotEmpty) {
+        widgets.add(
+          _RecentChatsSection(
+            chats: recentChats,
+            onSelected: onRecentChatSelected,
+          ),
+        );
+      }
       if (expanded && section != item.section) {
         section = item.section;
         widgets.add(_SectionLabel(section));
@@ -107,7 +131,9 @@ class ResearchSidebar extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
               child: _ChatPrimaryAction(
                 selected: selectedIndex == 1,
-                onTap: () => onSelected(1),
+                onTap: () {
+                  onNewChat();
+                },
               ),
             ),
           Expanded(
@@ -219,6 +245,58 @@ class _ChatPrimaryAction extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RecentChatsSection extends StatelessWidget {
+  const _RecentChatsSection({required this.chats, required this.onSelected});
+
+  final List<ResearchRecentChat> chats;
+  final Future<void> Function(String id) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const _SectionLabel('เมื่อเร็ว ๆ นี้'),
+        for (final chat in chats)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                key: Key('desktop-recent-chat-${chat.id}'),
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  onSelected(chat.id);
+                },
+                child: SizedBox(
+                  height: 36,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: <Widget>[
+                        const Icon(Icons.chat_bubble_outline, size: 16),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            chat.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
