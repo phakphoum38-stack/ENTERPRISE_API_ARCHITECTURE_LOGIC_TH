@@ -2,10 +2,16 @@ name: Owner Special Friend Complete
 
 on:
   push:
-    branches: ['owner-special/**']
-    paths: ['owner_special/**', '.github/workflows/owner-special-friend.yml']
+    branches: ['main', 'owner-special/**', 'debug/owner-installer-guard']
+    paths:
+      - 'owner_special/**'
+      - 'v3/research_os_v3/**'
+      - '.github/workflows/owner-special-friend.yml'
   pull_request:
-    paths: ['owner_special/**', '.github/workflows/owner-special-friend.yml']
+    paths:
+      - 'owner_special/**'
+      - 'v3/research_os_v3/**'
+      - '.github/workflows/owner-special-friend.yml'
   workflow_dispatch:
 
 permissions:
@@ -22,9 +28,26 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - name: Compile Owner and V3 Python sources
+        shell: bash
+        run: python -m compileall -q owner_special/research_os_friend owner_special/scripts owner_special/tests v3/research_os_v3
+      - name: Validate Owner manifest JSON
+        shell: bash
+        run: python -m json.tool owner_special/OWNER_MANIFEST.json > /dev/null
       - name: Run owner_special/tests/test_*.py
         shell: bash
         run: PYTHONPATH=owner_special python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
+      - name: Probe Owner V3 bridge
+        shell: bash
+        run: |
+          PYTHONPATH=owner_special python - <<'PY'
+          from pathlib import Path
+          from research_os_friend.v3_bridge import V3Bridge
+          status = V3Bridge(Path.cwd()).probe()
+          print(status)
+          if not status.available:
+              raise SystemExit(f'Owner V3 bridge unavailable: {status.reason}')
+          PY
       - name: Run owner_special/scripts/smoke.py
         shell: bash
         run: PYTHONPATH=owner_special python owner_special/scripts/smoke.py
@@ -115,6 +138,21 @@ jobs:
         run: |
           dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish
           if ($LASTEXITCODE -ne 0) { throw 'Owner ServiceHost publish failed' }
+      - name: Parse Owner PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem owner_special/scripts -Filter '*.ps1' -File | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "PowerShell parse errors in $($_.FullName):"
+              $errors | Format-List | Out-Host
+            }
+          }
+          if ($failed) { throw 'Owner PowerShell syntax validation failed' }
       - name: Run owner_special/scripts/stage-owner-installer.ps1
         shell: pwsh
         run: .\owner_special\scripts\stage-owner-installer.ps1 -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\installer\desktop" -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
@@ -202,7 +240,15 @@ jobs:
           if not archive_path.is_file() or not result.get('source_only'): raise SystemExit('Owner Bundle invalid')
           with zipfile.ZipFile(archive_path) as archive:
               names=set(archive.namelist())
-              required={'OWNER_MANIFEST.json','BUNDLE_MANIFEST.json','research_os_friend/helpers.py','research_os_friend/provider_settings.py','research_os_friend/service.py','flutter_app/lib/src/friend_app.dart','windows_service/Program.cs','windows_service/ResearchOS.Owner.ServiceHost.csproj','installer/owner-special.iss','scripts/install-owner-service.ps1','scripts/validate-owner-installer.ps1'}
+              required={
+                  'OWNER_MANIFEST.json','BUNDLE_MANIFEST.json',
+                  'research_os_friend/helpers.py','research_os_friend/provider_settings.py','research_os_friend/service.py','research_os_friend/v3_bridge.py',
+                  'flutter_app/lib/src/friend_app.dart',
+                  'windows_service/Program.cs','windows_service/ResearchOS.Owner.ServiceHost.csproj',
+                  'installer/owner-special.iss',
+                  'scripts/install-owner-service.ps1','scripts/stage-owner-installer.ps1','scripts/validate-owner-installer.ps1',
+                  'tests/test_friend_complete.py','tests/test_friend_persistence.py','tests/test_friend_service.py','tests/test_provider_settings.py'
+              }
               missing=required-names
               if missing: raise SystemExit(f'Missing Owner Bundle files: {sorted(missing)}')
           print(result)
