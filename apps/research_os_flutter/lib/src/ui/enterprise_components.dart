@@ -59,7 +59,10 @@ class EnterprisePageHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 680;
-        final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+        // Read the platform view directly. A Scaffold may derive a MediaQuery
+        // for its body with consumed viewInsets, which can hide the software
+        // keyboard from descendants even though the FlutterView still reports it.
+        final keyboardOpen = View.of(context).viewInsets.bottom > 0;
 
         // On phones the software keyboard already consumes a large part of the
         // viewport. Collapse the page-level header while typing so the active
