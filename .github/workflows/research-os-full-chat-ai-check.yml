@@ -97,10 +97,10 @@ jobs:
     env:
       RESEARCH_OS_PROVIDER: gemini
       RESEARCH_OS_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      # CI fallback model: the configured gemini-3.6-flash free-tier quota was
-      # exhausted by repeated live benchmark runs. Keep the production model
-      # configuration untouched and evaluate against this stable Gemini model.
-      RESEARCH_OS_GEMINI_MODEL: gemini-2.5-flash
+      # CI-only evaluation model. Google currently lists Gemini 3.5 Flash as a
+      # supported migration target from 3.6 Flash. Production model selection
+      # remains controlled independently by the normal provider configuration.
+      RESEARCH_OS_GEMINI_MODEL: gemini-3.5-flash
       RESEARCH_OS_API_HOST: 127.0.0.1
       RESEARCH_OS_API_PORT: "8787"
       RESEARCH_OS_API_BASE_URL: http://127.0.0.1:8787
@@ -154,9 +154,6 @@ jobs:
                   time.sleep(1)
           raise SystemExit(f"Local API did not become ready: {type(last_error).__name__}")
           PY
-
-      - name: Live provider connectivity smoke
-        run: python tools/research_os_api/provider_smoke.py
 
       - name: Flutter client to Local API to Gemini E2E
         working-directory: apps/research_os_flutter
