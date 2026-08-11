@@ -104,6 +104,16 @@ export BROWSER_USE_API_KEY="..."
 
 Research OS เก็บ Browser Use API key และ CDP URL เต็มไว้ฝั่ง backend เท่านั้น; UI เห็นเฉพาะสถานะ session และ browser id.
 
+สำหรับ CI หรือทดสอบแบบไม่กิน quota ให้ชี้ backend ไปที่ simulator:
+
+```bash
+python tools/research_os_api/browser_use_cloud_simulator.py --host 127.0.0.1 --port 8799
+export BROWSER_USE_API_KEY="browser-use-ci-simulator-key"
+export BROWSER_USE_API_BASE="http://127.0.0.1:8799"
+```
+
+GitHub Actions workflow `Browser Use Cloud Connect Smoke` ใช้ simulator เป็นค่าเริ่มต้น และจะยิง Browser Use Cloud จริงเฉพาะเมื่อรันแบบ `connect_cloud=true` พร้อม `BROWSER_USE_API_KEY` ใน GitHub Secrets.
+
 ## Security Boundary
 
 API รุ่นแรก bind ที่ `127.0.0.1` โดยค่าเริ่มต้นและยังไม่มีระบบ Authentication จึง **ห้ามเปิดออกอินเทอร์เน็ตโดยตรง**

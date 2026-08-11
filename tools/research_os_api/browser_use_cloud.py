@@ -21,18 +21,21 @@ class BrowserUseCloudConnector:
     browser-control access.
     """
 
-    api_base = "https://api.browser-use.com"
+    default_api_base = "https://api.browser-use.com"
 
     def __init__(
         self,
         data_dir: str | os.PathLike[str] | None = None,
         api_key: str | None = None,
+        api_base: str | None = None,
     ) -> None:
         root = Path(data_dir or os.environ.get("RESEARCH_OS_DATA_DIR") or Path.home() / "ResearchOSData")
         self.root = root / "browser_use"
         self.root.mkdir(parents=True, exist_ok=True)
         self.session_path = self.root / "session.json"
         self.api_key = (api_key or os.environ.get("BROWSER_USE_API_KEY") or "").strip()
+        configured_api_base = api_base or os.environ.get("BROWSER_USE_API_BASE") or self.default_api_base
+        self.api_base = configured_api_base.strip().rstrip("/")
 
     @property
     def api_key_configured(self) -> bool:
@@ -49,13 +52,16 @@ class BrowserUseCloudConnector:
             "proxy_country_code": session.get("proxy_country_code") if session else None,
             "cdp_url_available": bool(cdp_url),
             "cdp_host": urllib.parse.urlsplit(cdp_url).hostname if cdp_url else None,
+            "api_base_host": urllib.parse.urlsplit(self.api_base).hostname,
             "token_storage": "backend_env_only",
             "session_storage": "backend_local_only",
         }
 
     def connect(self, proxy_country_code: str = "us") -> dict[str, Any]:
         if not self.api_key_configured:
-            raise BrowserUseCloudError("Set BROWSER_USE_API_KEY on the Research OS backend before connecting Browser Use Cloud.")
+            raise BrowserUseCloudError(
+                "Set BROWSER_USE_API_KEY on the Research OS backend before connecting Browser Use Cloud."
+            )
 
         proxy = (proxy_country_code or "us").strip().lower()[:2] or "us"
         payload = self._request("POST", "/api/v4/browsers", {"proxyCountryCode": proxy})

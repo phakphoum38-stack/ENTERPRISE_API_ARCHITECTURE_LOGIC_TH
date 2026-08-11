@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       connect_cloud:
-        description: Create and stop a real Browser Use Cloud browser session
+        description: Use real Browser Use Cloud instead of the local simulator
         required: false
         default: false
         type: boolean
@@ -34,7 +34,8 @@ jobs:
       RESEARCH_OS_PROVIDER: mock
       RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
       RESEARCH_OS_CONVERSATION_STORE: ${{ runner.temp }}/ResearchOSData/sessions/conversations.json
-      BROWSER_USE_API_KEY: ${{ secrets.BROWSER_USE_API_KEY }}
+      BROWSER_USE_API_BASE: ${{ inputs.connect_cloud == true && 'https://api.browser-use.com' || 'http://127.0.0.1:8799' }}
+      BROWSER_USE_API_KEY: ${{ inputs.connect_cloud == true && secrets.BROWSER_USE_API_KEY || 'browser-use-ci-simulator-key' }}
       CONNECT_CLOUD: ${{ inputs.connect_cloud }}
       PROXY_COUNTRY_CODE: ${{ inputs.proxy_country_code || 'us' }}
     steps:
@@ -54,6 +55,21 @@ jobs:
           python -m unittest \
             test_browser_use_cloud \
             test_api.ResearchOSAPITests.test_browser_use_status_is_backend_key_gated
+
+      - name: Start simulated Browser Use Cloud
+        if: ${{ inputs.connect_cloud != true }}
+        run: |
+          python tools/research_os_api/browser_use_cloud_simulator.py --host 127.0.0.1 --port 8799 > "$RUNNER_TEMP/browser-use-sim.log" 2>&1 &
+          echo "BROWSER_USE_SIM_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8799/health > /tmp/browser-use-sim-health.json; then
+              cat /tmp/browser-use-sim-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/browser-use-sim.log"
+          exit 1
 
       - name: Start Research OS API
         run: |
@@ -86,6 +102,7 @@ jobs:
               json.dumps(
                   {
                       "provider": status["provider"],
+                      "api_base_host": status["api_base_host"],
                       "api_key_configured": status["api_key_configured"],
                       "connected": status["connected"],
                       "token_storage": status["token_storage"],
@@ -107,8 +124,7 @@ jobs:
           flutter pub get
           flutter test test/research_os_api_client_test.dart test/widget_test.dart
 
-      - name: Connect and stop Browser Use Cloud session
-        if: ${{ inputs.connect_cloud == true }}
+      - name: Connect and stop Browser Use session
         run: |
           if [ -z "${BROWSER_USE_API_KEY}" ]; then
             echo "BROWSER_USE_API_KEY GitHub Secret is required when connect_cloud=true."
@@ -166,9 +182,23 @@ jobs:
             kill "$RESEARCH_OS_API_PID" 2>/dev/null || true
           fi
 
+      - name: Stop simulated Browser Use Cloud
+        if: always()
+        run: |
+          if [ -n "${BROWSER_USE_SIM_PID:-}" ]; then
+            kill "$BROWSER_USE_SIM_PID" 2>/dev/null || true
+          fi
+
       - name: Upload API log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: browser-use-cloud-smoke-api-log
           path: ${{ runner.temp }}/research-os-api.log
+
+      - name: Upload simulator log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-use-cloud-smoke-simulator-log
+          path: ${{ runner.temp }}/browser-use-sim.log

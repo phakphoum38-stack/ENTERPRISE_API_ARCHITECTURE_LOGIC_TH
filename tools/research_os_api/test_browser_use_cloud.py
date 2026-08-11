@@ -63,6 +63,30 @@ class BrowserUseCloudConnectorTest(unittest.TestCase):
         self.assertEqual(requests[0].headers["X-browser-use-api-key"], "browser-use-secret")
         self.assertEqual(json.loads(requests[0].data.decode("utf-8")), {"proxyCountryCode": "us"})
 
+    def test_connect_can_target_simulated_api_base(self):
+        requests = []
+
+        def fake_urlopen(request, timeout=0):
+            requests.append(request)
+            return _Response(
+                {"id": "sim-browser-123", "cdpUrl": "wss://simulated.browser-use.local/devtools/sim-browser-123"}
+            )
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ,
+            {
+                "BROWSER_USE_API_KEY": "browser-use-secret",
+                "BROWSER_USE_API_BASE": "http://127.0.0.1:8799",
+            },
+            clear=True,
+        ), patch("browser_use_cloud.urllib.request.urlopen", side_effect=fake_urlopen):
+            status = BrowserUseCloudConnector(tmp).connect("th")
+
+        self.assertEqual(status["browser_id"], "sim-browser-123")
+        self.assertEqual(status["proxy_country_code"], "th")
+        self.assertEqual(status["api_base_host"], "127.0.0.1")
+        self.assertEqual(requests[0].full_url, "http://127.0.0.1:8799/api/v4/browsers")
+
     def test_disconnect_stops_existing_cloud_browser(self):
         requests = []
 
