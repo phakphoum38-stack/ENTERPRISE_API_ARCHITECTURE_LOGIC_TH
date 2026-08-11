@@ -118,7 +118,7 @@ class _CheckInPageState extends State<CheckInPage> {
     final minutes = end.difference(start).inMinutes.clamp(0, 1000000000);
     final hours = minutes ~/ 60;
     final remain = minutes % 60;
-    return '${hours}ชม. ${remain}น.';
+    return '$hoursชม. $remainน.';
   }
 
   Widget _checkInButton(Map<String, dynamic>? active) => FilledButton.icon(
