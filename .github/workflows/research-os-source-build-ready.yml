@@ -1,0 +1,128 @@
+name: Research OS Build-Ready Source
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/chatgpt-style-desktop-shell
+    paths:
+      - "BUILD_READY.md"
+      - "apps/research_os_flutter/**"
+      - "owner_special/**"
+      - "v3/**"
+      - "tools/research_os_api/**"
+      - "render.yaml"
+      - "render.staging.yaml"
+      - "scripts/apply-research-os-branding.py"
+      - "scripts/research-os-service.ps1"
+      - ".github/workflows/research-os-ios-ipa.yml"
+      - ".github/workflows/research-os-windows-artifact.yml"
+      - ".github/workflows/owner-special-friend.yml"
+      - ".github/workflows/research-os-source-build-ready.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-build-ready-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Validate build-ready source contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f BUILD_READY.md
+          test -f apps/research_os_flutter/pubspec.yaml
+          test -f apps/research_os_flutter/lib/src/features/checkin/check_in_page.dart
+          test -f apps/research_os_flutter/lib/src/app_shell.dart
+          test -f tools/research_os_api/server.py
+          test -f tools/research_os_api/google_identity.py
+          test -f owner_special/OWNER_MANIFEST.json
+          test -f owner_special/flutter_app/pubspec.yaml
+          test -d v3
+          grep -q '/v1/auth/google/status' tools/research_os_api/server.py
+          grep -q '/v1/auth/google/callback' tools/research_os_api/server.py
+          grep -q 'RESEARCH_OS_GOOGLE_IDENTITY_REDIRECT_URI' render.yaml
+          grep -q 'com.phakphoum38.researchos' .github/workflows/research-os-ios-ipa.yml
+
+          max_path=$(git ls-files | awk '{ if (length($0) > max) { max=length($0); path=$0 } } END { print max ":" path }')
+          echo "MAX_TRACKED_RELATIVE_PATH=$max_path"
+          max_len=${max_path%%:*}
+          if [ "$max_len" -gt 220 ]; then
+            echo "Tracked source path is too long for the build-ready archive: $max_path" >&2
+            exit 1
+          fi
+
+      - name: Package App, Core, and Complete source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          short_sha="${GITHUB_SHA:0:12}"
+
+          git archive --format=zip \
+            -o "dist/Research-OS-App-Source-Build-Ready-${short_sha}.zip" \
+            HEAD \
+            BUILD_READY.md \
+            apps/research_os_flutter \
+            scripts/apply-research-os-branding.py \
+            .github/workflows/research-os-ios-ipa.yml \
+            .github/workflows/research-os-windows-artifact.yml \
+            .github/workflows/research-os-source-build-ready.yml
+
+          git archive --format=zip \
+            -o "dist/Research-OS-Core-Friend-API-Source-Build-Ready-${short_sha}.zip" \
+            HEAD \
+            BUILD_READY.md \
+            owner_special \
+            v3 \
+            tools/research_os_api \
+            render.yaml \
+            render.staging.yaml \
+            scripts/research-os-service.ps1 \
+            .github/workflows/owner-special-friend.yml \
+            .github/workflows/research-os-source-build-ready.yml
+
+          git archive --format=zip \
+            -o "dist/Research-OS-Complete-Source-Build-Ready-${short_sha}.zip" \
+            HEAD
+
+          cat > dist/SOURCE_BUILD_INFO.txt <<EOF
+          Research OS Build-Ready Source
+          Branch: ${GITHUB_REF_NAME}
+          Commit: ${GITHUB_SHA}
+          App: Minimal Chat + Google/Gmail Account + Check-in
+          API: Google identity endpoints + Google Workspace + providers + memory
+          Friend/Core: Owner Friend + ServiceHost + installer + V3
+          Archive source: Git tracked files only
+          Generated caches/runtime/binaries: not included unless intentionally tracked
+          EOF
+
+          cd dist
+          sha256sum *.zip > SHA256SUMS.txt
+          ls -lh
+          cat SHA256SUMS.txt
+
+      - name: Upload build-ready source
+        uses: actions/upload-artifact@v4
+        with:
+          name: Research-OS-Build-Ready-Source-${{ github.sha }}
+          path: |
+            dist/Research-OS-App-Source-Build-Ready-*.zip
+            dist/Research-OS-Core-Friend-API-Source-Build-Ready-*.zip
+            dist/Research-OS-Complete-Source-Build-Ready-*.zip
+            dist/SOURCE_BUILD_INFO.txt
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
