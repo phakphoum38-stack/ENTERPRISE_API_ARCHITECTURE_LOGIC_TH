@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -140,12 +141,76 @@ def _first_env(*names: str) -> str | None:
     return None
 
 
+def _retry_delay_from_body(body: str) -> float | None:
+    """Extract a provider-advised retry delay without exposing response text.
+
+    Gemini may return RetryInfo.retryDelay or put "Please retry in 30.7s" in
+    the error message while omitting the HTTP Retry-After header.
+    """
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        payload = None
+
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict):
+            details = error.get("details")
+            if isinstance(details, list):
+                for detail in details:
+                    if not isinstance(detail, dict):
+                        continue
+                    raw_delay = detail.get("retryDelay")
+                    if isinstance(raw_delay, str):
+                        match = re.fullmatch(r"\s*([0-9]+(?:\.[0-9]+)?)s\s*", raw_delay)
+                        if match:
+                            return float(match.group(1))
+            message = error.get("message")
+            if isinstance(message, str):
+                match = re.search(
+                    r"(?:please\s+)?retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
+                    message,
+                    flags=re.IGNORECASE,
+                )
+                if match:
+                    return float(match.group(1))
+
+    match = re.search(
+        r"(?:please\s+)?retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
+        body,
+        flags=re.IGNORECASE,
+    )
+    return float(match.group(1)) if match else None
+
+
+def _retry_delay_seconds(
+    exc: urllib.error.HTTPError,
+    body: str,
+    attempt: int,
+) -> float:
+    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+    try:
+        if retry_after:
+            return max(0.0, float(retry_after))
+    except (TypeError, ValueError):
+        pass
+
+    advised = _retry_delay_from_body(body)
+    if advised is not None:
+        # Small cushion prevents retrying a fraction of a second before the
+        # quota window actually resets.
+        return max(0.0, advised + 0.5)
+
+    return float(2 ** (attempt - 1))
+
+
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
     if not url or not url.strip():
         raise ProviderError("provider endpoint is empty")
 
     retryable_statuses = {429, 500, 502, 503, 504}
     max_attempts = 4
+    max_retry_delay = float(os.getenv("RESEARCH_OS_PROVIDER_MAX_RETRY_DELAY", "65"))
     last_error: Exception | None = None
 
     for attempt in range(1, max_attempts + 1):
@@ -164,12 +229,8 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
             if exc.code not in retryable_statuses or attempt == max_attempts:
                 raise ProviderError(f"provider HTTP {exc.code}: {body[:500]}") from exc
 
-            retry_after = exc.headers.get("Retry-After") if exc.headers else None
-            try:
-                delay = float(retry_after) if retry_after else float(2 ** (attempt - 1))
-            except (TypeError, ValueError):
-                delay = float(2 ** (attempt - 1))
-            time.sleep(min(delay, 8.0))
+            delay = _retry_delay_seconds(exc, body, attempt)
+            time.sleep(min(max(0.0, delay), max_retry_delay))
         except (urllib.error.URLError, json.JSONDecodeError, ValueError) as exc:
             last_error = exc
             if attempt == max_attempts:
@@ -204,10 +265,7 @@ def build_provider(name: str | None = None) -> AIProvider:
                 "https://api.anthropic.com/v1/messages",
             ),
             api_key=key,
-            default_model=_env_or_default(
-                "RESEARCH_OS_ANTHROPIC_MODEL",
-                "claude-sonnet-4-5",
-            ),
+            default_model=_env_or_default("RESEARCH_OS_ANTHROPIC_MODEL", "claude-sonnet-4-5"),
         )
     if selected == "gemini":
         key = _first_env("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY")
@@ -221,9 +279,6 @@ def build_provider(name: str | None = None) -> AIProvider:
                 "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
             ),
             api_key=key,
-            default_model=_env_or_default(
-                "RESEARCH_OS_GEMINI_MODEL",
-                "gemini-2.5-flash",
-            ),
+            default_model=_env_or_default("RESEARCH_OS_GEMINI_MODEL", "gemini-2.5-flash"),
         )
     raise ProviderError(f"unsupported provider: {selected}")
