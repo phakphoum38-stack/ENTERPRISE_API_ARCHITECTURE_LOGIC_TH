@@ -59,6 +59,16 @@ class EnterprisePageHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 680;
+        final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
+        // On phones the software keyboard already consumes a large part of the
+        // viewport. Collapse the page-level header while typing so the active
+        // content and composer keep useful vertical space. The app-shell title
+        // remains visible, and this header returns automatically when the
+        // keyboard closes.
+        if (compact && keyboardOpen) {
+          return const SizedBox.shrink();
+        }
 
         if (compact) {
           return Column(
