@@ -80,9 +80,9 @@ begin
     Exit;
   end;
 
-  { Write a tiny checker to {tmp} so PowerShell parsing does not depend on deeply
-    nested -Command quoting inside Pascal Script. Exit 0 = released, 10 = exact
-    packaged python.exe still running, 20 = checker failure. }
+  // Write a tiny checker to {tmp} so PowerShell parsing does not depend on deeply
+  // nested -Command quoting inside Pascal Script. Exit 0 = released, 10 = exact
+  // packaged python.exe still running, 20 = checker failure.
   CheckerPath := ExpandConstant('{tmp}\research-os-owner-python-check.ps1');
   CheckerScript :=
     'param([Parameter(Mandatory=$true)][string]$Target)' + #13#10 +
