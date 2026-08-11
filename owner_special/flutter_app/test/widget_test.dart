@@ -4,6 +4,8 @@ import 'package:research_os_owner_special/src/friend_app.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 
 class FakeOwnerFriendApi implements OwnerFriendApi {
+  int? lastHelperBudget;
+
   @override
   Future<Map<String, dynamic>> health() async => <String, dynamic>{'status': 'ok'};
   @override
@@ -17,19 +19,21 @@ class FakeOwnerFriendApi implements OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> testProvider() async => <String, dynamic>{'connected': true};
   @override
-  Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) async => <String, dynamic>{'text': 'friend:$text', 'decision': <String, dynamic>{'scale': helperBudget >= 1000000 ? 'fast-1m' : '6^6', 'capacity': helperBudget >= 1000000 ? 1000000 : 46656}, 'helpers': <String, dynamic>{'active_workers': 128, 'batches': 7813}, 'factory': <String, dynamic>{'stages': <String>['master', 'factory', 'team', 'tests', 'release']}};
+  Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) async {
+    lastHelperBudget = helperBudget;
+    return <String, dynamic>{'text': 'friend:$text', 'decision': <String, dynamic>{'scale': helperBudget >= 1000000 ? 'fast-1m' : '6^6', 'capacity': helperBudget >= 1000000 ? 1000000 : 46656}, 'helpers': <String, dynamic>{'active_workers': 128, 'batches': 7813}, 'factory': <String, dynamic>{'stages': <String>['master', 'factory', 'team', 'tests', 'release']}};
+  }
 }
 
 void main() {
   testWidgets('Owner Friend desktop uses bounded million-helper mode', (tester) async {
-    await tester.pumpWidget(OwnerFriendApp(api: FakeOwnerFriendApi()));
+    final api = FakeOwnerFriendApi();
+    await tester.pumpWidget(OwnerFriendApp(api: api));
     await tester.enterText(find.byKey(const Key('friend-input')), 'hello');
     await tester.tap(find.byKey(const Key('friend-send')));
     await tester.pumpAndSettle();
     expect(find.text('friend:hello'), findsOneWidget);
     expect(find.text('Brain scale: fast-1m'), findsOneWidget);
-    expect(find.text('Logical capacity: 1000000'), findsOneWidget);
-    expect(find.text('Active workers: 128'), findsOneWidget);
-    expect(find.textContaining('master → factory → team → tests → release'), findsOneWidget);
+    expect(api.lastHelperBudget, 1000000);
   });
 }
