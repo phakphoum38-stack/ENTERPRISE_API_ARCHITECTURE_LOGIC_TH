@@ -12,11 +12,38 @@ class Provider(Protocol):
 
 @dataclass
 class MockProvider:
+    """Human-friendly local fallback used when no external AI provider is ready.
+
+    Provider/debug metadata stays in the structured response (`provider=owner-mock`)
+    instead of being leaked into the text shown to the owner.
+    """
+
     name: str = "owner-mock"
 
     def complete(self, *, prompt: str, context: tuple[str, ...]) -> str:
-        prefix = f"context={len(context)}"
-        return f"[{self.name} {prefix}] {prompt}"
+        text = prompt.strip()
+        normalized = text.casefold()
+        greetings = {
+            "hi",
+            "hello",
+            "hey",
+            "สวัสดี",
+            "สวัสดีครับ",
+            "สวัสดีค่ะ",
+            "หวัดดี",
+            "หวัดดีครับ",
+        }
+        if normalized in greetings:
+            return (
+                "สวัสดีครับ 👋 Research OS Friend พร้อมรับงานครับ\n\n"
+                "ตอนนี้กำลังใช้ Local Fallback อยู่ หากต้องการคำตอบจากโมเดล AI จริง "
+                "ให้เปิดแท็บ Provider แล้วเชื่อม API จากนั้นกด Save & Test Connection"
+            )
+        return (
+            f"รับข้อความแล้วครับ: {text}\n\n"
+            "ตอนนี้ Research OS Friend กำลังใช้ Local Fallback จึงยังไม่ได้สร้างคำตอบจากโมเดล AI จริง "
+            "ให้เปิดแท็บ Provider แล้วเชื่อม API จากนั้นกด Save & Test Connection"
+        )
 
 
 class ProviderRouter:
