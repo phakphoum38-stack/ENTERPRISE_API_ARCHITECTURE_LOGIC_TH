@@ -23,7 +23,8 @@ $ProviderEnvironmentNames = @(
   'RESEARCH_OS_GOOGLE_CLIENT_SECRET',
   'RESEARCH_OS_GOOGLE_REDIRECT_URI',
   'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET'
+  'GOOGLE_CLIENT_SECRET',
+  'BROWSER_USE_API_KEY'
 )
 
 function Test-Admin {
@@ -249,6 +250,7 @@ function Set-ServiceEnvironment(
   Add-OptionalServiceEnvironmentValue $values 'RESEARCH_OS_GOOGLE_REDIRECT_URI'
   Add-OptionalServiceEnvironmentValue $values 'GOOGLE_CLIENT_ID'
   Add-OptionalServiceEnvironmentValue $values 'GOOGLE_CLIENT_SECRET'
+  Add-OptionalServiceEnvironmentValue $values 'BROWSER_USE_API_KEY'
 
   New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $values.ToArray() -Force | Out-Null
 }
@@ -263,12 +265,14 @@ switch ($Action) {
     $startMode = (Get-CimInstance Win32_Service -Filter "Name='$ServiceName'").StartMode
     $googleClient = if (Test-ServiceEnvironmentValue @('RESEARCH_OS_GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_ID')) { 'configured' } else { 'missing' }
     $googleSecret = if (Test-ServiceEnvironmentValue @('RESEARCH_OS_GOOGLE_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET')) { 'configured' } else { 'missing' }
+    $browserUseKey = if (Test-ServiceEnvironmentValue @('BROWSER_USE_API_KEY')) { 'configured' } else { 'missing' }
     Write-Host "Research OS Service: $($svc.Status)"
     Write-Host "Service name       : $ServiceName"
     Write-Host "Startup            : $startMode"
     Write-Host "Local API          : http://127.0.0.1:$ApiPort"
     Write-Host "Google OAuth client: $googleClient"
     Write-Host "Google OAuth secret: $googleSecret"
+    Write-Host "Browser Use key    : $browserUseKey"
     exit 0
   }
 

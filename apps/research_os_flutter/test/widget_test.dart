@@ -28,6 +28,14 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       },
     ],
   };
+  Map<String, dynamic> browserUseStatus = <String, dynamic>{
+    'provider': 'browser_use_cloud',
+    'api_key_configured': true,
+    'connected': false,
+    'browser_id': null,
+    'cdp_url_available': false,
+    'token_storage': 'backend_env_only',
+  };
 
   @override
   Future<Map<String, dynamic>> getHealth() async => <String, dynamic>{
@@ -116,6 +124,34 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       'account_mode': 'local',
     };
     return googleWorkspaceDashboard;
+  }
+
+  @override
+  Future<Map<String, dynamic>> getBrowserUseStatus() async => browserUseStatus;
+
+  @override
+  Future<Map<String, dynamic>> connectBrowserUse({String proxyCountryCode = 'us'}) async {
+    browserUseStatus = <String, dynamic>{
+      ...browserUseStatus,
+      'connected': true,
+      'browser_id': 'browser-test',
+      'cdp_url_available': true,
+      'cdp_host': 'cdp.browser-use.test',
+      'proxy_country_code': proxyCountryCode,
+    };
+    return browserUseStatus;
+  }
+
+  @override
+  Future<Map<String, dynamic>> disconnectBrowserUse() async {
+    browserUseStatus = <String, dynamic>{
+      ...browserUseStatus,
+      'connected': false,
+      'browser_id': null,
+      'cdp_url_available': false,
+      'cdp_host': null,
+    };
+    return browserUseStatus;
   }
 
   @override
@@ -286,6 +322,31 @@ void main() {
 
     expect(find.text('Research OS Local พร้อมใช้งาน'), findsOneWidget);
     expect(find.text('Local'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Browser Use Cloud can connect from the connections page', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await openDesktopDestination(tester, 6);
+
+    expect(find.text('Browser Use Cloud'), findsOneWidget);
+    expect(find.byKey(const Key('browser-use-connect')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('browser-use-connect')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Connected'), findsOneWidget);
+    expect(find.textContaining('browser-test'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

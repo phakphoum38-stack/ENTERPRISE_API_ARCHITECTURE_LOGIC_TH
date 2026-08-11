@@ -47,6 +47,9 @@ curl -X POST http://127.0.0.1:8787/v1/ai/generate \
 |---|---|---|
 | GET | `/health` | ตรวจสถานะ API |
 | GET | `/v1/providers` | รายชื่อ Provider Adapters |
+| GET | `/v1/browser-use/status` | ตรวจสถานะ Browser Use Cloud connector |
+| POST | `/v1/browser-use/connect` | สร้าง Browser Use Cloud browser session ผ่าน backend |
+| POST | `/v1/browser-use/disconnect` | หยุด Browser Use Cloud browser session |
 | POST | `/v1/ai/generate` | เรียก AI ผ่าน Adapter |
 | POST | `/v1/conversations/analyze` | สร้าง Artifact Preview |
 | GET | `/v1/knowledge/artifacts` | อ่าน Artifact Index |
@@ -90,6 +93,16 @@ export RESEARCH_OS_GEMINI_MODEL="..."
 ```
 
 ชื่อโมเดลจริงต้องกำหนดผ่าน Environment Variable เพื่อไม่ฝัง dependency กับรุ่นใดใน Core
+
+### Browser Use Cloud
+
+ตั้งค่า key เฉพาะฝั่ง backend/service แล้วให้ Flutter กด Connect ผ่าน API:
+
+```bash
+export BROWSER_USE_API_KEY="..."
+```
+
+Research OS เก็บ Browser Use API key และ CDP URL เต็มไว้ฝั่ง backend เท่านั้น; UI เห็นเฉพาะสถานะ session และ browser id.
 
 ## Security Boundary
 

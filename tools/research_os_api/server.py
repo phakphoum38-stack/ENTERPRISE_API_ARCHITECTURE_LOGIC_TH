@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from browser_use_cloud import BrowserUseCloudConnector, BrowserUseCloudError, get_browser_use_status
 from conversation_store import (
     authorize as authorize_sync,
     delete_session as delete_cloud_session,
@@ -166,6 +167,9 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             if path == "/v1/google-workspace/oauth/status":
                 self._send(HTTPStatus.OK, GoogleOAuthBroker().status())
                 return
+            if path == "/v1/browser-use/status":
+                self._send(HTTPStatus.OK, get_browser_use_status())
+                return
             if path == "/v1/google-workspace/oauth/callback":
                 params = parse_qs(parsed.query)
                 error = str(params.get("error", [""])[0]).strip()
@@ -234,7 +238,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, github_dashboard(repository))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (ValueError, GoogleOAuthError) as exc:
+        except (ValueError, GoogleOAuthError, BrowserUseCloudError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except GitHubStatusError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
@@ -261,6 +265,13 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 config = GoogleWorkspaceConfig()
                 config.set_enabled_services(str(item) for item in services)
                 self._send(HTTPStatus.OK, config.dashboard())
+                return
+            if path == "/v1/browser-use/connect":
+                proxy = str(body.get("proxy_country_code") or "us")
+                self._send(HTTPStatus.OK, BrowserUseCloudConnector().connect(proxy))
+                return
+            if path == "/v1/browser-use/disconnect":
+                self._send(HTTPStatus.OK, BrowserUseCloudConnector().disconnect())
                 return
             if path == "/v1/conversations/cloud/sync":
                 if not self._authorize_cloud_sync():
@@ -342,7 +353,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, self._commit_memory(body))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (TypeError, ValueError, GoogleOAuthError) as exc:
+        except (TypeError, ValueError, GoogleOAuthError, BrowserUseCloudError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})

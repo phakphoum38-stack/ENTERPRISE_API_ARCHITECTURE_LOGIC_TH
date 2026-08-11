@@ -46,6 +46,14 @@ class ResearchOSApiClient {
       _postJson('/v1/google-workspace/services', <String, Object?>{
         'enabled_services': services,
       });
+  Future<Map<String, dynamic>> getBrowserUseStatus() =>
+      _getJson('/v1/browser-use/status');
+  Future<Map<String, dynamic>> connectBrowserUse({String proxyCountryCode = 'us'}) =>
+      _postJson('/v1/browser-use/connect', <String, Object?>{
+        'proxy_country_code': proxyCountryCode,
+      });
+  Future<Map<String, dynamic>> disconnectBrowserUse() =>
+      _postJson('/v1/browser-use/disconnect', const <String, Object?>{});
 
   Future<Map<String, dynamic>> getAgents() => _getJson('/v1/agents');
   Future<Map<String, dynamic>> getAgentReadiness() =>

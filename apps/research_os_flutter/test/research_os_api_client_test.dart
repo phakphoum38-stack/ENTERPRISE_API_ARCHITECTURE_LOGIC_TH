@@ -106,4 +106,32 @@ void main() {
     expect(response['app_access'], isTrue);
     expect(response['account_mode'], 'local');
   });
+
+  test('Browser Use connect uses backend route without client secret material', () async {
+    late http.Request captured;
+    final client = ResearchOSApiClient(
+      baseUrl: 'http://127.0.0.1:8787',
+      client: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'provider': 'browser_use_cloud',
+            'api_key_configured': true,
+            'connected': true,
+            'browser_id': 'browser-123',
+            'cdp_url_available': true,
+          }),
+          200,
+        );
+      }),
+    );
+
+    final response = await client.connectBrowserUse();
+
+    expect(captured.method, 'POST');
+    expect(captured.url.path, '/v1/browser-use/connect');
+    expect(captured.body, isNot(contains('BROWSER_USE_API_KEY')));
+    expect(response['connected'], isTrue);
+    expect(response.containsKey('cdp_url'), isFalse);
+  });
 }

@@ -4,6 +4,7 @@ import os
 import tempfile
 import threading
 import unittest
+import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import ThreadingHTTPServer
@@ -38,8 +39,11 @@ class ResearchOSAPITests(unittest.TestCase):
             headers=request_headers,
             method=method,
         )
-        with urllib.request.urlopen(request, timeout=5) as response:
-            return response.status, json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                return response.status, json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read().decode("utf-8"))
 
     def test_health(self):
         status, payload = self.request("GET", "/health")
@@ -167,6 +171,23 @@ class ResearchOSAPITests(unittest.TestCase):
             self.assertTrue(payload["local_account_accepted"])
             self.assertEqual(payload["account_mode"], "local")
             self.assertFalse(payload["connected"])
+
+    def test_browser_use_status_is_backend_key_gated(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ,
+            {"RESEARCH_OS_DATA_DIR": tmp},
+            clear=True,
+        ):
+            status, payload = self.request("GET", "/v1/browser-use/status")
+            self.assertEqual(200, status)
+            self.assertFalse(payload["api_key_configured"])
+            self.assertFalse(payload["connected"])
+            self.assertEqual(payload["token_storage"], "backend_env_only")
+
+            status, error = self.request("POST", "/v1/browser-use/connect", {})
+            self.assertEqual(400, status)
+            self.assertEqual("bad_request", error["error"])
+            self.assertIn("BROWSER_USE_API_KEY", error["detail"])
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
   bool _working = false;
   String? _error;
   Map<String, dynamic> _dashboard = const <String, dynamic>{};
+  Map<String, dynamic> _browserUse = const <String, dynamic>{};
 
   @override
   void initState() {
@@ -30,10 +31,14 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
       _error = null;
     });
     try {
-      final payload = await widget.apiClient.getGoogleWorkspaceDashboard();
+      final results = await Future.wait<Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
+        widget.apiClient.getGoogleWorkspaceDashboard(),
+        widget.apiClient.getBrowserUseStatus(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _dashboard = payload;
+        _dashboard = results[0];
+        _browserUse = results[1];
         _loading = false;
       });
     } on Object catch (error) {
@@ -109,6 +114,46 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
     }
   }
 
+  Future<void> _connectBrowserUse() async {
+    if (_working) return;
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final payload = await widget.apiClient.connectBrowserUse();
+      if (!mounted) return;
+      setState(() => _browserUse = payload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('เชื่อม Browser Use Cloud แล้ว')),
+      );
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _disconnectBrowserUse() async {
+    if (_working) return;
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final payload = await widget.apiClient.disconnectBrowserUse();
+      if (!mounted) return;
+      setState(() => _browserUse = payload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ตัดการเชื่อมต่อ Browser Use Cloud แล้ว')),
+      );
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
   Future<void> _setService(String service, bool enabled) async {
     final raw = _dashboard['services'];
     if (raw is! List) return;
@@ -144,14 +189,18 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
         ? List<dynamic>.from(_dashboard['services'] as List)
         : const <dynamic>[];
     final enabledCount = services.where((item) => item is Map && item['enabled'] == true).length;
+    final browserUseConfigured = _browserUse['api_key_configured'] == true;
+    final browserUseConnected = _browserUse['connected'] == true;
+    final browserUseBrowserId = _browserUse['browser_id']?.toString() ?? '';
+    final browserUseCdpHost = _browserUse['cdp_host']?.toString() ?? '';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
       children: <Widget>[
         _Heading(
-          icon: Icons.apps_outlined,
-          title: 'Google Workspace Hub',
-          subtitle: 'เริ่มใช้งานแบบ Local ได้ทันที และเชื่อม Google เพิ่มภายหลังเมื่อพร้อม',
+          icon: Icons.extension_outlined,
+          title: 'Connections Hub',
+          subtitle: 'กด Connect เครื่องมือที่ต้องใช้จากที่เดียว: Local, Browser Use Cloud และ Google Workspace',
           action: IconButton(
             tooltip: 'รีเฟรชสถานะ',
             onPressed: _loading || _working ? null : _refresh,
@@ -245,6 +294,88 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
                       ),
                   ],
                 ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Icon(
+                      browserUseConnected ? Icons.cloud_done_outlined : Icons.travel_explore_outlined,
+                      size: 32,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text('Browser Use Cloud', style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 4),
+                          Text(
+                            browserUseConnected
+                                ? 'Cloud browser พร้อมใช้งานผ่าน backend แล้ว'
+                                : browserUseConfigured
+                                    ? 'กด Connect เพื่อสร้าง cloud browser session'
+                                    : 'ตั้งค่า BROWSER_USE_API_KEY บน backend ก่อน แล้วกลับมากด Connect',
+                          ),
+                        ],
+                      ),
+                    ),
+                    Chip(
+                      label: Text(
+                        browserUseConnected
+                            ? 'Connected'
+                            : browserUseConfigured
+                                ? 'Ready'
+                                : 'Needs key',
+                      ),
+                    ),
+                  ],
+                ),
+                if (browserUseBrowserId.isNotEmpty || browserUseCdpHost.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(
+                    [
+                      if (browserUseBrowserId.isNotEmpty) 'Browser: $browserUseBrowserId',
+                      if (browserUseCdpHost.isNotEmpty) 'CDP host: $browserUseCdpHost',
+                    ].join(' • '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    FilledButton.icon(
+                      key: const Key('browser-use-connect'),
+                      onPressed: _working || !browserUseConfigured || browserUseConnected ? null : _connectBrowserUse,
+                      icon: const Icon(Icons.link),
+                      label: const Text('Connect Browser'),
+                    ),
+                    if (browserUseConnected)
+                      OutlinedButton.icon(
+                        key: const Key('browser-use-disconnect'),
+                        onPressed: _working ? null : _disconnectBrowserUse,
+                        icon: const Icon(Icons.link_off),
+                        label: const Text('Disconnect'),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: _working ? null : _refresh,
+                      icon: const Icon(Icons.sync),
+                      label: const Text('ตรวจสถานะ'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text('API key และ CDP URL เต็มถูกเก็บฝั่ง backend เท่านั้น ไม่ฝังใน Flutter'),
               ],
             ),
           ),

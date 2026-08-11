@@ -52,6 +52,15 @@ class DesktopShellApiClient extends ResearchOSApiClient {
       };
 
   @override
+  Future<Map<String, dynamic>> getBrowserUseStatus() async =>
+      <String, dynamic>{
+        'provider': 'browser_use_cloud',
+        'api_key_configured': false,
+        'connected': false,
+        'token_storage': 'backend_env_only',
+      };
+
+  @override
   void close() {}
 }
 
