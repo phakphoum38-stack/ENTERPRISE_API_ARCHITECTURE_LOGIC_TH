@@ -1,9 +1,6 @@
 name: Research OS CI Lite
 
 on:
-  push:
-    branches:
-      - agent/local-research-os-access-41f17ac
   workflow_dispatch:
     inputs:
       target_sha:
