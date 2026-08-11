@@ -53,6 +53,25 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
             )
             return
 
+        if parsed.path == "/v2/master":
+            capacity = BRAIN.capacity_snapshot()
+            self._send(
+                HTTPStatus.OK,
+                {
+                    "master": {
+                        "contract": "unified-master-orchestrator-v3",
+                        "architecture": capacity["architecture"],
+                        "provider_mode": "local_or_configured_provider",
+                        "capacity": capacity,
+                        "state_owners": {
+                            "orchestrator": "agent_server.ORCHESTRATOR",
+                            "brain": "brain_skills.BRAIN",
+                        },
+                    }
+                },
+            )
+            return
+
         if parsed.path == "/v2/brain/skills":
             self._send(HTTPStatus.OK, {"brain": BRAIN.catalog()})
             return
