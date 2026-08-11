@@ -18,7 +18,17 @@ services:
         value: https://phakphoum38-stack.github.io
       - key: RESEARCH_OS_GITHUB_REPOSITORY
         value: phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
+      - key: RESEARCH_OS_PUBLIC_BASE_URL
+        value: https://research-os-api-phakphoum.onrender.com
+      - key: RESEARCH_OS_GOOGLE_IDENTITY_REDIRECT_URI
+        value: https://research-os-api-phakphoum.onrender.com/v1/auth/google/callback
+      - key: RESEARCH_OS_GOOGLE_REDIRECT_URI
+        value: https://research-os-api-phakphoum.onrender.com/v1/google-workspace/oauth/callback
       - key: GEMINI_API_KEY
         sync: false
       - key: RESEARCH_OS_SYNC_KEY
+        sync: false
+      - key: RESEARCH_OS_GOOGLE_CLIENT_ID
+        sync: false
+      - key: RESEARCH_OS_GOOGLE_CLIENT_SECRET
         sync: false
