@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import 'src/friend_app.dart';
+import 'src/friend_ui_v3.dart';
 import 'src/owner_api.dart';
 import 'src/startup_probe.dart';
 
@@ -27,5 +27,5 @@ Future<void> main() async {
     startupError = error.toString();
   }
 
-  runApp(OwnerFriendApp(api: api, startup: startup, startupError: startupError));
+  runApp(OwnerFriendAppV3(api: api, startup: startup, startupError: startupError));
 }
