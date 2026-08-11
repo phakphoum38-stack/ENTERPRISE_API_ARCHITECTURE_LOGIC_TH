@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_flutter/src/api/research_os_api_client.dart';
 import 'package:research_os_flutter/src/app_shell.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DesktopShellApiClient extends ResearchOSApiClient {
   DesktopShellApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
@@ -45,6 +48,25 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'research_os_chat_sessions_v1': jsonEncode(<Map<String, Object>>[
+        <String, Object>{
+          'id': 'chat-recent-1',
+          'title': 'PR Review Blockers and Fixes',
+          'updated_at': '2026-08-11T11:45:00.000',
+          'messages': <Map<String, Object>>[],
+        },
+        <String, Object>{
+          'id': 'chat-recent-2',
+          'title': 'Owner Installer Watch',
+          'updated_at': '2026-08-11T11:40:00.000',
+          'messages': <Map<String, Object>>[],
+        },
+      ]),
+    });
+  });
+
   testWidgets('desktop shell shows chat-first Research OS sidebar', (tester) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
@@ -57,7 +79,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.byKey(const Key('desktop-shell-title')), findsOneWidget);
     expect(find.text('Research OS'), findsWidgets);
@@ -72,10 +94,31 @@ void main() {
     expect(find.text('System'), findsWidgets);
     expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
     expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
+    expect(find.text('เมื่อเร็ว ๆ นี้'), findsOneWidget);
+    expect(find.text('PR Review Blockers and Fixes'), findsOneWidget);
+    expect(find.text('Owner Installer Watch'), findsOneWidget);
 
     final before =
         tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
     expect(before, 300);
+
+    await tester.tap(
+      find.byKey(const Key('desktop-recent-chat-chat-recent-2')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('AI Workspace'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('desktop-new-chat')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final prefs = await SharedPreferences.getInstance();
+    final stored = jsonDecode(
+      prefs.getString('research_os_chat_sessions_v1')!,
+    ) as List<dynamic>;
+    expect(stored.length, 3);
+    expect((stored.first as Map<String, dynamic>)['title'], 'บทสนทนาใหม่');
 
     await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
     await tester.pump();
