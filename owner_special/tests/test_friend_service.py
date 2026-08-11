@@ -8,6 +8,9 @@ from pathlib import Path
 from research_os_friend import OwnerFriendService
 
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
 class OwnerFriendServiceTests(unittest.TestCase):
     def _request(self, url: str, *, owner: str | None = "owner", method: str = "GET", body: dict | None = None):
         headers = {}
@@ -32,7 +35,7 @@ class OwnerFriendServiceTests(unittest.TestCase):
                 port=0,
                 data_root=root / "data",
                 audit_path=audit,
-                repository_root=Path.cwd(),
+                repository_root=REPOSITORY_ROOT,
             )
             service.start()
             base = f"http://127.0.0.1:{service.port}"
@@ -68,7 +71,7 @@ class OwnerFriendServiceTests(unittest.TestCase):
                 owner_id="owner",
                 port=0,
                 data_root=root / "data",
-                repository_root=Path.cwd(),
+                repository_root=REPOSITORY_ROOT,
             )
             service2.start()
             try:
