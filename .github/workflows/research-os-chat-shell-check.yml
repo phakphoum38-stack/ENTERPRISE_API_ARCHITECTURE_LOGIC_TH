@@ -26,9 +26,10 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Validate desktop shell source
+      - name: Validate desktop shell and chat flow
         working-directory: apps/research_os_flutter
         run: |
           flutter pub get
           flutter analyze
           flutter test test/desktop_shell_test.dart
+          flutter test test/chat_flow_test.dart
