@@ -86,6 +86,19 @@ class V2CompatibilityTests(unittest.TestCase):
             {item["agent_id"] for item in v2["agents"]},
         )
 
+    def test_v2_master_reports_canonical_brain_capacity(self) -> None:
+        status, payload = self.request("/v2/master")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["api_version"], "v2")
+        master = payload["master"]
+        self.assertEqual(master["contract"], "unified-master-orchestrator-v3")
+        self.assertEqual(master["architecture"], "adaptive_hierarchical_6x6")
+        self.assertEqual(master["capacity"]["assistant_6x3_capacity"], 6**3)
+        self.assertEqual(master["capacity"]["max_leaf_capacity"], 6**6)
+        self.assertEqual(master["state_owners"]["orchestrator"], "agent_server.ORCHESTRATOR")
+        self.assertEqual(master["state_owners"]["brain"], "brain_skills.BRAIN")
+        self.assertFalse(master["capacity"]["all_workers_started_by_default"])
+
     def test_v2_orchestration_is_visible_through_v1(self) -> None:
         run_id = self.create_run(1)
 
