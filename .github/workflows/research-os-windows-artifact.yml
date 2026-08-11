@@ -18,9 +18,9 @@ concurrency:
 
 jobs:
   build:
-    name: Build and publish Windows release
+    name: Build and publish branded Windows release
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Build Windows release
+      - name: Build branded Windows release
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: |
@@ -40,6 +40,57 @@ jobs:
             Write-Host "Generating runner-only Windows scaffold."
             flutter create --platforms=windows --project-name research_os_flutter .
           }
+
+          # Build a real multi-size Windows icon from the committed Research OS master artwork.
+          python -m pip install --disable-pip-version-check --quiet pillow
+          @'
+          from pathlib import Path
+          from PIL import Image
+
+          source = Path("assets/branding/research_os_master.webp")
+          target = Path("windows/runner/resources/app_icon.ico")
+          if not source.exists():
+              raise SystemExit(f"Missing Research OS master artwork: {source}")
+          image = Image.open(source).convert("RGBA")
+          side = max(image.size)
+          square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+          square.alpha_composite(image, ((side - image.width) // 2, (side - image.height) // 2))
+          target.parent.mkdir(parents=True, exist_ok=True)
+          square.save(
+              target,
+              format="ICO",
+              sizes=[(16,16), (24,24), (32,32), (48,48), (64,64), (128,128), (256,256)],
+          )
+          print(f"WINDOWS_ICON={target}")
+          '@ | Set-Content -Path "$env:RUNNER_TEMP\make_research_os_icon.py" -Encoding utf8
+          python "$env:RUNNER_TEMP\make_research_os_icon.py"
+
+          # Give the desktop window the product name shown to the user.
+          $mainCpp = "windows\runner\main.cpp"
+          $mainText = Get-Content $mainCpp -Raw
+          $mainText = $mainText -replace 'Create\(L"research_os_flutter"', 'Create(L"Research OS"'
+          Set-Content -Path $mainCpp -Value $mainText -Encoding utf8
+
+          # Embed Research OS ownership/team metadata in the Windows PE version resource.
+          $runnerRc = "windows\runner\Runner.rc"
+          $rc = Get-Content $runnerRc -Raw
+          $rc = $rc -replace 'VALUE "CompanyName", ".*?"', 'VALUE "CompanyName", "Research OS Team"'
+          $rc = $rc -replace 'VALUE "FileDescription", ".*?"', 'VALUE "FileDescription", "Research OS"'
+          $rc = $rc -replace 'VALUE "InternalName", ".*?"', 'VALUE "InternalName", "ResearchOS"'
+          $rc = $rc -replace 'VALUE "OriginalFilename", ".*?"', 'VALUE "OriginalFilename", "Research OS.exe"'
+          $rc = $rc -replace 'VALUE "ProductName", ".*?"', 'VALUE "ProductName", "Research OS"'
+          $rc = $rc -replace 'VALUE "LegalCopyright", ".*?"', 'VALUE "LegalCopyright", "Copyright (C) 2026 Research OS Team"'
+          Set-Content -Path $runnerRc -Value $rc -Encoding utf8
+
+          # Prove the generated resource inputs are branded before compiling.
+          if ((Get-Item "windows\runner\resources\app_icon.ico").Length -lt 1000) {
+            throw "Research OS Windows icon was not generated correctly."
+          }
+          $rcProof = Get-Content $runnerRc -Raw
+          foreach ($needle in @('Research OS Team', 'ProductName", "Research OS', 'OriginalFilename", "Research OS.exe')) {
+            if (-not $rcProof.Contains($needle)) { throw "Windows metadata missing: $needle" }
+          }
+
           flutter build windows --release
 
           $exe = Get-ChildItem -Path "build\windows" -Filter "research_os_flutter.exe" -File -Recurse |
@@ -53,10 +104,34 @@ jobs:
           }
           $release = $exe.Directory
 
+          # Verify the PE version resource really contains the requested team/product values.
+          $version = (Get-Item $exe.FullName).VersionInfo
+          if ($version.CompanyName -ne "Research OS Team") {
+            throw "CompanyName was not embedded. Actual: '$($version.CompanyName)'"
+          }
+          if ($version.ProductName -ne "Research OS") {
+            throw "ProductName was not embedded. Actual: '$($version.ProductName)'"
+          }
+
+          # Rename only after compilation; companion DLL/data files stay beside it.
+          $brandedExe = Join-Path $release.FullName "Research OS.exe"
+          if (Test-Path $brandedExe) { Remove-Item $brandedExe -Force }
+          Rename-Item -Path $exe.FullName -NewName "Research OS.exe"
+          $exe = Get-Item $brandedExe
+
           $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Path $stage | Out-Null
           Copy-Item -Path (Join-Path $release.FullName "*") -Destination $stage -Recurse -Force
+
+          @"
+          Research OS Windows x64
+          App: Research OS
+          Publisher/Team: Research OS Team
+          Executable: Research OS.exe
+          Icon source: assets/branding/research_os_master.webp
+          Commit: $env:GITHUB_SHA
+          "@ | Set-Content -Path (Join-Path $stage "RESEARCH_OS_BUILD_INFO.txt") -Encoding utf8
 
           $zip = Join-Path $env:RUNNER_TEMP "Research-OS-Windows-x64.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
@@ -66,14 +141,16 @@ jobs:
           "$hash  Research-OS-Windows-x64.zip" | Set-Content -Path "$zip.sha256" -Encoding ascii
 
           Write-Host "WINDOWS_EXE=$($exe.FullName)"
-          Write-Host "WINDOWS_RELEASE_DIR=$($release.FullName)"
+          Write-Host "WINDOWS_COMPANY=$($version.CompanyName)"
+          Write-Host "WINDOWS_PRODUCT=$($version.ProductName)"
+          Write-Host "WINDOWS_ICON_BYTES=$((Get-Item 'windows\runner\resources\app_icon.ico').Length)"
           Write-Host "WINDOWS_ZIP=$zip"
           Write-Host "WINDOWS_SHA256=$hash"
 
-      - name: Upload Windows ZIP
+      - name: Upload branded Windows ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Research-OS-Windows-x64-${{ github.sha }}
+          name: Research-OS-Windows-x64-Branded-${{ github.sha }}
           path: |
             ${{ runner.temp }}/Research-OS-Windows-x64.zip
             ${{ runner.temp }}/Research-OS-Windows-x64.zip.sha256
