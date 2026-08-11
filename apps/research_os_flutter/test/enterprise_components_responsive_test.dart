@@ -38,4 +38,43 @@ void main() {
     expect(find.text('New chat'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('EnterprisePageHeader collapses on phones while keyboard is open',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: Size(390, 844),
+            viewInsets: EdgeInsets.only(bottom: 320),
+          ),
+          child: Scaffold(
+            body: SizedBox(
+              width: 390,
+              child: EnterprisePageHeader(
+                title: 'AI Workspace',
+                subtitle: 'Mobile keyboard mode',
+                icon: Icons.auto_awesome_outlined,
+                actions: <Widget>[
+                  OutlinedButton(
+                    onPressed: null,
+                    child: Text('History'),
+                  ),
+                  FilledButton(
+                    onPressed: null,
+                    child: Text('New chat'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('AI Workspace'), findsNothing);
+    expect(find.text('History'), findsNothing);
+    expect(find.text('New chat'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
