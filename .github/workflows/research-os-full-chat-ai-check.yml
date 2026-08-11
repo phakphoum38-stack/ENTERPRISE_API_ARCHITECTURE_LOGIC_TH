@@ -97,7 +97,10 @@ jobs:
     env:
       RESEARCH_OS_PROVIDER: gemini
       RESEARCH_OS_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      RESEARCH_OS_GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+      # CI fallback model: the configured gemini-3.6-flash free-tier quota was
+      # exhausted by repeated live benchmark runs. Keep the production model
+      # configuration untouched and evaluate against this stable Gemini model.
+      RESEARCH_OS_GEMINI_MODEL: gemini-2.5-flash
       RESEARCH_OS_API_HOST: 127.0.0.1
       RESEARCH_OS_API_PORT: "8787"
       RESEARCH_OS_API_BASE_URL: http://127.0.0.1:8787
