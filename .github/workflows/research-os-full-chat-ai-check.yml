@@ -52,6 +52,7 @@ jobs:
           python -m py_compile tools/research_os_api/provider_readiness.py
           python -m py_compile tools/research_os_api/provider_smoke.py
           python -m py_compile tools/research_os_api/ai_capability_eval.py
+          python -m py_compile tools/research_os_api/ai_capability_batch_eval.py
           python -m py_compile tools/research_os_api/server.py
       - name: Run focused API, memory, provider and conversation tests
         working-directory: tools/research_os_api
@@ -103,8 +104,6 @@ jobs:
       RESEARCH_OS_EXPECTED_PROVIDER: gemini
       RESEARCH_OS_EVAL_BASE_URL: http://127.0.0.1:8787
       RESEARCH_OS_EVAL_REPORT: ai-capability-report.json
-      RESEARCH_OS_EVAL_CASE_COOLDOWN: "2"
-      RESEARCH_OS_EVAL_CASE_ATTEMPTS: "3"
       RESEARCH_OS_PROVIDER_MAX_RETRY_DELAY: "65"
       PYTHONUNBUFFERED: "1"
     steps:
@@ -162,8 +161,8 @@ jobs:
           flutter pub get
           dart run tool/chat_service_e2e.dart
 
-      - name: Reasoning, judgment, context and wit benchmark
-        run: python tools/research_os_api/ai_capability_eval.py
+      - name: Quota-safe reasoning, judgment, context and wit benchmark
+        run: python tools/research_os_api/ai_capability_batch_eval.py
 
       - name: Write capability summary
         if: always()
@@ -176,6 +175,7 @@ jobs:
           report = json.loads(Path("ai-capability-report.json").read_text(encoding="utf-8"))
           print("# Research OS Full Chat + AI Capability")
           print()
+          print(f"- Benchmark: `{report['benchmark']}`")
           print(f"- Provider: `{report['provider']}`")
           print(f"- Model: `{report['model']}`")
           print(f"- Ability score: **{report['ability_score']}/100**")
@@ -183,15 +183,16 @@ jobs:
           print(f"- Provider/infrastructure errors: **{report['provider_errors']}**")
           print(f"- Critical answer failures: **{len(report['critical_failures'])}**")
           print(f"- Critical unavailable cases: **{len(report['critical_unavailable'])}**")
-          print(f"- Median latency: **{report['median_latency_ms']} ms**")
+          print(f"- Live benchmark model calls: **{report['live_model_calls']}**")
+          print(f"- Median request latency: **{report['median_request_latency_ms']} ms**")
           print(f"- Result: **{report['result_kind']}**")
           print()
-          print("| Category | Case | Evaluation | Result | Attempts | Latency |")
-          print("|---|---|---:|---:|---:|---:|")
+          print("| Category | Case | Evaluation | Result |")
+          print("|---|---|---:|---:|")
           for case in report["cases"]:
               evaluation = "MODEL" if case["evaluated"] else "INFRA"
-              result = "PASS" if case["passed"] else ("FAIL" if case["evaluated"] else case.get("error_class", "INFRA"))
-              print(f"| {case['category']} | {case['name']} | {evaluation} | {result} | {case.get('attempts')} | {case.get('elapsed_ms')} ms |")
+              result = "PASS" if case["passed"] else ("FAIL" if case["evaluated"] else "INFRA")
+              print(f"| {case['category']} | {case['name']} | {evaluation} | {result} |")
           print()
           print("Full model replies and API secrets are not written to this report.")
           PY
