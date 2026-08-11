@@ -108,7 +108,8 @@ jobs:
               Get-Content $log -Tail 300 | Out-Host
             }
           }
-          sc.exe queryex ResearchOSOwnerFriendService 2>&1 | Out-Host
+          & sc.exe queryex ResearchOSOwnerFriendService 2>&1 | Out-Host
+          $global:LASTEXITCODE = 0
           $python = [IO.Path]::GetFullPath('C:\Program Files\Research OS Owner Special\runtime\python\python.exe')
           Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
             $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $python)
