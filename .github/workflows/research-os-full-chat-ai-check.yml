@@ -74,7 +74,14 @@ jobs:
         run: |
           flutter pub get
           flutter config --enable-windows-desktop
+          if (-not (Test-Path "windows")) {
+            Write-Host "Windows scaffold is not committed on this branch; generating an ephemeral runner-only scaffold."
+            flutter create --platforms=windows --project-name research_os_flutter .
+          }
           flutter build windows --release
+          if (-not (Test-Path "build\windows")) {
+            throw "Windows build directory was not produced."
+          }
           $exe = Get-ChildItem -Path "build\windows" -Filter "*.exe" -Recurse | Select-Object -First 1
           if (-not $exe) { throw "Windows Research OS executable was not produced." }
           Write-Host "Windows executable produced: $($exe.FullName)"
@@ -96,6 +103,8 @@ jobs:
       RESEARCH_OS_EXPECTED_PROVIDER: gemini
       RESEARCH_OS_EVAL_BASE_URL: http://127.0.0.1:8787
       RESEARCH_OS_EVAL_REPORT: ai-capability-report.json
+      RESEARCH_OS_EVAL_CASE_COOLDOWN: "2"
+      RESEARCH_OS_EVAL_CASE_ATTEMPTS: "2"
       PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
@@ -168,18 +177,21 @@ jobs:
           print()
           print(f"- Provider: `{report['provider']}`")
           print(f"- Model: `{report['model']}`")
-          print(f"- Capability score: **{report['score']}/100**")
-          print(f"- Passed: **{report['passed_cases']}/{report['total_cases']}**")
-          print(f"- Critical failures: **{len(report['critical_failures'])}**")
+          print(f"- Ability score: **{report['ability_score']}/100**")
+          print(f"- Evaluated coverage: **{report['evaluated_cases']}/{report['total_cases']} ({report['coverage_percent']}%)**")
+          print(f"- Provider/infrastructure errors: **{report['provider_errors']}**")
+          print(f"- Critical answer failures: **{len(report['critical_failures'])}**")
+          print(f"- Critical unavailable cases: **{len(report['critical_unavailable'])}**")
           print(f"- Median latency: **{report['median_latency_ms']} ms**")
-          print(f"- Overall: **{'PASS' if report['overall_passed'] else 'FAIL'}**")
+          print(f"- Result: **{report['result_kind']}**")
           print()
-          print("| Category | Case | Result | Latency |")
-          print("|---|---|---:|---:|")
+          print("| Category | Case | Evaluation | Result | Attempts | Latency |")
+          print("|---|---|---:|---:|---:|---:|")
           for case in report["cases"]:
-              result = "PASS" if case["passed"] else "FAIL"
+              evaluation = "MODEL" if case["evaluated"] else "INFRA"
+              result = "PASS" if case["passed"] else ("FAIL" if case["evaluated"] else case.get("error_class", "INFRA"))
               latency = case.get("elapsed_ms")
-              print(f"| {case['category']} | {case['name']} | {result} | {latency} ms |")
+              print(f"| {case['category']} | {case['name']} | {evaluation} | {result} | {case.get('attempts')} | {latency} ms |")
           print()
           print("Full model replies and API secrets are not written to this report.")
           PY
@@ -197,12 +209,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Show redacted API log on failure
+      - name: Show API request status log on failure
         if: failure()
         shell: bash
         run: |
           if [ -f /tmp/research-os-full-chat-api.log ]; then
-            sed -E 's/(key=)[^&[:space:]]+/\1***/g; s/(AIza)[A-Za-z0-9_-]+/\1***/g; s/(Bearer )[A-Za-z0-9._-]+/\1***/g' /tmp/research-os-full-chat-api.log | tail -n 200
+            grep -E 'Research OS listening|\[research-os-api\]' /tmp/research-os-full-chat-api.log | tail -n 200 || true
           fi
 
       - name: Stop Local Research OS API
