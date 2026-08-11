@@ -38,6 +38,8 @@ class ResearchOSApiClient {
       _getJson('/v1/google-workspace/oauth/status');
   Future<Map<String, dynamic>> startGoogleWorkspaceOAuth() =>
       _postJson('/v1/google-workspace/oauth/start', const <String, Object?>{});
+  Future<Map<String, dynamic>> acceptLocalGoogleWorkspace() =>
+      _postJson('/v1/google-workspace/local/accept', const <String, Object?>{});
   Future<Map<String, dynamic>> disconnectGoogleWorkspace() =>
       _postJson('/v1/google-workspace/oauth/disconnect', const <String, Object?>{});
   Future<Map<String, dynamic>> setGoogleWorkspaceServices(List<String> services) =>

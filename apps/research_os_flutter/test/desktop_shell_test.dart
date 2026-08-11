@@ -41,6 +41,17 @@ class DesktopShellApiClient extends ResearchOSApiClient {
       };
 
   @override
+  Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() async =>
+      <String, dynamic>{
+        'oauth_configured': false,
+        'connected': false,
+        'app_access': false,
+        'local_account_accepted': false,
+        'account_mode': 'none',
+        'services': <Map<String, dynamic>>[],
+      };
+
+  @override
   void close() {}
 }
 

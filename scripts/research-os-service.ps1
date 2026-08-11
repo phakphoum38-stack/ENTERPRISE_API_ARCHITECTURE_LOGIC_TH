@@ -18,7 +18,12 @@ $ProviderEnvironmentNames = @(
   'RESEARCH_OS_OPENAI_API_KEY',
   'OPENAI_API_KEY',
   'RESEARCH_OS_OPENAI_RESPONSES_ENDPOINT',
-  'RESEARCH_OS_OPENAI_RESPONSES_MODEL'
+  'RESEARCH_OS_OPENAI_RESPONSES_MODEL',
+  'RESEARCH_OS_GOOGLE_CLIENT_ID',
+  'RESEARCH_OS_GOOGLE_CLIENT_SECRET',
+  'RESEARCH_OS_GOOGLE_REDIRECT_URI',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET'
 )
 
 function Test-Admin {
@@ -165,6 +170,60 @@ function Get-PreservedProviderEnvironment {
   )
 }
 
+function Get-ConfiguredEnvironmentValue([string]$Name) {
+  foreach ($target in @('Process', 'User', 'Machine')) {
+    $value = [Environment]::GetEnvironmentVariable($Name, $target)
+    if (-not [string]::IsNullOrWhiteSpace($value)) {
+      return $value
+    }
+  }
+  return $null
+}
+
+function Add-ServiceEnvironmentEntry([System.Collections.Generic.List[string]]$Values, [string]$Entry) {
+  if ([string]::IsNullOrWhiteSpace($Entry)) { return }
+  $separator = $Entry.IndexOf('=')
+  if ($separator -le 0) { return }
+  $name = $Entry.Substring(0, $separator)
+  $prefix = "$name="
+  foreach ($existing in $Values) {
+    if ($existing.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+      return
+    }
+  }
+  $Values.Add($Entry) | Out-Null
+}
+
+function Add-OptionalServiceEnvironmentValue([System.Collections.Generic.List[string]]$Values, [string]$Name) {
+  $value = Get-ConfiguredEnvironmentValue $Name
+  if (-not [string]::IsNullOrWhiteSpace($value)) {
+    Add-ServiceEnvironmentEntry $Values "$Name=$value"
+  }
+}
+
+function Get-ServiceEnvironmentValues {
+  $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
+  if (-not (Test-Path $serviceKey)) { return @() }
+  $environment = (Get-ItemProperty -Path $serviceKey -Name Environment -ErrorAction SilentlyContinue).Environment
+  return @($environment)
+}
+
+function Test-ServiceEnvironmentValue([string[]]$Names) {
+  $environment = Get-ServiceEnvironmentValues
+  foreach ($entry in $environment) {
+    foreach ($name in $Names) {
+      $prefix = "$name="
+      if ($entry.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+        $value = $entry.Substring($prefix.Length)
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+          return $true
+        }
+      }
+    }
+  }
+  return $false
+}
+
 function Set-ServiceEnvironment(
   [string]$PythonPath,
   [string[]]$PreservedProviderEnvironment = @()
@@ -174,16 +233,24 @@ function Set-ServiceEnvironment(
     throw "Windows Service registry key was not created: $serviceKey"
   }
 
-  $values = @(
-    "RESEARCH_OS_REPO_ROOT=$RepoRoot",
-    "RESEARCH_OS_DATA_DIR=$DataDir",
-    "RESEARCH_OS_PYTHON_EXE=$PythonPath",
-    'RESEARCH_OS_API_HOST=127.0.0.1',
-    "RESEARCH_OS_API_PORT=$ApiPort"
-  )
-  $values += @($PreservedProviderEnvironment)
+  $values = [System.Collections.Generic.List[string]]::new()
+  Add-ServiceEnvironmentEntry $values "RESEARCH_OS_REPO_ROOT=$RepoRoot"
+  Add-ServiceEnvironmentEntry $values "RESEARCH_OS_DATA_DIR=$DataDir"
+  Add-ServiceEnvironmentEntry $values "RESEARCH_OS_PYTHON_EXE=$PythonPath"
+  Add-ServiceEnvironmentEntry $values 'RESEARCH_OS_API_HOST=127.0.0.1'
+  Add-ServiceEnvironmentEntry $values "RESEARCH_OS_API_PORT=$ApiPort"
 
-  New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $values -Force | Out-Null
+  foreach ($entry in @($PreservedProviderEnvironment)) {
+    Add-ServiceEnvironmentEntry $values $entry
+  }
+
+  Add-OptionalServiceEnvironmentValue $values 'RESEARCH_OS_GOOGLE_CLIENT_ID'
+  Add-OptionalServiceEnvironmentValue $values 'RESEARCH_OS_GOOGLE_CLIENT_SECRET'
+  Add-OptionalServiceEnvironmentValue $values 'RESEARCH_OS_GOOGLE_REDIRECT_URI'
+  Add-OptionalServiceEnvironmentValue $values 'GOOGLE_CLIENT_ID'
+  Add-OptionalServiceEnvironmentValue $values 'GOOGLE_CLIENT_SECRET'
+
+  New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $values.ToArray() -Force | Out-Null
 }
 
 switch ($Action) {
@@ -194,10 +261,14 @@ switch ($Action) {
       exit 2
     }
     $startMode = (Get-CimInstance Win32_Service -Filter "Name='$ServiceName'").StartMode
+    $googleClient = if (Test-ServiceEnvironmentValue @('RESEARCH_OS_GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_ID')) { 'configured' } else { 'missing' }
+    $googleSecret = if (Test-ServiceEnvironmentValue @('RESEARCH_OS_GOOGLE_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET')) { 'configured' } else { 'missing' }
     Write-Host "Research OS Service: $($svc.Status)"
     Write-Host "Service name       : $ServiceName"
     Write-Host "Startup            : $startMode"
     Write-Host "Local API          : http://127.0.0.1:$ApiPort"
+    Write-Host "Google OAuth client: $googleClient"
+    Write-Host "Google OAuth secret: $googleSecret"
     exit 0
   }
 

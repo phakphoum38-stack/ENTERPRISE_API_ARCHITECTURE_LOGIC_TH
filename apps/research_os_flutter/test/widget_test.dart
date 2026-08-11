@@ -8,6 +8,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FakeResearchOSApiClient extends ResearchOSApiClient {
   FakeResearchOSApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
 
+  Map<String, dynamic> googleWorkspaceDashboard = <String, dynamic>{
+    'hub': 'google_workspace',
+    'oauth_configured': false,
+    'connected': false,
+    'app_access': false,
+    'local_account_accepted': false,
+    'account_mode': 'none',
+    'services': <Map<String, dynamic>>[
+      <String, dynamic>{
+        'service': 'drive',
+        'enabled': true,
+        'state': 'not_configured',
+      },
+      <String, dynamic>{
+        'service': 'gmail',
+        'enabled': true,
+        'state': 'not_configured',
+      },
+    ],
+  };
+
   @override
   Future<Map<String, dynamic>> getHealth() async => <String, dynamic>{
         'status': 'ok',
@@ -81,6 +102,21 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
         ],
         'pull_requests': <Map<String, dynamic>>[],
       };
+
+  @override
+  Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() async =>
+      googleWorkspaceDashboard;
+
+  @override
+  Future<Map<String, dynamic>> acceptLocalGoogleWorkspace() async {
+    googleWorkspaceDashboard = <String, dynamic>{
+      ...googleWorkspaceDashboard,
+      'app_access': true,
+      'local_account_accepted': true,
+      'account_mode': 'local',
+    };
+    return googleWorkspaceDashboard;
+  }
 
   @override
   Future<Map<String, dynamic>> answerWithMemory(
@@ -225,6 +261,31 @@ void main() {
 
     expect(find.text('Research OS Flutter'), findsOneWidget);
     expect(find.text('Add GitHub dashboard'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Google Workspace can accept local mode without OAuth', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await openDesktopDestination(tester, 6);
+
+    expect(find.text('กดยอมรับเพื่อเริ่มใช้งาน'), findsOneWidget);
+    expect(find.byKey(const Key('google-workspace-local-accept')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('google-workspace-local-accept')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Research OS Local พร้อมใช้งาน'), findsOneWidget);
+    expect(find.text('Local'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

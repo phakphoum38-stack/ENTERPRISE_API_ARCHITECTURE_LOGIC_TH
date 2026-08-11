@@ -81,4 +81,29 @@ void main() {
     final payload = jsonDecode(captured.body) as Map<String, dynamic>;
     expect(payload['provider'], 'gemini');
   });
+
+  test('local Google Workspace acceptance uses the simple backend route', () async {
+    late http.Request captured;
+    final client = ResearchOSApiClient(
+      baseUrl: 'http://127.0.0.1:8787',
+      client: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'app_access': true,
+            'local_account_accepted': true,
+            'account_mode': 'local',
+          }),
+          200,
+        );
+      }),
+    );
+
+    final response = await client.acceptLocalGoogleWorkspace();
+
+    expect(captured.method, 'POST');
+    expect(captured.url.path, '/v1/google-workspace/local/accept');
+    expect(response['app_access'], isTrue);
+    expect(response['account_mode'], 'local');
+  });
 }

@@ -15,6 +15,9 @@ class GoogleWorkspaceConfigTest(unittest.TestCase):
             self.assertEqual(dashboard["total_count"], len(WORKSPACE_SERVICES))
             self.assertEqual(dashboard["enabled_count"], len(WORKSPACE_SERVICES))
             self.assertFalse(dashboard["oauth_configured"])
+            self.assertFalse(dashboard["app_access"])
+            self.assertFalse(dashboard["local_account_accepted"])
+            self.assertEqual(dashboard["account_mode"], "none")
             self.assertTrue(all(item["state"] == "not_configured" for item in dashboard["services"]))
             self.assertEqual(dashboard["token_storage"], "backend_only")
 
@@ -37,6 +40,17 @@ class GoogleWorkspaceConfigTest(unittest.TestCase):
             self.assertFalse(status["gmail"].enabled)
             self.assertEqual(status["gmail"].state, "disabled")
             self.assertTrue((Path(tmp) / "google_workspace" / "settings.json").exists())
+
+    def test_local_account_acceptance_enables_app_access_without_google_token(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {}, clear=True):
+            config = GoogleWorkspaceConfig(tmp)
+            dashboard = config.accept_local_account()
+            self.assertTrue(dashboard["app_access"])
+            self.assertTrue(dashboard["local_account_accepted"])
+            self.assertEqual(dashboard["account_mode"], "local")
+            self.assertFalse(dashboard["connected"])
+            self.assertFalse((Path(tmp) / "google_workspace" / "oauth_token.json").exists())
+            self.assertTrue((Path(tmp) / "google_workspace" / "local_account.json").exists())
 
 
 if __name__ == "__main__":

@@ -251,6 +251,9 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             if path == "/v1/google-workspace/oauth/disconnect":
                 self._send(HTTPStatus.OK, GoogleOAuthBroker().disconnect())
                 return
+            if path == "/v1/google-workspace/local/accept":
+                self._send(HTTPStatus.OK, GoogleWorkspaceConfig().accept_local_account())
+                return
             if path == "/v1/google-workspace/services":
                 services = body.get("enabled_services")
                 if not isinstance(services, list):

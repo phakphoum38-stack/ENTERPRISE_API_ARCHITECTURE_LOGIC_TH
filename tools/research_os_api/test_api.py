@@ -155,6 +155,19 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertNotIn("code=", log_line)
         self.assertNotIn("state=", log_line)
 
+    def test_google_workspace_local_accept_enables_app_access(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ,
+            {"RESEARCH_OS_DATA_DIR": tmp},
+            clear=True,
+        ):
+            status, payload = self.request("POST", "/v1/google-workspace/local/accept", {})
+            self.assertEqual(200, status)
+            self.assertTrue(payload["app_access"])
+            self.assertTrue(payload["local_account_accepted"])
+            self.assertEqual(payload["account_mode"], "local")
+            self.assertFalse(payload["connected"])
+
 
 if __name__ == "__main__":
     unittest.main()

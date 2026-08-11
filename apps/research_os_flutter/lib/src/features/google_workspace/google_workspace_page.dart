@@ -73,6 +73,26 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
     }
   }
 
+  Future<void> _acceptLocal() async {
+    if (_working) return;
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final payload = await widget.apiClient.acceptLocalGoogleWorkspace();
+      if (!mounted) return;
+      setState(() => _dashboard = payload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ใช้งาน Research OS แบบ Local ได้แล้ว')),
+      );
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
   Future<void> _disconnect() async {
     if (_working) return;
     setState(() {
@@ -118,6 +138,8 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
   Widget build(BuildContext context) {
     final connected = _dashboard['connected'] == true;
     final oauthConfigured = _dashboard['oauth_configured'] == true;
+    final localAccepted = _dashboard['local_account_accepted'] == true;
+    final appAccess = _dashboard['app_access'] == true || localAccepted || connected;
     final services = _dashboard['services'] is List
         ? List<dynamic>.from(_dashboard['services'] as List)
         : const <dynamic>[];
@@ -129,7 +151,7 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
         _Heading(
           icon: Icons.apps_outlined,
           title: 'Google Workspace Hub',
-          subtitle: 'เชื่อมบริการ Google ผ่าน OAuth โดยเก็บ Client Secret และ Token ไว้ฝั่ง Backend เท่านั้น',
+          subtitle: 'เริ่มใช้งานแบบ Local ได้ทันที และเชื่อม Google เพิ่มภายหลังเมื่อพร้อม',
           action: IconButton(
             tooltip: 'รีเฟรชสถานะ',
             onPressed: _loading || _working ? null : _refresh,
@@ -155,26 +177,42 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    Icon(connected ? Icons.cloud_done_outlined : Icons.cloud_off_outlined, size: 32),
+                    Icon(appAccess ? Icons.check_circle_outline : Icons.login_outlined, size: 32),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            connected ? 'Google account connected' : 'Google account not connected',
+                            connected
+                                ? 'Google account connected'
+                                : localAccepted
+                                    ? 'Research OS Local พร้อมใช้งาน'
+                                    : 'กดยอมรับเพื่อเริ่มใช้งาน',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            oauthConfigured
-                                ? 'OAuth credentials พร้อมใช้งานบน Research OS Backend'
-                                : 'ตั้ง Google OAuth Client ID และ Client Secret ที่ Local API ก่อน',
+                            connected
+                                ? 'Google Workspace เชื่อมแล้ว'
+                                : localAccepted
+                                    ? 'ใช้แอปและข้อมูลในเครื่องได้ก่อน Google/Gmail เป็นตัวเลือกเสริม'
+                                    : 'ไม่ต้องตั้งค่า Google ก่อน เข้าใช้งานแบบ Local ได้ทันที',
                           ),
                         ],
                       ),
                     ),
-                    Chip(label: Text(connected ? 'Connected' : oauthConfigured ? 'Ready' : 'Not configured')),
+                    Chip(
+                      label: Text(
+                        connected
+                            ? 'Google'
+                            : localAccepted
+                                ? 'Local'
+                                : oauthConfigured
+                                    ? 'Ready'
+                                    : 'Start',
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -183,10 +221,16 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
                   runSpacing: 8,
                   children: <Widget>[
                     FilledButton.icon(
+                      key: const Key('google-workspace-local-accept'),
+                      onPressed: _working || appAccess ? null : _acceptLocal,
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('ยอมรับและใช้งานแบบ Local'),
+                    ),
+                    OutlinedButton.icon(
                       key: const Key('google-workspace-connect'),
                       onPressed: _working || connected || !oauthConfigured ? null : _connect,
                       icon: const Icon(Icons.login),
-                      label: const Text('เชื่อมบัญชี Google'),
+                      label: const Text('เชื่อม Google ทีหลัง'),
                     ),
                     OutlinedButton.icon(
                       onPressed: _working ? null : _refresh,

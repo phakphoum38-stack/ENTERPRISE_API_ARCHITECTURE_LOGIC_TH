@@ -156,9 +156,13 @@ class GoogleOAuthBroker:
     def status(self) -> dict[str, Any]:
         token = self._read_token(silent=True)
         connected = bool(token.get("access_token") or token.get("refresh_token"))
+        local_account_accepted = self.config.local_account_accepted
         return {
             "oauth_configured": self.config.oauth_configured,
             "connected": connected,
+            "app_access": connected or local_account_accepted,
+            "local_account_accepted": local_account_accepted,
+            "account_mode": "google" if connected else "local" if local_account_accepted else "none",
             "has_refresh_token": bool(token.get("refresh_token")),
             "redirect_uri": self.redirect_uri(),
             "token_storage": "backend_only",
