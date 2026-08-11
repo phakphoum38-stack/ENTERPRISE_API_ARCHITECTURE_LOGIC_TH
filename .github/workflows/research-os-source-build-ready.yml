@@ -8,8 +8,6 @@ on:
     paths:
       - "BUILD_READY.md"
       - "apps/research_os_flutter/**"
-      - "owner_special/**"
-      - "v3/**"
       - "tools/research_os_api/**"
       - "render.yaml"
       - "render.staging.yaml"
@@ -17,7 +15,6 @@ on:
       - "scripts/research-os-service.ps1"
       - ".github/workflows/research-os-ios-ipa.yml"
       - ".github/workflows/research-os-windows-artifact.yml"
-      - ".github/workflows/owner-special-friend.yml"
       - ".github/workflows/research-os-source-build-ready.yml"
 
 permissions:
@@ -27,92 +24,175 @@ concurrency:
   group: research-os-build-ready-source-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FRIEND_REF: 092e02596e09baa4a2ff3cf1ed12496d02a6c6d7
+
 jobs:
   package-source:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Checkout exact source
+      - name: Checkout latest Research OS desktop and API source
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Validate build-ready source contracts
+      - name: Checkout exact latest Friend source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FRIEND_REF }}
+          path: friend_source
+          fetch-depth: 1
+
+      - name: Validate combined build-ready source contracts
         shell: bash
         run: |
           set -euo pipefail
-          test -f BUILD_READY.md
-          test -f apps/research_os_flutter/pubspec.yaml
-          test -f apps/research_os_flutter/lib/src/features/checkin/check_in_page.dart
-          test -f apps/research_os_flutter/lib/src/app_shell.dart
-          test -f tools/research_os_api/server.py
-          test -f tools/research_os_api/google_identity.py
-          test -f owner_special/OWNER_MANIFEST.json
-          test -f owner_special/flutter_app/pubspec.yaml
-          test -d v3
+          for file in \
+            BUILD_READY.md \
+            apps/research_os_flutter/pubspec.yaml \
+            apps/research_os_flutter/lib/src/features/checkin/check_in_page.dart \
+            apps/research_os_flutter/lib/src/app_shell.dart \
+            tools/research_os_api/server.py \
+            tools/research_os_api/google_identity.py \
+            render.yaml \
+            .github/workflows/research-os-ios-ipa.yml \
+            friend_source/owner_special/OWNER_MANIFEST.json \
+            friend_source/owner_special/flutter_app/pubspec.yaml; do
+            if [ ! -f "$file" ]; then
+              echo "MISSING_BUILD_SOURCE=$file" >&2
+              exit 1
+            fi
+          done
+          test -d friend_source/v3
           grep -q '/v1/auth/google/status' tools/research_os_api/server.py
           grep -q '/v1/auth/google/callback' tools/research_os_api/server.py
           grep -q 'RESEARCH_OS_GOOGLE_IDENTITY_REDIRECT_URI' render.yaml
           grep -q 'com.phakphoum38.researchos' .github/workflows/research-os-ios-ipa.yml
-
-          max_path=$(git ls-files | awk '{ if (length($0) > max) { max=length($0); path=$0 } } END { print max ":" path }')
-          echo "MAX_TRACKED_RELATIVE_PATH=$max_path"
-          max_len=${max_path%%:*}
-          if [ "$max_len" -gt 220 ]; then
-            echo "Tracked source path is too long for the build-ready archive: $max_path" >&2
-            exit 1
-          fi
+          echo "DESKTOP_SOURCE_COMMIT=$GITHUB_SHA"
+          echo "FRIEND_SOURCE_COMMIT=$FRIEND_REF"
 
       - name: Package App, Core, and Complete source
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p dist
-          short_sha="${GITHUB_SHA:0:12}"
+          rm -rf dist .source-stage
+          mkdir -p dist .source-stage
+          python3 - <<'PY'
+          from __future__ import annotations
 
-          git archive --format=zip \
-            -o "dist/Research-OS-App-Source-Build-Ready-${short_sha}.zip" \
-            HEAD \
-            BUILD_READY.md \
-            apps/research_os_flutter \
-            scripts/apply-research-os-branding.py \
-            .github/workflows/research-os-ios-ipa.yml \
-            .github/workflows/research-os-windows-artifact.yml \
-            .github/workflows/research-os-source-build-ready.yml
+          import hashlib
+          import os
+          import shutil
+          import subprocess
+          import zipfile
+          from pathlib import Path
 
-          git archive --format=zip \
-            -o "dist/Research-OS-Core-Friend-API-Source-Build-Ready-${short_sha}.zip" \
-            HEAD \
-            BUILD_READY.md \
-            owner_special \
-            v3 \
-            tools/research_os_api \
-            render.yaml \
-            render.staging.yaml \
-            scripts/research-os-service.ps1 \
-            .github/workflows/owner-special-friend.yml \
-            .github/workflows/research-os-source-build-ready.yml
+          root = Path.cwd()
+          friend = root / 'friend_source'
+          stage_root = root / '.source-stage'
+          dist = root / 'dist'
+          desktop_sha = os.environ['GITHUB_SHA']
+          friend_sha = os.environ['FRIEND_REF']
+          short_sha = desktop_sha[:12]
 
-          git archive --format=zip \
-            -o "dist/Research-OS-Complete-Source-Build-Ready-${short_sha}.zip" \
-            HEAD
+          def tracked(repo: Path, paths: list[str] | None = None) -> list[str]:
+              cmd = ['git', '-C', str(repo), 'ls-files', '-z']
+              if paths:
+                  cmd.extend(['--', *paths])
+              raw = subprocess.check_output(cmd)
+              return [p.decode('utf-8') for p in raw.split(b'\0') if p]
 
-          cat > dist/SOURCE_BUILD_INFO.txt <<EOF
-          Research OS Build-Ready Source
-          Branch: ${GITHUB_REF_NAME}
-          Commit: ${GITHUB_SHA}
-          App: Minimal Chat + Google/Gmail Account + Check-in
-          API: Google identity endpoints + Google Workspace + providers + memory
-          Friend/Core: Owner Friend + ServiceHost + installer + V3
-          Archive source: Git tracked files only
-          Generated caches/runtime/binaries: not included unless intentionally tracked
-          EOF
+          def copy_files(repo: Path, files: list[str], dest: Path) -> None:
+              for rel in files:
+                  src = repo / rel
+                  if not src.is_file():
+                      continue
+                  out = dest / rel
+                  out.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(src, out)
 
-          cd dist
-          sha256sum *.zip > SHA256SUMS.txt
-          ls -lh
-          cat SHA256SUMS.txt
+          def validate_paths(stage: Path) -> tuple[int, str]:
+              longest = (0, '')
+              for path in stage.rglob('*'):
+                  if not path.is_file():
+                      continue
+                  rel = path.relative_to(stage).as_posix()
+                  if len(rel) > longest[0]:
+                      longest = (len(rel), rel)
+              print(f'{stage.name}_MAX_RELATIVE_PATH={longest[0]}:{longest[1]}')
+              if longest[0] > 220:
+                  raise SystemExit(f'Path too long in {stage.name}: {longest[0]} {longest[1]}')
+              return longest
+
+          def zip_stage(stage: Path, output: Path) -> None:
+              validate_paths(stage)
+              with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+                  for path in sorted(stage.rglob('*')):
+                      if path.is_file():
+                          zf.write(path, path.relative_to(stage).as_posix())
+
+          app_stage = stage_root / 'app'
+          core_stage = stage_root / 'core'
+          complete_stage = stage_root / 'complete'
+          for stage in (app_stage, core_stage, complete_stage):
+              stage.mkdir(parents=True, exist_ok=True)
+
+          app_paths = [
+              'BUILD_READY.md',
+              'apps/research_os_flutter',
+              'scripts/apply-research-os-branding.py',
+              '.github/workflows/research-os-ios-ipa.yml',
+              '.github/workflows/research-os-windows-artifact.yml',
+              '.github/workflows/research-os-source-build-ready.yml',
+          ]
+          copy_files(root, tracked(root, app_paths), app_stage)
+
+          core_desktop_paths = [
+              'BUILD_READY.md',
+              'tools/research_os_api',
+              'render.yaml',
+              'render.staging.yaml',
+              'scripts/research-os-service.ps1',
+              '.github/workflows/research-os-source-build-ready.yml',
+          ]
+          copy_files(root, tracked(root, core_desktop_paths), core_stage)
+          copy_files(friend, tracked(friend, ['owner_special', 'v3']), core_stage)
+
+          copy_files(root, tracked(root), complete_stage)
+          copy_files(friend, tracked(friend, ['owner_special', 'v3']), complete_stage)
+
+          info = (
+              'Research OS Build-Ready Source\n'
+              f'Desktop/API branch: feat/chatgpt-style-desktop-shell\n'
+              f'Desktop/API commit: {desktop_sha}\n'
+              f'Friend branch: owner-special/friend-complete-v1\n'
+              f'Friend commit: {friend_sha}\n'
+              'Includes: Minimal Chat, Google/Gmail identity, Check-in, Research OS API, Friend/Core, ServiceHost, installer, V3\n'
+              'Policy: Git tracked source only; generated build/runtime/cache output excluded.\n'
+          )
+          for stage in (app_stage, core_stage, complete_stage):
+              (stage / 'SOURCE_BUILD_INFO.txt').write_text(info, encoding='utf-8')
+
+          outputs = [
+              (app_stage, dist / f'Research-OS-App-Source-Build-Ready-{short_sha}.zip'),
+              (core_stage, dist / f'Research-OS-Core-Friend-API-Source-Build-Ready-{short_sha}.zip'),
+              (complete_stage, dist / f'Research-OS-Complete-Source-Build-Ready-{short_sha}.zip'),
+          ]
+          for stage, output in outputs:
+              zip_stage(stage, output)
+
+          sums = []
+          for _, output in outputs:
+              digest = hashlib.sha256(output.read_bytes()).hexdigest()
+              sums.append(f'{digest}  {output.name}')
+              print(f'SHA256 {output.name} {digest}')
+          (dist / 'SHA256SUMS.txt').write_text('\n'.join(sums) + '\n', encoding='ascii')
+          (dist / 'SOURCE_BUILD_INFO.txt').write_text(info, encoding='utf-8')
+          PY
+          ls -lh dist
+          cat dist/SHA256SUMS.txt
 
       - name: Upload build-ready source
         uses: actions/upload-artifact@v4
