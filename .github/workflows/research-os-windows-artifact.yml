@@ -21,9 +21,9 @@ env:
 
 jobs:
   build:
-    name: Build branded Windows + complete Friend package
+    name: Build branded Windows + complete Friend package + UI gate
     runs-on: windows-latest
-    timeout-minutes: 50
+    timeout-minutes: 55
 
     steps:
       - name: Checkout Research OS desktop
@@ -48,11 +48,22 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Build branded Research OS desktop
+      - name: Analyze and UI-test Research OS desktop
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: |
           flutter pub get
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw "Research OS Flutter analyze failed." }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw "Research OS Flutter tests failed." }
+          flutter test test/desktop_shell_test.dart --reporter expanded
+          if ($LASTEXITCODE -ne 0) { throw "Research OS desktop shell UI test failed." }
+
+      - name: Build branded Research OS desktop
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
           flutter config --enable-windows-desktop
           if (-not (Test-Path "windows")) {
             Write-Host "Generating runner-only Windows scaffold."
@@ -95,6 +106,7 @@ jobs:
 
           if ((Get-Item "windows\runner\resources\app_icon.ico").Length -lt 1000) { throw "Research OS icon generation failed." }
           flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw "Research OS Windows build failed." }
 
           $exe = Get-ChildItem -Path "build\windows" -Filter "research_os_flutter.exe" -File -Recurse | Select-Object -First 1
           if (-not $exe) { throw "Research OS Windows executable was not produced." }
@@ -120,6 +132,7 @@ jobs:
           Icon source: apps/research_os_flutter/assets/branding/research_os_master.webp
           Desktop commit: $env:GITHUB_SHA
           Friend Complete commit: $env:FRIEND_REF
+          UI gate: flutter analyze + full tests + desktop shell test + Windows launch smoke
           "@ | Set-Content -Path (Join-Path $stage "RESEARCH_OS_BUILD_INFO.txt") -Encoding utf8
 
       - name: Test complete Friend source before packaging
@@ -132,7 +145,7 @@ jobs:
           python "$friendRoot\owner_special\scripts\smoke.py"
           if ($LASTEXITCODE -ne 0) { throw "Friend Complete smoke failed." }
 
-      - name: Build branded Friend desktop and ServiceHost
+      - name: Build and UI-test branded Friend desktop and ServiceHost
         shell: pwsh
         run: |
           $friendRoot = Join-Path $env:GITHUB_WORKSPACE "friend_source"
@@ -162,6 +175,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Friend Flutter analyze failed." }
             flutter test
             if ($LASTEXITCODE -ne 0) { throw "Friend Flutter tests failed." }
+            flutter test test/widget_test.dart --reporter expanded
+            if ($LASTEXITCODE -ne 0) { throw "Friend UI widget test failed." }
             flutter build windows --release
             if ($LASTEXITCODE -ne 0) { throw "Friend Flutter Windows build failed." }
 
@@ -169,6 +184,7 @@ jobs:
             if (-not $friendExe) { throw "Friend Desktop EXE missing." }
             $friendVersion = $friendExe.VersionInfo
             if ($friendVersion.CompanyName -ne "Research OS Team") { throw "Friend CompanyName missing." }
+            if ($friendVersion.ProductName -ne "Research OS Friend") { throw "Friend ProductName missing." }
             Rename-Item $friendExe.FullName -NewName "Research OS Friend.exe"
           } finally {
             Pop-Location
@@ -186,7 +202,6 @@ jobs:
           $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows"
           $friendRoot = Join-Path $env:GITHUB_WORKSPACE "friend_source"
 
-          # Copy every tracked Friend source area before generated build folders are considered.
           foreach ($dir in @("owner_special", "v3", "tools\research_os_api")) {
             $source = Join-Path $friendRoot $dir
             $destination = Join-Path $stage $dir
@@ -196,13 +211,11 @@ jobs:
           New-Item -ItemType Directory -Path "$stage\.github\workflows" -Force | Out-Null
           Copy-Item "$friendRoot\.github\workflows\owner-special-friend.yml" "$stage\.github\workflows\owner-special-friend.yml" -Force
 
-          # Remove generated cache/build directories from the copied source while keeping all tracked files.
           Get-ChildItem "$stage\owner_special" -Directory -Recurse -Force |
             Where-Object { $_.Name -in @("build", ".dart_tool") } |
             Sort-Object FullName -Descending |
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-          # Add compiled Friend desktop.
           $friendRelease = Get-ChildItem "$friendRoot\owner_special\flutter_app\build\windows" -Directory -Recurse |
             Where-Object { Test-Path (Join-Path $_.FullName "Research OS Friend.exe") } |
             Select-Object -First 1
@@ -210,11 +223,9 @@ jobs:
           New-Item -ItemType Directory -Path "$stage\friend_desktop" -Force | Out-Null
           Copy-Item "$($friendRelease.FullName)\*" "$stage\friend_desktop" -Recurse -Force
 
-          # Add self-contained Windows ServiceHost.
           New-Item -ItemType Directory -Path "$stage\service_host" -Force | Out-Null
           Copy-Item "$env:RUNNER_TEMP\friend-service-host\*" "$stage\service_host" -Recurse -Force
 
-          # Bundle the complete Python 3.12 installation used by CI, including stdlib and DLLs.
           $pythonExe = (Get-Command python).Source
           $pythonRoot = Split-Path $pythonExe -Parent
           $runtime = "$stage\runtime\python"
@@ -234,10 +245,12 @@ jobs:
           New-Item -ItemType Directory -Path $data -Force | Out-Null
           $env:PYTHONPATH = Join-Path $root "owner_special"
           $service = Start-Process $python -ArgumentList @($entry,"--owner-id","owner","--host","127.0.0.1","--port","$Port","--data-root",$data,"--audit-path",$audit,"--repository-root",$root) -PassThru
+          $ready = $false
           for ($i=0; $i -lt 60; $i++) {
-            try { $h = Invoke-RestMethod "http://127.0.0.1:$Port/owner/health" -TimeoutSec 2; if ($h.status -eq "ok") { break } } catch {}
+            try { $h = Invoke-RestMethod "http://127.0.0.1:$Port/owner/health" -TimeoutSec 2; if ($h.status -eq "ok") { $ready = $true; break } } catch {}
             Start-Sleep -Milliseconds 500
           }
+          if (-not $ready) { throw "Research OS Friend service did not become ready" }
           if (-not (Test-Path $friendExe)) { throw "Research OS Friend.exe missing" }
           Start-Process $friendExe
           Write-Host "Research OS Friend ready on 127.0.0.1:$Port (PID $($service.Id))"
@@ -273,6 +286,7 @@ jobs:
             runtime/python/python.exe      (bundled Python 3.12 runtime)
           Friend loopback endpoint: http://127.0.0.1:8790
           Team/Publisher: Research OS Team
+          UI validation: Research OS shell + Friend widget tests + both Windows EXE launch smoke
           "@ | Set-Content "$stage\FRIEND_COMPLETE_MANIFEST.txt" -Encoding utf8
 
       - name: Prove packaged Friend runtime and file completeness
@@ -329,10 +343,22 @@ jobs:
               Start-Sleep -Milliseconds 500
             }
             if (-not $ready) { throw "Packaged Friend runtime did not become ready." }
+
+            $mainApp = Start-Process (Join-Path $stage "Research OS.exe") -PassThru
+            Start-Sleep -Seconds 5
+            if ($mainApp.HasExited) { throw "Research OS.exe exited during UI launch smoke with code $($mainApp.ExitCode)." }
+            Stop-Process $mainApp.Id -Force -ErrorAction SilentlyContinue
+
+            $friendApp = Start-Process (Join-Path $stage "friend_desktop\Research OS Friend.exe") -PassThru
+            Start-Sleep -Seconds 5
+            if ($friendApp.HasExited) { throw "Research OS Friend.exe exited during UI launch smoke with code $($friendApp.ExitCode)." }
+            Stop-Process $friendApp.Id -Force -ErrorAction SilentlyContinue
           } finally {
             if (-not $proc.HasExited) { Stop-Process $proc.Id -Force -ErrorAction SilentlyContinue }
           }
           Write-Host "FRIEND_PACKAGE_SMOKE=PASS"
+          Write-Host "RESEARCH_OS_UI_LAUNCH=PASS"
+          Write-Host "FRIEND_UI_LAUNCH=PASS"
 
       - name: Package Windows + Friend Complete ZIP
         shell: pwsh
