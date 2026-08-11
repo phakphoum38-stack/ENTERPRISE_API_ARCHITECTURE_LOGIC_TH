@@ -6,7 +6,13 @@ on:
     branches:
       - feat/chatgpt-style-desktop-shell
     paths:
+      - 'apps/research_os_flutter/**'
+      - 'tools/research_os_api/**'
+      - 'scripts/apply-research-os-branding.py'
+      - 'render.yaml'
       - '.github/workflows/research-os-build-ready-source.yml'
+      - '.github/workflows/research-os-ios-ipa.yml'
+      - '.github/workflows/research-os-windows-artifact.yml'
 
 permissions:
   contents: read
@@ -103,7 +109,6 @@ jobs:
               "$src/" "$dst/"
           }
 
-          # App source: keep the Flutter application plus files needed by its CI/build pipeline.
           copy_clean "$GITHUB_WORKSPACE/apps/research_os_flutter" "$APP/apps/research_os_flutter"
           mkdir -p "$APP/scripts" "$APP/.github/workflows" "$APP/tools"
           cp "$GITHUB_WORKSPACE/scripts/apply-research-os-branding.py" "$APP/scripts/"
@@ -113,7 +118,6 @@ jobs:
           cp "$GITHUB_WORKSPACE/render.yaml" "$APP/"
           copy_clean "$GITHUB_WORKSPACE/tools/research_os_api" "$APP/tools/research_os_api"
 
-          # Friend/Core source comes from the exact commit proven by the Windows Complete workflow.
           copy_clean "$GITHUB_WORKSPACE/_friend/owner_special" "$FRIEND/owner_special"
           copy_clean "$GITHUB_WORKSPACE/_friend/v3" "$FRIEND/v3"
           mkdir -p "$FRIEND/tools" "$FRIEND/.github/workflows"
@@ -171,7 +175,6 @@ jobs:
           The two roots are intentionally separated to avoid deep duplicate paths and to preserve the exact Friend commit used by the proven Windows package.
           EOF
 
-          # Conservative path-length gate for easy Windows extraction.
           python - <<'PY'
           from pathlib import Path
           import os
