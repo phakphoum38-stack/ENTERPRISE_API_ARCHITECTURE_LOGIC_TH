@@ -157,34 +157,6 @@ function Invoke-UpgradeValidation {
         $currentBefore = (Get-FileHash $memoryPath -Algorithm SHA256).Hash
         if ($currentBefore -ne [string]$state.memory_sha256_before_upgrade) { throw 'Owner memory changed before upgrade phase started' }
 
-        # Quiesce the running service and bundled Python before in-place upgrade so that
-        # the installer's PrepareToInstall check does not time out waiting for python.exe
-        # to release file handles (which causes exit code 7 / Access denied on file replacement).
-        Write-Host 'Quiescing Owner Friend Service and bundled Python before upgrade.'
-        $svc = Get-Service $serviceName -ErrorAction SilentlyContinue
-        if ($svc -and $svc.Status -ne 'Stopped') {
-            Stop-Service $serviceName -Force -ErrorAction SilentlyContinue
-            $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
-        }
-        $bundledPython = Join-Path $appRoot 'runtime\python\python.exe'
-        $resolved = if (Test-Path $bundledPython) { [IO.Path]::GetFullPath($bundledPython) } else { $null }
-        if ($resolved) {
-            for ($i = 0; $i -lt 20; $i++) {
-                $procs = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-                    Where-Object { $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $resolved) })
-                if ($procs.Count -eq 0) { break }
-                Start-Sleep -Milliseconds 500
-            }
-            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-                Where-Object { $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $resolved) } |
-                ForEach-Object {
-                    Write-Host "Forcibly stopping lingering bundled python.exe PID $($_.ProcessId)."
-                    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-                }
-            Start-Sleep -Milliseconds 500
-        }
-        Write-Host 'Owner Friend Service and bundled Python quiesced; proceeding with upgrade installer.'
-
         $upgradeLog = Join-Path $env:RUNNER_TEMP 'owner-special-upgrade.log'
         $upgrade = Start-Process -FilePath $SetupPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$upgradeLog") -Wait -PassThru
         Write-Host "Owner in-place upgrade installer exit code: $($upgrade.ExitCode)"
