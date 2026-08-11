@@ -1,20 +1,27 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AUDITOR_PATH = REPO_ROOT / "tools" / "file_audit_v6x6.py"
+MODULE_NAME = "file_audit_v6x6"
 
 
 def _load_auditor():
-    spec = importlib.util.spec_from_file_location("file_audit_v6x6", AUDITOR_PATH)
+    spec = importlib.util.spec_from_file_location(MODULE_NAME, AUDITOR_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load 6^6 file auditor: {AUDITOR_PATH}")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.modules[MODULE_NAME] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(MODULE_NAME, None)
+        raise
     return module
 
 
