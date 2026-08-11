@@ -41,31 +41,32 @@ void main() {
 
   testWidgets('EnterprisePageHeader collapses on phones while keyboard is open',
       (tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetViewInsets);
+
     await tester.pumpWidget(
       const MaterialApp(
-        home: MediaQuery(
-          data: MediaQueryData(
-            size: Size(390, 844),
-            viewInsets: EdgeInsets.only(bottom: 320),
-          ),
-          child: Scaffold(
-            body: SizedBox(
-              width: 390,
-              child: EnterprisePageHeader(
-                title: 'AI Workspace',
-                subtitle: 'Mobile keyboard mode',
-                icon: Icons.auto_awesome_outlined,
-                actions: <Widget>[
-                  OutlinedButton(
-                    onPressed: null,
-                    child: Text('History'),
-                  ),
-                  FilledButton(
-                    onPressed: null,
-                    child: Text('New chat'),
-                  ),
-                ],
-              ),
+        home: Scaffold(
+          body: SizedBox(
+            width: 390,
+            child: EnterprisePageHeader(
+              title: 'AI Workspace',
+              subtitle: 'Mobile keyboard mode',
+              icon: Icons.auto_awesome_outlined,
+              actions: <Widget>[
+                OutlinedButton(
+                  onPressed: null,
+                  child: Text('History'),
+                ),
+                FilledButton(
+                  onPressed: null,
+                  child: Text('New chat'),
+                ),
+              ],
             ),
           ),
         ),
@@ -74,7 +75,7 @@ void main() {
 
     final headerContext =
         tester.element(find.byType(EnterprisePageHeader, skipOffstage: false));
-    expect(MediaQuery.viewInsetsOf(headerContext).bottom, 320);
+    expect(View.of(headerContext).viewInsets.bottom, 320);
     expect(find.text('AI Workspace'), findsNothing);
     expect(find.text('History'), findsNothing);
     expect(find.text('New chat'), findsNothing);
