@@ -10,8 +10,8 @@ class ResearchNavItem {
 }
 
 const researchNavigationItems = <ResearchNavItem>[
-  ResearchNavItem('Workspace', 'Home', Icons.dashboard_outlined, 0),
-  ResearchNavItem('Workspace', 'AI Chat', Icons.chat_bubble_outline, 1),
+  ResearchNavItem('Workspace', 'Home', Icons.home_outlined, 0),
+  ResearchNavItem('Workspace', 'AI Chat', Icons.edit_square, 1),
   ResearchNavItem('Workspace', 'Agent Center', Icons.smart_toy_outlined, 2),
   ResearchNavItem('Knowledge', 'Library', Icons.local_library_outlined, 3),
   ResearchNavItem('Knowledge', 'Knowledge Graph', Icons.hub_outlined, 4),
@@ -63,87 +63,204 @@ class ResearchSidebar extends StatelessWidget {
     return AnimatedContainer(
       key: const Key('enterprise-sidebar'),
       duration: const Duration(milliseconds: 180),
-      width: expanded ? 244 : 76,
-      color: scheme.surface,
+      curve: Curves.easeOutCubic,
+      width: expanded ? 300 : 72,
+      color: scheme.surfaceContainerLow,
       child: Column(
         children: <Widget>[
           SizedBox(
-            height: 72,
-            child: expanded
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Row(
-                      children: <Widget>[
-                        const ResearchBrandMark(),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                'Research OS',
-                                key: Key('desktop-shell-title'),
-                                style: TextStyle(fontWeight: FontWeight.w800),
-                              ),
-                              Text('Enterprise Workspace', style: TextStyle(fontSize: 11)),
-                            ],
-                          ),
+            height: 64,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: expanded ? 14 : 8),
+              child: Row(
+                children: <Widget>[
+                  if (expanded) ...<Widget>[
+                    const ResearchBrandMark(),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Research OS',
+                        key: Key('desktop-shell-title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
                         ),
-                        IconButton(
-                          key: Key('toggle-desktop-sidebar'),
-                          tooltip: 'ย่อ Sidebar',
-                          onPressed: onToggle,
-                          icon: Icon(Icons.chevron_left),
-                        ),
-                      ],
+                      ),
                     ),
-                  )
-                : Center(
-                    child: IconButton(
-                      key: const Key('toggle-desktop-sidebar'),
-                      tooltip: 'ขยาย Sidebar',
-                      onPressed: onToggle,
-                      icon: const Icon(Icons.chevron_right),
+                  ],
+                  IconButton(
+                    key: const Key('toggle-desktop-sidebar'),
+                    tooltip: expanded ? 'ย่อ Sidebar' : 'ขยาย Sidebar',
+                    onPressed: onToggle,
+                    icon: Icon(
+                      expanded ? Icons.menu_open_rounded : Icons.menu_rounded,
                     ),
                   ),
+                ],
+              ),
+            ),
           ),
-          const Divider(height: 1),
+          if (expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+              child: _ChatPrimaryAction(
+                selected: selectedIndex == 1,
+                onTap: () => onSelected(1),
+              ),
+            ),
           Expanded(
             child: ListView(
               key: const Key('desktop-navigation-list'),
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.fromLTRB(0, expanded ? 2 : 8, 0, 8),
               children: _entries(context),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12),
-            child: Container(
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: expanded
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
-                        const SizedBox(width: 8),
-                        const Flexible(
-                          child: Text(
-                            'Local-first & secure',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12),
-                          ),
+            padding: EdgeInsets.fromLTRB(
+              expanded ? 12 : 8,
+              6,
+              expanded ? 12 : 8,
+              12,
+            ),
+            child: Column(
+              children: <Widget>[
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: expanded ? 12 : 8,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: expanded
+                      ? Row(
+                          children: <Widget>[
+                            Icon(
+                              Icons.shield_outlined,
+                              size: 18,
+                              color: scheme.primary,
+                            ),
+                            const SizedBox(width: 9),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    'Local-first',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Research OS workspace',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : Icon(
+                          Icons.shield_outlined,
+                          size: 18,
+                          color: scheme.primary,
                         ),
-                      ],
-                    )
-                  : Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
+                ),
+                if (expanded) ...<Widget>[
+                  const SizedBox(height: 8),
+                  const _OwnerFooter(),
+                ],
+              ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatPrimaryAction extends StatelessWidget {
+  const _ChatPrimaryAction({required this.selected, required this.onTap});
+
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? scheme.surfaceContainerHighest : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        key: const Key('desktop-new-chat'),
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: const SizedBox(
+          height: 44,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.edit_square, size: 21),
+                SizedBox(width: 12),
+                Text(
+                  'แชตใหม่',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OwnerFooter extends StatelessWidget {
+  const _OwnerFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 44,
+      child: Row(
+        children: <Widget>[
+          CircleAvatar(
+            radius: 15,
+            backgroundColor: scheme.primaryContainer,
+            child: Text(
+              'R',
+              style: TextStyle(
+                color: scheme.onPrimaryContainer,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Research OS Owner',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                Text('Owner workspace', style: TextStyle(fontSize: 10)),
+              ],
+            ),
+          ),
+          const Icon(Icons.more_horiz, size: 18),
         ],
       ),
     );
@@ -261,16 +378,16 @@ class ResearchStatusBar extends StatelessWidget {
         color: scheme.surfaceContainerLow,
         border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
-      child: Row(
+      child: const Row(
         children: <Widget>[
-          Icon(Icons.circle, size: 8, color: scheme.primary),
-          const SizedBox(width: 6),
-          const Text('Research OS', style: TextStyle(fontSize: 12)),
-          const Spacer(),
-          const _StatusItem(Icons.smart_toy_outlined, 'Agents'),
-          const _StatusItem(Icons.memory_outlined, 'Memory'),
-          const _StatusItem(Icons.apps_outlined, 'Workspace'),
-          const _StatusItem(Icons.dns_outlined, 'Local API'),
+          Icon(Icons.circle, size: 8),
+          SizedBox(width: 6),
+          Text('Research OS', style: TextStyle(fontSize: 12)),
+          Spacer(),
+          _StatusItem(Icons.smart_toy_outlined, 'Agents'),
+          _StatusItem(Icons.memory_outlined, 'Memory'),
+          _StatusItem(Icons.apps_outlined, 'Workspace'),
+          _StatusItem(Icons.dns_outlined, 'Local API'),
         ],
       ),
     );
@@ -286,11 +403,10 @@ class _SectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
       child: Text(
-        label.toUpperCase(),
+        label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-              letterSpacing: .7,
+              fontWeight: FontWeight.w600,
             ),
       ),
     );
@@ -314,26 +430,28 @@ class _SidebarDestination extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: expanded ? 10 : 8, vertical: 2),
+      padding: EdgeInsets.symmetric(horizontal: expanded ? 10 : 8, vertical: 1),
       child: Tooltip(
         message: expanded ? '' : item.label,
         child: Material(
-          color: selected ? scheme.secondaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: selected ? scheme.surfaceContainerHighest : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
           child: InkWell(
             key: Key('desktop-nav-${item.index}'),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             onTap: onTap,
             child: SizedBox(
-              height: 44,
+              height: 40,
               child: Row(
-                mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+                mainAxisAlignment:
+                    expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
                 children: <Widget>[
                   SizedBox(
-                    width: expanded ? 44 : 58,
+                    width: expanded ? 42 : 54,
                     child: Icon(
                       item.icon,
-                      color: selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
+                      size: 20,
+                      color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
                     ),
                   ),
                   if (expanded)
@@ -342,7 +460,11 @@ class _SidebarDestination extends StatelessWidget {
                         item.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
+                        ),
                       ),
                     ),
                 ],
