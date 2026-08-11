@@ -27,5 +27,14 @@ class GoogleIdentityBroker(GoogleOAuthBroker):
         ).strip()
         if explicit:
             return explicit
+
+        public_base = (
+            os.environ.get("RESEARCH_OS_PUBLIC_BASE_URL")
+            or os.environ.get("RENDER_EXTERNAL_URL")
+            or ""
+        ).strip().rstrip("/")
+        if public_base:
+            return f"{public_base}/v1/auth/google/callback"
+
         port = int(os.environ.get("RESEARCH_OS_API_PORT", "8787"))
         return f"http://127.0.0.1:{port}/v1/auth/google/callback"
