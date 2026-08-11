@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FRIEND_REF: 666bb0df67b6f6b83dfc51af0d8251e98096bc25
+  FRIEND_REF: 092e02596e09baa4a2ff3cf1ed12496d02a6c6d7
 
 jobs:
   build:
