@@ -4,6 +4,9 @@ import 'package:research_os_owner_special/src/friend_ui_v3.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 
 class FakeOwnerFriendApiV3 implements OwnerFriendApi {
+  int? lastHelperBudget;
+  List<String> lastRequestedSkills = const <String>[];
+
   @override
   Future<Map<String, dynamic>> health() async => <String, dynamic>{'status': 'ok'};
 
@@ -61,24 +64,28 @@ class FakeOwnerFriendApiV3 implements OwnerFriendApi {
     int helperBudget = 0,
     List<String> requestedSkills = const <String>[],
     List<String> requestedTools = const <String>[],
-  }) async =>
-      <String, dynamic>{
-        'text': 'friend-v3:$text',
-        'provider': 'test-provider',
-        'decision': <String, dynamic>{
-          'scale': helperBudget >= 1000000 ? 'fast-1m' : '6^6',
-          'capacity': helperBudget >= 1000000 ? 1000000 : 46656,
-        },
-        'helpers': <String, dynamic>{'active_workers': 128, 'batches': 7813},
-        'factory': <String, dynamic>{
-          'stages': <String>['master', 'factory', 'team', 'tests', 'release'],
-        },
-      };
+  }) async {
+    lastHelperBudget = helperBudget;
+    lastRequestedSkills = List<String>.from(requestedSkills);
+    return <String, dynamic>{
+      'text': 'friend-v3:$text',
+      'provider': 'test-provider',
+      'decision': <String, dynamic>{
+        'scale': helperBudget >= 1000000 ? 'fast-1m' : '6^6',
+        'capacity': helperBudget >= 1000000 ? 1000000 : 46656,
+      },
+      'helpers': <String, dynamic>{'active_workers': 128, 'batches': 7813},
+      'factory': <String, dynamic>{
+        'stages': <String>['master', 'factory', 'team', 'tests', 'release'],
+      },
+    };
+  }
 }
 
 void main() {
   testWidgets('Friend UI V3 is the interactive desktop shell', (tester) async {
-    await tester.pumpWidget(OwnerFriendAppV3(api: FakeOwnerFriendApiV3()));
+    final api = FakeOwnerFriendApiV3();
+    await tester.pumpWidget(OwnerFriendAppV3(api: api));
     await tester.pumpAndSettle();
 
     expect(find.text('UI V3'), findsOneWidget);
@@ -90,8 +97,8 @@ void main() {
 
     expect(find.textContaining('friend-v3:สวัสดีครับ'), findsOneWidget);
     expect(find.text('Brain scale: fast-1m'), findsOneWidget);
-    expect(find.text('Active workers: 128'), findsOneWidget);
-    expect(find.text('Provider: test-provider'), findsWidgets);
+    expect(api.lastHelperBudget, 1000000);
+    expect(api.lastRequestedSkills, containsAll(<String>['analysis', 'planning', 'memory', 'quality']));
   });
 
   testWidgets('Friend UI V3 exposes the new plus menu', (tester) async {
