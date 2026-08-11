@@ -56,7 +56,7 @@ jobs:
       - name: Run focused API, memory, provider and conversation tests
         working-directory: tools/research_os_api
         run: |
-          python -m unittest test_api test_provider_readiness test_conversation_store -v
+          python -m unittest test_api test_provider_readiness test_provider_retry test_conversation_store -v
 
   windows-chat-build:
     name: Windows desktop release build
@@ -104,7 +104,8 @@ jobs:
       RESEARCH_OS_EVAL_BASE_URL: http://127.0.0.1:8787
       RESEARCH_OS_EVAL_REPORT: ai-capability-report.json
       RESEARCH_OS_EVAL_CASE_COOLDOWN: "2"
-      RESEARCH_OS_EVAL_CASE_ATTEMPTS: "2"
+      RESEARCH_OS_EVAL_CASE_ATTEMPTS: "3"
+      RESEARCH_OS_PROVIDER_MAX_RETRY_DELAY: "65"
       PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
@@ -190,8 +191,7 @@ jobs:
           for case in report["cases"]:
               evaluation = "MODEL" if case["evaluated"] else "INFRA"
               result = "PASS" if case["passed"] else ("FAIL" if case["evaluated"] else case.get("error_class", "INFRA"))
-              latency = case.get("elapsed_ms")
-              print(f"| {case['category']} | {case['name']} | {evaluation} | {result} | {case.get('attempts')} | {latency} ms |")
+              print(f"| {case['category']} | {case['name']} | {evaluation} | {result} | {case.get('attempts')} | {case.get('elapsed_ms')} ms |")
           print()
           print("Full model replies and API secrets are not written to this report.")
           PY
