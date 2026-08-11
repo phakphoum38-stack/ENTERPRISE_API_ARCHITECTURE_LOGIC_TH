@@ -23,6 +23,7 @@ from conversation_store import (
     upsert_session as upsert_cloud_session,
 )
 from github_status import GitHubStatusError, dashboard as github_dashboard
+from google_identity import GoogleIdentityBroker
 from google_oauth import GoogleOAuthBroker, GoogleOAuthError
 from google_workspace import GoogleWorkspaceConfig, get_google_workspace_dashboard
 from memory import build_context, search_memory
@@ -160,6 +161,29 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     },
                 )
                 return
+            if path == "/v1/auth/google/status":
+                self._send(HTTPStatus.OK, GoogleIdentityBroker().status())
+                return
+            if path == "/v1/auth/google/callback":
+                params = parse_qs(parsed.query)
+                error = str(params.get("error", [""])[0]).strip()
+                if error:
+                    self._send_html(
+                        HTTPStatus.BAD_REQUEST,
+                        f"<html><body><h2>Research OS Google sign-in failed</h2><p>{error}</p><p>You can close this window.</p></body></html>",
+                    )
+                    return
+                code = str(params.get("code", [""])[0]).strip()
+                state = str(params.get("state", [""])[0]).strip()
+                if not code or not state:
+                    raise ValueError("Google sign-in callback requires code and state")
+                result = GoogleIdentityBroker().complete(code=code, state=state)
+                email = ((result.get("account") or {}).get("email") or "Google account")
+                self._send_html(
+                    HTTPStatus.OK,
+                    f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>",
+                )
+                return
             if path == "/v1/google-workspace/dashboard":
                 self._send(HTTPStatus.OK, get_google_workspace_dashboard())
                 return
@@ -245,6 +269,12 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = self._read_json()
+            if path == "/v1/auth/google/start":
+                self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
+                return
+            if path == "/v1/auth/google/signout":
+                self._send(HTTPStatus.OK, GoogleIdentityBroker().disconnect())
+                return
             if path == "/v1/google-workspace/oauth/start":
                 self._send(HTTPStatus.OK, GoogleOAuthBroker().begin())
                 return
