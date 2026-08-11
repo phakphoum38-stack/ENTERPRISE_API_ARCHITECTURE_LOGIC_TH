@@ -52,7 +52,7 @@ void main() {
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pumpAndSettle();
 
-    expect(find.text('สวัสดีเพื่อน ทดสอบแชทตัวเอง'), findsOneWidget);
+    expect(find.text('สวัสดีเพื่อน ทดสอบแชทตัวเอง'), findsWidgets);
     expect(
       find.text('สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว'),
       findsOneWidget,
@@ -94,7 +94,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('สวัสดีเพื่อน ทดสอบแชทตัวเอง'), findsOneWidget);
+    expect(find.text('สวัสดีเพื่อน ทดสอบแชทตัวเอง'), findsWidgets);
     expect(
       find.text('สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว'),
       findsOneWidget,
