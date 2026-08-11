@@ -217,6 +217,20 @@ class ResearchMobileDrawer extends StatelessWidget {
   final String? accountName;
   final String? accountEmail;
 
+  void _closeThen(BuildContext context, VoidCallback callback) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) => callback());
+  }
+
+  Future<void> _closeThenAsync(
+    BuildContext context,
+    Future<void> Function() callback,
+  ) async {
+    Navigator.of(context).pop();
+    await Future<void>.delayed(Duration.zero);
+    await callback();
+  }
+
   List<Widget> _entries(BuildContext context) {
     final widgets = <Widget>[];
     String? section;
@@ -246,7 +260,10 @@ class ResearchMobileDrawer extends StatelessWidget {
       widgets.add(
         _RecentChatsSection(
           chats: recentChats.take(8).toList(growable: false),
-          onSelected: onRecentChatSelected,
+          onSelected: (id) => _closeThenAsync(
+            context,
+            () => onRecentChatSelected(id),
+          ),
           keyPrefix: 'mobile-recent-chat',
         ),
       );
@@ -279,7 +296,7 @@ class ResearchMobileDrawer extends StatelessWidget {
                   IconButton(
                     key: const Key('mobile-search'),
                     tooltip: 'ค้นหาบทสนทนา',
-                    onPressed: onSearch,
+                    onPressed: () => _closeThen(context, onSearch),
                     icon: const Icon(Icons.search_rounded),
                   ),
                 ],
@@ -292,7 +309,7 @@ class ResearchMobileDrawer extends StatelessWidget {
                 child: _ChatPrimaryAction(
                   keyName: 'mobile-new-chat',
                   selected: selectedIndex == 1,
-                  onTap: onNewChat,
+                  onTap: () => _closeThenAsync(context, onNewChat),
                 ),
               ),
             ),
@@ -311,7 +328,7 @@ class ResearchMobileDrawer extends StatelessWidget {
                 connected: accountConnected,
                 name: accountName,
                 email: accountEmail,
-                onTap: onAccountTap,
+                onTap: () => _closeThen(context, onAccountTap),
               ),
             ),
           ],
