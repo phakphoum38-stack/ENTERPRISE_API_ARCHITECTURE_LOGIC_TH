@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
 import 'features/chat/chat_page.dart';
+import 'features/checkin/check_in_page.dart';
 import 'features/developer_access/developer_access_page.dart';
 import 'features/github/github_dashboard_page.dart';
 import 'features/google_workspace/google_workspace_page.dart';
@@ -70,6 +71,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
           onApiBaseUrlChanged: widget.onApiBaseUrlChanged,
         ),
         DeveloperAccessPage(),
+        const CheckInPage(),
       ];
 
   List<Map<String, dynamic>> _decodeStoredSessions(String? raw) {
