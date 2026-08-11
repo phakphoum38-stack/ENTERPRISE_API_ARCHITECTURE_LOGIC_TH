@@ -79,7 +79,8 @@ begin
     Exit;
   end;
 
-  EscapedPythonPath := StringChangeEx(PythonPath, '''', '''''', True);
+  EscapedPythonPath := PythonPath;
+  StringChangeEx(EscapedPythonPath, '''', '''''', True);
   PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
   CommandLine :=
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' +
