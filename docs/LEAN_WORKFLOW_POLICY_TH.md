@@ -4,7 +4,7 @@
 
 ลดการใช้ GitHub Actions ให้เหลือเท่าที่จำเป็น โดยยึดหลัก:
 
-> เขียนให้เสร็จก่อน ตรวจบนเครื่องก่อน และ Build ตัวติดตั้งจริงเพียงครั้งเดียวต่อ Candidate
+> เขียนให้เสร็จก่อน ตรวจบนเครื่องก่อน และสั่ง GitHub Actions เฉพาะเมื่อมีเหตุผลชัดเจน
 
 พร้อมใช้กฎการเปลี่ยนแปลงหลักของโปรเจกต์:
 
@@ -47,22 +47,21 @@
 - จำนวนผู้ช่วย 1, 6, 6³ หรือ 6⁶ ไม่สัมพันธ์กับจำนวน GitHub workflow runs
 - การเรียกผู้ช่วยใน Research OS runtime ใช้ **0 GitHub Actions runs**
 
-## โครงสร้างใหม่
+## โครงสร้าง GitHub Actions ปัจจุบัน
 
-เหลือ GitHub Actions เพียง 3 workflow:
+ใช้ workflow หลัก/เฉพาะทางทั้งหมด 5 ตัว และทุกตัวเป็น **manual-only**:
 
 1. `ci-lite.yml`
-   - Manual only
-   - ใช้เมื่อต้องการตรวจบน GitHub เพิ่มเติม
-   - ค่าเริ่มต้นตรวจ Python/API
-   - Flutter check เปิดเพิ่มได้ตามต้องการ
+   - ตรวจ Python/API ตาม exact SHA
+   - Flutter analyze/test เปิดเพิ่มได้ตามต้องการ
+   - ไม่รันอัตโนมัติทุก push หรือ pull request
 
 2. `candidate.yml`
-   - Manual only
+   - canonical owner ของ Windows release-candidate validation
    - Windows runner เพียง 1 ตัว
    - Build/Test Windows App
    - Build/Test ServiceHost และ Runtime
-   - Build Setup EXE เพียงครั้งเดียว
+   - Build Setup EXE
    - Install + In-place Upgrade + Uninstall
    - ตรวจการเก็บข้อมูลเดิม
    - ตรวจ loopback-only และ secret-safe provider status
@@ -70,11 +69,22 @@
    - Upload verified candidate artifact
 
 3. `release.yml`
-   - Manual only
    - รับ candidate run ID และ exact SHA
    - ตรวจ lineage + SHA256 ก่อน
    - ไม่สร้าง Release โดยค่าเริ่มต้น
    - สร้าง GitHub Release เฉพาะเมื่อ `publish=true`
+
+4. `artifacts-build.yml`
+   - สร้าง distribution/developer artifacts แบบเลือกได้สำหรับ Website, Windows และ unsigned iOS IPA
+   - เป็น manual-only และผูกกับ exact SHA
+   - artifact จาก workflow นี้ **ไม่ถือเป็น verified release candidate evidence**
+   - Windows Setup จาก workflow นี้ใช้สำหรับ build/distribution validation เท่านั้น; การออก Release ต้องใช้ artifact lineage จาก `candidate.yml`
+
+5. `browser-use-cloud-smoke.yml`
+   - ตรวจ Browser Use connector/API/Flutter contract แบบ end-to-end
+   - ค่าเริ่มต้นใช้ local simulator จึงไม่ใช้ Browser Use Cloud quota
+   - real cloud เป็น opt-in และต้องใช้ `BROWSER_USE_API_KEY` จาก GitHub Secrets
+   - ไม่เปิดเผย API key หรือ CDP URL ใน status payload
 
 ## ระหว่างพัฒนา
 
@@ -98,11 +108,35 @@ GitHub Actions = 0 นาทีต่อ commit ถ้าไม่สั่ง w
 .\scripts\research-os-preflight.ps1 -SkipServiceHost
 ```
 
+## CI Lite
+
+ใช้เมื่อ local preflight ยังไม่พอและต้องการหลักฐานบน GitHub เพิ่มเติม ให้ dispatch `Research OS CI Lite` ด้วย exact SHA ที่ต้องการตรวจ
+
+ห้ามใช้ push trigger เป็นค่าเริ่มต้น เพราะขัดกับหลัก zero-Actions-per-development-commit
+
 ## Candidate
 
-เมื่อเขียนงานชุดนั้นเสร็จแล้ว ให้สั่ง `Research OS Candidate` เพียง 1 ครั้ง และระบุ SHA ที่ต้องการตรวจ
+เมื่อเขียนงานชุดนั้นเสร็จแล้ว ให้สั่ง `Research OS Candidate` เพียง 1 ครั้งจาก workflow ที่ลงทะเบียนบน `main` และระบุ exact SHA ของ branch/commit ที่ต้องการตรวจ
 
 ห้ามเปิด Candidate หลาย run สำหรับ SHA เดียวกันโดยไม่จำเป็น
+
+`candidate.yml` บน `main` เป็น canonical owner ของ candidate gate; feature branch ไม่ควรสร้างสำเนา workflow นี้เอง
+
+## Distribution Artifacts
+
+ถ้าต้องการเฉพาะไฟล์ Website, Windows หรือ unsigned iOS IPA โดยยังไม่ต้องการ candidate evidence ให้ใช้ `Research OS Artifact Build`
+
+- ต้องระบุ exact SHA เมื่อ build งานสำคัญ
+- ไม่ถือ artifact จาก workflow นี้เป็น Release Candidate โดยอัตโนมัติ
+- Release lineage ต้องย้อนกลับไปยัง Candidate ที่ผ่าน validation เท่านั้น
+
+## Browser Use Cloud Smoke
+
+ใช้ `Browser Use Cloud Connect Smoke` เมื่อมีการแก้ connector, backend route หรือ Flutter connect UI
+
+- ค่าเริ่มต้น `connect_cloud=false` ใช้ simulator
+- เปิด `connect_cloud=true` เฉพาะเมื่อจำเป็นต้องพิสูจน์ real-cloud integration
+- real-cloud secret ต้องอยู่ใน GitHub Secrets เท่านั้น
 
 ## Release
 
@@ -110,6 +144,7 @@ Release แยกจาก Candidate เสมอ
 
 - Candidate ผ่าน ≠ Release
 - Merge ≠ Release
+- Distribution artifact ≠ Release Candidate
 - Release ต้องสั่งเอง
 - Production code signing ต้องเพิ่มเมื่อมี trusted certificate จริง
 - ห้ามใช้ self-signed certificate เป็น production signing
@@ -119,14 +154,15 @@ Release แยกจาก Candidate เสมอ
 - OAuth callback request logging ต้องไม่บันทึกค่า query ที่มี `code` หรือ `state`
 - HTTP handler ต้อง redact callback query เป็น `?[REDACTED]` ก่อนเขียน persistent request log
 - regression test ต้องตรวจว่าค่า OAuth callback secret ไม่ปรากฏใน log
+- Browser Use status ต้องไม่ส่ง API key หรือ CDP URL กลับไปยัง client
 
 ## สิ่งที่ยกเลิกจาก workflow เดิม
 
 นำ workflow ย่อยที่เคยรันแยกกันออก เช่น Windows App, ServiceHost, Runtime Smoke, Installer Build, Installer Validation, Branding, Agent Platform, Completion Crew, Performance, Nightly, Pages, Provider Smoke, Gemini E2E, Google Workspace, Production Health และ staging/RC gates
 
-ความสามารถที่จำเป็นต่อ Windows Candidate ถูกรวมไว้ใน `candidate.yml`
+ความสามารถที่จำเป็นต่อ Windows Candidate ถูกรวมไว้ใน canonical `candidate.yml`
 
-งานเฉพาะทางที่ไม่จำเป็นต่อ Candidate ให้รันแบบ local/manual ตามความต้องการแทน
+งาน Browser Use และ cross-platform artifact build คงไว้เป็น manual specialized workflows เพราะมี runner/credential/lifecycle ต่างจาก Candidate โดยตรง
 
 ## หลักประหยัด Actions
 
@@ -134,10 +170,11 @@ Release แยกจาก Candidate เสมอ
 - ไม่ใช้ `push` auto-build
 - ไม่ใช้ scheduled/nightly โดยค่าเริ่มต้น
 - ไม่ dispatch workflow ต่อ workflow
-- ไม่สร้าง intermediate artifacts หลายรอบ
+- ไม่สร้าง intermediate artifacts หลายรอบโดยไม่จำเป็น
 - ใช้ exact SHA เดียวตลอด Candidate
 - ใช้ Windows runner หนึ่งตัวตลอด Candidate
 - Release เป็น manual-only
+- real Browser Use Cloud เป็น opt-in; simulator เป็นค่าเริ่มต้น
 - การเรียกผู้ช่วย AI ปกติไม่ใช้ GitHub Actions
 
 ## หมายเหตุเรื่อง Branch Protection
