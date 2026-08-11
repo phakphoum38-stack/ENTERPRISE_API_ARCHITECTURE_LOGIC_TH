@@ -1,0 +1,85 @@
+name: Owner Special Installer Quick Check
+
+on:
+  push:
+    branches: ['debug/owner-installer-guard']
+    paths:
+      - 'owner_special/installer/owner-special.iss'
+      - '.github/workflows/owner-special-installer-quick.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-installer-iss-check:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Prepare minimal package for owner_special/installer/owner-special.iss
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:GITHUB_WORKSPACE 'owner_special\installer\package'
+          New-Item -ItemType Directory -Force -Path (Join-Path $package 'runtime\python') | Out-Null
+          Set-Content -Path (Join-Path $package 'quick-check-placeholder.txt') -Value 'quick-check' -Encoding ascii
+
+      - name: Compile only owner_special/installer/owner-special.iss
+        working-directory: owner_special/installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc '.\owner-special.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'owner-special.iss compilation failed' }
+          if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe')) {
+            throw 'Quick-check Setup.exe was not produced'
+          }
+
+      - name: Verify owner-special.iss uses file-based Python checker
+        shell: pwsh
+        run: |
+          $iss = Get-Content '.\owner_special\installer\owner-special.iss' -Raw
+          if ($iss -notmatch 'owner-python-check\.ps1') { throw 'Temporary Python checker file is missing from owner-special.iss' }
+          if ($iss -notmatch '-File') { throw 'Python guard is not using PowerShell -File' }
+          if ($iss -match '-Command\s+"') { throw 'Nested PowerShell -Command quoting still exists in owner-special.iss' }
+
+      - name: Exercise bundled-Python guard exit codes only
+        shell: pwsh
+        run: |
+          $probeDir = Join-Path $env:RUNNER_TEMP 'owner-python-guard-probe'
+          New-Item -ItemType Directory -Force -Path $probeDir | Out-Null
+          $probePython = Join-Path $probeDir 'python.exe'
+          Copy-Item "$env:WINDIR\System32\cmd.exe" $probePython -Force
+          $checker = Join-Path $probeDir 'owner-python-check.ps1'
+          @'
+          param([Parameter(Mandatory=$true)][string]$Target)
+          $targetPath = [IO.Path]::GetFullPath($Target)
+          $running = @(Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" | Where-Object {
+            $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $targetPath)
+          })
+          if ($running.Count -eq 0) { exit 0 } else { exit 10 }
+          '@ | Set-Content -Path $checker -Encoding utf8
+
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $checker -Target $probePython
+          if ($LASTEXITCODE -ne 0) { throw "Guard idle check expected exit 0, got $LASTEXITCODE" }
+
+          $child = Start-Process $probePython -ArgumentList @('/c','ping -n 20 127.0.0.1 >nul') -PassThru
+          try {
+            Start-Sleep -Seconds 1
+            & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $checker -Target $probePython
+            if ($LASTEXITCODE -ne 10) { throw "Guard active check expected exit 10, got $LASTEXITCODE" }
+          }
+          finally {
+            if (-not $child.HasExited) { Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue }
+            Wait-Process -Id $child.Id -ErrorAction SilentlyContinue
+          }
+
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $checker -Target $probePython
+          if ($LASTEXITCODE -ne 0) { throw "Guard post-exit check expected exit 0, got $LASTEXITCODE" }
+
+          Write-Host 'Targeted owner-special.iss guard check passed: 0 -> 10 -> 0.'
