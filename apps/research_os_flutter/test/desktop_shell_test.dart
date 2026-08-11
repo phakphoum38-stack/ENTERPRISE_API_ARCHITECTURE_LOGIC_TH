@@ -45,7 +45,7 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 }
 
 void main() {
-  testWidgets('desktop shell shows organized enterprise sidebar', (tester) async {
+  testWidgets('desktop shell shows chat-first Research OS sidebar', (tester) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -63,22 +63,29 @@ void main() {
     expect(find.text('Research OS'), findsWidgets);
     expect(find.byKey(const Key('enterprise-sidebar')), findsOneWidget);
     expect(find.byKey(const Key('desktop-navigation-list')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-status-bar')), findsOneWidget);
-    expect(find.text('WORKSPACE'), findsWidgets);
-    expect(find.text('KNOWLEDGE'), findsWidgets);
-    expect(find.text('CONNECTIONS'), findsWidgets);
-    expect(find.text('SYSTEM'), findsWidgets);
+    expect(find.byKey(const Key('desktop-main-pane')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-status-bar')), findsNothing);
+    expect(find.byKey(const Key('desktop-new-chat')), findsOneWidget);
+    expect(find.text('Workspace'), findsWidgets);
+    expect(find.text('Knowledge'), findsWidgets);
+    expect(find.text('Connections'), findsWidgets);
+    expect(find.text('System'), findsWidgets);
     expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
     expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
 
-    final before = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
+    final before =
+        tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
+    expect(before, 300);
+
     await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
-    final after = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
+    final after =
+        tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
 
     expect(after, lessThan(before));
-    expect(after, 76);
+    expect(after, 72);
+    expect(find.byKey(const Key('desktop-new-chat')), findsNothing);
     expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
     expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
     expect(tester.takeException(), isNull);
