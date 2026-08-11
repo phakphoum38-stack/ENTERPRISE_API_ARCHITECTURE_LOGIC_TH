@@ -28,7 +28,12 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7),
   ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8),
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
-  ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
+  ResearchNavItem(
+    'Access',
+    'Developer Access',
+    Icons.admin_panel_settings_outlined,
+    10,
+  ),
 ];
 
 class ResearchSidebar extends StatelessWidget {
@@ -40,6 +45,11 @@ class ResearchSidebar extends StatelessWidget {
     required this.onSelected,
     required this.onNewChat,
     required this.onRecentChatSelected,
+    required this.onSearch,
+    required this.onAccountTap,
+    required this.accountConnected,
+    this.accountName,
+    this.accountEmail,
     super.key,
   });
 
@@ -50,22 +60,16 @@ class ResearchSidebar extends StatelessWidget {
   final ValueChanged<int> onSelected;
   final Future<void> Function() onNewChat;
   final Future<void> Function(String id) onRecentChatSelected;
+  final VoidCallback onSearch;
+  final VoidCallback onAccountTap;
+  final bool accountConnected;
+  final String? accountName;
+  final String? accountEmail;
 
   List<Widget> _entries(BuildContext context) {
     final widgets = <Widget>[];
     String? section;
     for (final item in researchNavigationItems) {
-      if (expanded &&
-          section == 'Workspace' &&
-          item.section != section &&
-          recentChats.isNotEmpty) {
-        widgets.add(
-          _RecentChatsSection(
-            chats: recentChats,
-            onSelected: onRecentChatSelected,
-          ),
-        );
-      }
       if (expanded && section != item.section) {
         section = item.section;
         widgets.add(_SectionLabel(section));
@@ -76,6 +80,15 @@ class ResearchSidebar extends StatelessWidget {
           expanded: expanded,
           selected: selectedIndex == item.index,
           onTap: () => onSelected(item.index),
+        ),
+      );
+    }
+    if (expanded && recentChats.isNotEmpty) {
+      widgets.add(
+        _RecentChatsSection(
+          chats: recentChats,
+          onSelected: onRecentChatSelected,
+          keyPrefix: 'desktop-recent-chat',
         ),
       );
     }
@@ -109,10 +122,16 @@ class ResearchSidebar extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
+                    ),
+                    IconButton(
+                      key: const Key('desktop-search'),
+                      tooltip: 'ค้นหาบทสนทนา',
+                      onPressed: onSearch,
+                      icon: const Icon(Icons.search_rounded),
                     ),
                   ],
                   IconButton(
@@ -131,10 +150,9 @@ class ResearchSidebar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
               child: _ChatPrimaryAction(
+                keyName: 'desktop-new-chat',
                 selected: selectedIndex == 1,
-                onTap: () {
-                  onNewChat();
-                },
+                onTap: onNewChat,
               ),
             ),
           Expanded(
@@ -153,56 +171,16 @@ class ResearchSidebar extends StatelessWidget {
             ),
             child: Column(
               children: <Widget>[
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: expanded ? 12 : 8,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: expanded
-                      ? Row(
-                          children: <Widget>[
-                            Icon(
-                              Icons.shield_outlined,
-                              size: 18,
-                              color: scheme.primary,
-                            ),
-                            const SizedBox(width: 9),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    'Local-first',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Research OS workspace',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 11),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        )
-                      : Icon(
-                          Icons.shield_outlined,
-                          size: 18,
-                          color: scheme.primary,
-                        ),
-                ),
+                _LocalFirstBadge(expanded: expanded),
                 if (expanded) ...<Widget>[
                   const SizedBox(height: 8),
-                  const _OwnerFooter(),
+                  _AccountFooter(
+                    keyName: 'desktop-account-footer',
+                    connected: accountConnected,
+                    name: accountName,
+                    email: accountEmail,
+                    onTap: onAccountTap,
+                  ),
                 ],
               ],
             ),
@@ -213,9 +191,144 @@ class ResearchSidebar extends StatelessWidget {
   }
 }
 
-class _ChatPrimaryAction extends StatelessWidget {
-  const _ChatPrimaryAction({required this.selected, required this.onTap});
+class ResearchMobileDrawer extends StatelessWidget {
+  const ResearchMobileDrawer({
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.recentChats,
+    required this.onNewChat,
+    required this.onRecentChatSelected,
+    required this.onSearch,
+    required this.onAccountTap,
+    required this.accountConnected,
+    this.accountName,
+    this.accountEmail,
+    super.key,
+  });
 
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final List<ResearchRecentChat> recentChats;
+  final Future<void> Function() onNewChat;
+  final Future<void> Function(String id) onRecentChatSelected;
+  final VoidCallback onSearch;
+  final VoidCallback onAccountTap;
+  final bool accountConnected;
+  final String? accountName;
+  final String? accountEmail;
+
+  List<Widget> _entries(BuildContext context) {
+    final widgets = <Widget>[];
+    String? section;
+    for (final item in researchNavigationItems) {
+      if (section != item.section) {
+        section = item.section;
+        widgets.add(_SectionLabel(section));
+      }
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
+          child: ListTile(
+            key: Key('mobile-nav-${item.index}'),
+            dense: true,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            selected: selectedIndex == item.index,
+            leading: Icon(item.icon),
+            title: Text(item.label),
+            onTap: () => onSelected(item.index),
+          ),
+        ),
+      );
+    }
+    if (recentChats.isNotEmpty) {
+      widgets.add(
+        _RecentChatsSection(
+          chats: recentChats.take(8).toList(growable: false),
+          onSelected: onRecentChatSelected,
+          keyPrefix: 'mobile-recent-chat',
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      width: MediaQuery.sizeOf(context).width.clamp(280, 390).toDouble(),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 10, 8),
+              child: Row(
+                children: <Widget>[
+                  const ResearchBrandMark(),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Research OS',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('mobile-search'),
+                    tooltip: 'ค้นหาบทสนทนา',
+                    onPressed: onSearch,
+                    icon: const Icon(Icons.search_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              child: SizedBox(
+                width: double.infinity,
+                child: _ChatPrimaryAction(
+                  keyName: 'mobile-new-chat',
+                  selected: selectedIndex == 1,
+                  onTap: onNewChat,
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                key: const Key('mobile-navigation-list'),
+                padding: const EdgeInsets.only(bottom: 10),
+                children: _entries(context),
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: _AccountFooter(
+                keyName: 'mobile-account-footer',
+                connected: accountConnected,
+                name: accountName,
+                email: accountEmail,
+                onTap: onAccountTap,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatPrimaryAction extends StatelessWidget {
+  const _ChatPrimaryAction({
+    required this.keyName,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String keyName;
   final bool selected;
   final VoidCallback onTap;
 
@@ -223,24 +336,21 @@ class _ChatPrimaryAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: selected ? scheme.surfaceContainerHighest : Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
+      color: selected ? scheme.surfaceContainerHighest : scheme.surface,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        key: const Key('desktop-new-chat'),
-        borderRadius: BorderRadius.circular(10),
+        key: Key(keyName),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: const SizedBox(
-          height: 44,
+          height: 46,
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
+            padding: EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               children: <Widget>[
                 Icon(Icons.edit_square, size: 21),
                 SizedBox(width: 12),
-                Text(
-                  'แชตใหม่',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
+                Text('แชตใหม่', style: TextStyle(fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -251,43 +361,46 @@ class _ChatPrimaryAction extends StatelessWidget {
 }
 
 class _RecentChatsSection extends StatelessWidget {
-  const _RecentChatsSection({required this.chats, required this.onSelected});
+  const _RecentChatsSection({
+    required this.chats,
+    required this.onSelected,
+    required this.keyPrefix,
+  });
 
   final List<ResearchRecentChat> chats;
   final Future<void> Function(String id) onSelected;
+  final String keyPrefix;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const _SectionLabel('เมื่อเร็ว ๆ นี้'),
+        const _SectionLabel('Recents'),
         for (final chat in chats)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
             child: Material(
               color: Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               child: InkWell(
-                key: Key('desktop-recent-chat-${chat.id}'),
-                borderRadius: BorderRadius.circular(10),
-                onTap: () {
-                  onSelected(chat.id);
-                },
+                key: Key('$keyPrefix-${chat.id}'),
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => onSelected(chat.id),
                 child: SizedBox(
-                  height: 36,
+                  height: 40,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
                       children: <Widget>[
-                        const Icon(Icons.chat_bubble_outline, size: 16),
+                        const Icon(Icons.chat_bubble_outline, size: 17),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             chat.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12.5),
+                            style: const TextStyle(fontSize: 13),
                           ),
                         ),
                       ],
@@ -302,113 +415,142 @@ class _RecentChatsSection extends StatelessWidget {
   }
 }
 
-class _OwnerFooter extends StatelessWidget {
-  const _OwnerFooter();
+class _LocalFirstBadge extends StatelessWidget {
+  const _LocalFirstBadge({required this.expanded});
+
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: 44,
-      child: Row(
-        children: <Widget>[
-          CircleAvatar(
-            radius: 15,
-            backgroundColor: scheme.primaryContainer,
-            child: Text(
-              'R',
-              style: TextStyle(
-                color: scheme.onPrimaryContainer,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Research OS Owner',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                ),
-                Text('Owner workspace', style: TextStyle(fontSize: 10)),
-              ],
-            ),
-          ),
-          const Icon(Icons.more_horiz, size: 18),
-        ],
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: expanded ? 12 : 8,
+        vertical: 10,
       ),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: expanded
+          ? Row(
+              children: <Widget>[
+                Icon(Icons.shield_outlined, size: 18, color: scheme.primary),
+                const SizedBox(width: 9),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Local-first',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'ข้อมูลหลักอยู่บนอุปกรณ์ของคุณ',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10.5),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          : Icon(Icons.shield_outlined, size: 18, color: scheme.primary),
     );
   }
 }
 
-class ResearchMobileDrawer extends StatelessWidget {
-  const ResearchMobileDrawer({
-    required this.selectedIndex,
-    required this.onSelected,
-    super.key,
+class _AccountFooter extends StatelessWidget {
+  const _AccountFooter({
+    required this.keyName,
+    required this.connected,
+    required this.name,
+    required this.email,
+    required this.onTap,
   });
 
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
+  final String keyName;
+  final bool connected;
+  final String? name;
+  final String? email;
+  final VoidCallback onTap;
 
-  List<Widget> _entries(BuildContext context) {
-    final widgets = <Widget>[];
-    String? section;
-    for (final item in researchNavigationItems) {
-      if (section != item.section) {
-        section = item.section;
-        widgets.add(_SectionLabel(section));
-      }
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-          child: ListTile(
-            key: Key('mobile-nav-${item.index}'),
-            selected: selectedIndex == item.index,
-            leading: Icon(item.icon),
-            title: Text(item.label),
-            onTap: () => onSelected(item.index),
-          ),
-        ),
-      );
-    }
-    return widgets;
+  String get _initial {
+    final source = (name?.trim().isNotEmpty ?? false) ? name!.trim() : email?.trim();
+    if (source == null || source.isEmpty) return 'R';
+    return source.characters.first.toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      child: SafeArea(
-        child: Column(
-          children: <Widget>[
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Row(
-                children: <Widget>[
-                  ResearchBrandMark(),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Research OS',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+    final scheme = Theme.of(context).colorScheme;
+    final title = connected
+        ? ((name?.trim().isNotEmpty ?? false) ? name!.trim() : 'Google account')
+        : 'ลงชื่อเข้าใช้';
+    final subtitle = connected
+        ? (email?.trim().isNotEmpty ?? false ? email!.trim() : 'Google / Gmail')
+        : 'Google / Gmail';
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        key: Key(keyName),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          height: 54,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: <Widget>[
+                CircleAvatar(
+                  radius: 17,
+                  backgroundColor: scheme.primaryContainer,
+                  child: Text(
+                    _initial,
+                    style: TextStyle(
+                      color: scheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.more_horiz, size: 18),
+              ],
             ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: _entries(context),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -475,6 +617,7 @@ class ResearchStatusBar extends StatelessWidget {
 
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.label);
+
   final String label;
 
   @override
@@ -485,7 +628,7 @@ class _SectionLabel extends StatelessWidget {
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
       ),
     );
@@ -514,13 +657,13 @@ class _SidebarDestination extends StatelessWidget {
         message: expanded ? '' : item.label,
         child: Material(
           color: selected ? scheme.surfaceContainerHighest : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           child: InkWell(
             key: Key('desktop-nav-${item.index}'),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             onTap: onTap,
             child: SizedBox(
-              height: 40,
+              height: 42,
               child: Row(
                 mainAxisAlignment:
                     expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
@@ -558,6 +701,7 @@ class _SidebarDestination extends StatelessWidget {
 
 class _StatusItem extends StatelessWidget {
   const _StatusItem(this.icon, this.label);
+
   final IconData icon;
   final String label;
 
