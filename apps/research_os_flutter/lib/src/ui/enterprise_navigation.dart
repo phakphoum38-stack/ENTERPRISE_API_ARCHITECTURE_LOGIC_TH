@@ -20,6 +20,7 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('Workspace', 'Home', Icons.home_outlined, 0),
   ResearchNavItem('Workspace', 'AI Chat', Icons.edit_square, 1),
   ResearchNavItem('Workspace', 'Agent Center', Icons.smart_toy_outlined, 2),
+  ResearchNavItem('Workspace', 'Check-in', Icons.how_to_reg_outlined, 11),
   ResearchNavItem('Knowledge', 'Library', Icons.local_library_outlined, 3),
   ResearchNavItem('Knowledge', 'Knowledge Graph', Icons.hub_outlined, 4),
   ResearchNavItem('Connections', 'GitHub', Icons.account_tree_outlined, 5),
