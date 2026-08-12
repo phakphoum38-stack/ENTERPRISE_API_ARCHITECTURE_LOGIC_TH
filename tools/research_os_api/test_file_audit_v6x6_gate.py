@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -25,6 +26,10 @@ def _load_auditor():
     return module
 
 
+@unittest.skipIf(
+    os.getenv("RESEARCH_OS_SKIP_FILE_AUDIT") == "1",
+    "6^6 repository audit runs in its dedicated Candidate gate",
+)
 class CandidateFileAuditV6x6GateTests(unittest.TestCase):
     def test_candidate_repository_passes_adaptive_6x6_file_audit(self) -> None:
         auditor = _load_auditor()
