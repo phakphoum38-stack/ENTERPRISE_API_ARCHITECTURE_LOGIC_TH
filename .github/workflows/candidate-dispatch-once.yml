@@ -1,0 +1,16 @@
+name: Candidate Dispatch Once
+on:
+  push:
+    paths:
+      - '.github/workflows/candidate-dispatch-once.yml'
+permissions:
+  actions: write
+  contents: read
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch exact PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run candidate.yml --repo "${{ github.repository }}" -f target_sha=ba9a582f8535b5278110f0664a6da6d2fbf74e4c
