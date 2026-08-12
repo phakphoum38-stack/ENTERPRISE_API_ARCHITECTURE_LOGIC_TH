@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from provider_readiness import inspect_all
@@ -53,6 +54,22 @@ class CloudResearchOSHandler(V2ResearchOSHandler):
             return
 
         super().do_GET()
+
+    def log_message(self, format: str, *args: object) -> None:
+        """Keep the normal HTTP log and a deterministic request-audit trail."""
+        super().log_message(format, *args)
+        data_dir = os.getenv("RESEARCH_OS_DATA_DIR")
+        if not data_dir:
+            return
+        audit_path = Path(data_dir) / "logs" / "request-audit.log"
+        try:
+            audit_path.parent.mkdir(parents=True, exist_ok=True)
+            with audit_path.open("a", encoding="utf-8") as stream:
+                stream.write((format % args) + "\n")
+        except OSError:
+            # Request handling must never fail because diagnostic evidence could
+            # not be written.
+            pass
 
     def end_headers(self) -> None:
         allowed_origin = os.getenv(
