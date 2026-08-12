@@ -50,7 +50,7 @@ PR #27 เป็น subset/duplicate ของสายนี้และไม�
 
 ## 5. Superseded PRs
 
-PR ต่อไปนี้ให้ถือเป็น `superseded` และปิดโดยไม่ merge เพื่อรักษา history แต่ไม่สร้าง implementation ซ้ำ:
+PR ต่อไปนี้เป็น `superseded` และต้องปิดโดยไม่ merge เพื่อรักษา history แต่ไม่สร้าง implementation ซ้ำ:
 
 - #18 — AI Gateway v2 hardening prototype; superseded by later Brain/V3 provider architecture
 - #19 — V2 Brain Core phases; superseded by consolidated V3 architecture
@@ -59,6 +59,8 @@ PR ต่อไปนี้ให้ถือเป็น `superseded` และ
 - #22 — Adaptive 6^6 Compound Brain; superseded by canonical V3 clean line
 - #23 — Unified Master V3 integration; superseded by canonical V3 clean line
 - #27 — Local access subset; superseded by PR #28
+
+Cleanup status: #18, #19, #20, #21, #22, #23 และ #27 ปิดแบบ superseded โดยไม่ merge และเก็บ commit/history ไว้เป็น reference/audit เท่านั้น
 
 ## 6. Version naming policy
 
