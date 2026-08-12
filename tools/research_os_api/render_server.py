@@ -4,13 +4,55 @@
 from __future__ import annotations
 
 import os
+from http import HTTPStatus
 from http.server import ThreadingHTTPServer
+from urllib.parse import urlsplit
 
+from provider_readiness import inspect_all
 from v2_server import V2ResearchOSHandler
+
+
+_ASSISTANT_BRANCHING = 6
+_ASSISTANT_6X3_CAPACITY = _ASSISTANT_BRANCHING ** 3
+_ASSISTANT_6X6_CAPACITY = _ASSISTANT_BRANCHING ** 6
 
 
 class CloudResearchOSHandler(V2ResearchOSHandler):
     """Primary Research OS handler with V1 compatibility and V2 namespace."""
+
+    def do_GET(self) -> None:  # noqa: N802
+        parsed = urlsplit(self.path)
+
+        if parsed.path == "/v2/master":
+            self._v2_request = True
+            self._send(
+                HTTPStatus.OK,
+                {
+                    "master": {
+                        "contract": "unified-master-orchestrator-v3",
+                        "architecture": "adaptive-hierarchical-ai-software-factory",
+                        "provider_mode": "local_or_configured_provider",
+                        "capacity": {
+                            "branching_factor": _ASSISTANT_BRANCHING,
+                            "assistant_levels": 3,
+                            "max_levels": 6,
+                            "assistant_6x3_capacity": _ASSISTANT_6X3_CAPACITY,
+                            "max_leaf_capacity": _ASSISTANT_6X6_CAPACITY,
+                        },
+                        "state_owners": {
+                            "orchestrator": "agent_server.ORCHESTRATOR",
+                        },
+                    }
+                },
+            )
+            return
+
+        if parsed.path == "/v2/brain/providers":
+            self._v2_request = True
+            self._send(HTTPStatus.OK, {"providers": inspect_all()})
+            return
+
+        super().do_GET()
 
     def end_headers(self) -> None:
         allowed_origin = os.getenv(
