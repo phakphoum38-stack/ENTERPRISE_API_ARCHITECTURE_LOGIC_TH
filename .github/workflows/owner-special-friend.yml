@@ -1,0 +1,311 @@
+name: Owner Special Friend Complete
+
+on:
+  push:
+    branches: ['main', 'owner-special/**', 'debug/owner-installer-guard']
+    paths:
+      - 'owner_special/**'
+      - 'v3/research_os_v3/**'
+      - '.github/workflows/owner-special-friend.yml'
+  pull_request:
+    paths:
+      - 'owner_special/**'
+      - 'v3/research_os_v3/**'
+      - '.github/workflows/owner-special-friend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  friend-complete:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Compile Owner and V3 Python sources
+        shell: bash
+        run: python -m compileall -q owner_special/research_os_friend owner_special/scripts owner_special/tests v3/research_os_v3
+      - name: Validate Owner manifest JSON
+        shell: bash
+        run: python -m json.tool owner_special/OWNER_MANIFEST.json > /dev/null
+      - name: Run owner_special/tests/test_*.py
+        shell: bash
+        run: PYTHONPATH=owner_special python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
+      - name: Probe Owner V3 bridge
+        shell: bash
+        run: |
+          PYTHONPATH=owner_special python - <<'PY'
+          from pathlib import Path
+          from research_os_friend.v3_bridge import V3Bridge
+          status = V3Bridge(Path.cwd()).probe()
+          print(status)
+          if not status.available:
+              raise SystemExit(f'Owner V3 bridge unavailable: {status.reason}')
+          PY
+      - name: Run owner_special/scripts/smoke.py
+        shell: bash
+        run: PYTHONPATH=owner_special python owner_special/scripts/smoke.py
+
+  owner-desktop:
+    needs: friend-complete
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: subosito/flutter-action@v2
+        with: {channel: stable, cache: true}
+      - name: Generate owner_special/flutter_app/windows
+        working-directory: owner_special/flutter_app
+        shell: pwsh
+        run: flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+      - name: Analyze test build owner_special/flutter_app
+        working-directory: owner_special/flutter_app
+        shell: pwsh
+        run: |
+          flutter pub get; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter analyze; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter test; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter build windows --release; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run owner_special/scripts/run_friend_service.py
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\owner_special"
+          $dataRoot = "$env:RUNNER_TEMP\research-os-owner-data"
+          $auditPath = "$env:RUNNER_TEMP\owner-friend-audit.jsonl"
+          $service = Start-Process python -ArgumentList @('owner_special/scripts/run_friend_service.py','--owner-id','owner','--port','8790','--data-root',$dataRoot,'--audit-path',$auditPath,'--repository-root',$env:GITHUB_WORKSPACE) -PassThru
+          "OWNER_FRIEND_PID=$($service.Id)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "OWNER_FRIEND_AUDIT=$auditPath" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "RESEARCH_OS_OWNER_ID=owner" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "RESEARCH_OS_OWNER_PROFILE=default" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "RESEARCH_OS_OWNER_SESSION=desktop-e2e" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "RESEARCH_OS_FRIEND_URL=http://127.0.0.1:8790" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          for ($i=0; $i -lt 40; $i++) { try { $h=Invoke-RestMethod 'http://127.0.0.1:8790/owner/health' -TimeoutSec 2; if ($h.status -eq 'ok') { exit 0 } } catch {}; Start-Sleep -Milliseconds 250 }
+          throw 'Owner Friend Service did not become ready'
+      - name: Launch owner_special/flutter_app/build/windows/x64/runner/Release/research_os_owner_special.exe
+        shell: pwsh
+        run: |
+          Set-Content $env:OWNER_FRIEND_AUDIT '' -Encoding utf8
+          $exe = Get-ChildItem 'owner_special/flutter_app/build/windows/x64/runner/Release' -Filter 'research_os_owner_special.exe' -File | Select-Object -First 1
+          if (-not $exe) { throw 'Owner Desktop EXE not found' }
+          $app = Start-Process $exe.FullName -PassThru
+          try {
+            $proved=$false
+            for ($i=0; $i -lt 60; $i++) {
+              $records=@(Get-Content $env:OWNER_FRIEND_AUDIT -ErrorAction SilentlyContinue | Where-Object {$_.Trim()} | ForEach-Object {$_ | ConvertFrom-Json})
+              $h=@($records|Where-Object {$_.path -eq '/owner/health' -and [int]$_.status -eq 200}).Count -gt 0
+              $s=@($records|Where-Object {$_.path -eq '/owner/status' -and [int]$_.status -eq 200}).Count -gt 0
+              $p=@($records|Where-Object {$_.path -eq '/owner/provider' -and [int]$_.status -eq 200}).Count -gt 0
+              if ($h -and $s -and $p) {$proved=$true; break}; Start-Sleep -Milliseconds 250
+            }
+            if (-not $proved) { throw 'Owner Desktop startup E2E failed' }
+          } finally { if (-not $app.HasExited) { Stop-Process $app.Id -Force -ErrorAction SilentlyContinue } }
+      - name: Cleanup owner_special/scripts/run_friend_service.py
+        if: always()
+        shell: pwsh
+        run: if ($env:OWNER_FRIEND_PID) { Stop-Process ([int]$env:OWNER_FRIEND_PID) -Force -ErrorAction SilentlyContinue }
+      - name: Upload owner_special/flutter_app/build/windows/x64/runner/Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-special-desktop-${{ github.sha }}
+          path: owner_special/flutter_app/build/windows/x64/runner/Release/**
+          if-no-files-found: error
+          retention-days: 30
+
+  owner-installer-build:
+    needs: owner-desktop
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: '8.0.x'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: owner-special-desktop-${{ github.sha }}
+          path: owner_special/installer/desktop
+      - name: Publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj
+        shell: pwsh
+        run: |
+          dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish
+          if ($LASTEXITCODE -ne 0) { throw 'Owner ServiceHost publish failed' }
+      - name: Parse Owner PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem owner_special/scripts -Filter '*.ps1' -File | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "PowerShell parse errors in $($_.FullName):"
+              $errors | Format-List | Out-Host
+            }
+          }
+          if ($failed) { throw 'Owner PowerShell syntax validation failed' }
+      - name: Run owner_special/scripts/stage-owner-installer.ps1
+        shell: pwsh
+        run: .\owner_special\scripts\stage-owner-installer.ps1 -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\installer\desktop" -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
+      - name: Install Inno Setup for owner_special/installer/owner-special.iss
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Build owner_special/installer/owner-special.iss into Setup.exe
+        working-directory: owner_special/installer
+        shell: pwsh
+        run: |
+          $iscc="${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc '.\owner-special.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Setup compilation failed' }
+          if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe')) { throw 'Owner Setup EXE missing' }
+      - name: Upload raw owner_special Setup.exe for validation
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-special-setup-build-${{ github.sha }}
+          path: owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.0-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  owner-installer-validation:
+    needs: owner-installer-build
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Download prebuilt owner_special Setup.exe
+        uses: actions/download-artifact@v4
+        with:
+          name: owner-special-setup-build-${{ github.sha }}
+          path: owner_special/installer/output
+      - name: Verify prebuilt owner_special Setup.exe exists
+        shell: pwsh
+        run: |
+          $setup="$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+          if (-not (Test-Path $setup -PathType Leaf)) { throw 'Prebuilt Owner Setup EXE missing before validation' }
+          Get-FileHash $setup -Algorithm SHA256 | Format-List | Out-Host
+      - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase clean
+        shell: pwsh
+        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+      - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase upgrade
+        shell: pwsh
+        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+      - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase uninstall
+        shell: pwsh
+        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+      - name: Upload validated owner_special Setup.exe and evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-special-setup-${{ github.sha }}
+          path: |
+            owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.0-x64.exe
+            owner_special/installer/output/owner-v1.3-validation.json
+          if-no-files-found: error
+          retention-days: 30
+
+  owner-bundle:
+    needs: [friend-complete, owner-desktop, owner-installer-validation]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Download validated Setup.exe for final composition
+        uses: actions/download-artifact@v4
+        with:
+          name: owner-special-setup-${{ github.sha }}
+          path: owner_special/dist/validated-installer
+      - name: Run owner_special/scripts/build_bundle.py
+        shell: bash
+        run: PYTHONPATH=owner_special python owner_special/scripts/build_bundle.py
+      - name: Verify owner_special/dist/Research-OS-Owner-Special-Friend-Complete.zip
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, zipfile
+          from pathlib import Path
+          dist=Path('owner_special/dist'); archive_path=dist/'Research-OS-Owner-Special-Friend-Complete.zip'
+          result=json.loads((dist/'bundle-result.json').read_text(encoding='utf-8'))
+          if not archive_path.is_file() or not result.get('source_only'): raise SystemExit('Owner Bundle invalid')
+          with zipfile.ZipFile(archive_path) as archive:
+              names=set(archive.namelist())
+              required={
+                  'OWNER_MANIFEST.json','BUNDLE_MANIFEST.json',
+                  'research_os_friend/helpers.py','research_os_friend/provider_settings.py','research_os_friend/service.py','research_os_friend/v3_bridge.py',
+                  'flutter_app/lib/src/friend_app.dart',
+                  'windows_service/Program.cs','windows_service/ResearchOS.Owner.ServiceHost.csproj',
+                  'installer/owner-special.iss',
+                  'scripts/install-owner-service.ps1','scripts/stage-owner-installer.ps1','scripts/validate-owner-installer.ps1',
+                  'tests/test_friend_complete.py','tests/test_friend_persistence.py','tests/test_friend_service.py','tests/test_provider_settings.py'
+              }
+              missing=required-names
+              if missing: raise SystemExit(f'Missing Owner Bundle files: {sorted(missing)}')
+          print(result)
+          PY
+      - name: Compose validated Setup.exe with Owner source bundle
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, zipfile
+          from pathlib import Path
+          dist=Path('owner_special/dist')
+          validated=dist/'validated-installer'
+          setup=validated/'Research-OS-Owner-Special-Setup-1.3.0-x64.exe'
+          evidence=validated/'owner-v1.3-validation.json'
+          source=dist/'Research-OS-Owner-Special-Friend-Complete.zip'
+          source_sha=dist/'BUNDLE_SHA256.txt'
+          source_result=dist/'bundle-result.json'
+          required=[setup,evidence,source,source_sha,source_result]
+          missing=[str(path) for path in required if not path.is_file()]
+          if missing: raise SystemExit(f'Missing final composition inputs: {missing}')
+          final=dist/'Research-OS-Owner-Special-Complete-Release.zip'
+          with zipfile.ZipFile(final,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as archive:
+              archive.write(setup, setup.name)
+              archive.write(evidence, evidence.name)
+              archive.write(source, source.name)
+              archive.write(source_sha, source_sha.name)
+              archive.write(source_result, source_result.name)
+          digest=hashlib.sha256(final.read_bytes()).hexdigest()
+          (dist/'RELEASE_SHA256.txt').write_text(f'{digest}  {final.name}\n',encoding='utf-8')
+          print({'release':str(final),'sha256':digest})
+          PY
+      - name: Verify final Owner Special release composition
+        shell: bash
+        run: |
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          final=Path('owner_special/dist/Research-OS-Owner-Special-Complete-Release.zip')
+          if not final.is_file(): raise SystemExit('Final Owner Special release ZIP missing')
+          with zipfile.ZipFile(final) as archive:
+              names=set(archive.namelist())
+              required={'Research-OS-Owner-Special-Setup-1.3.0-x64.exe','owner-v1.3-validation.json','Research-OS-Owner-Special-Friend-Complete.zip','BUNDLE_SHA256.txt','bundle-result.json'}
+              missing=required-names
+              if missing: raise SystemExit(f'Missing final Owner Special release files: {sorted(missing)}')
+          print(final)
+          PY
+      - name: Upload owner_special final release outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-special-friend-complete-${{ github.sha }}
+          path: |
+            owner_special/dist/Research-OS-Owner-Special-Complete-Release.zip
+            owner_special/dist/RELEASE_SHA256.txt
+            owner_special/dist/Research-OS-Owner-Special-Friend-Complete.zip
+            owner_special/dist/BUNDLE_SHA256.txt
+            owner_special/dist/bundle-result.json
+            owner_special/dist/validated-installer/Research-OS-Owner-Special-Setup-1.3.0-x64.exe
+            owner_special/dist/validated-installer/owner-v1.3-validation.json
+          if-no-files-found: error
+          retention-days: 30
