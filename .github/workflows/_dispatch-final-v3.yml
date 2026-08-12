@@ -1,0 +1,28 @@
+name: One-shot Final V3 Candidate Dispatcher
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/_dispatch-final-v3.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch final V3 candidate on merge SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: architecture/v3-clean
+          TARGET_SHA: 332db1c29871ba73d44c1492618487f062e8340a
+        run: |
+          gh api --method POST -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/workflows/v3-candidate.yml/dispatches" \
+            -f ref="$BRANCH" \
+            -f "inputs[target_sha]=$TARGET_SHA"
