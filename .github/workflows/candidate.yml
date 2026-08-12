@@ -54,18 +54,33 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Run API and unified factory tests
+      - name: Run API and optional legacy factory tests
         working-directory: src
         shell: pwsh
         run: |
           $env:RESEARCH_OS_DATA_DIR = "$env:RUNNER_TEMP\ResearchOSData"
           $env:RESEARCH_OS_CONVERSATION_STORE = "$env:RUNNER_TEMP\ResearchOSData\sessions\conversations.json"
-          python -m compileall -q tools/research_os_api tools/research_curator software_factory
+          $compileTargets = @("tools/research_os_api", "tools/research_curator")
+          if (Test-Path "software_factory") {
+            $compileTargets += "software_factory"
+          } else {
+            Write-Host "Legacy software_factory package is not present; skipping legacy compile target."
+          }
+          python -m compileall -q @compileTargets
           if ($LASTEXITCODE -ne 0) { throw "Python compile failed" }
           python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "API tests failed" }
-          python -m unittest discover -s tests -p "test_adaptive_software_factory*.py" -v
-          if ($LASTEXITCODE -ne 0) { throw "Adaptive Software Factory tests failed" }
+          if (Test-Path "tests") {
+            $legacyFactoryTests = @(Get-ChildItem "tests" -Filter "test_adaptive_software_factory*.py" -File -ErrorAction SilentlyContinue)
+            if ($legacyFactoryTests.Count -gt 0) {
+              python -m unittest discover -s tests -p "test_adaptive_software_factory*.py" -v
+              if ($LASTEXITCODE -ne 0) { throw "Adaptive Software Factory tests failed" }
+            } else {
+              Write-Host "Legacy Adaptive Software Factory test files are not present; skipping legacy suite."
+            }
+          } else {
+            Write-Host "Legacy tests directory is not present; skipping Adaptive Software Factory suite."
+          }
 
       - name: Stage Flutter app at short path
         shell: pwsh
@@ -81,10 +96,17 @@ jobs:
         shell: pwsh
         run: |
           flutter create --platforms=windows --project-name=research_os_flutter .
+          if ($LASTEXITCODE -ne 0) { throw "Flutter Windows project generation failed" }
+          python -m pip install --disable-pip-version-check pillow
+          if ($LASTEXITCODE -ne 0) { throw "Pillow installation failed" }
           python "$env:GITHUB_WORKSPACE\src\scripts\apply-research-os-branding.py" --app-root "D:\w" --platform windows
+          if ($LASTEXITCODE -ne 0) { throw "Windows branding failed" }
           flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw "Flutter pub get failed" }
           flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw "Flutter analyze failed" }
           flutter test
+          if ($LASTEXITCODE -ne 0) { throw "Flutter tests failed" }
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { throw "Flutter Windows build failed" }
           if (-not (Test-Path "D:\w\build\windows\x64\runner\Release\research_os_flutter.exe")) {
@@ -173,10 +195,14 @@ jobs:
           Copy-Item "tools\research_os_service\publish\*" "$package\tools\research_os_service\publish" -Recurse -Force
           New-Item -ItemType Directory -Force -Path "$package\tools\research_os_api" | Out-Null
           Copy-Item "tools\research_os_api\*.py" "$package\tools\research_os_api" -Force
-          New-Item -ItemType Directory -Force -Path "$package\software_factory" | Out-Null
-          Copy-Item "software_factory\*.py" "$package\software_factory" -Force
-          if (-not (Test-Path "$package\software_factory\__init__.py")) {
-            throw "Unified Software Factory package is missing"
+          if (Test-Path "software_factory") {
+            New-Item -ItemType Directory -Force -Path "$package\software_factory" | Out-Null
+            Copy-Item "software_factory\*.py" "$package\software_factory" -Force
+            if (-not (Test-Path "$package\software_factory\__init__.py")) {
+              throw "Legacy Software Factory package exists but __init__.py is missing"
+            }
+          } else {
+            Write-Host "Legacy software_factory package is not present; skipping installer packaging."
           }
           New-Item -ItemType Directory -Force -Path "$package\tools\research_curator" | Out-Null
           Copy-Item "tools\research_curator\*" "$package\tools\research_curator" -Recurse -Force
@@ -200,8 +226,8 @@ jobs:
         working-directory: src
         shell: pwsh
         run: |
-          python -m pip install --disable-pip-version-check pillow
           python scripts/apply-research-os-branding.py --app-root apps/research_os_flutter --platform windows
+          if ($LASTEXITCODE -ne 0) { throw "Installer branding generation failed" }
           if (-not (Test-Path "apps\research_os_flutter\assets\branding\research_os.ico")) {
             throw "Installer icon was not generated"
           }

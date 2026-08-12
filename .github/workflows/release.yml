@@ -1,0 +1,114 @@
+name: Research OS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact candidate commit SHA
+        required: true
+        type: string
+      candidate_run_id:
+        description: Successful Research OS Candidate workflow run ID
+        required: true
+        type: string
+      tag_name:
+        description: Release tag, for example v3.0.0
+        required: false
+        type: string
+      publish:
+        description: Actually create a GitHub Release and tag
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: research-os-release-${{ inputs.target_sha }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TARGET_SHA: ${{ inputs.target_sha }}
+      CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Verify candidate run lineage
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          workflow="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+          status="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json status --jq '.status')"
+          conclusion="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+          head_sha="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+          test "$workflow" = "Research OS Candidate"
+          test "$status" = "completed"
+          test "$conclusion" = "success"
+          test "$head_sha" = "$TARGET_SHA"
+
+      - name: Download verified candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release-input
+          gh run download "$CANDIDATE_RUN_ID" \
+            --repo "${{ github.repository }}" \
+            --name "research-os-verified-candidate-$TARGET_SHA" \
+            --dir release-input
+
+      - name: Verify exact SHA and digest
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          manifest = json.loads(Path("release-input/candidate-manifest.json").read_text(encoding="utf-8-sig"))
+          assert manifest["target_sha"] == os.environ["TARGET_SHA"]
+          assert manifest["validation"] == "passed"
+          item = manifest["artifact"]
+          setup = Path("release-input") / item["name"]
+          actual = hashlib.sha256(setup.read_bytes()).hexdigest()
+          assert actual == item["sha256"], (actual, item["sha256"])
+          assert manifest["release_created"] is False
+          assert manifest["tag_created"] is False
+          print("Candidate SHA and digest verified.")
+          PY
+
+      - name: Upload release-ready artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-release-ready-${{ env.TARGET_SHA }}
+          path: release-input/**
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: ${{ inputs.publish == true }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.tag_name }}
+        run: |
+          tag="$REQUESTED_TAG"
+          if [ -z "$tag" ]; then
+            tag="research-os-${TARGET_SHA:0:12}"
+          fi
+          setup="$(find release-input -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
+          test -n "$setup"
+          gh release create "$tag" "$setup" release-input/SHA256SUMS.txt release-input/candidate-manifest.json \
+            --repo "${{ github.repository }}" \
+            --target "$TARGET_SHA" \
+            --title "Research OS $tag" \
+            --notes "Verified Research OS candidate $TARGET_SHA"
