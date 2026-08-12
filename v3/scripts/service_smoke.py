@@ -65,7 +65,9 @@ def main() -> int:
             assert health["status"] == "ok"
             assert health["version"] == "v3-clean"
             assert master["contract"] == "unified-master-orchestrator-v3-clean"
-            assert master["scale"] == "6^6"
+            # 217 tasks exceed 6^3 (216), so adaptive selection must choose
+            # the smallest sufficient tier: 3^6 (729), not jump to 6^6.
+            assert master["scale"] == "3^6"
             assert master["maximum_leaf_capacity"] == 46656
             provider = providers["providers"][0]
             assert provider["secret_exposed"] is False

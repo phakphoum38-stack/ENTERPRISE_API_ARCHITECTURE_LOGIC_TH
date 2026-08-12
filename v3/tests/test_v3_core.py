@@ -9,7 +9,9 @@ from research_os_v3 import (
     OpenAICompatibleProvider,
     ProviderRegistry,
     ScaleTier,
+    SkillOrigin,
     UnifiedMasterOrchestrator,
+    UnifiedSkillRegistry,
     V3LocalService,
     Workload,
     master_contract,
@@ -49,10 +51,11 @@ class V3CleanCoreTests(unittest.TestCase):
 
     def test_adaptive_scale_profiles(self) -> None:
         cases = (
-            (Workload(estimated_leaf_tasks=1), ScaleTier.TIER_1_3, 1),
-            (Workload(estimated_leaf_tasks=2), ScaleTier.TIER_3_3, 27),
+            (Workload(estimated_leaf_tasks=1), ScaleTier.TIER_3_1, 3),
+            (Workload(estimated_leaf_tasks=4), ScaleTier.TIER_3_3, 27),
             (Workload(estimated_leaf_tasks=30), ScaleTier.TIER_6_3, 216),
-            (Workload(estimated_leaf_tasks=217), ScaleTier.TIER_6_6, 46656),
+            (Workload(estimated_leaf_tasks=217), ScaleTier.TIER_3_6, 729),
+            (Workload(estimated_leaf_tasks=730), ScaleTier.TIER_6_6, 46656),
         )
         for workload, expected_tier, expected_capacity in cases:
             with self.subTest(workload=workload):
@@ -64,6 +67,16 @@ class V3CleanCoreTests(unittest.TestCase):
         decision = self.master.decide(Workload(estimated_leaf_tasks=50000))
         self.assertEqual(decision.profile.tier, ScaleTier.TIER_6_6)
         self.assertIn("queue/backpressure", decision.reason)
+
+    def test_unified_skill_registry_contains_v1_v2_v3_native_skills(self) -> None:
+        registry = UnifiedSkillRegistry()
+        self.assertEqual(registry.origins(), (SkillOrigin.V1, SkillOrigin.V2, SkillOrigin.V3))
+        self.assertTrue(registry.by_origin(SkillOrigin.V1))
+        self.assertTrue(registry.by_origin(SkillOrigin.V2))
+        self.assertTrue(registry.by_origin(SkillOrigin.V3))
+        self.assertTrue(all(skill.native_v3 for skill in registry.list()))
+        self.assertIsNotNone(registry.get("adaptive-hierarchy"))
+        self.assertIs(self.master.skills.get("adaptive-hierarchy").origin, SkillOrigin.V3)
 
     def test_factory_pipeline_is_deterministic(self) -> None:
         _, plan = self.master.plan(Workload(estimated_leaf_tasks=30))
@@ -139,7 +152,7 @@ class V3CleanCoreTests(unittest.TestCase):
             self.assertTrue(all(path.is_dir() for path in second.directories().values()))
 
     def test_master_contract_is_stable(self) -> None:
-        decision = self.master.decide(Workload(estimated_leaf_tasks=217))
+        decision = self.master.decide(Workload(estimated_leaf_tasks=730))
         payload = master_contract(decision)
         self.assertEqual(payload["contract"], "unified-master-orchestrator-v3-clean")
         self.assertEqual(payload["scale"], "6^6")

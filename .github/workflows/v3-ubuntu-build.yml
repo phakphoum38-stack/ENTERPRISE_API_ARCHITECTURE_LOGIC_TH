@@ -1,0 +1,199 @@
+name: Research OS V3 Ubuntu Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - architecture/v3-clean
+    paths:
+      - 'v3/**'
+      - '.github/workflows/v3-ubuntu-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-ubuntu-build-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  ubuntu-v3:
+    name: Ubuntu V3 native build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ubuntu desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            xvfb dbus-x11
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate V3 Python core
+        working-directory: v3
+        run: |
+          python -m unittest discover -s tests -v
+          python scripts/provider_smoke.py
+
+      - name: Validate current V3 service contract without legacy smoke
+        working-directory: v3
+        shell: bash
+        run: |
+          set -euo pipefail
+          export RESEARCH_OS_V3_HOST=127.0.0.1
+          export RESEARCH_OS_V3_PORT=8788
+          export RESEARCH_OS_V3_DATA_DIR="$RUNNER_TEMP/research-os-v3-ubuntu-data"
+          python scripts/run_service.py >"$RUNNER_TEMP/v3-service.out.log" 2>"$RUNNER_TEMP/v3-service.err.log" &
+          SERVICE_PID=$!
+          trap 'kill "$SERVICE_PID" 2>/dev/null || true' EXIT
+
+          python - <<'PY'
+          import json
+          import time
+          from urllib.request import urlopen
+
+          base = 'http://127.0.0.1:8788'
+          health = None
+          for _ in range(60):
+              try:
+                  with urlopen(base + '/health', timeout=2) as response:
+                      health = json.load(response)
+                  if health.get('status') == 'ok':
+                      break
+              except Exception:
+                  time.sleep(0.25)
+          else:
+              raise SystemExit('V3 Ubuntu service did not become healthy')
+
+          def get(path):
+              with urlopen(base + path, timeout=5) as response:
+                  return json.load(response)
+
+          master = get('/v3/master?tasks=217')
+          providers = get('/v3/providers')
+
+          assert health.get('version') == 'v3-clean', health
+          assert master.get('contract') == 'unified-master-orchestrator-v3-clean', master
+          assert master.get('scale') == '3^6', master
+          assert isinstance(master.get('maximum_leaf_capacity'), int), master
+          assert master.get('maximum_leaf_capacity') >= 217, master
+          assert providers.get('providers'), providers
+          assert providers['providers'][0].get('secret_exposed') is False, providers
+
+          print(json.dumps({
+              'health': health,
+              'master': master,
+              'providers': providers,
+          }, indent=2, sort_keys=True))
+          PY
+
+      - name: Create fresh Flutter Linux platform and test
+        working-directory: v3/flutter_app
+        run: |
+          flutter create --platforms=linux --project-name=research_os_v3_flutter .
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Build V3 Flutter Ubuntu release
+        working-directory: v3/flutter_app
+        run: |
+          flutter build linux --release
+          test -x build/linux/x64/release/bundle/research_os_v3_flutter
+
+      - name: Validate real Ubuntu Flutter app to V3 service E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_DIR="$RUNNER_TEMP/research-os-v3-ubuntu-e2e"
+          rm -rf "$DATA_DIR"
+          mkdir -p "$DATA_DIR/logs"
+          export RESEARCH_OS_V3_DATA_DIR="$DATA_DIR"
+          export RESEARCH_OS_V3_HOST=127.0.0.1
+          export RESEARCH_OS_V3_PORT=8788
+
+          python v3/scripts/run_service.py >"$RUNNER_TEMP/v3-e2e-service.out.log" 2>"$RUNNER_TEMP/v3-e2e-service.err.log" &
+          SERVICE_PID=$!
+          APP_PID=''
+          cleanup() {
+            if [ -n "$APP_PID" ]; then kill "$APP_PID" 2>/dev/null || true; fi
+            kill "$SERVICE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          python - <<'PY'
+          import json, time
+          from urllib.request import urlopen
+          for _ in range(60):
+              try:
+                  with urlopen('http://127.0.0.1:8788/health', timeout=2) as r:
+                      if json.load(r).get('status') == 'ok':
+                          break
+              except Exception:
+                  time.sleep(0.25)
+          else:
+              raise SystemExit('V3 service not ready for Ubuntu Flutter E2E')
+          PY
+
+          : > "$DATA_DIR/logs/http-audit.jsonl"
+          APP="${GITHUB_WORKSPACE}/v3/flutter_app/build/linux/x64/release/bundle/research_os_v3_flutter"
+          xvfb-run -a "$APP" >"$RUNNER_TEMP/v3-flutter.out.log" 2>"$RUNNER_TEMP/v3-flutter.err.log" &
+          APP_PID=$!
+
+          python - <<'PY'
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+          audit = Path(os.environ['RESEARCH_OS_V3_DATA_DIR']) / 'logs' / 'http-audit.jsonl'
+          for _ in range(80):
+              records = []
+              if audit.exists():
+                  for line in audit.read_text(encoding='utf-8').splitlines():
+                      if line.strip():
+                          records.append(json.loads(line))
+              health = any(r.get('method') == 'GET' and r.get('path') == '/health' and r.get('status') == 200 for r in records)
+              providers = any(r.get('method') == 'GET' and r.get('path') == '/v3/providers' and r.get('status') == 200 for r in records)
+              if health and providers:
+                  print(json.dumps(records, indent=2, sort_keys=True))
+                  break
+              time.sleep(0.25)
+          else:
+              raise SystemExit('Ubuntu Flutter app did not prove /health and /v3/providers requests')
+          PY
+
+      - name: Package Ubuntu V3 artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          tar -C v3/flutter_app/build/linux/x64/release/bundle -czf \
+            "dist/research-os-v3-ubuntu-${GITHUB_SHA}.tar.gz" .
+          sha256sum "dist/research-os-v3-ubuntu-${GITHUB_SHA}.tar.gz" | tee \
+            "dist/research-os-v3-ubuntu-${GITHUB_SHA}.sha256"
+
+      - name: Upload Ubuntu V3 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-ubuntu-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14

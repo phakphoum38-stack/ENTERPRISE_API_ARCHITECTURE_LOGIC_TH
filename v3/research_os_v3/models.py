@@ -5,8 +5,9 @@ from enum import Enum
 
 
 class ScaleTier(str, Enum):
-    TIER_1_3 = "1^3"
+    TIER_3_1 = "3^1"
     TIER_3_3 = "3^3"
+    TIER_3_6 = "3^6"
     TIER_6_3 = "6^3"
     TIER_6_6 = "6^6"
 
@@ -22,10 +23,12 @@ class ScaleProfile:
         return self.fanout ** self.depth
 
 
+# Ordered by capacity. BrainCore always picks the smallest safe profile.
 SCALE_PROFILES: tuple[ScaleProfile, ...] = (
-    ScaleProfile(ScaleTier.TIER_1_3, fanout=1, depth=3),
+    ScaleProfile(ScaleTier.TIER_3_1, fanout=3, depth=1),
     ScaleProfile(ScaleTier.TIER_3_3, fanout=3, depth=3),
     ScaleProfile(ScaleTier.TIER_6_3, fanout=6, depth=3),
+    ScaleProfile(ScaleTier.TIER_3_6, fanout=3, depth=6),
     ScaleProfile(ScaleTier.TIER_6_6, fanout=6, depth=6),
 )
 

@@ -32,6 +32,7 @@ from .secrets import (
     default_secret_source,
 )
 from .service import PROFILE_HEADER, USER_HEADER, V3LocalService
+from .skills import SkillDefinition, SkillOrigin, UnifiedSkillRegistry
 from .storage import DataLayout, UserDataLayout
 from .user_context import UserContext, safe_local_user_id
 
@@ -58,11 +59,14 @@ __all__ = [
     "RetryPolicy",
     "ScaleProfile",
     "ScaleTier",
+    "SkillDefinition",
+    "SkillOrigin",
     "SoftwareFactory",
     "StageEvidence",
     "StageHandler",
     "USER_HEADER",
     "UnifiedMasterOrchestrator",
+    "UnifiedSkillRegistry",
     "UserContext",
     "UserDataLayout",
     "V3LocalService",
