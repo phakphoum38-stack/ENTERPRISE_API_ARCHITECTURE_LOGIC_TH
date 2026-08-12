@@ -20,7 +20,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           BRANCH: feat/v3-unified-skills-adaptive-tiers
-          TARGET_SHA: eaa455e3d21e13d5e3a0f72cc08096911ee03c16
+          TARGET_SHA: 45c9e29ec2cdd2c5af37a9a09de9b7af4dfa21aa
         run: |
           gh api --method POST -H "Accept: application/vnd.github+json" \
             "/repos/$REPO/actions/workflows/v3-clean-core.yml/dispatches" \
