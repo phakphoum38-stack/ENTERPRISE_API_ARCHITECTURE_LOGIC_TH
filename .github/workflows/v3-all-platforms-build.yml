@@ -27,6 +27,7 @@ env:
 
 jobs:
   android-web:
+    if: ${{ !contains(github.event.head_commit.message, '[linux-only]') }}
     name: Android + Web
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -100,6 +101,7 @@ jobs:
             v3/flutter_app/branding.json
 
   apple:
+    if: ${{ !contains(github.event.head_commit.message, '[linux-only]') }}
     name: iOS + macOS
     runs-on: macos-latest
     timeout-minutes: 60
@@ -169,6 +171,7 @@ jobs:
             v3/flutter_app/branding.json
 
   windows:
+    if: ${{ !contains(github.event.head_commit.message, '[linux-only]') }}
     name: Windows Flutter V3
     runs-on: windows-latest
     timeout-minutes: 45
@@ -242,7 +245,8 @@ jobs:
           python scripts/apply-research-os-branding.py --app-root v3/flutter_app --platform linux
           cd v3/flutter_app
           flutter build linux --release
-          tar -C build/linux/x64/release/bundle -czf ../../../research-os-v3-linux-${{ github.sha }}.tar.gz .
+          tar -C build/linux/x64/release/bundle -czf ../../research-os-v3-linux-${{ github.sha }}.tar.gz .
+          test $(stat -c%s ../../research-os-v3-linux-${{ github.sha }}.tar.gz) -gt 1048576
       - uses: actions/upload-artifact@v4
         with:
           name: research-os-v3-linux-${{ github.sha }}
