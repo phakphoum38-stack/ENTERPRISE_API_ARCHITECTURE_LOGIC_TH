@@ -1,0 +1,81 @@
+name: Research OS V3 Provider Hardening
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - architecture/v3-clean
+    paths:
+      - 'v3/research_os_v3/providers.py'
+      - 'v3/research_os_v3/resilience.py'
+      - 'v3/research_os_v3/secrets.py'
+      - 'v3/research_os_v3/__init__.py'
+      - 'v3/tests/test_provider_resilience.py'
+      - 'v3/scripts/provider_smoke.py'
+      - 'v3/scripts/provider_resilience_smoke.py'
+      - 'v3/ROADMAP.md'
+      - 'v3/ARCHITECTURE.md'
+      - '.github/workflows/v3-provider-hardening.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-provider-hardening-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  provider-hardening:
+    name: Provider hardening (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Initialize provider hardening evidence
+        working-directory: v3
+        run: python scripts/evidence.py --output evidence/provider-hardening-progress.json --stage initialized --status passed --data '{"sha":"${{ github.sha }}","os":"${{ runner.os }}"}'
+
+      - name: Run provider hardening unit tests
+        working-directory: v3
+        run: |
+          python -m unittest discover -s tests -p "test_provider_resilience.py" -v
+          python scripts/evidence.py --output evidence/provider-hardening-progress.json --stage provider_hardening_tests --status passed --data '{"os_native_secret_store":true,"retry":true,"timeout":true,"circuit_breaker":true,"fallback":true}'
+
+      - name: Preserve legacy provider adapter contract
+        working-directory: v3
+        run: |
+          python scripts/provider_smoke.py
+          python scripts/evidence.py --output evidence/provider-hardening-progress.json --stage provider_adapter_compatibility --status passed --data '{"legacy_contract_preserved":true,"secret_exposed":false}'
+
+      - name: Run resilience and secret-store smoke
+        working-directory: v3
+        run: |
+          python scripts/provider_resilience_smoke.py
+          python scripts/evidence.py --output evidence/provider-hardening-progress.json --stage provider_resilience --status passed --data '{"credential_manager":true,"retry":true,"circuit_breaker":true,"fallback":true,"secret_exposed":false}'
+
+      - name: Mark provider hardening passed
+        working-directory: v3
+        run: python scripts/evidence.py --output evidence/provider-hardening-progress.json --stage validation --status passed --data '{"result":"passed"}'
+
+      - name: Upload provider hardening evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-provider-hardening-${{ runner.os }}-${{ github.sha }}
+          path: v3/evidence/provider-hardening-progress.json
+          if-no-files-found: warn
+          retention-days: 30
