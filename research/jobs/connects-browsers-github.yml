@@ -1,0 +1,45 @@
+schema_version: 1
+job_id: connects-browsers-github
+title: Connect browsers through GitHub, Flutter, YAML, and cloud
+owner: research-os
+mode: manual
+quota_policy:
+  default_cloud: simulated
+  real_cloud_requires:
+    - workflow_dispatch.connect_cloud=true
+    - GitHub secret BROWSER_USE_API_KEY
+  simulated_cloud_quota: browser-use-cloud=0
+pipeline:
+  - step: github_yaml
+    workflow: .github/workflows/browser-use-cloud-smoke.yml
+    purpose: Validate connect/disconnect path through Research OS API.
+  - step: simulated_cloud
+    tool: tools/research_os_api/browser_use_cloud_simulator.py
+    purpose: Emulate Browser Use Cloud on localhost inside the runner.
+  - step: backend_connector
+    endpoints:
+      - GET /v1/browser-use/status
+      - POST /v1/browser-use/connect
+      - POST /v1/browser-use/disconnect
+    purpose: Keep Browser Use API key and full CDP URL backend-only.
+  - step: flutter_contract
+    tests:
+      - apps/research_os_flutter/test/research_os_api_client_test.dart
+      - apps/research_os_flutter/test/widget_test.dart
+    purpose: Verify the UI and API client use backend routes only.
+  - step: artifacts
+    workflow: .github/workflows/artifacts-build.yml
+    outputs:
+      - Windows EXE and installer artifact
+      - unsigned iOS IPA artifact
+      - static website and Flutter web artifact
+memory_model:
+  strategy: adaptive_exponential
+  evidence_levels:
+    - run
+    - branch
+    - pull_request
+    - release
+    - product
+    - adaptive_factory
+  rule: Treat missing evidence as an assumption, not a fact.

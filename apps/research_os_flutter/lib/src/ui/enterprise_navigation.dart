@@ -13,10 +13,11 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('Workspace', 'Home', Icons.dashboard_outlined, 0),
   ResearchNavItem('Workspace', 'AI Chat', Icons.chat_bubble_outline, 1),
   ResearchNavItem('Workspace', 'Agent Center', Icons.smart_toy_outlined, 2),
+  ResearchNavItem('AI', 'Brain Skills', Icons.psychology_alt_outlined, 11),
   ResearchNavItem('Knowledge', 'Library', Icons.local_library_outlined, 3),
   ResearchNavItem('Knowledge', 'Knowledge Graph', Icons.hub_outlined, 4),
   ResearchNavItem('Connections', 'GitHub', Icons.account_tree_outlined, 5),
-  ResearchNavItem('Connections', 'Google Workspace', Icons.apps_outlined, 6),
+  ResearchNavItem('Connections', 'Connections', Icons.extension_outlined, 6),
   ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7),
   ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8),
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
@@ -24,6 +25,10 @@ const researchNavigationItems = <ResearchNavItem>[
 ];
 
 class ResearchSidebar extends StatelessWidget {
+  static const compactWidth = 76.0;
+  static const expandedWidth = 244.0;
+  static const animationDuration = Duration(milliseconds: 220);
+
   const ResearchSidebar({
     required this.expanded,
     required this.selectedIndex,
@@ -62,15 +67,20 @@ class ResearchSidebar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return AnimatedContainer(
       key: const Key('enterprise-sidebar'),
-      duration: const Duration(milliseconds: 180),
-      width: expanded ? 244 : 76,
+      duration: animationDuration,
+      curve: Curves.easeOutCubic,
+      width: expanded ? expandedWidth : compactWidth,
       color: scheme.surface,
       child: Column(
         children: <Widget>[
           SizedBox(
             height: 72,
-            child: expanded
-                ? Padding(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final showExpandedHeader =
+                    expanded && constraints.maxWidth >= 200;
+                if (showExpandedHeader) {
+                  return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Row(
                       children: <Widget>[
@@ -98,15 +108,18 @@ class ResearchSidebar extends StatelessWidget {
                         ),
                       ],
                     ),
-                  )
-                : Center(
-                    child: IconButton(
-                      key: const Key('toggle-desktop-sidebar'),
-                      tooltip: 'ขยาย Sidebar',
-                      onPressed: onToggle,
-                      icon: const Icon(Icons.chevron_right),
-                    ),
+                  );
+                }
+                return Center(
+                  child: IconButton(
+                    key: const Key('toggle-desktop-sidebar'),
+                    tooltip: 'ขยาย Sidebar',
+                    onPressed: onToggle,
+                    icon: const Icon(Icons.chevron_right),
                   ),
+                );
+              },
+            ),
           ),
           const Divider(height: 1),
           Expanded(

@@ -58,6 +58,7 @@ class GoogleWorkspaceConfig:
         self.root.mkdir(parents=True, exist_ok=True)
         self.settings_path = self.root / "settings.json"
         self.token_path = self.root / "oauth_token.json"
+        self.local_account_path = self.root / "local_account.json"
 
     @property
     def client_id_configured(self) -> bool:
@@ -80,6 +81,28 @@ class GoogleWorkspaceConfig:
         except (OSError, ValueError, TypeError):
             return False
         return bool(payload.get("access_token") or payload.get("refresh_token"))
+
+    @property
+    def local_account_accepted(self) -> bool:
+        if not self.local_account_path.exists():
+            return False
+        try:
+            payload = json.loads(self.local_account_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return False
+        return payload.get("accepted") is True
+
+    def accept_local_account(self) -> dict:
+        payload = {
+            "accepted": True,
+            "mode": "local",
+            "account": {
+                "email": "local@research.os",
+                "name": "Research OS Local",
+            },
+        }
+        self.local_account_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return self.dashboard()
 
     def _load_enabled(self) -> set[str]:
         if not self.settings_path.exists():
@@ -117,12 +140,18 @@ class GoogleWorkspaceConfig:
 
     def dashboard(self) -> dict:
         statuses = self.statuses()
+        connected = self.connected
+        local_account_accepted = self.local_account_accepted
+        account_mode = "google" if connected else "local" if local_account_accepted else "none"
         return {
             "hub": "google_workspace",
             "oauth_configured": self.oauth_configured,
             "client_id_configured": self.client_id_configured,
             "client_secret_configured": self.client_secret_configured,
-            "connected": self.connected,
+            "connected": connected,
+            "app_access": connected or local_account_accepted,
+            "local_account_accepted": local_account_accepted,
+            "account_mode": account_mode,
             "services": [asdict(item) for item in statuses],
             "connected_count": sum(1 for item in statuses if item.state == "connected"),
             "enabled_count": sum(1 for item in statuses if item.enabled),

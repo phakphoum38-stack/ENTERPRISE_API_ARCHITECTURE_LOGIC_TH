@@ -24,6 +24,8 @@ Google Workspace Hub is the single integration boundary between Research OS and 
 
 ## Authentication design
 
+Research OS can be accepted for **local app access** before Google OAuth is configured. This lets the user enter the app, use local data, and configure providers without first creating Google credentials. Local acceptance does not connect Gmail, Drive, Calendar, or any other Google service.
+
 The backend reads these environment variables when Google OAuth is configured:
 
 ```text

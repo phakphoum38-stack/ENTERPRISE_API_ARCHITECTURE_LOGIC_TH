@@ -12,6 +12,20 @@ $PublishDir = Join-Path $RepoRoot 'tools\research_os_service\publish'
 $ServiceExe = Join-Path $PublishDir 'ResearchOS.ServiceHost.exe'
 $BundledPython = Join-Path $RepoRoot 'runtime\python\python.exe'
 $ApiPort = 8787
+$ProviderEnvironmentNames = @(
+  'RESEARCH_OS_PROVIDER',
+  'RESEARCH_OS_SEARCH_PROVIDER',
+  'RESEARCH_OS_OPENAI_API_KEY',
+  'OPENAI_API_KEY',
+  'RESEARCH_OS_OPENAI_RESPONSES_ENDPOINT',
+  'RESEARCH_OS_OPENAI_RESPONSES_MODEL',
+  'RESEARCH_OS_GOOGLE_CLIENT_ID',
+  'RESEARCH_OS_GOOGLE_CLIENT_SECRET',
+  'RESEARCH_OS_GOOGLE_REDIRECT_URI',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'BROWSER_USE_API_KEY'
+)
 
 function Test-Admin {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -135,21 +149,110 @@ function Stop-ResearchOsServiceAndApi {
   Stop-ResearchOsApiListener
 }
 
-function Set-ServiceEnvironment([string]$PythonPath) {
+function Get-PreservedProviderEnvironment {
+  $serviceKey = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\$ServiceName"
+  if (-not (Test-Path $serviceKey)) { return @() }
+
+  try {
+    $entries = @((Get-ItemProperty -Path $serviceKey -Name Environment -ErrorAction Stop).Environment)
+  }
+  catch {
+    return @()
+  }
+
+  return @(
+    $entries | Where-Object {
+      if (-not $_) { return $false }
+      $separator = $_.IndexOf('=')
+      if ($separator -le 0) { return $false }
+      $name = $_.Substring(0, $separator)
+      return $ProviderEnvironmentNames -contains $name
+    }
+  )
+}
+
+function Get-ConfiguredEnvironmentValue([string]$Name) {
+  foreach ($target in @('Process', 'User', 'Machine')) {
+    $value = [Environment]::GetEnvironmentVariable($Name, $target)
+    if (-not [string]::IsNullOrWhiteSpace($value)) {
+      return $value
+    }
+  }
+  return $null
+}
+
+function Add-ServiceEnvironmentEntry([System.Collections.Generic.List[string]]$Values, [string]$Entry) {
+  if ([string]::IsNullOrWhiteSpace($Entry)) { return }
+  $separator = $Entry.IndexOf('=')
+  if ($separator -le 0) { return }
+  $name = $Entry.Substring(0, $separator)
+  $prefix = "$name="
+  foreach ($existing in $Values) {
+    if ($existing.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+      return
+    }
+  }
+  $Values.Add($Entry) | Out-Null
+}
+
+function Add-OptionalServiceEnvironmentValue([System.Collections.Generic.List[string]]$Values, [string]$Name) {
+  $value = Get-ConfiguredEnvironmentValue $Name
+  if (-not [string]::IsNullOrWhiteSpace($value)) {
+    Add-ServiceEnvironmentEntry $Values "$Name=$value"
+  }
+}
+
+function Get-ServiceEnvironmentValues {
+  $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
+  if (-not (Test-Path $serviceKey)) { return @() }
+  $environment = (Get-ItemProperty -Path $serviceKey -Name Environment -ErrorAction SilentlyContinue).Environment
+  return @($environment)
+}
+
+function Test-ServiceEnvironmentValue([string[]]$Names) {
+  $environment = Get-ServiceEnvironmentValues
+  foreach ($entry in $environment) {
+    foreach ($name in $Names) {
+      $prefix = "$name="
+      if ($entry.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+        $value = $entry.Substring($prefix.Length)
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+          return $true
+        }
+      }
+    }
+  }
+  return $false
+}
+
+function Set-ServiceEnvironment(
+  [string]$PythonPath,
+  [string[]]$PreservedProviderEnvironment = @()
+) {
   $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
   if (-not (Test-Path $serviceKey)) {
     throw "Windows Service registry key was not created: $serviceKey"
   }
 
-  $values = @(
-    "RESEARCH_OS_REPO_ROOT=$RepoRoot",
-    "RESEARCH_OS_DATA_DIR=$DataDir",
-    "RESEARCH_OS_PYTHON_EXE=$PythonPath",
-    'RESEARCH_OS_API_HOST=0.0.0.0',
-    "RESEARCH_OS_API_PORT=$ApiPort"
-  )
+  $values = [System.Collections.Generic.List[string]]::new()
+  Add-ServiceEnvironmentEntry $values "RESEARCH_OS_REPO_ROOT=$RepoRoot"
+  Add-ServiceEnvironmentEntry $values "RESEARCH_OS_DATA_DIR=$DataDir"
+  Add-ServiceEnvironmentEntry $values "RESEARCH_OS_PYTHON_EXE=$PythonPath"
+  Add-ServiceEnvironmentEntry $values 'RESEARCH_OS_API_HOST=127.0.0.1'
+  Add-ServiceEnvironmentEntry $values "RESEARCH_OS_API_PORT=$ApiPort"
 
-  New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $values -Force | Out-Null
+  foreach ($entry in @($PreservedProviderEnvironment)) {
+    Add-ServiceEnvironmentEntry $values $entry
+  }
+
+  Add-OptionalServiceEnvironmentValue $values 'RESEARCH_OS_GOOGLE_CLIENT_ID'
+  Add-OptionalServiceEnvironmentValue $values 'RESEARCH_OS_GOOGLE_CLIENT_SECRET'
+  Add-OptionalServiceEnvironmentValue $values 'RESEARCH_OS_GOOGLE_REDIRECT_URI'
+  Add-OptionalServiceEnvironmentValue $values 'GOOGLE_CLIENT_ID'
+  Add-OptionalServiceEnvironmentValue $values 'GOOGLE_CLIENT_SECRET'
+  Add-OptionalServiceEnvironmentValue $values 'BROWSER_USE_API_KEY'
+
+  New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $values.ToArray() -Force | Out-Null
 }
 
 switch ($Action) {
@@ -160,10 +263,16 @@ switch ($Action) {
       exit 2
     }
     $startMode = (Get-CimInstance Win32_Service -Filter "Name='$ServiceName'").StartMode
+    $googleClient = if (Test-ServiceEnvironmentValue @('RESEARCH_OS_GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_ID')) { 'configured' } else { 'missing' }
+    $googleSecret = if (Test-ServiceEnvironmentValue @('RESEARCH_OS_GOOGLE_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET')) { 'configured' } else { 'missing' }
+    $browserUseKey = if (Test-ServiceEnvironmentValue @('BROWSER_USE_API_KEY')) { 'configured' } else { 'missing' }
     Write-Host "Research OS Service: $($svc.Status)"
     Write-Host "Service name       : $ServiceName"
     Write-Host "Startup            : $startMode"
     Write-Host "Local API          : http://127.0.0.1:$ApiPort"
+    Write-Host "Google OAuth client: $googleClient"
+    Write-Host "Google OAuth secret: $googleSecret"
+    Write-Host "Browser Use key    : $browserUseKey"
     exit 0
   }
 
@@ -208,9 +317,10 @@ switch ($Action) {
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_REPO_ROOT', $RepoRoot, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_DATA_DIR', $DataDir, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_PYTHON_EXE', $python, 'Machine')
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', '0.0.0.0', 'Machine')
+    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', '127.0.0.1', 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_PORT', "$ApiPort", 'Machine')
 
+    $preservedProviderEnvironment = Get-PreservedProviderEnvironment
     $existing = Get-ServiceSafe
     if ($existing) {
       Stop-ResearchOsServiceAndApi
@@ -226,7 +336,7 @@ switch ($Action) {
     sc.exe config $ServiceName start= delayed-auto | Out-Null
     sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
     sc.exe failureflag $ServiceName 1 | Out-Null
-    Set-ServiceEnvironment -PythonPath $python
+    Set-ServiceEnvironment -PythonPath $python -PreservedProviderEnvironment $preservedProviderEnvironment
 
     Start-Service -Name $ServiceName
     Wait-ServiceState 'Running' | Out-Null
@@ -265,6 +375,15 @@ switch ($Action) {
     }
 
     Stop-ResearchOsApiListener
+    foreach ($name in @(
+      'RESEARCH_OS_REPO_ROOT',
+      'RESEARCH_OS_DATA_DIR',
+      'RESEARCH_OS_PYTHON_EXE',
+      'RESEARCH_OS_API_HOST',
+      'RESEARCH_OS_API_PORT'
+    )) {
+      [Environment]::SetEnvironmentVariable($name, $null, 'Machine')
+    }
     Write-Host 'Research OS Service uninstalled. Local data was preserved.'
   }
 

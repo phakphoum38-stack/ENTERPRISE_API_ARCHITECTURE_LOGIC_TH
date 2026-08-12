@@ -201,6 +201,133 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/brain/skills:
+    get:
+      summary: List provider-neutral Brain Skills from the shared V3 registry
+      responses:
+        "200":
+          description: Versioned Brain Skills catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2BrainCatalog'
+  /v2/brain/capacity:
+    get:
+      summary: Describe Adaptive 6x3 assistant and 6x6 capacity policies
+      responses:
+        "200":
+          description: Theoretical 6^3 assistant preset, 6^6 ceiling, and current activation limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2BrainCapacity'
+  /v2/brain/providers:
+    get:
+      summary: Discover configured Brain providers without exposing credential values
+      responses:
+        "200":
+          description: Safe provider credential and web-search capability status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2BrainProviders'
+  /v2/brain/plans:
+    post:
+      summary: Create a provider-neutral adaptive Brain Skills dispatch plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective]
+              properties:
+                objective:
+                  type: string
+                  minLength: 1
+                complexity_level:
+                  type: integer
+                  minimum: 1
+                  maximum: 6
+                  default: 1
+                  description: Omit to allow objective text such as 6^3, 6³, or ผู้ช่วย 6 to select the 6^3 assistant preset automatically.
+                requested_workers:
+                  type: integer
+                  minimum: 1
+                  maximum: 46656
+                budget_workers:
+                  type: integer
+                  minimum: 1
+                ready_workers:
+                  type: integer
+                  minimum: 1
+      responses:
+        "201":
+          description: Adaptive Brain Skills plan created without starting all workers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2BrainPlan'
+        "400":
+          description: Invalid planning request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+  /v2/brain/search:
+    post:
+      summary: Run bounded Compound 6x6 research with provider-hosted web search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 20000
+                provider:
+                  type: string
+                  description: Defaults to the configured RESEARCH_OS_SEARCH_PROVIDER or openai-responses.
+                model:
+                  type: string
+                complexity_level:
+                  type: integer
+                  minimum: 1
+                  maximum: 6
+                  default: 3
+                requested_workers:
+                  type: integer
+                  minimum: 1
+                  maximum: 46656
+                budget_workers:
+                  type: integer
+                  minimum: 1
+                ready_workers:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Source-backed answer and bounded compound Brain plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2BrainSearch'
+        "400":
+          description: Invalid search query or Brain plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
+        "503":
+          description: Search provider or credential is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ErrorEnvelope'
   /v2/agents:
     get:
       summary: V2 agent catalog backed by the same dynamic registry as V1
@@ -528,6 +655,211 @@ components:
         "404":
           description: Orchestration run not found
   schemas:
+    V2BrainCatalog:
+      type: object
+      required: [api_version, brain]
+      properties:
+        api_version:
+          const: v2
+        brain:
+          type: object
+          required: [provider_mode, skill_count, skills]
+          properties:
+            provider_mode:
+              const: local_or_configured_provider
+            skill_count:
+              type: integer
+              minimum: 1
+            skills:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+    V2BrainCapacity:
+      type: object
+      required: [api_version, capacity]
+      properties:
+        api_version:
+          const: v2
+        capacity:
+          type: object
+          required:
+            - architecture
+            - branch_factor
+            - elastic_tiers
+            - assistant_6x3_capacity
+            - max_leaf_capacity
+            - default_assistant_mode
+            - max_active_workers
+            - activation_mode
+            - all_workers_started_by_default
+          properties:
+            architecture:
+              const: adaptive_hierarchical_6x6
+            branch_factor:
+              const: 6
+            elastic_tiers:
+              const: 6
+            assistant_6x3_capacity:
+              const: 216
+            max_leaf_capacity:
+              const: 46656
+            default_assistant_mode:
+              const: assistant_6x3
+            assistant_modes:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            max_active_workers:
+              type: integer
+              minimum: 1
+              maximum: 1296
+            activation_mode:
+              const: demand_budget_readiness
+            all_workers_started_by_default:
+              const: false
+          additionalProperties: true
+    V2BrainPlan:
+      type: object
+      required: [api_version, plan]
+      properties:
+        api_version:
+          const: v2
+        plan:
+          type: object
+          required:
+            - plan_id
+            - objective
+            - selected_skills
+            - assistant_profile
+            - hierarchy
+            - cognition
+            - provider_mode
+            - requires_external_api_key
+            - provider_execution_requires_credentials
+            - writes_require_approval
+          properties:
+            plan_id:
+              type: string
+            objective:
+              type: string
+            selected_skills:
+              type: array
+              items:
+                type: string
+            assistant_profile:
+              type: object
+              required: [mode, branch_factor, elastic_tiers, theoretical_assistants]
+              properties:
+                mode:
+                  enum: [assistant_6x3, compound_6x6]
+                branch_factor:
+                  const: 6
+                elastic_tiers:
+                  type: integer
+                  minimum: 3
+                  maximum: 6
+                theoretical_assistants:
+                  type: integer
+                  enum: [216, 46656]
+              additionalProperties: true
+            hierarchy:
+              type: object
+              additionalProperties: true
+            cognition:
+              type: object
+              required:
+                - mode
+                - stages
+                - candidate_capacity
+                - hypothesis_branches
+                - critic_passes
+                - consensus_quorum
+                - bounded
+              properties:
+                mode:
+                  enum: [assistant_6x3, compound_6x6]
+                stages:
+                  type: array
+                  items:
+                    type: string
+                candidate_capacity:
+                  type: integer
+                  minimum: 6
+                  maximum: 46656
+                hypothesis_branches:
+                  type: integer
+                  minimum: 1
+                  maximum: 36
+                critic_passes:
+                  type: integer
+                  minimum: 1
+                  maximum: 6
+                consensus_quorum:
+                  type: integer
+                  minimum: 1
+                bounded:
+                  const: true
+              additionalProperties: true
+            provider_mode:
+              const: local_or_configured_provider
+            requires_external_api_key:
+              const: false
+            provider_execution_requires_credentials:
+              const: true
+            writes_require_approval:
+              const: true
+    V2BrainProviders:
+      type: object
+      required: [api_version, providers]
+      properties:
+        api_version:
+          const: v2
+        providers:
+          type: object
+          additionalProperties:
+            type: object
+            required: [configured, secret_exposed, supports_web_search]
+            properties:
+              configured:
+                type: boolean
+              credential_source:
+                type: [string, 'null']
+              secret_exposed:
+                const: false
+              supports_web_search:
+                type: boolean
+    V2BrainSearch:
+      type: object
+      required: [api_version, result, brain_plan]
+      properties:
+        api_version:
+          const: v2
+        result:
+          type: object
+          required: [provider, model, text, sources]
+          properties:
+            provider:
+              type: string
+            model:
+              type: string
+            text:
+              type: string
+            sources:
+              type: array
+              items:
+                type: object
+                required: [url, title]
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                  title:
+                    type: string
+        brain_plan:
+          type: object
+          additionalProperties: true
     DelegatedStepInput:
       type: object
       required: [objective]
