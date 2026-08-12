@@ -8,6 +8,7 @@ from .execution import FactoryExecutionEngine, FactoryExecutionResult, StageHand
 from .factory import SoftwareFactory, SoftwareFactoryPlan
 from .models import OrchestrationDecision, Workload
 from .providers import ProviderRegistry
+from .skills import UnifiedSkillRegistry
 
 
 class UnifiedMasterOrchestrator:
@@ -20,10 +21,12 @@ class UnifiedMasterOrchestrator:
         brain: BrainCore | None = None,
         providers: ProviderRegistry | None = None,
         factory: SoftwareFactory | None = None,
+        skills: UnifiedSkillRegistry | None = None,
     ) -> None:
         self.brain = brain or BrainCore()
         self.providers = providers or ProviderRegistry()
         self.factory = factory or SoftwareFactory()
+        self.skills = skills or UnifiedSkillRegistry()
 
     def decide(self, workload: Workload) -> OrchestrationDecision:
         profile, demand, reason = self.brain.select_profile(workload)
