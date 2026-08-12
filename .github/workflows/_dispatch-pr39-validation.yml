@@ -1,0 +1,29 @@
+name: One-shot PR39 Split Validation Dispatcher
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/_dispatch-pr39-validation.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch 6x6 full repository audit and Candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: 9ca5934f3f018992689dc7f278555a5e077552a9
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --method POST -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/workflows/file-audit-v6x6.yml/dispatches" \
+            -f ref=main -f "inputs[target_sha]=$TARGET_SHA"
+          gh api --method POST -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/workflows/candidate.yml/dispatches" \
+            -f ref=main -f "inputs[target_sha]=$TARGET_SHA"
