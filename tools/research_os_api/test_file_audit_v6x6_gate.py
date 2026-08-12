@@ -26,9 +26,16 @@ def _load_auditor():
     return module
 
 
+def _audit_runs_separately() -> bool:
+    return (
+        os.getenv("RESEARCH_OS_SKIP_FILE_AUDIT") == "1"
+        or os.getenv("GITHUB_WORKFLOW") == "Research OS Candidate"
+    )
+
+
 @unittest.skipIf(
-    os.getenv("RESEARCH_OS_SKIP_FILE_AUDIT") == "1",
-    "6^6 repository audit runs in its dedicated Candidate gate",
+    _audit_runs_separately(),
+    "6^6 repository audit runs in the dedicated full-repository audit workflow",
 )
 class CandidateFileAuditV6x6GateTests(unittest.TestCase):
     def test_candidate_repository_passes_adaptive_6x6_file_audit(self) -> None:
