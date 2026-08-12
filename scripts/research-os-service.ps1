@@ -49,15 +49,15 @@ function Test-ResearchOsApiProcess([int]$ProcessId) {
 
   $commandLine = [string]$process.CommandLine
   $executablePath = [string]$process.ExecutablePath
-  $normalizedRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
-  $normalizedBundledRoot = [IO.Path]::GetFullPath((Join-Path $RepoRoot 'runtime\python')).TrimEnd('\')
+  $normalizedRoot = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\\')
+  $normalizedBundledRoot = [IO.Path]::GetFullPath((Join-Path $RepoRoot 'runtime\\python')).TrimEnd('\\')
 
   $isBundledPython = $false
   if ($executablePath) {
     try {
       $normalizedExe = [IO.Path]::GetFullPath($executablePath)
       $isBundledPython = $normalizedExe.StartsWith(
-        $normalizedBundledRoot + '\',
+        $normalizedBundledRoot + '\\',
         [StringComparison]::OrdinalIgnoreCase
       )
     }
@@ -67,7 +67,7 @@ function Test-ResearchOsApiProcess([int]$ProcessId) {
   }
 
   $isRepoRenderServer = $false
-  if ($commandLine -and $commandLine -match '(?i)render_server\.py') {
+  if ($commandLine -and $commandLine -match '(?i)render_server\\.py') {
     $isRepoRenderServer = $commandLine.IndexOf(
       $normalizedRoot,
       [StringComparison]::OrdinalIgnoreCase
@@ -136,7 +136,7 @@ function Stop-ResearchOsServiceAndApi {
 }
 
 function Set-ServiceEnvironment([string]$PythonPath) {
-  $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
+  $serviceKey = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\$ServiceName"
   if (-not (Test-Path $serviceKey)) {
     throw "Windows Service registry key was not created: $serviceKey"
   }
@@ -145,7 +145,7 @@ function Set-ServiceEnvironment([string]$PythonPath) {
     "RESEARCH_OS_REPO_ROOT=$RepoRoot",
     "RESEARCH_OS_DATA_DIR=$DataDir",
     "RESEARCH_OS_PYTHON_EXE=$PythonPath",
-    'RESEARCH_OS_API_HOST=0.0.0.0',
+    'RESEARCH_OS_API_HOST=127.0.0.1',
     "RESEARCH_OS_API_PORT=$ApiPort"
   )
 
@@ -178,117 +178,55 @@ switch ($Action) {
       if (-not $dotnet) {
         throw 'ServiceHost binary is missing and .NET SDK is not installed. Use the packaged Research OS installer.'
       }
-      New-Item -ItemType Directory -Force -Path $PublishDir | Out-Null
-      & $dotnet.Source publish $Project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o $PublishDir
-      if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ServiceExe)) {
-        throw 'Research OS ServiceHost publish failed.'
-      }
+      dotnet publish $Project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o $PublishDir
     }
 
-    if (Test-Path $BundledPython) {
-      $python = $BundledPython
-      Write-Host "Using bundled Python runtime: $python"
-    }
-    else {
-      $pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
-      if (-not $pythonCommand) {
-        throw 'Python runtime was not found. Install using the packaged Research OS installer or install Python for development mode.'
-      }
-      $python = $pythonCommand.Source
-      Write-Host "Using system Python runtime: $python"
-    }
+    $pythonPath = if (Test-Path $BundledPython) { $BundledPython } else { (Get-Command python.exe).Source }
 
-    New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'logs') | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'sessions') | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'database') | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'artifacts') | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $DataDir 'backups') | Out-Null
-
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_REPO_ROOT', $RepoRoot, 'Machine')
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_DATA_DIR', $DataDir, 'Machine')
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_PYTHON_EXE', $python, 'Machine')
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', '0.0.0.0', 'Machine')
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_PORT', "$ApiPort", 'Machine')
-
-    $existing = Get-ServiceSafe
-    if ($existing) {
+    if (Get-ServiceSafe) {
       Stop-ResearchOsServiceAndApi
-      sc.exe delete $ServiceName | Out-Null
+      sc.exe delete $ServiceName | Out-Host
       Start-Sleep -Seconds 1
     }
 
-    $quotedExe = '"' + $ServiceExe + '"'
-    sc.exe create $ServiceName binPath= $quotedExe start= auto DisplayName= 'Research OS API Service' | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to create Research OS Windows Service.' }
-
-    sc.exe description $ServiceName 'Research OS Local API, Memory, Google Workspace and AI backend service.' | Out-Null
-    sc.exe config $ServiceName start= delayed-auto | Out-Null
-    sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
-    sc.exe failureflag $ServiceName 1 | Out-Null
-    Set-ServiceEnvironment -PythonPath $python
-
+    sc.exe create $ServiceName binPath= "`"$ServiceExe`"" start= auto DisplayName= "Research OS Service" | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create $ServiceName." }
+    Set-ServiceEnvironment -PythonPath $pythonPath
+    sc.exe description $ServiceName "Research OS local API service" | Out-Host
     Start-Service -Name $ServiceName
     Wait-ServiceState 'Running' | Out-Null
-
-    Write-Host 'Research OS Service installed and started.'
-    Write-Host "Service : $ServiceName"
-    Write-Host "API     : http://127.0.0.1:$ApiPort"
-    Write-Host "Data    : $DataDir"
-    Write-Host "Runtime : $python"
-    Write-Host 'Recovery: restart after 5s, 10s, then 30s'
+    Write-Host "Installed and started $ServiceName."
   }
 
   'uninstall' {
     Require-Admin
     $svc = Get-ServiceSafe
     if (-not $svc) {
-      # The service may already be gone while a child process from a previous
-      # shutdown is still alive. Clean only positively identified Research OS listeners.
       Stop-ResearchOsApiListener
-      Write-Host 'Research OS Service is not installed.'
+      Write-Host "$ServiceName is already absent."
       exit 0
     }
-
     Stop-ResearchOsServiceAndApi
-    sc.exe delete $ServiceName | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to delete Research OS Service.' }
-
-    $deadline = (Get-Date).AddSeconds(15)
-    do {
-      if (-not (Get-ServiceSafe)) { break }
-      Start-Sleep -Milliseconds 500
-    } while ((Get-Date) -lt $deadline)
-
-    if (Get-ServiceSafe) {
-      throw 'Research OS Service is still registered after delete.'
-    }
-
-    Stop-ResearchOsApiListener
-    Write-Host 'Research OS Service uninstalled. Local data was preserved.'
+    sc.exe delete $ServiceName | Out-Host
+    Start-Sleep -Seconds 1
+    Write-Host "Removed $ServiceName."
   }
 
   'start' {
     Require-Admin
-    if (-not (Get-ServiceSafe)) { throw 'Research OS Service is not installed.' }
     Start-Service -Name $ServiceName
     Wait-ServiceState 'Running' | Out-Null
-    Write-Host 'Research OS Service started.'
   }
 
   'stop' {
     Require-Admin
-    if (-not (Get-ServiceSafe)) { throw 'Research OS Service is not installed.' }
     Stop-ResearchOsServiceAndApi
-    Write-Host 'Research OS Service stopped and API listener released.'
   }
 
   'restart' {
     Require-Admin
-    if (-not (Get-ServiceSafe)) { throw 'Research OS Service is not installed.' }
     Stop-ResearchOsServiceAndApi
     Start-Service -Name $ServiceName
     Wait-ServiceState 'Running' | Out-Null
-    Write-Host 'Research OS Service restarted.'
   }
 }
