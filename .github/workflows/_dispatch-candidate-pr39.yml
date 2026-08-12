@@ -1,0 +1,29 @@
+name: One-shot Candidate PR39 Dispatcher
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/_dispatch-candidate-pr39.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Research OS Candidate for PR39 exact SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: c7dd462e09b21a6c6e832ad659f3868d7939b34d
+          REPO: ${{ github.repository }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/workflows/candidate.yml/dispatches" \
+            -f ref=main \
+            -f "inputs[target_sha]=$TARGET_SHA"
