@@ -60,3 +60,5 @@
 A commit is release-ready only when its exact SHA passes the V3 Core, Provider Hardening, Software Factory, and Candidate workflows. Passing evidence from earlier SHAs is retained for audit but is not substituted for final exact-SHA validation.
 
 Provider Hardening and Factory Execution are intentionally triggered by this roadmap, so the final user-isolation certification SHA receives evidence from every primary V3 validation workflow.
+
+After synchronizing V3 with canonical `main`, the final certification cycle must touch this roadmap with a `[candidate]` commit so all four primary V3 workflows execute against one identical head SHA before merge.
