@@ -1,0 +1,63 @@
+name: Research OS V3 Linux Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - architecture/v3-clean
+    paths:
+      - '.github/workflows/v3-linux-build.yml'
+      - 'v3/flutter_app/**'
+      - 'apps/research_os_flutter/assets/branding/**'
+      - 'scripts/apply-research-os-branding.py'
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: Research OS
+  PUBLISHER: Research OS Team
+  BUNDLE_ID: com.phakphoum38.researchos
+  PROJECT_NAME: research_os_v3_flutter
+
+jobs:
+  linux:
+    name: Linux Flutter V3
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create build brand and package Linux
+        run: |
+          cd v3/flutter_app
+          flutter create --platforms=linux --org com.phakphoum38 --project-name "$PROJECT_NAME" .
+          flutter pub get
+          flutter analyze
+          flutter test
+          cd ../..
+          python -m pip install pillow
+          mkdir -p v3/flutter_app/assets/branding
+          cp apps/research_os_flutter/assets/branding/research_os_master.webp v3/flutter_app/assets/branding/research_os_master.webp
+          python scripts/apply-research-os-branding.py --app-root v3/flutter_app --platform linux
+          cd v3/flutter_app
+          flutter build linux --release
+          tar -C build/linux/x64/release/bundle -czf ../../research-os-v3-linux-${{ github.sha }}.tar.gz .
+          cd ../..
+          test -s research-os-v3-linux-${{ github.sha }}.tar.gz
+          test $(stat -c%s research-os-v3-linux-${{ github.sha }}.tar.gz) -gt 1000000
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-linux-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            research-os-v3-linux-${{ github.sha }}.tar.gz
+            v3/flutter_app/branding.json
