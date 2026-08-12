@@ -15,7 +15,7 @@ class RenderServerCompatibilityTests(unittest.TestCase):
         self.original_provider = os.environ.get("RESEARCH_OS_PROVIDER")
         self.original_openai_key = os.environ.get("RESEARCH_OS_OPENAI_API_KEY")
         os.environ["RESEARCH_OS_PROVIDER"] = "mock"
-        os.environ["RESEARCH_OS_OPENAI_API_KEY"] = "sk-test-secret-value-should-never-leak"
+        os.environ["RESEARCH_OS_OPENAI_API_KEY"] = "fixture-secret-value-should-never-leak"
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), CloudResearchOSHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -50,7 +50,7 @@ class RenderServerCompatibilityTests(unittest.TestCase):
         payload = self.request("/v2/brain/providers")
         serialized = json.dumps(payload)
         self.assertTrue(payload["providers"]["safe"])
-        self.assertNotIn("sk-test-secret-value-should-never-leak", serialized)
+        self.assertNotIn("fixture-secret-value-should-never-leak", serialized)
         self.assertNotIn("Bearer ", serialized)
 
 
