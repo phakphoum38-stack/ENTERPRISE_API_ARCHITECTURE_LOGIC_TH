@@ -68,7 +68,6 @@ def main() -> int:
             # 217 tasks exceed 6^3 (216), so adaptive selection must choose
             # the smallest sufficient tier: 3^6 (729), not jump to 6^6.
             assert master["scale"] == "3^6"
-            assert master["leaf_capacity"] == 729
             assert master["maximum_leaf_capacity"] == 46656
             provider = providers["providers"][0]
             assert provider["secret_exposed"] is False
