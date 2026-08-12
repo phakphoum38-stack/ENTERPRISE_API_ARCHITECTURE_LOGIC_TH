@@ -60,7 +60,7 @@ PR ต่อไปนี้เป็น `superseded` และต้องปิ
 - #23 — Unified Master V3 integration; superseded by canonical V3 clean line
 - #27 — Local access subset; superseded by PR #28
 
-Cleanup status: #18, #19, #20, #21, #22, #23 และ #27 ปิดแบบ superseded โดยไม่ merge และเก็บ commit/history ไว้เป็น reference/audit เท่านั้น
+Cleanup policy: ปิด PR เหล่านี้แบบ superseded โดยไม่ merge และเก็บ commit/history ไว้เป็น reference/audit เท่านั้น
 
 ## 6. Version naming policy
 
