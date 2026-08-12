@@ -1,0 +1,10 @@
+{
+  "app_name": "Research OS",
+  "publisher": "Research OS Team",
+  "team_name": "Research OS Team",
+  "bundle_id": "com.phakphoum38.researchos",
+  "android_application_id": "com.phakphoum38.researchos",
+  "apple_team_id_source": "GitHub Actions variable APPLE_TEAM_ID",
+  "icon_master": "apps/research_os_flutter/assets/branding/research_os_master.webp",
+  "version_line": "v3"
+}
