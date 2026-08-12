@@ -28,9 +28,9 @@ PR/branch V3 รุ่นทดลองก่อนหน้าให้ถื�
 
 PR #26 (`copilot/fix-owner-installer-upgrade-check`) เป็นสายเฉพาะ Owner Special และคง lifecycle/service/installer แยกจาก Research OS V3 ปกติ
 
-## Integration — canonical PR #28
+## Integration Clean — canonical PR #33
 
-PR #28 (`agent/local-research-os-access-41f17ac`) เป็น integration owner ของ Browser Use Cloud, local Google Workspace access และ Website / Windows / unsigned iOS artifact build
+PR #33 (`integration/clean-browser-local-artifacts`) เป็น integration owner ของ Browser Use Cloud, local Google Workspace access และ Website / Windows / unsigned iOS artifact build โดยสร้างใหม่บน canonical `main` เพื่อไม่ให้ workflow legacy กลับมา
 
 ## Superseded PRs
 
@@ -45,7 +45,9 @@ PR #28 (`agent/local-research-os-access-41f17ac`) เป็น integration owner
 - #21 — V3 AI Workspace feature map
 - #22 — Adaptive 6^6 Compound Brain
 - #23 — Unified Master V3 integration
-- #27 — Local access subset; superseded by PR #28
+- #27 — Local access subset
+- #28 — Integration branch เดิม; superseded by clean PR #33
+- #32 — failed/conflicted sync attempt for Integration; superseded by clean PR #33
 
 ทั้งหมดข้างต้นถูกปิดโดยไม่ merge และ commit/history ยังอยู่สำหรับ audit หรือ migration reference
 
@@ -54,7 +56,7 @@ PR #28 (`agent/local-research-os-access-41f17ac`) เป็น integration owner
 - `Current` — สิ่งที่ merge อยู่บน `main`
 - `V3 Next` — PR #25 จนกว่าจะได้รับการรับรองและ merge
 - `Owner Special` — PR #26
-- `Integration` — PR #28
+- `Integration Clean` — PR #33
 
 เมื่อ V3 Next ผ่าน Candidate ของ SHA ล่าสุดและ merge แล้ว ให้เปลี่ยนสถานะเป็น `Current V3`
 
