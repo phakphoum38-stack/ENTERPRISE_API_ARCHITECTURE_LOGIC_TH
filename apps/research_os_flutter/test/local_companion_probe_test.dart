@@ -35,6 +35,34 @@ void main() {
     apiClient.close();
   });
 
+  test('startup probe retries transient local-service startup failures', () async {
+    var healthAttempts = 0;
+    final httpClient = MockClient((request) async {
+      if (request.url.path == '/health') {
+        healthAttempts++;
+        if (healthAttempts == 1) {
+          throw http.ClientException('service starting', request.url);
+        }
+        return http.Response(jsonEncode(<String, Object?>{'status': 'ok'}), 200);
+      }
+      return http.Response(jsonEncode(<String, Object?>{'active': 'mock'}), 200);
+    });
+    final apiClient = ResearchOSApiClient(
+      baseUrl: 'http://127.0.0.1:8787',
+      client: httpClient,
+    );
+
+    final connected = await probeLocalCompanionService(
+      client: apiClient,
+      attempts: 2,
+      retryDelay: Duration.zero,
+    );
+
+    expect(connected, isTrue);
+    expect(healthAttempts, 2);
+    apiClient.close();
+  });
+
   test('startup probe is non-fatal when local service is unavailable', () async {
     final httpClient = MockClient((request) async {
       throw http.ClientException('service unavailable', request.url);
@@ -44,7 +72,11 @@ void main() {
       client: httpClient,
     );
 
-    final connected = await probeLocalCompanionService(client: apiClient);
+    final connected = await probeLocalCompanionService(
+      client: apiClient,
+      attempts: 1,
+      retryDelay: Duration.zero,
+    );
 
     expect(connected, isFalse);
     apiClient.close();
