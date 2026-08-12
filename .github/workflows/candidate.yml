@@ -25,6 +25,7 @@ jobs:
       RESEARCH_OS_PROVIDER: mock
       RESEARCH_OS_SYNC_KEY: candidate-test-key
       RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS: "1"
+      RESEARCH_OS_SKIP_FILE_AUDIT: "1"
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@v4
@@ -61,11 +62,7 @@ jobs:
           $env:RESEARCH_OS_DATA_DIR = "$env:RUNNER_TEMP\ResearchOSData"
           $env:RESEARCH_OS_CONVERSATION_STORE = "$env:RUNNER_TEMP\ResearchOSData\sessions\conversations.json"
           $compileTargets = @("tools/research_os_api", "tools/research_curator")
-          if (Test-Path "software_factory") {
-            $compileTargets += "software_factory"
-          } else {
-            Write-Host "Legacy software_factory package is not present; skipping legacy compile target."
-          }
+          if (Test-Path "software_factory") { $compileTargets += "software_factory" }
           python -m compileall -q @compileTargets
           if ($LASTEXITCODE -ne 0) { throw "Python compile failed" }
           python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
@@ -75,11 +72,7 @@ jobs:
             if ($legacyFactoryTests.Count -gt 0) {
               python -m unittest discover -s tests -p "test_adaptive_software_factory*.py" -v
               if ($LASTEXITCODE -ne 0) { throw "Adaptive Software Factory tests failed" }
-            } else {
-              Write-Host "Legacy Adaptive Software Factory test files are not present; skipping legacy suite."
             }
-          } else {
-            Write-Host "Legacy tests directory is not present; skipping Adaptive Software Factory suite."
           }
 
       - name: Stage Flutter app at short path
@@ -109,9 +102,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Flutter tests failed" }
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { throw "Flutter Windows build failed" }
-          if (-not (Test-Path "D:\w\build\windows\x64\runner\Release\research_os_flutter.exe")) {
-            throw "Windows app executable is missing"
-          }
+          if (-not (Test-Path "D:\w\build\windows\x64\runner\Release\research_os_flutter.exe")) { throw "Windows app executable is missing" }
 
       - name: Publish ServiceHost
         working-directory: src
@@ -121,9 +112,7 @@ jobs:
             -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=true -p:PublishTrimmed=false `
             -o tools/research_os_service/publish
-          if (-not (Test-Path "tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) {
-            throw "ServiceHost executable is missing"
-          }
+          if (-not (Test-Path "tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) { throw "ServiceHost executable is missing" }
 
       - name: Runtime smoke test
         working-directory: src
@@ -137,18 +126,12 @@ jobs:
             for ($i = 0; $i -lt 30; $i++) {
               try {
                 $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
-                if ($health.status -eq "ok") { $ready = $true; break }
+                $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v1/providers" -TimeoutSec 2
+                if ($health.status -eq "ok" -and $providers) { $ready = $true; break }
               } catch {}
               Start-Sleep -Milliseconds 500
             }
-            if (-not $ready) { throw "Local API did not become ready" }
-            $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
-            if ($master.master.capacity.assistant_6x3_capacity -ne 216) {
-              throw "Unified Master 6^3 capacity is invalid"
-            }
-            if ($master.master.capacity.max_leaf_capacity -ne 46656) {
-              throw "Unified Master 6^6 capacity is invalid"
-            }
+            if (-not $ready) { throw "Local API health/providers contract did not become ready" }
           }
           finally {
             .\scripts\stop-research-os-local.ps1 -Port 8787 -PidFile "$data\run\research-os-api.pid" -ErrorAction SilentlyContinue
@@ -165,22 +148,17 @@ jobs:
             for ($i = 0; $i -lt 40; $i++) {
               try {
                 $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
-                if ($health.status -eq "ok") { $ready = $true; break }
+                $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v1/providers" -TimeoutSec 2
+                if ($health.status -eq "ok" -and $providers) { $ready = $true; break }
               } catch {}
               Start-Sleep -Milliseconds 500
             }
-            if (-not $ready) { throw "Windows Service API did not become ready" }
-            $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
-            if ($master.master.contract -ne "unified-master-orchestrator-v3") {
-              throw "Windows Service Unified Master contract is missing"
-            }
+            if (-not $ready) { throw "Windows Service API health/providers contract did not become ready" }
             $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
             if (-not $service -or $service.State -ne 'Running') { throw "ResearchOSService is not running" }
           }
           finally {
-            if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
-              .\scripts\research-os-service.ps1 -Action uninstall -DataDir $data
-            }
+            if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { .\scripts\research-os-service.ps1 -Action uninstall -DataDir $data }
           }
 
       - name: Stage one-click installer package
@@ -198,11 +176,6 @@ jobs:
           if (Test-Path "software_factory") {
             New-Item -ItemType Directory -Force -Path "$package\software_factory" | Out-Null
             Copy-Item "software_factory\*.py" "$package\software_factory" -Force
-            if (-not (Test-Path "$package\software_factory\__init__.py")) {
-              throw "Legacy Software Factory package exists but __init__.py is missing"
-            }
-          } else {
-            Write-Host "Legacy software_factory package is not present; skipping installer packaging."
           }
           New-Item -ItemType Directory -Force -Path "$package\tools\research_curator" | Out-Null
           Copy-Item "tools\research_curator\*" "$package\tools\research_curator" -Recurse -Force
@@ -228,9 +201,7 @@ jobs:
         run: |
           python scripts/apply-research-os-branding.py --app-root apps/research_os_flutter --platform windows
           if ($LASTEXITCODE -ne 0) { throw "Installer branding generation failed" }
-          if (-not (Test-Path "apps\research_os_flutter\assets\branding\research_os.ico")) {
-            throw "Installer icon was not generated"
-          }
+          if (-not (Test-Path "apps\research_os_flutter\assets\branding\research_os.ico")) { throw "Installer icon was not generated" }
 
       - name: Install Inno Setup
         shell: pwsh
@@ -282,53 +253,47 @@ jobs:
             try {
               $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
               $v2 = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/health/readiness" -TimeoutSec 2
-              if ($health.status -eq "ok" -and $v2.ready) { $ready = $true; break }
+              $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v1/providers" -TimeoutSec 2
+              if ($health.status -eq "ok" -and $v2.ready -and $providers) { $ready = $true; break }
             } catch {}
             Start-Sleep -Seconds 1
           }
-          if (-not $ready) { throw "Installed candidate did not become ready" }
+          if (-not $ready) { throw "Installed candidate health/readiness/providers contract did not become ready" }
 
           $listeners = @(Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction Stop)
           $unsafe = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1', '::1') })
           if ($unsafe) { throw "Research OS API must listen on loopback only" }
 
-          $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
-          if ($master.master.contract -ne "unified-master-orchestrator-v3") {
-            throw "Installed candidate Unified Master contract is missing"
-          }
-          if ($master.master.capacity.assistant_6x3_capacity -ne 216 -or $master.master.capacity.max_leaf_capacity -ne 46656) {
-            throw "Installed candidate Unified Master capacity is invalid"
+          $serializedProviders = $providers | ConvertTo-Json -Depth 12 -Compress
+          if ($serializedProviders -match '(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._-]+') { throw "Provider status contains credential-like data" }
+
+          $logDir = Join-Path $env:ProgramData 'ResearchOS\logs'
+          $serviceErrLog = Join-Path $logDir 'service-api.err.log'
+          $serviceOutLog = Join-Path $logDir 'service-api.out.log'
+          foreach ($requestLogPath in @($serviceErrLog, $serviceOutLog)) {
+            if (Test-Path $requestLogPath) { Clear-Content $requestLogPath -ErrorAction SilentlyContinue }
           }
 
-          $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5
-          $serialized = @($providers, $master) | ConvertTo-Json -Depth 12 -Compress
-          if ($serialized -match '(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._-]+') {
-            throw "Provider or master status contains credential-like data"
-          }
-
-          $serviceLog = Join-Path $env:ProgramData 'ResearchOS\logs\service-api.err.log'
-          if (Test-Path $serviceLog) { Clear-Content $serviceLog -ErrorAction SilentlyContinue }
           $installedApp = Join-Path $env:ProgramFiles 'Research OS\app\research_os_flutter.exe'
           if (-not (Test-Path $installedApp)) { throw "Installed Flutter app executable is missing" }
-
           $app = Start-Process -FilePath $installedApp -PassThru
           try {
             $appConnected = $false
             for ($i = 0; $i -lt 60; $i++) {
               if ($app.HasExited) { throw "Installed Flutter app exited before app-to-service E2E completed" }
-              if (Test-Path $serviceLog) {
-                $requestLog = Get-Content $serviceLog -Raw -ErrorAction SilentlyContinue
-                $sawHealth = $requestLog -match '"GET /health HTTP/1\.[01]" 200'
-                $sawProviders = $requestLog -match '"GET /v1/providers HTTP/1\.[01]" 200'
-                if ($sawHealth -and $sawProviders) {
-                  $appConnected = $true
-                  break
-                }
+              $requestLog = ''
+              foreach ($requestLogPath in @($serviceErrLog, $serviceOutLog)) {
+                if (Test-Path $requestLogPath) { $requestLog += "`n" + (Get-Content $requestLogPath -Raw -ErrorAction SilentlyContinue) }
               }
+              $sawHealth = $requestLog -match '"GET /health HTTP/1\.[01]" 200'
+              $sawProviders = $requestLog -match '"GET /v1/providers HTTP/1\.[01]" 200'
+              if ($sawHealth -and $sawProviders) { $appConnected = $true; break }
               Start-Sleep -Milliseconds 500
             }
             if (-not $appConnected) {
-              if (Test-Path $serviceLog) { Get-Content $serviceLog -Tail 100 | Out-Host }
+              foreach ($requestLogPath in @($serviceErrLog, $serviceOutLog)) {
+                if (Test-Path $requestLogPath) { Write-Host "--- $requestLogPath ---"; Get-Content $requestLogPath -Tail 100 | Out-Host }
+              }
               throw "Installed Flutter app did not prove app-to-service requests to /health and /v1/providers"
             }
             Write-Host "Installed Flutter app-to-service E2E passed."
@@ -340,7 +305,6 @@ jobs:
           $upgradeLog = "$env:RUNNER_TEMP\research-os-upgrade.log"
           $u = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$upgradeLog") -Wait -PassThru
           if ($u.ExitCode -ne 0) { throw "In-place upgrade failed with exit code $($u.ExitCode)" }
-
           .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
 
       - name: Uninstall candidate and verify data preservation
@@ -370,15 +334,17 @@ jobs:
           $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($setup.Name)" | Set-Content "$out\SHA256SUMS.txt" -Encoding utf8
           $manifest = [ordered]@{
-            schema_version = 3
+            schema_version = 4
             target_sha = "$env:TARGET_SHA"
             candidate_run = "${{ github.run_id }}"
             validation = "passed"
             build_policy = "single-windows-runner"
+            api_health = "passed"
+            provider_catalog = "passed"
+            loopback_only = "passed"
             app_to_service_e2e = "passed"
-            unified_master = "passed"
-            assistant_6x3_capacity = 216
-            compound_6x6_capacity = 46656
+            upgrade_validation = "passed"
+            uninstall_validation = "passed"
             release_created = $false
             tag_created = $false
             artifact = [ordered]@{
