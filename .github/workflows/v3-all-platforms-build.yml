@@ -1,0 +1,244 @@
+name: Research OS V3 All Platforms Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - architecture/v3-clean
+    paths:
+      - 'v3/flutter_app/**'
+      - 'apps/research_os_flutter/assets/branding/**'
+      - 'scripts/apply-research-os-branding.py'
+      - '.github/workflows/v3-all-platforms-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-all-platforms-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  APP_NAME: Research OS
+  PUBLISHER: Research OS Team
+  BUNDLE_ID: com.phakphoum38.researchos
+  PROJECT_NAME: research_os_v3_flutter
+  APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+
+jobs:
+  android-web:
+    name: Android + Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create fresh Android and Web shells
+        working-directory: v3/flutter_app
+        run: |
+          flutter create --platforms=android,web --org com.phakphoum38 --project-name "$PROJECT_NAME" .
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Apply Research OS team branding and icon
+        run: |
+          python -m pip install pillow
+          mkdir -p v3/flutter_app/assets/branding
+          cp apps/research_os_flutter/assets/branding/research_os_master.webp v3/flutter_app/assets/branding/research_os_master.webp
+          python scripts/apply-research-os-branding.py --app-root v3/flutter_app --platform android --platform web
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('v3/flutter_app')
+          gradle=root/'android/app/build.gradle.kts'
+          if gradle.exists():
+              s=gradle.read_text()
+              s=s.replace('com.phakphoum38.research_os_v3_flutter','com.phakphoum38.researchos')
+              gradle.write_text(s)
+          manifest=root/'android/app/src/main/AndroidManifest.xml'
+          s=manifest.read_text().replace('android:label="research_os_v3_flutter"','android:label="Research OS"')
+          manifest.write_text(s)
+          web=root/'web/manifest.json'
+          data=json.loads(web.read_text())
+          data['name']='Research OS'; data['short_name']='Research OS'
+          web.write_text(json.dumps(data,indent=2))
+          index=root/'web/index.html'
+          s=index.read_text().replace('<title>research_os_v3_flutter</title>','<title>Research OS</title>')
+          index.write_text(s)
+          PY
+      - name: Build Android APK AAB and Web
+        working-directory: v3/flutter_app
+        run: |
+          flutter build apk --release
+          flutter build appbundle --release
+          flutter build web --release
+      - name: Package Web
+        run: |
+          tar -C v3/flutter_app/build/web -czf research-os-v3-web-${{ github.sha }}.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-android-${{ github.sha }}
+          path: |
+            v3/flutter_app/build/app/outputs/flutter-apk/app-release.apk
+            v3/flutter_app/build/app/outputs/bundle/release/app-release.aab
+            v3/flutter_app/branding.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-web-${{ github.sha }}
+          path: |
+            research-os-v3-web-${{ github.sha }}.tar.gz
+            v3/flutter_app/branding.json
+
+  apple:
+    name: iOS + macOS
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create fresh Apple shells
+        working-directory: v3/flutter_app
+        run: |
+          flutter create --platforms=ios,macos --org com.phakphoum38 --project-name "$PROJECT_NAME" .
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Apply Research OS team branding icon and bundle ID
+        run: |
+          python -m pip install pillow
+          mkdir -p v3/flutter_app/assets/branding
+          cp apps/research_os_flutter/assets/branding/research_os_master.webp v3/flutter_app/assets/branding/research_os_master.webp
+          python scripts/apply-research-os-branding.py --app-root v3/flutter_app --platform ios --platform macos
+          python - <<'PY'
+          from pathlib import Path
+          root=Path('v3/flutter_app')
+          for p in [root/'ios/Runner.xcodeproj/project.pbxproj', root/'macos/Runner.xcodeproj/project.pbxproj']:
+              s=p.read_text()
+              s=s.replace('com.phakphoum38.researchOsV3Flutter','com.phakphoum38.researchos')
+              s=s.replace('com.phakphoum38.research_os_v3_flutter','com.phakphoum38.researchos')
+              if __import__('os').environ.get('APPLE_TEAM_ID'):
+                  team=__import__('os').environ['APPLE_TEAM_ID']
+                  s=s.replace('PRODUCT_BUNDLE_IDENTIFIER = com.phakphoum38.researchos;',f'PRODUCT_BUNDLE_IDENTIFIER = com.phakphoum38.researchos;\n\t\t\t\tDEVELOPMENT_TEAM = {team};')
+              p.write_text(s)
+          for p in [root/'ios/Runner/Info.plist',root/'macos/Runner/Info.plist']:
+              if p.exists():
+                  s=p.read_text().replace('research_os_v3_flutter','Research OS').replace('Research Os V3 Flutter','Research OS')
+                  p.write_text(s)
+          PY
+      - name: Build unsigned iOS and macOS
+        working-directory: v3/flutter_app
+        run: |
+          flutter build ios --release --no-codesign
+          flutter build macos --release
+      - name: Package unsigned IPA and macOS app
+        run: |
+          mkdir -p Payload
+          cp -R v3/flutter_app/build/ios/iphoneos/Runner.app Payload/ResearchOS.app
+          zip -qry research-os-v3-ios-unsigned-${{ github.sha }}.ipa Payload
+          ditto -c -k --sequesterRsrc --keepParent v3/flutter_app/build/macos/Build/Products/Release/research_os_v3_flutter.app research-os-v3-macos-${{ github.sha }}.zip
+          printf 'App: Research OS\nTeam: Research OS Team\nBundle ID: com.phakphoum38.researchos\nApple Team ID: %s\n' "${APPLE_TEAM_ID:-selected-at-signing}" > apple-build-metadata.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-ios-unsigned-${{ github.sha }}
+          path: |
+            research-os-v3-ios-unsigned-${{ github.sha }}.ipa
+            apple-build-metadata.txt
+            v3/flutter_app/branding.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-macos-${{ github.sha }}
+          path: |
+            research-os-v3-macos-${{ github.sha }}.zip
+            apple-build-metadata.txt
+            v3/flutter_app/branding.json
+
+  windows:
+    name: Windows Flutter V3
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create fresh Windows shell
+        working-directory: v3/flutter_app
+        shell: pwsh
+        run: |
+          flutter create --platforms=windows --org com.phakphoum38 --project-name=$env:PROJECT_NAME .
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Apply Research OS icon and name
+        shell: pwsh
+        run: |
+          python -m pip install pillow
+          New-Item -ItemType Directory -Force v3/flutter_app/assets/branding | Out-Null
+          Copy-Item apps/research_os_flutter/assets/branding/research_os_master.webp v3/flutter_app/assets/branding/research_os_master.webp -Force
+          python scripts/apply-research-os-branding.py --app-root v3/flutter_app --platform windows
+          $p='v3/flutter_app/windows/runner/main.cpp'
+          (Get-Content $p -Raw).Replace('research_os_v3_flutter','Research OS') | Set-Content $p
+          flutter build windows --release --project-dir v3/flutter_app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-windows-app-${{ github.sha }}
+          path: |
+            v3/flutter_app/build/windows/x64/runner/Release/**
+            v3/flutter_app/branding.json
+
+  linux:
+    name: Linux Flutter V3
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create build brand and package Linux
+        run: |
+          cd v3/flutter_app
+          flutter create --platforms=linux --org com.phakphoum38 --project-name "$PROJECT_NAME" .
+          flutter pub get
+          flutter analyze
+          flutter test
+          cd ../..
+          python -m pip install pillow
+          mkdir -p v3/flutter_app/assets/branding
+          cp apps/research_os_flutter/assets/branding/research_os_master.webp v3/flutter_app/assets/branding/research_os_master.webp
+          python scripts/apply-research-os-branding.py --app-root v3/flutter_app --platform linux
+          cd v3/flutter_app
+          flutter build linux --release
+          tar -C build/linux/x64/release/bundle -czf ../../../research-os-v3-linux-${{ github.sha }}.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-linux-${{ github.sha }}
+          path: |
+            research-os-v3-linux-${{ github.sha }}.tar.gz
+            v3/flutter_app/branding.json
