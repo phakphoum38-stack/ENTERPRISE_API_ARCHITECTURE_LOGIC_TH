@@ -27,7 +27,6 @@ env:
 
 jobs:
   android-web:
-    if: ${{ !contains(github.event.head_commit.message, '[windows-only]') }}
     name: Android + Web
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -101,7 +100,6 @@ jobs:
             v3/flutter_app/branding.json
 
   apple:
-    if: ${{ !contains(github.event.head_commit.message, '[windows-only]') }}
     name: iOS + macOS
     runs-on: macos-latest
     timeout-minutes: 60
@@ -216,7 +214,6 @@ jobs:
             v3/flutter_app/branding.json
 
   linux:
-    if: ${{ !contains(github.event.head_commit.message, '[windows-only]') }}
     name: Linux Flutter V3
     runs-on: ubuntu-latest
     timeout-minutes: 45
