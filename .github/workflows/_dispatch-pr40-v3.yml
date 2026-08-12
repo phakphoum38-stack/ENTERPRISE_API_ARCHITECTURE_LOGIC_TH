@@ -1,0 +1,31 @@
+name: One-shot PR40 V3 Validation Dispatcher
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/_dispatch-pr40-v3.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch V3 core and candidate from PR40 branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: feat/v3-unified-skills-adaptive-tiers
+          TARGET_SHA: eaa455e3d21e13d5e3a0f72cc08096911ee03c16
+        run: |
+          gh api --method POST -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/workflows/v3-clean-core.yml/dispatches" \
+            -f ref="$BRANCH"
+          gh api --method POST -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/workflows/v3-candidate.yml/dispatches" \
+            -f ref="$BRANCH" \
+            -f "inputs[target_sha]=$TARGET_SHA"
