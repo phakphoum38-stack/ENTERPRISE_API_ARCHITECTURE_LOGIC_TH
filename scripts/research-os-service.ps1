@@ -145,7 +145,7 @@ function Set-ServiceEnvironment([string]$PythonPath) {
     "RESEARCH_OS_REPO_ROOT=$RepoRoot",
     "RESEARCH_OS_DATA_DIR=$DataDir",
     "RESEARCH_OS_PYTHON_EXE=$PythonPath",
-    'RESEARCH_OS_API_HOST=0.0.0.0',
+    'RESEARCH_OS_API_HOST=127.0.0.1',
     "RESEARCH_OS_API_PORT=$ApiPort"
   )
 
@@ -208,7 +208,7 @@ switch ($Action) {
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_REPO_ROOT', $RepoRoot, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_DATA_DIR', $DataDir, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_PYTHON_EXE', $python, 'Machine')
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', '0.0.0.0', 'Machine')
+    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', '127.0.0.1', 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_PORT', "$ApiPort", 'Machine')
 
     $existing = Get-ServiceSafe
