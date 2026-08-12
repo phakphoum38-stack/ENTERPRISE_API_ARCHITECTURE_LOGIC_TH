@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'api/api_endpoint_store.dart';
+import 'api/local_companion_probe.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
 
@@ -19,6 +22,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   @override
   void initState() {
     super.initState();
+    unawaited(probeLocalCompanionService());
     _loadApiEndpoint();
   }
 
