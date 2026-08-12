@@ -37,7 +37,7 @@ void main() {
 
   test('startup probe is non-fatal when local service is unavailable', () async {
     final httpClient = MockClient((request) async {
-      throw const http.ClientException('service unavailable');
+      throw http.ClientException('service unavailable', request.url);
     });
     final apiClient = ResearchOSApiClient(
       baseUrl: 'http://127.0.0.1:8787',
