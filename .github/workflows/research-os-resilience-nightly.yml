@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 12
     env:
       RESEARCH_OS_PROVIDER: mock
-      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
+      RESEARCH_OS_DATA_DIR: /tmp/ResearchOSData
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
