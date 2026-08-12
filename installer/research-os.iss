@@ -55,6 +55,36 @@ Filename: "{app}\app\{#MyAppExeName}"; Description: "Launch Research OS"; Workin
 Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\scripts\research-os-service.ps1"" -Action uninstall -DataDir ""{commonappdata}\ResearchOS"""; Flags: runhidden waituntilterminated; RunOnceId: "ResearchOSServiceUninstall"
 
 [Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ServiceScript: String;
+  Parameters: String;
+  ResultCode: Integer;
+begin
+  Result := '';
+  ServiceScript := ExpandConstant('{app}\\scripts\\research-os-service.ps1');
+  if not FileExists(ServiceScript) then
+    exit;
+
+  Parameters :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    ServiceScript + '" -Action stop -DataDir "' +
+    ExpandConstant('{commonappdata}\\ResearchOS') + '"';
+  if (not Exec(
+        ExpandConstant('{sys}\\WindowsPowerShell\\v1.0\\powershell.exe'),
+        Parameters,
+        '',
+        SW_HIDE,
+        ewWaitUntilTerminated,
+        ResultCode
+      )) or (ResultCode <> 0) then
+  begin
+    Result :=
+      'Research OS Service could not be stopped before upgrade. ' +
+      'Close Research OS and retry Setup.';
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then

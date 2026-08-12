@@ -17,12 +17,21 @@ from dataclasses import dataclass
 from typing import Any
 
 
+OPENAI_API_KEY_NAMES = ("RESEARCH_OS_OPENAI_API_KEY", "OPENAI_API_KEY")
+GEMINI_API_KEY_NAMES = ("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY")
+ANTHROPIC_API_KEY_NAMES = (
+    "RESEARCH_OS_ANTHROPIC_API_KEY",
+    "ANTHROPIC_API_KEY",
+)
+
+
 @dataclass(frozen=True)
 class ProviderResult:
     provider: str
     model: str
     text: str
     raw: dict[str, Any]
+    sources: tuple[dict[str, str], ...] = ()
 
 
 class ProviderError(RuntimeError):
@@ -36,6 +45,9 @@ class AIProvider(ABC):
     def generate(self, prompt: str, *, system: str = "", model: str | None = None) -> ProviderResult:
         raise NotImplementedError
 
+    def search(self, query: str, *, system: str = "", model: str | None = None) -> ProviderResult:
+        raise ProviderError(f"provider {self.name} does not support web search")
+
 
 class MockProvider(AIProvider):
     name = "mock"
@@ -44,6 +56,74 @@ class MockProvider(AIProvider):
         selected = model or "mock-v1"
         text = f"MOCK: {prompt[:500]}"
         return ProviderResult(self.name, selected, text, {"mock": True, "system": system})
+
+    def search(self, query: str, *, system: str = "", model: str | None = None) -> ProviderResult:
+        selected = model or "mock-search-v1"
+        text = f"MOCK SEARCH: {query[:500]}"
+        return ProviderResult(
+            self.name,
+            selected,
+            text,
+            {"mock": True, "system": system, "web_search": False},
+        )
+
+
+class OpenAIResponsesProvider(AIProvider):
+    """Official OpenAI Responses adapter with optional hosted web search."""
+
+    name = "openai-responses"
+
+    def __init__(self, *, endpoint: str, api_key: str, default_model: str):
+        if not api_key.strip():
+            raise ProviderError("missing OpenAI API key")
+        self.endpoint = endpoint
+        self.api_key = api_key
+        self.default_model = default_model
+
+    def generate(self, prompt: str, *, system: str = "", model: str | None = None) -> ProviderResult:
+        return self._respond(prompt, system=system, model=model, web_search=False)
+
+    def search(self, query: str, *, system: str = "", model: str | None = None) -> ProviderResult:
+        return self._respond(query, system=system, model=model, web_search=True)
+
+    def _respond(
+        self,
+        input_text: str,
+        *,
+        system: str,
+        model: str | None,
+        web_search: bool,
+    ) -> ProviderResult:
+        selected = model or self.default_model
+        payload: dict[str, Any] = {
+            "model": selected,
+            "input": input_text,
+            "store": False,
+        }
+        if system:
+            payload["instructions"] = system
+        if web_search:
+            payload["tools"] = [{"type": "web_search"}]
+            payload["tool_choice"] = "auto"
+            payload["include"] = ["web_search_call.action.sources"]
+        raw = _post_json(
+            self.endpoint,
+            payload,
+            {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        text = _responses_text(raw)
+        if not text:
+            raise ProviderError("OpenAI Responses API returned no output text")
+        return ProviderResult(
+            self.name,
+            selected,
+            text,
+            raw,
+            tuple(_responses_sources(raw)),
+        )
 
 
 class OpenAICompatibleProvider(AIProvider):
@@ -140,6 +220,84 @@ def _first_env(*names: str) -> str | None:
     return None
 
 
+def _first_env_name(*names: str) -> str | None:
+    """Return only the configured variable name, never its secret value."""
+    for name in names:
+        value = os.getenv(name)
+        if value and value.strip():
+            return name
+    return None
+
+
+def provider_credential_status() -> dict[str, dict[str, Any]]:
+    """Describe provider readiness without returning credential contents."""
+    aliases = {
+        "openai-responses": OPENAI_API_KEY_NAMES,
+        "gemini": GEMINI_API_KEY_NAMES,
+        "anthropic": ANTHROPIC_API_KEY_NAMES,
+    }
+    status: dict[str, dict[str, Any]] = {}
+    for provider, names in aliases.items():
+        source = _first_env_name(*names)
+        status[provider] = {
+            "configured": source is not None,
+            "credential_source": source,
+            "secret_exposed": False,
+            "supports_web_search": provider == "openai-responses",
+        }
+    status["local"] = {
+        "configured": True,
+        "credential_source": None,
+        "secret_exposed": False,
+        "supports_web_search": False,
+    }
+    return status
+
+
+def _responses_text(raw: dict[str, Any]) -> str:
+    direct = raw.get("output_text")
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+    chunks: list[str] = []
+    for item in raw.get("output", []):
+        if not isinstance(item, dict) or item.get("type") != "message":
+            continue
+        for content in item.get("content", []):
+            if not isinstance(content, dict) or content.get("type") != "output_text":
+                continue
+            value = content.get("text")
+            if isinstance(value, str) and value.strip():
+                chunks.append(value.strip())
+    return "\n".join(chunks)
+
+
+def _responses_sources(raw: dict[str, Any]) -> list[dict[str, str]]:
+    sources: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add(url: Any, title: Any = "") -> None:
+        if not isinstance(url, str) or not url.strip() or url in seen:
+            return
+        seen.add(url)
+        sources.append({"url": url, "title": str(title or url)})
+
+    for item in raw.get("output", []):
+        if not isinstance(item, dict):
+            continue
+        action = item.get("action")
+        if isinstance(action, dict):
+            for source in action.get("sources", []):
+                if isinstance(source, dict):
+                    add(source.get("url"), source.get("title"))
+        for content in item.get("content", []):
+            if not isinstance(content, dict):
+                continue
+            for annotation in content.get("annotations", []):
+                if isinstance(annotation, dict) and annotation.get("type") == "url_citation":
+                    add(annotation.get("url"), annotation.get("title"))
+    return sources
+
+
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
     if not url or not url.strip():
         raise ProviderError("provider endpoint is empty")
@@ -180,9 +338,26 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
 
 
 def build_provider(name: str | None = None) -> AIProvider:
-    selected = (name or os.getenv("RESEARCH_OS_PROVIDER", "mock")).lower()
+    selected = (name or os.getenv("RESEARCH_OS_PROVIDER", "mock")).strip().lower()
     if selected == "mock":
         return MockProvider()
+    if selected in {"openai-responses", "openai-search"}:
+        key = _first_env(*OPENAI_API_KEY_NAMES)
+        if not key:
+            raise ProviderError(
+                "missing OpenAI API key (set RESEARCH_OS_OPENAI_API_KEY or OPENAI_API_KEY)"
+            )
+        return OpenAIResponsesProvider(
+            endpoint=_env_or_default(
+                "RESEARCH_OS_OPENAI_RESPONSES_ENDPOINT",
+                "https://api.openai.com/v1/responses",
+            ),
+            api_key=key,
+            default_model=_env_or_default(
+                "RESEARCH_OS_OPENAI_RESPONSES_MODEL",
+                "gpt-5.5",
+            ),
+        )
     if selected in {"openai", "openai-compatible", "local"}:
         endpoint = _env_or_default(
             "RESEARCH_OS_OPENAI_ENDPOINT",
@@ -191,13 +366,15 @@ def build_provider(name: str | None = None) -> AIProvider:
         model = _env_or_default("RESEARCH_OS_OPENAI_MODEL", "local-model")
         return OpenAICompatibleProvider(
             endpoint=endpoint,
-            api_key=os.getenv("RESEARCH_OS_OPENAI_API_KEY"),
+            api_key=_first_env(*OPENAI_API_KEY_NAMES),
             default_model=model,
         )
     if selected == "anthropic":
-        key = os.getenv("RESEARCH_OS_ANTHROPIC_API_KEY")
+        key = _first_env(*ANTHROPIC_API_KEY_NAMES)
         if not key:
-            raise ProviderError("missing RESEARCH_OS_ANTHROPIC_API_KEY")
+            raise ProviderError(
+                "missing Anthropic API key (set RESEARCH_OS_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)"
+            )
         return AnthropicProvider(
             endpoint=_env_or_default(
                 "RESEARCH_OS_ANTHROPIC_ENDPOINT",
@@ -210,7 +387,7 @@ def build_provider(name: str | None = None) -> AIProvider:
             ),
         )
     if selected == "gemini":
-        key = _first_env("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY")
+        key = _first_env(*GEMINI_API_KEY_NAMES)
         if not key:
             raise ProviderError(
                 "missing Gemini API key (set RESEARCH_OS_GEMINI_API_KEY or GEMINI_API_KEY)"
@@ -227,3 +404,18 @@ def build_provider(name: str | None = None) -> AIProvider:
             ),
         )
     raise ProviderError(f"unsupported provider: {selected}")
+
+
+def build_search_provider(name: str | None = None) -> AIProvider:
+    """Resolve a web-search capable provider without exposing its key."""
+    selected = (
+        name
+        or os.getenv("RESEARCH_OS_SEARCH_PROVIDER")
+        or "openai-responses"
+    ).strip()
+    provider = build_provider(selected)
+    if provider.name not in {"openai-responses", "mock"}:
+        raise ProviderError(
+            f"provider {provider.name} does not support hosted web search"
+        )
+    return provider

@@ -41,6 +41,26 @@ class DesktopShellApiClient extends ResearchOSApiClient {
       };
 
   @override
+  Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() async =>
+      <String, dynamic>{
+        'oauth_configured': false,
+        'connected': false,
+        'app_access': false,
+        'local_account_accepted': false,
+        'account_mode': 'none',
+        'services': <Map<String, dynamic>>[],
+      };
+
+  @override
+  Future<Map<String, dynamic>> getBrowserUseStatus() async =>
+      <String, dynamic>{
+        'provider': 'browser_use_cloud',
+        'api_key_configured': false,
+        'connected': false,
+        'token_storage': 'backend_env_only',
+      };
+
+  @override
   void close() {}
 }
 
@@ -59,26 +79,53 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
 
-    expect(find.byKey(const Key('desktop-shell-title')), findsOneWidget);
-    expect(find.text('Research OS'), findsWidgets);
     expect(find.byKey(const Key('enterprise-sidebar')), findsOneWidget);
     expect(find.byKey(const Key('desktop-navigation-list')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-content-pane')), findsOneWidget);
     expect(find.byKey(const Key('desktop-status-bar')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
+
+    final compactWidth =
+        tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
+    final contentWidth =
+        tester.getSize(find.byKey(const Key('desktop-content-pane'))).width;
+
+    expect(compactWidth, 76);
+    expect(find.byKey(const Key('desktop-shell-title')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final expandedWidth =
+        tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
+    final contentWidthWhileExpanded =
+        tester.getSize(find.byKey(const Key('desktop-content-pane'))).width;
+
+    expect(expandedWidth, 244);
+    expect(expandedWidth, greaterThan(compactWidth));
+    expect(contentWidthWhileExpanded, contentWidth);
+    expect(find.byKey(const Key('desktop-shell-title')), findsOneWidget);
     expect(find.text('WORKSPACE'), findsWidgets);
     expect(find.text('KNOWLEDGE'), findsWidgets);
     expect(find.text('CONNECTIONS'), findsWidgets);
     expect(find.text('SYSTEM'), findsWidgets);
-    expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-sidebar-dismiss')), findsOneWidget);
 
-    final before = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
-    await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
+    await tester.tap(find.byKey(const Key('desktop-sidebar-dismiss')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
-    final after = tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
 
-    expect(after, lessThan(before));
-    expect(after, 76);
+    expect(
+      tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width,
+      compactWidth,
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('desktop-content-pane'))).width,
+      contentWidth,
+    );
+    expect(find.byKey(const Key('desktop-sidebar-dismiss')), findsNothing);
     expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
     expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
     expect(tester.takeException(), isNull);

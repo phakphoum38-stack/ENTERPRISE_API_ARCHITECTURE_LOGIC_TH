@@ -8,6 +8,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FakeResearchOSApiClient extends ResearchOSApiClient {
   FakeResearchOSApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
 
+  Map<String, dynamic> googleWorkspaceDashboard = <String, dynamic>{
+    'hub': 'google_workspace',
+    'oauth_configured': false,
+    'connected': false,
+    'app_access': false,
+    'local_account_accepted': false,
+    'account_mode': 'none',
+    'services': <Map<String, dynamic>>[
+      <String, dynamic>{
+        'service': 'drive',
+        'enabled': true,
+        'state': 'not_configured',
+      },
+      <String, dynamic>{
+        'service': 'gmail',
+        'enabled': true,
+        'state': 'not_configured',
+      },
+    ],
+  };
+  Map<String, dynamic> browserUseStatus = <String, dynamic>{
+    'provider': 'browser_use_cloud',
+    'api_key_configured': true,
+    'connected': false,
+    'browser_id': null,
+    'cdp_url_available': false,
+    'token_storage': 'backend_env_only',
+  };
+
   @override
   Future<Map<String, dynamic>> getHealth() async => <String, dynamic>{
         'status': 'ok',
@@ -83,7 +112,53 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
-  Future<Map<String, dynamic>> answerWithMemory(String question) async =>
+  Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() async =>
+      googleWorkspaceDashboard;
+
+  @override
+  Future<Map<String, dynamic>> acceptLocalGoogleWorkspace() async {
+    googleWorkspaceDashboard = <String, dynamic>{
+      ...googleWorkspaceDashboard,
+      'app_access': true,
+      'local_account_accepted': true,
+      'account_mode': 'local',
+    };
+    return googleWorkspaceDashboard;
+  }
+
+  @override
+  Future<Map<String, dynamic>> getBrowserUseStatus() async => browserUseStatus;
+
+  @override
+  Future<Map<String, dynamic>> connectBrowserUse({String proxyCountryCode = 'us'}) async {
+    browserUseStatus = <String, dynamic>{
+      ...browserUseStatus,
+      'connected': true,
+      'browser_id': 'browser-test',
+      'cdp_url_available': true,
+      'cdp_host': 'cdp.browser-use.test',
+      'proxy_country_code': proxyCountryCode,
+    };
+    return browserUseStatus;
+  }
+
+  @override
+  Future<Map<String, dynamic>> disconnectBrowserUse() async {
+    browserUseStatus = <String, dynamic>{
+      ...browserUseStatus,
+      'connected': false,
+      'browser_id': null,
+      'cdp_url_available': false,
+      'cdp_host': null,
+    };
+    return browserUseStatus;
+  }
+
+  @override
+  Future<Map<String, dynamic>> answerWithMemory(
+    String question, {
+    String? webSearchQuery,
+  }) async =>
       <String, dynamic>{
         'text': 'คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด',
         'memory_hits': <Map<String, dynamic>>[
@@ -92,7 +167,10 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
-  Future<Map<String, dynamic>> generateText(String prompt) async =>
+  Future<Map<String, dynamic>> generateText(
+    String prompt, {
+    String? webSearchQuery,
+  }) async =>
       <String, dynamic>{'text': 'คำตอบจาก Gemini โดยตรง'};
 
   @override
@@ -219,6 +297,56 @@ void main() {
 
     expect(find.text('Research OS Flutter'), findsOneWidget);
     expect(find.text('Add GitHub dashboard'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Google Workspace can accept local mode without OAuth', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await openDesktopDestination(tester, 6);
+
+    expect(find.text('กดยอมรับเพื่อเริ่มใช้งาน'), findsOneWidget);
+    expect(find.byKey(const Key('google-workspace-local-accept')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('google-workspace-local-accept')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Research OS Local พร้อมใช้งาน'), findsOneWidget);
+    expect(find.text('Local'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Browser Use Cloud can connect from the connections page', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await openDesktopDestination(tester, 6);
+
+    expect(find.text('Browser Use Cloud'), findsOneWidget);
+    expect(find.byKey(const Key('browser-use-connect')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('browser-use-connect')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Connected'), findsOneWidget);
+    expect(find.textContaining('browser-test'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

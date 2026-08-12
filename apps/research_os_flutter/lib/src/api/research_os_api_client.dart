@@ -22,6 +22,12 @@ class ResearchOSApiClient {
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
+  Future<Map<String, dynamic>> getBrainProviders() =>
+      _getJson('/v2/brain/providers');
+  Future<Map<String, dynamic>> getBrainSkills() =>
+      _getJson('/v2/brain/skills');
+  Future<Map<String, dynamic>> getBrainCapacity() =>
+      _getJson('/v2/brain/capacity');
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
@@ -32,12 +38,22 @@ class ResearchOSApiClient {
       _getJson('/v1/google-workspace/oauth/status');
   Future<Map<String, dynamic>> startGoogleWorkspaceOAuth() =>
       _postJson('/v1/google-workspace/oauth/start', const <String, Object?>{});
+  Future<Map<String, dynamic>> acceptLocalGoogleWorkspace() =>
+      _postJson('/v1/google-workspace/local/accept', const <String, Object?>{});
   Future<Map<String, dynamic>> disconnectGoogleWorkspace() =>
       _postJson('/v1/google-workspace/oauth/disconnect', const <String, Object?>{});
   Future<Map<String, dynamic>> setGoogleWorkspaceServices(List<String> services) =>
       _postJson('/v1/google-workspace/services', <String, Object?>{
         'enabled_services': services,
       });
+  Future<Map<String, dynamic>> getBrowserUseStatus() =>
+      _getJson('/v1/browser-use/status');
+  Future<Map<String, dynamic>> connectBrowserUse({String proxyCountryCode = 'us'}) =>
+      _postJson('/v1/browser-use/connect', <String, Object?>{
+        'proxy_country_code': proxyCountryCode,
+      });
+  Future<Map<String, dynamic>> disconnectBrowserUse() =>
+      _postJson('/v1/browser-use/disconnect', const <String, Object?>{});
 
   Future<Map<String, dynamic>> getAgents() => _getJson('/v1/agents');
   Future<Map<String, dynamic>> getAgentReadiness() =>
@@ -166,18 +182,113 @@ class ResearchOSApiClient {
     return _decode(response);
   }
 
-  Future<Map<String, dynamic>> generateText(String prompt) {
+  Future<Map<String, dynamic>> generateText(
+    String prompt, {
+    String? webSearchQuery,
+  }) {
+    final searchQuery = webSearchQuery?.trim().isNotEmpty == true
+        ? webSearchQuery!.trim()
+        : shouldUseWebSearch(prompt)
+            ? _latestUserPrompt(prompt)
+            : null;
+    if (searchQuery != null) {
+      return searchWebWithBrain(searchQuery);
+    }
     return _postJson('/v1/ai/generate', <String, Object?>{
       'provider': 'gemini',
       'prompt': prompt,
     });
   }
 
-  Future<Map<String, dynamic>> answerWithMemory(String question) {
+  Future<Map<String, dynamic>> answerWithMemory(
+    String question, {
+    String? webSearchQuery,
+  }) {
+    final searchQuery = webSearchQuery?.trim().isNotEmpty == true
+        ? webSearchQuery!.trim()
+        : shouldUseWebSearch(question)
+            ? _latestUserPrompt(question)
+            : null;
+    if (searchQuery != null) {
+      return searchWebWithBrain(searchQuery);
+    }
     return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
       'provider': 'gemini',
       'question': question,
     });
+  }
+
+  Future<Map<String, dynamic>> searchWebWithBrain(
+    String query, {
+    int complexityLevel = 3,
+  }) async {
+    final response = await _postJson('/v2/brain/search', <String, Object?>{
+      'query': query.trim(),
+      'complexity_level': complexityLevel,
+    });
+    final rawResult = response['result'];
+    if (rawResult is! Map) return response;
+    final result = Map<String, dynamic>.from(rawResult);
+    final text = (result['text'] ?? '').toString().trim();
+    final sources = result['sources'];
+    final renderedSources = sources is List
+        ? sources
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .where((item) => (item['url'] ?? '').toString().trim().isNotEmpty)
+            .take(8)
+            .map((item) {
+              final url = (item['url'] ?? '').toString().trim();
+              final title = (item['title'] ?? url)
+                  .toString()
+                  .replaceAll('[', '')
+                  .replaceAll(']', '')
+                  .trim();
+              return '- [${title.isEmpty ? url : title}]($url)';
+            })
+            .toList()
+        : <String>[];
+    final answer = renderedSources.isEmpty
+        ? text
+        : '$text\n\n### Sources\n${renderedSources.join('\n')}';
+    return <String, dynamic>{
+      ...response,
+      'text': answer,
+      'sources': sources,
+      'provider': result['provider'],
+      'model': result['model'],
+    };
+  }
+
+  static bool shouldUseWebSearch(String prompt) {
+    final value = _latestUserPrompt(prompt).toLowerCase();
+    if (value.isEmpty) return false;
+    const explicitSearchTerms = <String>[
+      'เรียก api',
+      'เรียกapi',
+      'ใช้ api',
+      'ใช้api',
+      'ค้นเว็บ',
+      'ค้นหาเว็บ',
+      'ค้นทางเว็บ',
+      'web search',
+      'search the web',
+      'search web',
+      'ข้อมูลล่าสุด',
+      'ข่าวล่าสุด',
+      'current information',
+      'latest information',
+      'latest news',
+    ];
+    return explicitSearchTerms.any(value.contains);
+  }
+
+  static String _latestUserPrompt(String prompt) {
+    final value = prompt.trim();
+    const marker = '\nUser: ';
+    final index = value.lastIndexOf(marker);
+    if (index < 0) return value;
+    return value.substring(index + marker.length).trim();
   }
 
   Future<Map<String, dynamic>> commitMemory(
