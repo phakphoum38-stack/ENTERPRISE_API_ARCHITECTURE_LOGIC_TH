@@ -1,0 +1,63 @@
+name: Research OS V3 Windows Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - architecture/v3-clean
+    paths:
+      - '.github/workflows/v3-windows-build.yml'
+      - 'v3/flutter_app/**'
+      - 'apps/research_os_flutter/assets/branding/**'
+      - 'scripts/apply-research-os-branding.py'
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: Research OS
+  PUBLISHER: Research OS Team
+  BUNDLE_ID: com.phakphoum38.researchos
+  PROJECT_NAME: research_os_v3_flutter
+
+jobs:
+  windows:
+    name: Windows Flutter V3
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create fresh Windows shell
+        working-directory: v3/flutter_app
+        shell: pwsh
+        run: |
+          flutter create --platforms=windows --org com.phakphoum38 --project-name=$env:PROJECT_NAME .
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Apply Research OS icon and name
+        shell: pwsh
+        run: |
+          python -m pip install pillow
+          New-Item -ItemType Directory -Force v3/flutter_app/assets/branding | Out-Null
+          Copy-Item apps/research_os_flutter/assets/branding/research_os_master.webp v3/flutter_app/assets/branding/research_os_master.webp -Force
+          python scripts/apply-research-os-branding.py --app-root v3/flutter_app --platform windows
+          $p='v3/flutter_app/windows/runner/main.cpp'
+          (Get-Content $p -Raw).Replace('research_os_v3_flutter','Research OS') | Set-Content $p
+      - name: Build Windows release
+        working-directory: v3/flutter_app
+        shell: pwsh
+        run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-windows-app-${{ github.sha }}
+          path: |
+            v3/flutter_app/build/windows/x64/runner/Release/**
+            v3/flutter_app/branding.json
