@@ -1,4 +1,4 @@
-name: One-shot PR40 V3 Core Dispatcher
+name: One-shot PR40 V3 Ubuntu Dispatcher
 
 on:
   push:
@@ -15,12 +15,12 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch V3 core from PR40 branch
+      - name: Dispatch clean Ubuntu V3 build from PR40 branch
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           BRANCH: feat/v3-unified-skills-adaptive-tiers
         run: |
           gh api --method POST -H "Accept: application/vnd.github+json" \
-            "/repos/$REPO/actions/workflows/v3-clean-core.yml/dispatches" \
+            "/repos/$REPO/actions/workflows/v3-ubuntu-build.yml/dispatches" \
             -f ref="$BRANCH"
