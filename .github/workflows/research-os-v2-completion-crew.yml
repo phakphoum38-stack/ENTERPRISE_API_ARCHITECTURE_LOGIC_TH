@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 12
     env:
       RESEARCH_OS_PROVIDER: mock
-      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}/ResearchOSData
+      RESEARCH_OS_DATA_DIR: /tmp/ResearchOSData
     steps:
       - name: Checkout
         uses: actions/checkout@v4
