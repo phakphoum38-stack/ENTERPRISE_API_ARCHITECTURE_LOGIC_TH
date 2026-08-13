@@ -89,7 +89,7 @@ jobs:
           python scripts/factory_execution_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Self-built factory execution smoke failed' }
 
-      - name: Gate 5 - analyze test and build generated Windows GUI EXE
+      - name: Gate 5 - self-repair analyze test and build generated Windows GUI EXE
         working-directory: D:\research-os-full-control-self-build\v3\flutter_app
         shell: pwsh
         run: |
@@ -97,6 +97,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'flutter create failed' }
           flutter pub get
           if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+          dart fix --apply
+          if ($LASTEXITCODE -ne 0) { throw 'generated Flutter self-repair failed' }
           dart format lib test
           if ($LASTEXITCODE -ne 0) { throw 'generated Flutter format failed' }
           flutter analyze
@@ -137,7 +139,7 @@ jobs:
             generated_ui_sha256 = (Get-FileHash "$env:SELF_WORKSPACE\v3\flutter_app\lib\src\research_os_v3_app.dart" -Algorithm SHA256).Hash.ToLowerInvariant()
             app_exe = [ordered]@{ filename = 'research_os_v3_flutter.exe'; size = (Get-Item $appExe).Length; sha256 = (Get-FileHash $appExe -Algorithm SHA256).Hash.ToLowerInvariant() }
             service_exe = [ordered]@{ filename = 'ResearchOS.V3.ServiceHost.exe'; size = (Get-Item $serviceExe).Length; sha256 = (Get-FileHash $serviceExe -Algorithm SHA256).Hash.ToLowerInvariant() }
-            gates = [ordered]@{ teacher_tests = $true; self_stage = $true; requirement_generation = $true; core_tests = $true; factory_smoke = $true; flutter_analyze = $true; flutter_tests = $true; windows_exe = $true; service_host = $true }
+            gates = [ordered]@{ teacher_tests = $true; self_stage = $true; requirement_generation = $true; core_tests = $true; factory_smoke = $true; dart_self_repair = $true; flutter_analyze = $true; flutter_tests = $true; windows_exe = $true; service_host = $true }
             canonical_source_mutated_by_builder = $false
             merged = $false
             deployed = $false
