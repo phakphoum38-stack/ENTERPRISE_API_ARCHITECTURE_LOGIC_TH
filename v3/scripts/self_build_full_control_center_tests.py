@@ -5,8 +5,8 @@ from pathlib import Path
 
 from self_repair_generated_dart import repair
 
-# This acceptance stage intentionally invokes the strict generated-Dart repair
-# before Flutter analysis so the self-built candidate must satisfy normal lints.
+# Acceptance tests prove that the generated single-shell Full Control Center
+# uses live V3 APIs/tool bindings instead of the old placeholder pages.
 TEST = r'''import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_v3_flutter/src/api/v3_api.dart';
@@ -120,7 +120,7 @@ void main() {
     expect(find.text('answer:hello self build'), findsOneWidget);
   });
 
-  testWidgets('workspace and system pages execute V3 tools instead of placeholder cards', (tester) async {
+  testWidgets('workspace and system pages execute V3 tools instead of placeholders', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1800, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ResearchOSV3App(api: FakeApi()));
@@ -139,9 +139,13 @@ void main() {
 
     await tester.tap(find.text('Backup').first);
     await tester.pumpAndSettle();
-    expect(find.text('Create Backup'), findsOneWidget);
-    expect(find.textContaining('Owner Gate'), findsOneWidget);
+    expect(find.text('backups-list'), findsOneWidget);
     expect(find.textContaining('ResearchOS-backup.zip'), findsWidgets);
+
+    await tester.tap(find.text('Restore').first);
+    await tester.pumpAndSettle();
+    expect(find.text('backups-list'), findsOneWidget);
+    expect(find.text('Owner Gate'), findsOneWidget);
 
     await tester.tap(find.text('Shell').first);
     await tester.pumpAndSettle();
