@@ -115,10 +115,17 @@ def main() -> int:
     workspace = Path(args.workspace).resolve()
     app_target = workspace / 'v3' / 'flutter_app' / 'lib' / 'src' / 'research_os_v3_app.dart'
     repaired = repair(app_target)
-    if repaired < 1:
-        raise SystemExit('expected Research OS generated GUI to require at least one strict style repair')
-    print(f'self-repaired generated GUI control-flow statements: {repaired}')
-    target = workspace / 'v3' / 'flutter_app' / 'test' / 'app_shell_test.dart'
+    if repaired < 2:
+        raise SystemExit('expected Research OS generated GUI to require strict style and layout repair')
+    print(f'self-repaired generated GUI statements/layout: {repaired}')
+
+    test_dir = workspace / 'v3' / 'flutter_app' / 'test'
+    obsolete = test_dir / 'widget_test.dart'
+    if obsolete.exists():
+        obsolete.unlink()
+        print(f'retired obsolete pre-morning GUI test: {obsolete}')
+
+    target = test_dir / 'app_shell_test.dart'
     target.write_text(TEST, encoding='utf-8', newline='\n')
     print(target)
     return 0
