@@ -5,6 +5,8 @@ from pathlib import Path
 
 from self_repair_generated_dart import repair
 
+# This acceptance stage intentionally invokes the strict generated-Dart repair
+# before Flutter analysis so the self-built candidate must satisfy normal lints.
 TEST = r'''import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_v3_flutter/src/api/v3_api.dart';
