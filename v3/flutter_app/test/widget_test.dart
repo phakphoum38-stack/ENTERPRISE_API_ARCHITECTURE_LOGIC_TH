@@ -35,6 +35,19 @@ class _WidgetTestApi implements V3Api {
         'scope': 'users/alice/profiles/default',
         'isolated': true,
       };
+
+  @override
+  Future<Map<String, dynamic>> chat(
+    String message, {
+    String sessionId = 'default',
+    String provider = 'auto',
+    String mode = 'answer',
+  }) async => {
+        'contract': 'research-os-v3-chat-v1',
+        'text': 'mock:$message',
+        'provider': 'mock',
+        'session_id': sessionId,
+      };
 }
 
 void main() {
