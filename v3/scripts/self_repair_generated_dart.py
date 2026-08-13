@@ -4,10 +4,14 @@ import argparse
 import re
 from pathlib import Path
 
-# Generated UI uses deliberately simple single-line control flow.  Repair only
-# standalone `if (...) statement;` lines.  Collection-if elements end with a
-# comma and are intentionally not touched.
-SINGLE_LINE_IF = re.compile(r"^(?P<indent>\s*)if\s*\((?P<condition>.+)\)\s+(?P<body>.+;)\s*$")
+# Generated UI uses deliberately simple single-line control flow. Repair only
+# standalone `if (...) statement;` lines. Conditions in the generated template
+# do not contain nested parentheses, so stop at the first closing parenthesis.
+# This is intentionally stricter than a greedy regex because bodies such as
+# `setState(() => ...)` contain their own parentheses.
+SINGLE_LINE_IF = re.compile(
+    r"^(?P<indent>\s*)if\s*\((?P<condition>[^)]*)\)\s+(?P<body>.+;)\s*$"
+)
 
 
 def repair(path: Path) -> int:
@@ -20,12 +24,13 @@ def repair(path: Path) -> int:
             output.append(line)
             continue
         body = match.group("body").strip()
-        # Avoid transforming conditional expressions or malformed fragments.
         if body.startswith(("else ", "case ")):
             output.append(line)
             continue
         indent = match.group("indent")
-        condition = match.group("condition")
+        condition = match.group("condition").strip()
+        if not condition:
+            raise ValueError(f"empty generated if condition in {path}")
         output.extend(
             [
                 f"{indent}if ({condition}) {{",
