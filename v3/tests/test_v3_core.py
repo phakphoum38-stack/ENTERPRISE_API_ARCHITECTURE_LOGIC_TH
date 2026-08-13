@@ -1,7 +1,10 @@
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from research_os_v3 import (
     CompletionRequest,
@@ -46,6 +49,46 @@ class FakeTransport:
 class V3CleanCoreTests(unittest.TestCase):
     def setUp(self) -> None:
         self.master = UnifiedMasterOrchestrator()
+
+    def _post_chat(
+        self,
+        payload: object,
+        *,
+        include_user: bool = True,
+    ) -> tuple[int, dict[str, object]]:
+        with tempfile.TemporaryDirectory() as temporary:
+            service = V3LocalService(
+                port=0,
+                data_layout=DataLayout(Path(temporary)).ensure(),
+            )
+            server = service.build_server()
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            host, port = server.server_address
+            headers = {"Content-Type": "application/json"}
+            if include_user:
+                headers["X-Research-OS-User"] = "alice"
+                headers["X-Research-OS-Profile"] = "default"
+            request = Request(
+                f"http://{host}:{port}/v3/chat",
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            try:
+                try:
+                    with urlopen(request, timeout=2) as response:
+                        status = response.status
+                        body = response.read().decode("utf-8")
+                except HTTPError as exc:
+                    status = exc.code
+                    body = exc.read().decode("utf-8")
+            finally:
+                service.shutdown()
+                thread.join(timeout=2)
+            decoded = json.loads(body)
+            self.assertIsInstance(decoded, dict)
+            return status, decoded
 
     def test_adaptive_scale_profiles(self) -> None:
         cases = (
@@ -123,6 +166,47 @@ class V3CleanCoreTests(unittest.TestCase):
     def test_local_service_rejects_non_loopback_binding(self) -> None:
         with self.assertRaisesRegex(ValueError, "must bind to a loopback address"):
             V3LocalService(host="0.0.0.0", port=0)
+
+    def test_chat_endpoint_accepts_canonical_message_contract(self) -> None:
+        status, payload = self._post_chat(
+            {
+                "message": "hello",
+                "session_id": "session-1",
+                "provider": "auto",
+                "mode": "answer",
+            }
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["contract"], "research-os-v3-chat-v1")
+        self.assertEqual(payload["text"], "mock:hello")
+        self.assertEqual(payload["answer"], "mock:hello")
+        self.assertEqual(payload["provider"], "mock")
+        self.assertEqual(payload["input_field"], "message")
+        self.assertEqual(payload["session_id"], "session-1")
+        self.assertEqual(payload["user_id"], "alice")
+        self.assertEqual(payload["profile_id"], "default")
+        self.assertIn("decision", payload)
+
+    def test_chat_endpoint_accepts_legacy_text_alias(self) -> None:
+        status, payload = self._post_chat({"text": "legacy request"})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["text"], "mock:legacy request")
+        self.assertEqual(payload["input_field"], "text")
+
+    def test_chat_endpoint_returns_actionable_invalid_body_error(self) -> None:
+        status, payload = self._post_chat({"provider": "auto"})
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"], "invalid request body")
+        self.assertEqual(
+            payload["accepted_input_fields"],
+            ["message", "text", "prompt", "question"],
+        )
+
+    def test_chat_endpoint_requires_user_isolation_header(self) -> None:
+        status, payload = self._post_chat({"message": "hello"}, include_user=False)
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"], "missing user context")
+        self.assertEqual(payload["required_header"], "X-Research-OS-User")
 
     def test_data_layout_is_idempotent_and_preserves_existing_data(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
