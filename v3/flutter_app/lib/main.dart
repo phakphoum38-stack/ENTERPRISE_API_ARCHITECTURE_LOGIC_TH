@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 
 import 'src/api/v3_api.dart';
-import 'src/research_os_v3_app.dart';
+import 'src/research_os_full_app.dart';
 import 'src/startup_probe.dart';
 
 void main() {
@@ -27,7 +27,7 @@ void main() {
     profileId: _safeIdentifier(rawProfile, fallbackPrefix: 'profile'),
   );
 
-  runApp(ResearchOSV3App(api: api));
+  runApp(ResearchOSFullApp(api: api));
 
   // Paint first, then prove loopback connectivity and user isolation context.
   unawaited(StartupProbe(api).run());
