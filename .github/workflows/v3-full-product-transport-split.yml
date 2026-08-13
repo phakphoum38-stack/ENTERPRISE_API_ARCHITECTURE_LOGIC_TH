@@ -1,0 +1,215 @@
+name: Research OS Full Product V3 Transport Split
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/research-os-self-build-lab-2026-08-13
+    paths:
+      - '.github/workflows/v3-full-product-transport-split.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  split-verified-product:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_RUN_ID: '31706836322'
+      SOURCE_SHA: '9fe426891fe1abf58c07a020baa0fea4a23b8d77'
+      SOURCE_ARTIFACT: 'research-os-full-product-v3-9fe426891fe1abf58c07a020baa0fea4a23b8d77'
+
+    steps:
+      - name: Checkout transport workflow
+        uses: actions/checkout@v4
+
+      - name: Download exact passed Full Product V3 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SOURCE_ARTIFACT }}
+          path: transport/input
+          github-token: ${{ github.token }}
+          repository: phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Split original archive without changing content
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path transport/out/setup -Force | Out-Null
+          New-Item -ItemType Directory -Path transport/out/parts -Force | Out-Null
+          New-Item -ItemType Directory -Path transport/out/meta -Force | Out-Null
+
+          $archive = Get-ChildItem transport/input -Recurse -File -Filter 'Research_OS_FULL_PRODUCT_V3_*.zip' | Select-Object -First 1
+          if (-not $archive) { throw 'Original Full Product V3 archive not found in passed artifact' }
+          $setup = Get-ChildItem transport/input -Recurse -File -Filter 'Research-OS-V3-Setup-*-x64.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Original Setup EXE not found in passed artifact' }
+          $productManifest = Get-ChildItem transport/input -Recurse -File -Filter 'FULL_PRODUCT_MANIFEST.json' | Select-Object -First 1
+
+          Copy-Item $setup.FullName "transport/out/setup/$($setup.Name)" -Force
+          if ($productManifest) { Copy-Item $productManifest.FullName transport/out/meta/FULL_PRODUCT_MANIFEST.json -Force }
+
+          $archiveHash = (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $chunkBytes = 200MB
+          $buffer = New-Object byte[] (4MB)
+          $input = [System.IO.File]::OpenRead($archive.FullName)
+          $parts = @()
+          try {
+            $index = 1
+            while ($input.Position -lt $input.Length) {
+              $partName = "$($archive.Name).part{0:d3}" -f $index
+              $partPath = Join-Path 'transport/out/parts' $partName
+              $output = [System.IO.File]::Create($partPath)
+              try {
+                $remaining = [Math]::Min([long]$chunkBytes, $input.Length - $input.Position)
+                while ($remaining -gt 0) {
+                  $want = [int][Math]::Min([long]$buffer.Length, $remaining)
+                  $read = $input.Read($buffer, 0, $want)
+                  if ($read -le 0) { throw 'Unexpected EOF while splitting archive' }
+                  $output.Write($buffer, 0, $read)
+                  $remaining -= $read
+                }
+              } finally {
+                $output.Dispose()
+              }
+              $partFile = Get-Item $partPath
+              $parts += [ordered]@{
+                name = $partFile.Name
+                size = $partFile.Length
+                sha256 = (Get-FileHash $partFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              }
+              $index++
+            }
+          } finally {
+            $input.Dispose()
+          }
+
+          if ($parts.Count -lt 1 -or $parts.Count -gt 4) { throw "Unexpected transport part count: $($parts.Count)" }
+
+          $transport = [ordered]@{
+            schema_version = 1
+            contract = 'research-os-full-product-v3-transport-only'
+            status = 'passed-source-preserved'
+            source_run_id = [long]$env:SOURCE_RUN_ID
+            source_sha = $env:SOURCE_SHA
+            source_artifact = $env:SOURCE_ARTIFACT
+            content_changed = $false
+            reason = 'Transport split only; connector download ceiling is 512 MB.'
+            original_archive = [ordered]@{
+              name = $archive.Name
+              size = $archive.Length
+              sha256 = $archiveHash
+            }
+            setup = [ordered]@{
+              name = $setup.Name
+              size = $setup.Length
+              sha256 = $setupHash
+            }
+            chunk_size_bytes = [long]$chunkBytes
+            parts = $parts
+          }
+          $transport | ConvertTo-Json -Depth 8 | Set-Content transport/out/meta/TRANSPORT_MANIFEST.json -Encoding utf8
+
+          $reassemble = @'
+          param(
+            [string]$PartsDirectory = '.',
+            [string]$ManifestPath = '.\TRANSPORT_MANIFEST.json'
+          )
+          $ErrorActionPreference = 'Stop'
+          $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
+          $target = Join-Path $PartsDirectory $manifest.original_archive.name
+          $output = [System.IO.File]::Create($target)
+          try {
+            foreach ($part in $manifest.parts) {
+              $path = Join-Path $PartsDirectory $part.name
+              if (-not (Test-Path $path)) { throw "Missing transport part: $($part.name)" }
+              $actualPartHash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($actualPartHash -ne $part.sha256) { throw "Part checksum mismatch: $($part.name)" }
+              $input = [System.IO.File]::OpenRead($path)
+              try { $input.CopyTo($output) } finally { $input.Dispose() }
+            }
+          } finally { $output.Dispose() }
+          $actual = (Get-FileHash $target -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $manifest.original_archive.sha256) { throw 'Reassembled archive checksum mismatch' }
+          Write-Host "PASS: $target"
+          Write-Host "SHA256: $actual"
+          '@
+          $reassemble | Set-Content transport/out/meta/REASSEMBLE_FULL_ARCHIVE.ps1 -Encoding utf8
+
+          Write-Host '=== TRANSPORT MANIFEST ==='
+          Get-Content transport/out/meta/TRANSPORT_MANIFEST.json
+          Write-Host '=== OUTPUT FILES ==='
+          Get-ChildItem transport/out -Recurse -File | Select-Object FullName,Length
+
+      - name: Verify split is byte-exact before upload
+        shell: pwsh
+        run: |
+          $manifest = Get-Content transport/out/meta/TRANSPORT_MANIFEST.json -Raw | ConvertFrom-Json
+          $temp = Join-Path $env:RUNNER_TEMP $manifest.original_archive.name
+          $output = [System.IO.File]::Create($temp)
+          try {
+            foreach ($part in $manifest.parts) {
+              $input = [System.IO.File]::OpenRead((Join-Path 'transport/out/parts' $part.name))
+              try { $input.CopyTo($output) } finally { $input.Dispose() }
+            }
+          } finally { $output.Dispose() }
+          $actual = (Get-FileHash $temp -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $manifest.original_archive.sha256) { throw 'Byte-exact reassembly verification failed' }
+          if ((Get-Item $temp).Length -ne [long]$manifest.original_archive.size) { throw 'Reassembled size mismatch' }
+          Remove-Item $temp -Force
+          Write-Host "PASS byte-exact archive SHA256: $actual"
+
+      - name: Upload Setup EXE transport artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-full-product-v3-setup-${{ env.SOURCE_SHA }}
+          path: transport/out/setup/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 001
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-full-product-v3-archive-part001-${{ env.SOURCE_SHA }}
+          path: transport/out/parts/*.part001
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 002
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-full-product-v3-archive-part002-${{ env.SOURCE_SHA }}
+          path: transport/out/parts/*.part002
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 003
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-full-product-v3-archive-part003-${{ env.SOURCE_SHA }}
+          path: transport/out/parts/*.part003
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 004
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-full-product-v3-archive-part004-${{ env.SOURCE_SHA }}
+          path: transport/out/parts/*.part004
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload transport evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-full-product-v3-transport-meta-${{ env.SOURCE_SHA }}
+          path: transport/out/meta/*
+          if-no-files-found: error
+          retention-days: 14
