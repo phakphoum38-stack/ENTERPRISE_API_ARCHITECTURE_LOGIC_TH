@@ -1,0 +1,183 @@
+name: Research OS V3 Self-Build Virtual Lab
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/research-os-self-build-lab-2026-08-13
+    paths:
+      - 'v3/research_os_v3/self_build.py'
+      - 'v3/scripts/self_build_lab.py'
+      - 'v3/tests/test_self_build_lab.py'
+      - 'docs/SELF_BUILD_VIRTUAL_LAB.md'
+      - '.github/workflows/v3-self-build-lab.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-self-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  self-build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout canonical teaching source
+        uses: actions/checkout@v4
+
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate the self-build teacher
+        working-directory: v3
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -p 'test_self_build_lab.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'Self-build teacher tests failed' }
+
+      - name: Research OS creates its isolated virtual workspace
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lab = 'D:\research-os-self-build'
+          if (Test-Path $lab) { Remove-Item $lab -Recurse -Force }
+          python v3/scripts/self_build_lab.py `
+            --source "$env:GITHUB_WORKSPACE" `
+            --workspace $lab `
+            --source-sha "$env:GITHUB_SHA"
+          if (-not (Test-Path "$lab\SELF_BUILD_MANIFEST.json" -PathType Leaf)) {
+            throw 'SELF_BUILD_MANIFEST.json missing'
+          }
+          $manifest = Get-Content "$lab\SELF_BUILD_MANIFEST.json" -Raw | ConvertFrom-Json
+          if ($manifest.contract -ne 'research-os-self-build-lab-v1') { throw 'Unexpected self-build contract' }
+          if ([int]$manifest.file_count -lt 1) { throw 'Self-build workspace is empty' }
+          if ($manifest.capabilities.tool_discovery_process.Count -ne 7) { throw 'Tool discovery lesson incomplete' }
+          Write-Host "Staged files: $($manifest.file_count)"
+          Write-Host "Tree SHA256: $($manifest.source_tree_sha256)"
+
+      - name: Prove V3 core from the created copy
+        working-directory: D:\research-os-self-build\v3
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'V3 tests failed inside self-created workspace' }
+          python scripts/factory_execution_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'Factory execution smoke failed inside self-created workspace' }
+
+      - name: Build Flutter Windows EXE from the created copy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $app = 'D:\research-os-self-build\v3\flutter_app'
+          Push-Location $app
+          try {
+            flutter create --platforms=windows --project-name=research_os_v3_flutter .
+            if ($LASTEXITCODE -ne 0) { throw 'flutter create failed' }
+            flutter pub get
+            if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+            flutter analyze
+            if ($LASTEXITCODE -ne 0) { throw 'flutter analyze failed' }
+            flutter test
+            if ($LASTEXITCODE -ne 0) { throw 'flutter test failed' }
+            flutter build windows --release
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows release build failed' }
+          }
+          finally {
+            Pop-Location
+          }
+          $exe = Join-Path $app 'build\windows\x64\runner\Release\research_os_v3_flutter.exe'
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "Research OS app EXE missing: $exe" }
+
+      - name: Build Windows ServiceHost from the created copy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'D:\research-os-self-build\out\service'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          dotnet publish 'D:\research-os-self-build\v3\windows_service\ResearchOS.V3.ServiceHost.csproj' `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:DebugType=None `
+            -o $out
+          if ($LASTEXITCODE -ne 0) { throw 'V3 ServiceHost publish failed' }
+          $exe = Join-Path $out 'ResearchOS.V3.ServiceHost.exe'
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "ServiceHost EXE missing: $exe" }
+
+      - name: Write self-build evidence
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lab = 'D:\research-os-self-build'
+          $appExe = "$lab\v3\flutter_app\build\windows\x64\runner\Release\research_os_v3_flutter.exe"
+          $serviceExe = "$lab\out\service\ResearchOS.V3.ServiceHost.exe"
+          $manifest = Get-Content "$lab\SELF_BUILD_MANIFEST.json" -Raw | ConvertFrom-Json
+          $evidence = [ordered]@{
+            schema_version = 1
+            contract = 'research-os-self-build-evidence-v1'
+            source_sha = $env:GITHUB_SHA
+            source_tree_sha256 = $manifest.source_tree_sha256
+            staged_file_count = [int]$manifest.file_count
+            tool_discovery_steps = [int]$manifest.capabilities.tool_discovery_process.Count
+            v3_tests = 'passed'
+            factory_smoke = 'passed'
+            flutter_windows = [ordered]@{
+              filename = (Split-Path $appExe -Leaf)
+              bytes = (Get-Item $appExe).Length
+              sha256 = (Get-FileHash $appExe -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            service_host = [ordered]@{
+              filename = (Split-Path $serviceExe -Leaf)
+              bytes = (Get-Item $serviceExe).Length
+              sha256 = (Get-FileHash $serviceExe -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            source_mutated_by_builder = $false
+            deployed = $false
+            merged = $false
+          }
+          $evidence | ConvertTo-Json -Depth 8 | Set-Content "$lab\SELF_BUILD_EVIDENCE.json" -Encoding UTF8
+          Get-Content "$lab\SELF_BUILD_EVIDENCE.json"
+
+      - name: Assemble proof artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lab = 'D:\research-os-self-build'
+          $artifact = Join-Path $env:GITHUB_WORKSPACE 'self-build-proof'
+          if (Test-Path $artifact) { Remove-Item $artifact -Recurse -Force }
+          New-Item -ItemType Directory -Path $artifact -Force | Out-Null
+          Copy-Item "$lab\SELF_BUILD_MANIFEST.json" $artifact
+          Copy-Item "$lab\SELF_BUILD_EVIDENCE.json" $artifact
+          Copy-Item "$lab\v3\flutter_app\build\windows\x64\runner\Release" "$artifact\flutter-windows" -Recurse
+          Copy-Item "$lab\out\service" "$artifact\service-host" -Recurse
+
+      - name: Upload self-built Research OS proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-self-built-windows-${{ github.sha }}
+          path: self-build-proof
+          if-no-files-found: error
+          retention-days: 14
