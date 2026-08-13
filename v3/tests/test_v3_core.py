@@ -6,14 +6,17 @@ from pathlib import Path
 from research_os_v3 import (
     CompletionRequest,
     DataLayout,
+    MemoryStore,
     OpenAICompatibleProvider,
     ProviderRegistry,
     ScaleTier,
     SkillOrigin,
     UnifiedMasterOrchestrator,
     UnifiedSkillRegistry,
+    UserContext,
     V3LocalService,
     Workload,
+    health_contract,
     master_contract,
     providers_contract,
 )
@@ -49,13 +52,14 @@ class V3CleanCoreTests(unittest.TestCase):
     def setUp(self) -> None:
         self.master = UnifiedMasterOrchestrator()
 
-    def test_adaptive_scale_profiles(self) -> None:
+    def test_adaptive_scale_profiles_include_10x10(self) -> None:
         cases = (
             (Workload(estimated_leaf_tasks=1), ScaleTier.TIER_3_1, 3),
             (Workload(estimated_leaf_tasks=4), ScaleTier.TIER_3_3, 27),
             (Workload(estimated_leaf_tasks=30), ScaleTier.TIER_6_3, 216),
             (Workload(estimated_leaf_tasks=217), ScaleTier.TIER_3_6, 729),
             (Workload(estimated_leaf_tasks=730), ScaleTier.TIER_6_6, 46656),
+            (Workload(estimated_leaf_tasks=46657), ScaleTier.TIER_10_10, 10_000_000_000),
         )
         for workload, expected_tier, expected_capacity in cases:
             with self.subTest(workload=workload):
@@ -63,10 +67,17 @@ class V3CleanCoreTests(unittest.TestCase):
                 self.assertEqual(decision.profile.tier, expected_tier)
                 self.assertEqual(decision.profile.capacity, expected_capacity)
 
-    def test_max_profile_uses_backpressure_when_demand_exceeds_capacity(self) -> None:
-        decision = self.master.decide(Workload(estimated_leaf_tasks=50000))
-        self.assertEqual(decision.profile.tier, ScaleTier.TIER_6_6)
+    def test_max_profile_uses_backpressure_when_demand_exceeds_10x10(self) -> None:
+        decision = self.master.decide(Workload(estimated_leaf_tasks=10_000_000_001))
+        self.assertEqual(decision.profile.tier, ScaleTier.TIER_10_10)
+        self.assertEqual(decision.profile.capacity, 10_000_000_000)
         self.assertIn("queue/backpressure", decision.reason)
+
+    def test_health_contract_advertises_logical_10x10_without_eager_spawn(self) -> None:
+        payload = health_contract()
+        self.assertEqual(payload["maximum_scale"], "10^10")
+        self.assertEqual(payload["maximum_logical_capacity"], 10_000_000_000)
+        self.assertEqual(payload["capacity_policy"], "lazy-bounded-execution")
 
     def test_unified_skill_registry_contains_v1_v2_v3_native_skills(self) -> None:
         registry = UnifiedSkillRegistry()
@@ -75,8 +86,46 @@ class V3CleanCoreTests(unittest.TestCase):
         self.assertTrue(registry.by_origin(SkillOrigin.V2))
         self.assertTrue(registry.by_origin(SkillOrigin.V3))
         self.assertTrue(all(skill.native_v3 for skill in registry.list()))
-        self.assertIsNotNone(registry.get("adaptive-hierarchy"))
+        for required in (
+            "adaptive-hierarchy",
+            "chat-runtime",
+            "memory-persistence",
+            "agent-execution",
+            "governed-tool-execution",
+        ):
+            self.assertIsNotNone(registry.get(required))
         self.assertIs(self.master.skills.get("adaptive-hierarchy").origin, SkillOrigin.V3)
+
+    def test_unified_tools_enforce_write_approval(self) -> None:
+        echo = self.master.execute_tool("echo", {"text": "ok"})
+        self.assertEqual(echo["text"], "ok")
+        artifact = self.master.tools.get("artifact-note")
+        self.assertIsNotNone(artifact)
+        self.assertTrue(artifact.approval_required)
+        with self.assertRaises(PermissionError):
+            self.master.execute_tool("artifact-note", {"text": "blocked"})
+
+    def test_agent_registry_is_capability_validated(self) -> None:
+        names = {agent.name for agent in self.master.agents.list()}
+        self.assertTrue({"researcher", "architect", "builder", "reviewer", "release-guardian"} <= names)
+        for agent in self.master.agents.list():
+            for skill in agent.skills:
+                self.assertIsNotNone(self.master.skills.get(skill))
+            for tool in agent.tools:
+                self.assertIsNotNone(self.master.tools.get(tool))
+
+    def test_memory_is_isolated_and_searchable(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            layout = DataLayout(Path(temporary)).ensure()
+            store = MemoryStore(layout)
+            alice = UserContext(user_id="alice", profile_id="default")
+            bob = UserContext(user_id="bob", profile_id="default")
+            store.add(alice, "Research OS uses a governed 10^10 logical ceiling")
+            store.add(bob, "private bob memory")
+            hits = store.search(alice, "10^10 governed")
+            self.assertEqual(len(hits), 1)
+            self.assertIn("10^10", hits[0].text)
+            self.assertEqual(store.search(alice, "bob"), [])
 
     def test_factory_pipeline_is_deterministic(self) -> None:
         _, plan = self.master.plan(Workload(estimated_leaf_tasks=30))
@@ -151,12 +200,14 @@ class V3CleanCoreTests(unittest.TestCase):
             )
             self.assertTrue(all(path.is_dir() for path in second.directories().values()))
 
-    def test_master_contract_is_stable(self) -> None:
+    def test_master_contract_is_full_system_and_reports_system_ceiling(self) -> None:
         decision = self.master.decide(Workload(estimated_leaf_tasks=730))
         payload = master_contract(decision)
-        self.assertEqual(payload["contract"], "unified-master-orchestrator-v3-clean")
+        self.assertEqual(payload["contract"], "unified-master-orchestrator-v3-full")
         self.assertEqual(payload["scale"], "6^6")
         self.assertEqual(payload["maximum_leaf_capacity"], 46656)
+        self.assertEqual(payload["system_maximum_scale"], "10^10")
+        self.assertEqual(payload["system_maximum_logical_capacity"], 10_000_000_000)
 
 
 if __name__ == "__main__":
