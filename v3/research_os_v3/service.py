@@ -9,9 +9,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .contracts import health_contract, master_contract, providers_contract
+from .memory import MemoryStore
 from .models import Workload
 from .orchestrator import UnifiedMasterOrchestrator
-from .providers import CompletionRequest
 from .storage import DataLayout
 from .user_context import UserContext
 
@@ -46,6 +46,7 @@ class V3LocalService:
     def build_server(self) -> ThreadingHTTPServer:
         orchestrator = self.orchestrator
         data_layout = self.data_layout
+        memory = MemoryStore(data_layout)
         audit_path = self.audit_path
         audit_lock = threading.Lock()
         if audit_path is not None:
@@ -170,11 +171,34 @@ class V3LocalService:
                         },
                     )
                     return
+                if parsed.path == "/v3/memory":
+                    context = self._required_user_context()
+                    if context is None:
+                        return
+                    query = parse_qs(parsed.query)
+                    text = query.get("q", [""])[0]
+                    try:
+                        limit = max(1, min(int(query.get("limit", ["20"])[0]), 100))
+                    except ValueError:
+                        limit = 20
+                    records = (
+                        memory.search(context, text, limit=limit)
+                        if text
+                        else memory.list(context, limit=limit)
+                    )
+                    self._write_json(
+                        200,
+                        {
+                            "memory": [record.to_dict() for record in records],
+                            "count": len(records),
+                        },
+                    )
+                    return
                 self._write_json(404, {"error": "not found"})
 
             def do_POST(self) -> None:  # noqa: N802 - stdlib handler contract
                 parsed = urlparse(self.path)
-                if parsed.path != "/v3/chat":
+                if parsed.path not in {"/v3/chat", "/v3/memory"}:
                     self._write_json(404, {"error": "not found"})
                     return
 
@@ -184,12 +208,48 @@ class V3LocalService:
 
                 try:
                     payload = self._read_json_object()
+                except ValueError as exc:
+                    self._write_json(
+                        400,
+                        {"error": "invalid request body", "detail": str(exc)},
+                    )
+                    return
+
+                if parsed.path == "/v3/memory":
+                    text = payload.get("text")
+                    raw_tags = payload.get("tags", [])
+                    if not isinstance(text, str) or not text.strip():
+                        self._write_json(
+                            400,
+                            {"error": "invalid request body", "detail": "text is required"},
+                        )
+                        return
+                    if not isinstance(raw_tags, list):
+                        self._write_json(
+                            400,
+                            {"error": "invalid request body", "detail": "tags must be an array"},
+                        )
+                        return
+                    try:
+                        record = memory.add(
+                            context,
+                            text,
+                            tags=tuple(str(tag) for tag in raw_tags),
+                        )
+                    except ValueError as exc:
+                        self._write_json(400, {"error": str(exc)})
+                        return
+                    self._write_json(201, {"memory": record.to_dict()})
+                    return
+
+                try:
                     message, input_field = self._chat_input(payload)
                     workload = Workload(
                         estimated_leaf_tasks=int(payload.get("tasks", 1)),
                         risk=int(payload.get("risk", 1)),
                         parallelism=int(payload.get("parallelism", 1)),
                     )
+                    memory_limit = max(0, min(int(payload.get("memory_limit", 8)), 20))
                 except (TypeError, ValueError) as exc:
                     self._write_json(
                         400,
@@ -219,14 +279,20 @@ class V3LocalService:
                 session_id = str(payload.get("session_id", "default")).strip() or "default"
                 mode = str(payload.get("mode", "answer")).strip() or "answer"
 
+                hits = (
+                    memory.search(context, message, limit=memory_limit)
+                    if memory_limit
+                    else []
+                )
+                memory_context = "\n".join(f"- {item.text}" for item in hits) or None
+
                 try:
                     decision = orchestrator.decide(workload)
-                    completion = orchestrator.providers.complete(
-                        CompletionRequest(
-                            prompt=message,
-                            system_prompt=system_prompt,
-                        ),
-                        preferred=preferred_provider,
+                    completion = orchestrator.answer(
+                        message,
+                        memory_context=memory_context,
+                        preferred_provider=preferred_provider,
+                        system_prompt=system_prompt,
                     )
                 except KeyError:
                     self._write_json(
@@ -237,7 +303,7 @@ class V3LocalService:
                         },
                     )
                     return
-                except RuntimeError as exc:
+                except (RuntimeError, ValueError) as exc:
                     self._write_json(
                         502,
                         {
@@ -262,8 +328,8 @@ class V3LocalService:
                         "session_id": session_id,
                         "mode": mode,
                         "input_field": input_field,
-                        "memory_hits": [],
-                        "memory_count": 0,
+                        "memory_hits": [item.to_dict() for item in hits],
+                        "memory_count": len(hits),
                         "decision": {
                             "scale": decision.profile.tier.value,
                             "maximum_leaf_capacity": decision.profile.capacity,
