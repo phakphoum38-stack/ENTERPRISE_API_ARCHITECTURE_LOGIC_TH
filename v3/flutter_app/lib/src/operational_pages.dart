@@ -1,3 +1,4 @@
+// Full Product trigger: live operational pages are the canonical workspace/system surface.
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
