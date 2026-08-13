@@ -95,6 +95,10 @@ jobs:
         run: |
           flutter create --platforms=windows --project-name=research_os_v3_flutter .
           if ($LASTEXITCODE -ne 0) { throw 'flutter create failed' }
+          if (Test-Path 'test\widget_test.dart') {
+            Remove-Item 'test\widget_test.dart' -Force
+            Write-Host 'Removed Flutter-generated MyApp template test after scaffold creation.'
+          }
           flutter pub get
           if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
           dart fix --apply
