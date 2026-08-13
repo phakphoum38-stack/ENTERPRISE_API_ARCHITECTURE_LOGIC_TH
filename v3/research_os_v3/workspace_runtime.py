@@ -4,64 +4,40 @@ import hashlib
 import os
 import platform
 import sys
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .storage import DataLayout
-from .user_context import UserContext
-
-
-@dataclass(frozen=True)
-class WorkspaceRoot:
-    name: str
-    path: Path
-    kind: str
-
-    def to_dict(self) -> dict[str, object]:
-        return {"name": self.name, "path": str(self.path), "kind": self.kind}
-
 
 class WorkspaceRuntime:
-    """Read-only Full Control Center runtime with strict root confinement."""
+    """Read-only Full Control Center runtime confined to DRIVE_VIRTUAL_CLOUD."""
 
     MAX_LIST = 500
     MAX_TEXT_BYTES = 262_144
 
-    def __init__(self, data_layout: DataLayout) -> None:
-        self.data_layout = data_layout
+    def __init__(self, configured_root: Path | None = None) -> None:
+        self.configured_root = configured_root
 
-    def roots(self, context: UserContext) -> tuple[WorkspaceRoot, ...]:
-        user_root = self.data_layout.for_user(context).ensure().root.resolve()
-        roots = [WorkspaceRoot("user", user_root, "user-data")]
+    def status(self) -> dict[str, object]:
         drive = self._detect_drive_root()
-        if drive is not None:
-            roots.append(WorkspaceRoot("drive", drive, "google-drive-mirror"))
-        return tuple(roots)
-
-    def status(self, context: UserContext) -> dict[str, object]:
-        roots = self.roots(context)
-        drive = next((item for item in roots if item.name == "drive"), None)
-        repos = self.repositories(context)
-        backups = self.backups(context)
+        repos = self.repositories()
+        backups = self.backups()
         return {
-            "roots": [item.to_dict() for item in roots],
             "drive_ready": drive is not None,
+            "drive_root": str(drive) if drive is not None else None,
             "repository_count": len(repos),
             "backup_count": len(backups),
             "shell_mode": "research-os-commands",
             "arbitrary_os_shell": False,
         }
 
-    def list_files(self, context: UserContext, arguments: dict[str, object]) -> dict[str, object]:
-        root_name = str(arguments.get("root", "user")).strip().lower() or "user"
+    def list_files(self, arguments: dict[str, object]) -> dict[str, object]:
         relative = str(arguments.get("path", "")).strip()
-        root = self._root(context, root_name)
-        target = self._resolve_under(root.path, relative)
+        root = self._required_drive_root()
+        target = self._resolve_under(root, relative)
         if not target.exists():
-            raise ValueError("workspace path does not exist")
+            raise ValueError("Drive workspace path does not exist")
         if not target.is_dir():
-            raise ValueError("workspace path is not a directory")
+            raise ValueError("Drive workspace path is not a directory")
         entries: list[dict[str, object]] = []
         for item in sorted(target.iterdir(), key=lambda value: (not value.is_dir(), value.name.lower()))[: self.MAX_LIST]:
             try:
@@ -71,43 +47,41 @@ class WorkspaceRuntime:
             entries.append(
                 {
                     "name": item.name,
-                    "path": item.relative_to(root.path).as_posix(),
+                    "path": item.relative_to(root).as_posix(),
                     "directory": item.is_dir(),
                     "size": stat.st_size if item.is_file() else 0,
                     "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
                 }
             )
         return {
-            "root": root.to_dict(),
-            "path": target.relative_to(root.path).as_posix() if target != root.path else "",
+            "root": str(root),
+            "path": target.relative_to(root).as_posix() if target != root else "",
             "entries": entries,
             "count": len(entries),
         }
 
-    def read_text(self, context: UserContext, arguments: dict[str, object]) -> dict[str, object]:
-        root_name = str(arguments.get("root", "user")).strip().lower() or "user"
+    def read_text(self, arguments: dict[str, object]) -> dict[str, object]:
         relative = str(arguments.get("path", "")).strip()
-        root = self._root(context, root_name)
-        target = self._resolve_under(root.path, relative)
+        root = self._required_drive_root()
+        target = self._resolve_under(root, relative)
         if not target.is_file():
-            raise ValueError("workspace file does not exist")
+            raise ValueError("Drive workspace file does not exist")
         size = target.stat().st_size
         if size > self.MAX_TEXT_BYTES:
             raise ValueError(f"text preview is limited to {self.MAX_TEXT_BYTES} bytes")
         raw = target.read_bytes()
         return {
-            "root": root.name,
-            "path": target.relative_to(root.path).as_posix(),
+            "path": target.relative_to(root).as_posix(),
             "size": size,
             "sha256": hashlib.sha256(raw).hexdigest(),
             "text": raw.decode("utf-8", errors="replace"),
         }
 
-    def repositories(self, context: UserContext) -> list[dict[str, object]]:
-        drive = self._optional_root(context, "drive")
+    def repositories(self) -> list[dict[str, object]]:
+        drive = self._detect_drive_root()
         if drive is None:
             return []
-        base = drive.path / "github" / "repositories"
+        base = drive / "github" / "repositories"
         if not base.is_dir():
             return []
         rows: list[dict[str, object]] = []
@@ -117,18 +91,18 @@ class WorkspaceRuntime:
                     {
                         "owner": owner.name,
                         "name": repo.name,
-                        "path": repo.relative_to(drive.path).as_posix(),
+                        "path": repo.relative_to(drive).as_posix(),
                         "files": self._count_files(repo, limit=20_000),
-                        "bundle": self._bundle_info(drive.path, repo.name),
+                        "bundle": self._bundle_info(drive, repo.name),
                     }
                 )
                 if len(rows) >= self.MAX_LIST:
                     return rows
         return rows
 
-    def github_status(self, context: UserContext) -> dict[str, object]:
-        drive = self._optional_root(context, "drive")
-        repos = self.repositories(context)
+    def github_status(self) -> dict[str, object]:
+        drive = self._detect_drive_root()
+        repos = self.repositories()
         return {
             "mode": "local-mirror",
             "network_required_for_inventory": False,
@@ -138,25 +112,23 @@ class WorkspaceRuntime:
             "note": "Online GitHub mutations require a separate governed integration/tool.",
         }
 
-    def drive_status(self, context: UserContext) -> dict[str, object]:
-        drive = self._optional_root(context, "drive")
+    def drive_status(self) -> dict[str, object]:
+        drive = self._detect_drive_root()
         if drive is None:
-            return {"configured": False, "available": False, "root": None, "directories": []}
-        directories = [item.name for item in sorted(drive.path.iterdir(), key=lambda item: item.name.lower()) if item.is_dir()][:100]
-        return {"configured": True, "available": True, "root": str(drive.path), "directories": directories}
+            return {"configured": self.configured_root is not None or bool(os.environ.get("RESEARCH_OS_DRIVE_ROOT")), "available": False, "root": None, "directories": []}
+        directories = [item.name for item in sorted(drive.iterdir(), key=lambda item: item.name.lower()) if item.is_dir()][:100]
+        return {"configured": True, "available": True, "root": str(drive), "directories": directories}
 
-    def runtime_status(self, context: UserContext) -> dict[str, object]:
-        user = self.data_layout.for_user(context).ensure()
+    def runtime_status(self) -> dict[str, object]:
         return {
             "python": platform.python_version(),
             "executable": str(Path(sys.executable).resolve()),
             "platform": platform.platform(),
-            "user_data_root": str(user.root.resolve()),
             "pid": os.getpid(),
             "service_process": True,
         }
 
-    def installer_status(self, context: UserContext) -> dict[str, object]:
+    def installer_status(self) -> dict[str, object]:
         executable = Path(sys.executable).resolve()
         candidates = [
             executable.parent,
@@ -178,16 +150,23 @@ class WorkspaceRuntime:
             "uninstall_policy": "remove-app-and-service-preserve-data",
         }
 
-    def backups(self, context: UserContext) -> list[dict[str, object]]:
-        destination = self._backup_root(context)
+    def backups(self) -> list[dict[str, object]]:
+        drive = self._detect_drive_root()
+        if drive is None:
+            return []
+        destination = drive / "backup" / "restore_points"
         if not destination.is_dir():
             return []
         rows: list[dict[str, object]] = []
-        for item in sorted(destination.glob("*.zip"), key=lambda path: path.stat().st_mtime, reverse=True)[: self.MAX_LIST]:
-            stat = item.stat()
+        for item in sorted(destination.rglob("*.zip"), key=lambda path: path.stat().st_mtime, reverse=True)[: self.MAX_LIST]:
+            try:
+                stat = item.stat()
+            except OSError:
+                continue
             rows.append(
                 {
                     "name": item.name,
+                    "path": item.relative_to(drive).as_posix(),
                     "size": stat.st_size,
                     "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
                     "sha256": self._sha256_file(item),
@@ -195,35 +174,34 @@ class WorkspaceRuntime:
             )
         return rows
 
-    def shell(self, context: UserContext, arguments: dict[str, object]) -> dict[str, object]:
+    def shell(self, arguments: dict[str, object]) -> dict[str, object]:
         command = str(arguments.get("command", "help")).strip().lower() or "help"
         if command == "help":
             return {"command": command, "commands": ["help", "workspace", "drive", "repos", "backups", "runtime", "installer"]}
         if command == "workspace":
-            return {"command": command, "output": self.status(context)}
+            return {"command": command, "output": self.status()}
         if command == "drive":
-            return {"command": command, "output": self.drive_status(context)}
+            return {"command": command, "output": self.drive_status()}
         if command == "repos":
-            return {"command": command, "output": self.repositories(context)}
+            return {"command": command, "output": self.repositories()}
         if command == "backups":
-            return {"command": command, "output": self.backups(context)}
+            return {"command": command, "output": self.backups()}
         if command == "runtime":
-            return {"command": command, "output": self.runtime_status(context)}
+            return {"command": command, "output": self.runtime_status()}
         if command == "installer":
-            return {"command": command, "output": self.installer_status(context)}
+            return {"command": command, "output": self.installer_status()}
         raise ValueError("unknown Research OS shell command")
 
-    def _root(self, context: UserContext, name: str) -> WorkspaceRoot:
-        root = self._optional_root(context, name)
+    def _required_drive_root(self) -> Path:
+        root = self._detect_drive_root()
         if root is None:
-            raise RuntimeError(f"workspace root is unavailable: {name}")
+            raise RuntimeError("DRIVE_VIRTUAL_CLOUD mirror is not configured or available")
         return root
-
-    def _optional_root(self, context: UserContext, name: str) -> WorkspaceRoot | None:
-        return next((item for item in self.roots(context) if item.name == name), None)
 
     def _detect_drive_root(self) -> Path | None:
         candidates: list[Path] = []
+        if self.configured_root is not None:
+            candidates.append(self.configured_root)
         configured = os.environ.get("RESEARCH_OS_DRIVE_ROOT")
         if configured:
             candidates.append(Path(configured).expanduser())
@@ -254,13 +232,8 @@ class WorkspaceRuntime:
                 return resolved
         return None
 
-    def _backup_root(self, context: UserContext) -> Path:
-        drive = self._optional_root(context, "drive")
-        if drive is not None:
-            return (drive.path / "backup" / "restore_points" / context.user_id / context.profile_id).resolve()
-        return (self.data_layout.for_user(context).ensure().root / "backups").resolve()
-
-    def _resolve_under(self, root: Path, relative: str) -> Path:
+    @staticmethod
+    def _resolve_under(root: Path, relative: str) -> Path:
         if not relative or relative in {".", "/"}:
             return root.resolve()
         candidate_path = Path(relative.replace("\\", "/"))
@@ -269,7 +242,7 @@ class WorkspaceRuntime:
         target = (root / candidate_path).resolve()
         resolved_root = root.resolve()
         if target != resolved_root and resolved_root not in target.parents:
-            raise ValueError("workspace path escaped allowed root")
+            raise ValueError("workspace path escaped Drive root")
         return target
 
     def _bundle_info(self, drive_root: Path, repo_name: str) -> dict[str, object] | None:
