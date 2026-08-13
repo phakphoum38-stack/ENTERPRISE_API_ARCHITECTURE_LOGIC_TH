@@ -12,6 +12,15 @@ if str(PROJECT_ROOT) not in sys.path:
 from research_os_v3 import DataLayout, UserContext
 
 
+def _logical_user_scope(root: Path) -> str:
+    """Return the stable users/... suffix without relying on Windows path aliases."""
+    parts = root.parts
+    for index, part in enumerate(parts):
+        if part.casefold() == "users":
+            return Path(*parts[index:]).as_posix()
+    raise AssertionError(f"user scope does not contain users segment: {root}")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="research-os-v3-data-") as temporary:
         layout = DataLayout(Path(temporary)).ensure()
@@ -48,8 +57,8 @@ def main() -> int:
             "preserved_existing_data": True,
             "cross_user_isolation": True,
             "legacy_root_preserved": True,
-            "user_a_scope": str(alice_again.root.relative_to(second.root)),
-            "user_b_scope": str(bob_again.root.relative_to(second.root)),
+            "user_a_scope": _logical_user_scope(alice_again.root),
+            "user_b_scope": _logical_user_scope(bob_again.root),
             "directories": sorted(alice_again.directories().keys()),
         }
         print(json.dumps(payload, indent=2, sort_keys=True))

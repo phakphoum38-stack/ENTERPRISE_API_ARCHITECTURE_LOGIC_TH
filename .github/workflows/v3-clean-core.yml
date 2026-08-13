@@ -5,8 +5,10 @@ on:
   push:
     branches:
       - architecture/v3-clean
+      - agent/v3-full-system-10x10
     paths:
       - 'v3/**'
+      - 'owner_special/research_os_friend/**'
       - '.github/workflows/v3-clean-core.yml'
 
 permissions:

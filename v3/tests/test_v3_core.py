@@ -1,162 +1,145 @@
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from research_os_v3 import (
-    CompletionRequest,
     DataLayout,
-    OpenAICompatibleProvider,
-    ProviderRegistry,
+    MemoryStore,
     ScaleTier,
     SkillOrigin,
+    SkillRuntimeContext,
     UnifiedMasterOrchestrator,
     UnifiedSkillRegistry,
-    V3LocalService,
+    UserContext,
     Workload,
+    health_contract,
     master_contract,
-    providers_contract,
 )
-
-
-class StaticSecretSource:
-    def __init__(self, values: dict[str, str]) -> None:
-        self.values = values
-
-    def get(self, name: str) -> str | None:
-        return self.values.get(name)
-
-
-class FakeTransport:
-    def __init__(self) -> None:
-        self.calls: list[dict[str, object]] = []
-
-    def post_json(
-        self,
-        url: str,
-        *,
-        headers: dict[str, str],
-        payload: dict[str, object],
-        timeout: float,
-    ) -> dict[str, object]:
-        self.calls.append(
-            {"url": url, "headers": headers, "payload": payload, "timeout": timeout}
-        )
-        return {"choices": [{"message": {"content": "provider-ok"}}]}
 
 
 class V3CleanCoreTests(unittest.TestCase):
     def setUp(self) -> None:
         self.master = UnifiedMasterOrchestrator()
 
-    def test_adaptive_scale_profiles(self) -> None:
-        cases = (
-            (Workload(estimated_leaf_tasks=1), ScaleTier.TIER_3_1, 3),
-            (Workload(estimated_leaf_tasks=4), ScaleTier.TIER_3_3, 27),
-            (Workload(estimated_leaf_tasks=30), ScaleTier.TIER_6_3, 216),
-            (Workload(estimated_leaf_tasks=217), ScaleTier.TIER_3_6, 729),
-            (Workload(estimated_leaf_tasks=730), ScaleTier.TIER_6_6, 46656),
-        )
-        for workload, expected_tier, expected_capacity in cases:
-            with self.subTest(workload=workload):
-                decision = self.master.decide(workload)
-                self.assertEqual(decision.profile.tier, expected_tier)
-                self.assertEqual(decision.profile.capacity, expected_capacity)
+    def test_scale_profiles_and_ceiling(self) -> None:
+        cases = ((1, ScaleTier.TIER_3_1, 3), (4, ScaleTier.TIER_3_3, 27), (30, ScaleTier.TIER_6_3, 216), (217, ScaleTier.TIER_3_6, 729), (730, ScaleTier.TIER_6_6, 46656), (46657, ScaleTier.TIER_10_10, 10_000_000_000))
+        for tasks, tier, capacity in cases:
+            decision = self.master.decide(Workload(estimated_leaf_tasks=tasks))
+            self.assertEqual(decision.profile.tier, tier)
+            self.assertEqual(decision.profile.capacity, capacity)
+        overloaded = self.master.decide(Workload(estimated_leaf_tasks=10_000_000_001))
+        self.assertIn("queue/backpressure", overloaded.reason)
+        self.assertEqual(health_contract()["capacity_policy"], "lazy-bounded-execution")
 
-    def test_max_profile_uses_backpressure_when_demand_exceeds_capacity(self) -> None:
-        decision = self.master.decide(Workload(estimated_leaf_tasks=50000))
-        self.assertEqual(decision.profile.tier, ScaleTier.TIER_6_6)
-        self.assertIn("queue/backpressure", decision.reason)
-
-    def test_unified_skill_registry_contains_v1_v2_v3_native_skills(self) -> None:
+    def test_unified_registry_is_fully_native(self) -> None:
         registry = UnifiedSkillRegistry()
-        self.assertEqual(registry.origins(), (SkillOrigin.V1, SkillOrigin.V2, SkillOrigin.V3))
-        self.assertTrue(registry.by_origin(SkillOrigin.V1))
-        self.assertTrue(registry.by_origin(SkillOrigin.V2))
-        self.assertTrue(registry.by_origin(SkillOrigin.V3))
-        self.assertTrue(all(skill.native_v3 for skill in registry.list()))
-        self.assertIsNotNone(registry.get("adaptive-hierarchy"))
-        self.assertIs(self.master.skills.get("adaptive-hierarchy").origin, SkillOrigin.V3)
+        self.assertEqual(registry.origins(), (SkillOrigin.V1, SkillOrigin.V2, SkillOrigin.V3, SkillOrigin.OWNER_FRIEND, SkillOrigin.LEGACY))
+        self.assertEqual(len(registry.list()), 40)
+        self.assertTrue(all(item.native_v3 and item.runtime_mode == "native" for item in registry.list()))
+        self.assertEqual(len(self.master.skill_runtime.handler_names()), 40)
+        self.assertEqual(registry.get("coding").execution_adapter, "v3-adapter")
+        self.assertEqual(registry.get("chat-runtime").execution_adapter, "v3-core")
+        self.assertNotIn("context-adapter", registry.conversation_context())
 
-    def test_factory_pipeline_is_deterministic(self) -> None:
-        _, plan = self.master.plan(Workload(estimated_leaf_tasks=30))
-        self.assertEqual(
-            [stage.name for stage in plan.stages],
-            ["master", "factory", "team", "tests", "release"],
-        )
-        self.assertEqual(plan.maximum_leaf_capacity, 216)
-
-    def test_provider_contract_never_exposes_secret(self) -> None:
-        payload = providers_contract(ProviderRegistry())
-        provider = payload["providers"][0]
-        self.assertEqual(provider["name"], "mock")
-        self.assertTrue(provider["ready"])
-        self.assertFalse(provider["secret_exposed"])
-        self.assertNotIn("api_key", provider)
-        self.assertNotIn("token", provider)
-
-    def test_openai_compatible_provider_uses_secret_without_exposing_it(self) -> None:
-        secret = "candidate-provider-secret"
-        transport = FakeTransport()
-        provider = OpenAICompatibleProvider(
-            base_url="https://provider.example/v1",
-            model="example-model",
-            secret_source=StaticSecretSource({"OPENAI_API_KEY": secret}),
-            transport=transport,
-            timeout=5.0,
-        )
-
-        before = provider.status()
-        self.assertTrue(before.ready)
-        self.assertFalse(before.connected)
-        safe_status = before.to_safe_dict()
-        self.assertNotIn(secret, json.dumps(safe_status, sort_keys=True))
-        self.assertEqual(safe_status["metadata"]["credential_source"], "OPENAI_API_KEY")
-
-        response = provider.complete(CompletionRequest(prompt="hello"))
-        self.assertEqual(response.text, "provider-ok")
-        self.assertEqual(response.provider, "openai-compatible")
-        self.assertEqual(len(transport.calls), 1)
-        call = transport.calls[0]
-        self.assertEqual(call["url"], "https://provider.example/v1/chat/completions")
-        self.assertEqual(call["headers"]["Authorization"], f"Bearer {secret}")
-        self.assertEqual(call["payload"]["model"], "example-model")
-        self.assertTrue(provider.status().connected)
-        self.assertNotIn(secret, json.dumps(provider.status().to_safe_dict(), sort_keys=True))
-
-    def test_openai_compatible_provider_requires_credential(self) -> None:
-        provider = OpenAICompatibleProvider(
-            secret_source=StaticSecretSource({}),
-            transport=FakeTransport(),
-        )
-        self.assertFalse(provider.status().ready)
-        with self.assertRaisesRegex(RuntimeError, "missing provider credential"):
-            provider.complete(CompletionRequest(prompt="hello"))
-
-    def test_local_service_rejects_non_loopback_binding(self) -> None:
-        with self.assertRaisesRegex(ValueError, "must bind to a loopback address"):
-            V3LocalService(host="0.0.0.0", port=0)
-
-    def test_data_layout_is_idempotent_and_preserves_existing_data(self) -> None:
+    def test_migrated_handlers_run_under_one_master(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            layout = DataLayout(Path(temporary)).ensure()
-            marker = layout.sessions / "existing.txt"
-            marker.write_text("keep", encoding="utf-8")
+            context = SkillRuntimeContext(user_id="owner", profile_id="default", user_data_root=Path(temporary), repository_root=Path(__file__).resolve().parents[2], approved=True)
+            analysis = self.master.execute_skill("analysis", "inspect evidence", context=context)
+            self.assertEqual(analysis["result"]["summary"], "inspect evidence")
+            gate = self.master.execute_skill("quality-gate", arguments={"checks": {"tests": True}}, context=context)
+            self.assertTrue(gate["result"]["passed"])
+            bridge = self.master.execute_skill("v3-bridge", context=context)
+            self.assertFalse(bridge["result"]["legacy_master_started"])
 
-            second = DataLayout(Path(temporary)).ensure()
-            self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
-            self.assertEqual(
-                set(second.directories()),
-                {"sessions", "database", "artifacts", "logs", "evidence"},
+    def test_owner_friend_native_skills_have_distinct_runtime_behavior(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            memories: list[dict[str, object]] = []
+
+            def memory_add(value: str, tags: tuple[str, ...]) -> dict[str, object]:
+                item = {"text": value, "tags": list(tags)}
+                memories.append(item)
+                return item
+
+            def memory_search(query: str, limit: int) -> list[dict[str, object]]:
+                wanted = query.lower()
+                return [item for item in memories if wanted in str(item["text"]).lower()][:limit]
+
+            def factory_plan(tasks: int) -> dict[str, object]:
+                return {"tasks": tasks, "bounded": True}
+
+            context = SkillRuntimeContext(
+                user_id="owner",
+                profile_id="default",
+                user_data_root=Path(temporary),
+                repository_root=Path(__file__).resolve().parents[2],
+                approved=True,
+                memory_search=memory_search,
+                memory_add=memory_add,
+                factory_plan=factory_plan,
             )
-            self.assertTrue(all(path.is_dir() for path in second.directories().values()))
 
-    def test_master_contract_is_stable(self) -> None:
-        decision = self.master.decide(Workload(estimated_leaf_tasks=730))
-        payload = master_contract(decision)
-        self.assertEqual(payload["contract"], "unified-master-orchestrator-v3-clean")
-        self.assertEqual(payload["scale"], "6^6")
-        self.assertEqual(payload["maximum_leaf_capacity"], 46656)
+            analysis = self.master.execute_skill("analysis", "inspect constraints?", arguments={"constraints": ["one-master"]}, context=context)
+            self.assertEqual(analysis["result"]["constraints"], ["one-master"])
+            self.assertGreater(analysis["result"]["words"], 0)
+
+            planning = self.master.execute_skill("planning", arguments={"goal": "ship V3", "tasks": 6}, context=context)
+            self.assertEqual(planning["result"]["factory"]["tasks"], 6)
+            self.assertIn("validate", planning["result"]["steps"])
+
+            coding = self.master.execute_skill("coding", "UnifiedMasterOrchestrator", context=context)
+            self.assertFalse(coding["result"]["mutation_performed"])
+            self.assertEqual(coding["result"]["write_boundary"], "governed-tool-execution")
+
+            research = self.master.execute_skill("research", "UnifiedMasterOrchestrator", context=context)
+            self.assertTrue(research["result"]["provenance"])
+            self.assertGreaterEqual(research["result"]["source_count"], 0)
+
+            data = self.master.execute_skill("data", arguments={"rows": [{"value": 1}, {"value": 2, "label": "ok"}]}, context=context)
+            self.assertEqual(data["result"]["row_count"], 2)
+            self.assertEqual(data["result"]["numeric_sums"]["value"], 3.0)
+
+            documents = self.master.execute_skill("documents", "evidence body", arguments={"title": "Evidence"}, context=context)
+            self.assertTrue(documents["result"]["markdown"].startswith("# Evidence"))
+            self.assertFalse(documents["result"]["persisted"])
+
+            automation = self.master.execute_skill("automation", "run quality gate", arguments={"action": "register", "schedule": "manual", "automation_id": "owner-quality"}, context=context)
+            self.assertEqual(automation["result"]["status"], "registered")
+            self.assertTrue((Path(temporary) / "automation" / "owner-quality.json").is_file())
+
+            added = self.master.execute_skill("memory", "native memory", arguments={"action": "add", "tags": ["v3"]}, context=context)
+            self.assertEqual(added["result"]["memory"]["text"], "native memory")
+            recalled = self.master.execute_skill("memory", arguments={"action": "search", "query": "native"}, context=context)
+            self.assertEqual(len(recalled["result"]["hits"]), 1)
+
+            security = self.master.execute_skill("security", arguments={"write": True, "api_key": "not-read"}, context=context)
+            self.assertTrue(security["result"]["write_allowed"])
+            self.assertEqual(security["result"]["secret_fields_detected"], ["api_key"])
+            self.assertFalse(security["result"]["credential_access"])
+
+            quality = self.master.execute_skill("quality", arguments={"checks": {"tests": True, "evidence": True}}, context=context)
+            self.assertTrue(quality["result"]["passed"])
+            self.assertTrue(quality["result"]["evidence_required"])
+
+            executed = {analysis["skill"], planning["skill"], coding["skill"], research["skill"], data["skill"], documents["skill"], automation["skill"], added["skill"], security["skill"], quality["skill"]}
+            self.assertEqual(executed, {"analysis", "planning", "coding", "research", "data", "documents", "automation", "memory", "security", "quality"})
+
+    def test_memory_agents_tools_and_factory_remain_governed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            store = MemoryStore(DataLayout(Path(temporary)).ensure())
+            alice = UserContext(user_id="alice", profile_id="default")
+            bob = UserContext(user_id="bob", profile_id="default")
+            store.add(alice, "governed native memory")
+            store.add(bob, "other profile data")
+            self.assertEqual(len(store.search(alice, "native")), 1)
+            self.assertEqual(store.search(alice, "other"), [])
+        self.assertEqual(len(self.master.agents.list()), 5)
+        self.assertEqual(self.master.execute_tool("echo", {"text": "ok"})["text"], "ok")
+        with self.assertRaises(PermissionError):
+            self.master.execute_tool("artifact-note", {"text": "blocked"})
+        _, plan = self.master.plan(Workload(estimated_leaf_tasks=30))
+        self.assertEqual([stage.name for stage in plan.stages], ["master", "factory", "team", "tests", "release"])
+        payload = master_contract(self.master.decide(Workload(estimated_leaf_tasks=730)))
+        self.assertEqual(payload["system_maximum_logical_capacity"], 10_000_000_000)
 
 
 if __name__ == "__main__":

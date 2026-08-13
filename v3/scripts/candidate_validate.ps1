@@ -118,7 +118,20 @@ try {
     }
 
     $health = Wait-V3Health
-    Record-Evidence 'installed_readiness' @{ status = $health.status; endpoint = '127.0.0.1'; port = $port }
+    if ($health.version -ne 'v3-full-10x10' -or $health.maximum_scale -ne '10^10') {
+        throw 'Installed V3 health contract is not the full-system 10^10 contract'
+    }
+    if ([Int64]$health.maximum_logical_capacity -ne 10000000000) {
+        throw 'Installed V3 health contract does not expose 10^10 logical capacity'
+    }
+    Record-Evidence 'installed_readiness' @{
+        status = $health.status
+        endpoint = '127.0.0.1'
+        port = $port
+        version = $health.version
+        maximum_scale = $health.maximum_scale
+        maximum_logical_capacity = [Int64]$health.maximum_logical_capacity
+    }
 
     $listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop)
     if ($listeners.Count -lt 1) { throw 'Installed V3 service has no listener' }
@@ -128,23 +141,59 @@ try {
     Record-Evidence 'loopback_binding' @{ binding = '127.0.0.1'; port = $port }
 
     $master = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/master?tasks=30" -TimeoutSec 5
-    if ($master.contract -ne 'unified-master-orchestrator-v3-clean') {
+    if ($master.contract -ne 'unified-master-orchestrator-v3-full') {
         throw 'Installed V3 master contract is invalid'
     }
     if ($master.scale -ne '6^3' -or [int]$master.maximum_leaf_capacity -ne 216) {
         throw 'Installed V3 adaptive master result is invalid'
     }
+    if ($master.system_maximum_scale -ne '10^10' -or [Int64]$master.system_maximum_logical_capacity -ne 10000000000) {
+        throw 'Installed V3 master does not expose the 10^10 system ceiling'
+    }
+
+    $maximum = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/master?tasks=46657" -TimeoutSec 5
+    if ($maximum.scale -ne '10^10' -or [Int64]$maximum.maximum_leaf_capacity -ne 10000000000) {
+        throw 'Installed V3 adaptive master did not select 10^10 above the 6^6 ceiling'
+    }
     Record-Evidence 'installed_unified_master' @{
         contract = $master.contract
-        scale = $master.scale
-        capacity = [int]$master.maximum_leaf_capacity
+        normal_scale = $master.scale
+        normal_capacity = [int]$master.maximum_leaf_capacity
+        maximum_scale = $maximum.scale
+        maximum_capacity = [Int64]$maximum.maximum_leaf_capacity
+        lazy_bounded = $true
     }
 
     $providers = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/providers" -TimeoutSec 5
     if (-not $providers.providers -or $providers.providers[0].secret_exposed -ne $false) {
         throw 'Installed V3 provider status is missing or exposes a secret'
     }
-    $safeText = @($providers, $master) | ConvertTo-Json -Compress -Depth 10
+    $skills = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/skills" -TimeoutSec 5
+    $tools = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/tools" -TimeoutSec 5
+    $agents = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v3/agents" -TimeoutSec 5
+    if (-not $skills.skills -or -not $tools.tools -or -not $agents.agents) {
+        throw 'Installed V3 full-system capability catalogs are incomplete'
+    }
+    foreach ($requiredSkill in @('chat-runtime','memory-persistence','agent-execution','governed-tool-execution','adaptive-hierarchy')) {
+        if (-not ($skills.skills | Where-Object { $_.name -eq $requiredSkill })) {
+            throw "Installed V3 skill is missing: $requiredSkill"
+        }
+    }
+    foreach ($requiredAgent in @('researcher','architect','builder','reviewer','release-guardian')) {
+        if (-not ($agents.agents | Where-Object { $_.name -eq $requiredAgent })) {
+            throw "Installed V3 agent is missing: $requiredAgent"
+        }
+    }
+    Record-Evidence 'full_system_capabilities' @{
+        skills = @($skills.skills).Count
+        tools = @($tools.tools).Count
+        agents = @($agents.agents).Count
+        chat = $true
+        memory = $true
+        factory = $true
+    }
+
+    $safeText = @($providers, $master, $maximum, $skills, $tools, $agents) | ConvertTo-Json -Compress -Depth 10
     if ($safeText -match '(?i)(?:^|[^A-Za-z0-9_])sk-[A-Za-z0-9_-]{12,}|Bearer\s+[A-Za-z0-9._-]{12,}') {
         throw 'Installed V3 status contains credential-like data'
     }
@@ -198,23 +247,22 @@ try {
     Set-Content -Path $auditPath -Value '' -Encoding utf8
     $app = Start-Process -FilePath $appExe -PassThru
     $proved = $false
-    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+    for ($attempt = 0; $attempt -lt 80; $attempt++) {
         if (Test-Path $auditPath) {
             $records = @(
                 Get-Content $auditPath -ErrorAction SilentlyContinue |
                     Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
                     ForEach-Object { $_ | ConvertFrom-Json }
             )
-            $healthSeen = @($records | Where-Object {
-                $_.method -eq 'GET' -and $_.path -eq '/health' -and [int]$_.status -eq 200
-            }).Count -gt 0
-            $userSeen = @($records | Where-Object {
-                $_.method -eq 'GET' -and $_.path -eq '/v3/user' -and [int]$_.status -eq 200
-            }).Count -gt 0
-            $providersSeen = @($records | Where-Object {
-                $_.method -eq 'GET' -and $_.path -eq '/v3/providers' -and [int]$_.status -eq 200
-            }).Count -gt 0
-            if ($healthSeen -and $userSeen -and $providersSeen) {
+            $requiredPaths = @('/health','/v3/user','/v3/master','/v3/providers','/v3/skills','/v3/tools','/v3/agents')
+            $missingPaths = @()
+            foreach ($requiredPath in $requiredPaths) {
+                $seen = @($records | Where-Object {
+                    $_.method -eq 'GET' -and $_.path -eq $requiredPath -and [int]$_.status -eq 200
+                }).Count -gt 0
+                if (-not $seen) { $missingPaths += $requiredPath }
+            }
+            if ($missingPaths.Count -eq 0) {
                 $proved = $true
                 break
             }
@@ -224,13 +272,23 @@ try {
     }
     if (-not $proved) {
         if (Test-Path $auditPath) { Get-Content $auditPath -ErrorAction SilentlyContinue }
-        throw 'Installed V3 Flutter EXE did not prove /health, /v3/user and /v3/providers requests'
+        throw 'Installed V3 Flutter EXE did not prove the full-system startup contract set'
     }
     $auditText = Get-Content $auditPath -Raw
     if ($auditText -match '(?i)authorization|bearer|api[_-]?key|token|secret') {
         throw 'V3 structured HTTP audit contains forbidden credential material'
     }
-    Record-Evidence 'app_to_service_e2e' @{ health = 200; user = 200; providers = 200; installed_exe = $true; audit_secret_free = $true }
+    Record-Evidence 'app_to_service_e2e' @{
+        health = 200
+        user = 200
+        master = 200
+        providers = 200
+        skills = 200
+        tools = 200
+        agents = 200
+        installed_exe = $true
+        audit_secret_free = $true
+    }
 
     if ($app -and -not $app.HasExited) {
         Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue

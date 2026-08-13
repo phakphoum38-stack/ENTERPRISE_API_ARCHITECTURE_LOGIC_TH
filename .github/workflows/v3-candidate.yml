@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - architecture/v3-clean
+      - agent/v3-full-system-10x10
     paths:
       - 'v3/**'
       - '.github/workflows/v3-candidate.yml'

@@ -6,6 +6,7 @@ import tempfile
 import threading
 from pathlib import Path
 from urllib.error import HTTPError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,29 @@ def get_json(
         payload = json.loads(response.read().decode("utf-8"))
     assert isinstance(payload, dict)
     return payload
+
+
+def post_json(
+    url: str,
+    payload: dict[str, object],
+    *,
+    user_id: str,
+    profile_id: str = "default",
+) -> dict[str, object]:
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            USER_HEADER: user_id,
+            PROFILE_HEADER: profile_id,
+        },
+    )
+    with urlopen(request, timeout=5.0) as response:
+        decoded = json.loads(response.read().decode("utf-8"))
+    assert isinstance(decoded, dict)
+    return decoded
 
 
 def main() -> int:
@@ -58,19 +82,28 @@ def main() -> int:
         try:
             health = get_json(f"{base}/health")
             master = get_json(f"{base}/v3/master?tasks=217")
+            maximum = get_json(f"{base}/v3/master?tasks=46657")
             providers = get_json(f"{base}/v3/providers")
+            skills = get_json(f"{base}/v3/skills")
+            tools = get_json(f"{base}/v3/tools")
+            agents = get_json(f"{base}/v3/agents")
             alice = get_json(f"{base}/v3/user", user_id="alice")
             bob = get_json(f"{base}/v3/user", user_id="bob")
 
             assert health["status"] == "ok"
-            assert health["version"] == "v3-clean"
-            assert master["contract"] == "unified-master-orchestrator-v3-clean"
-            # 217 tasks exceed 6^3 (216), so adaptive selection must choose
-            # the smallest sufficient tier: 3^6 (729), not jump to 6^6.
+            assert health["version"] == "v3-full-10x10"
+            assert health["maximum_scale"] == "10^10"
+            assert health["maximum_logical_capacity"] == 10_000_000_000
+            assert master["contract"] == "unified-master-orchestrator-v3-full"
             assert master["scale"] == "3^6"
-            assert master["maximum_leaf_capacity"] == 46656
-            provider = providers["providers"][0]
-            assert provider["secret_exposed"] is False
+            assert master["maximum_leaf_capacity"] == 729
+            assert maximum["scale"] == "10^10"
+            assert maximum["maximum_leaf_capacity"] == 10_000_000_000
+            assert providers["providers"]
+            assert providers["providers"][0]["secret_exposed"] is False
+            assert skills["skills"]
+            assert tools["tools"]
+            assert agents["agents"]
 
             assert alice["isolated"] is True
             assert bob["isolated"] is True
@@ -83,6 +116,25 @@ def main() -> int:
             assert alice_root.is_dir()
             assert bob_root.is_dir()
             assert alice_root != bob_root
+
+            created = post_json(
+                f"{base}/v3/memory",
+                {"text": "Research OS uses 10^10 logical capacity"},
+                user_id="alice",
+            )
+            assert created["memory"]["text"] == "Research OS uses 10^10 logical capacity"
+            memory = get_json(
+                f"{base}/v3/memory?q={quote('logical capacity')}",
+                user_id="alice",
+            )
+            assert len(memory["memory"]) == 1
+            chat = post_json(
+                f"{base}/v3/chat",
+                {"prompt": "logical capacity"},
+                user_id="alice",
+            )
+            assert chat["provider"] == "mock"
+            assert chat["memory_hits"]
 
             try:
                 get_json(f"{base}/v3/user")
@@ -107,23 +159,31 @@ def main() -> int:
                 "/health",
                 "/v3/master",
                 "/v3/providers",
+                "/v3/skills",
+                "/v3/tools",
+                "/v3/agents",
                 "/v3/user",
+                "/v3/memory",
+                "/v3/chat",
             }
             for record in records:
                 assert set(record) == {"timestamp", "method", "path", "status"}
-                assert record["method"] == "GET"
+                assert record["method"] in {"GET", "POST"}
                 assert "?" not in record["path"]
-                assert record["status"] in {200, 400}
+                assert record["status"] in {200, 201, 400}
 
             print(
                 json.dumps(
                     {
                         "health": health,
                         "master": master,
+                        "maximum": maximum,
                         "providers": providers,
-                        "alice": alice,
-                        "bob": bob,
+                        "skills_count": len(skills["skills"]),
+                        "tools_count": len(tools["tools"]),
+                        "agents_count": len(agents["agents"]),
                         "cross_user_isolation": True,
+                        "chat_memory_flow": True,
                         "audit_records": records,
                     },
                     indent=2,

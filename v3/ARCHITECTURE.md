@@ -1,68 +1,40 @@
-# V3 Clean Architecture
+# Research OS V3 Architecture
 
-## Core rule
+## One Truth
 
-V3 Clean has one authority for orchestration. Components may execute work, but they do not create competing control planes.
+`UnifiedMasterOrchestrator` is the only V3 coordination and execution authority. Brain, Providers, Skills, Tools, Agents, Memory, and Factory compose under this master. Restored Owner/Friend and legacy source never starts a competing master.
 
-## Adaptive hierarchy
+## Capacity
 
-| Profile | Fanout | Depth | Maximum leaf capacity | Intended use |
-|---|---:|---:|---:|---|
-| `1^3` | 1 | 3 | 1 | tiny/single-path tasks |
-| `3^3` | 3 | 3 | 27 | normal multi-step work |
-| `6^3` | 6 | 3 | 216 | large parallel work |
-| `6^6` | 6 | 6 | 46,656 | maximum logical capacity, allocated lazily |
+The hierarchy selects the smallest safe logical tier from `3^1`, `3^3`, `6^3`, `3^6`, `6^6`, and `10^10`. The top tier is a logical ceiling of 10,000,000,000 leaf slots. Actual execution remains bounded and queued above active capacity.
 
-Capacity is a ceiling, not a command to instantiate every assistant. The Brain Core selects the smallest profile that satisfies the workload estimate and policy constraints.
+## Skills
 
-## Control flow
+`UnifiedSkillRegistry` contains 40 capabilities across V1, V2, V3, Owner/Friend, and legacy origins. All current entries have a native V3 execution path.
 
-```text
-Request
-  -> Unified Master Orchestrator
-      -> Brain Core (select scale)
-      -> Provider Registry (select ready provider)
-      -> Software Factory (derive execution plan)
-          -> Factory
-          -> Team
-          -> Tests
-          -> Release
-      -> Evidence / status contracts
-```
+- `v3-core` identifies existing V3 implementations.
+- `v3-adapter` identifies migrated implementations hosted by `NativeSkillRuntime`.
+- `POST /v3/skills/execute` supplies explicit runtime evidence.
+- Persisting or mutating actions fail closed without request approval.
 
-## Boundaries
+The restored `owner_special/research_os_friend/` package is kept as provenance and compatibility source. V3 does not activate `FriendOrchestrator`.
 
-- Brain Core decides scale; it does not call external providers.
-- Provider adapters call model/provider APIs; they do not choose system-wide scale.
-- Software Factory converts an accepted orchestration decision into stages.
-- App/UI consumes contracts; it does not own core business logic.
-- Windows Service owns local lifecycle/transport; it does not own orchestration policy.
-- Installer packages validated outputs; it is not a source of truth.
+## Tools and Drive
 
-## Provider security and resilience
+`UnifiedToolRegistry` applies risk and approval policy to tool execution. `DriveToolRuntimeAdapter` reads packages from a locally synchronized Google Drive root; Drive itself is not treated as a process host.
 
-- Provider credentials are never owned by the Flutter desktop client or returned by status contracts.
-- The default secret source checks the process environment first and then the OS-native Windows Credential Manager using namespaced Generic Credential targets such as `ResearchOSV3/OPENAI_API_KEY`.
-- Secret values are used only for provider requests and are excluded from provider status, HTTP audit logs, candidate manifests, and incremental evidence.
-- Provider invocation uses a bounded retry policy with explicit request timeouts.
-- Repeated provider failures open a circuit breaker; an open provider is temporarily treated as unavailable.
-- The registry may fall back to another ready provider after the preferred provider exhausts retries or has an open circuit.
-- Resilience status reports only safe metadata such as circuit state, failure count, and retry count.
+The adapter checks package path containment and SHA-256 integrity, invokes supported runtimes without a shell, and bounds execution. `drive-tools-list` is read-only; `drive-tool-execute` requires approval.
 
-## Local service and data ownership
+## Agents and conversation
 
-- The V3 service binds only to loopback and exposes stable `/health`, `/v3/master`, and `/v3/providers` contracts.
-- Mutable local data has one root: `ProgramData\\ResearchOSV3` on installed Windows systems.
-- Sessions, database, artifacts, logs, and evidence are preserved across in-place upgrades and clean application uninstalls.
-- Structured HTTP audit records only timestamp, method, path, and status; it excludes headers, query credentials, tokens, and secret values.
+Researcher, architect, builder, reviewer, and release-guardian remain on-demand roles under the Unified Master. Flutter Chat routes through the loopback V3 chat endpoint and does not create an independent AI brain.
 
-## Installer and candidate rule
+## Data boundary
 
-- V3 has one Windows Setup EXE containing the Flutter app, self-contained ServiceHost, V3 Python core, and bundled Python runtime.
-- Candidate validation uses the installed executable and installed service, not development copies.
-- Required gates cover clean install, readiness, loopback binding, master/provider contracts, app-to-service E2E, in-place upgrade, data preservation, uninstall, and service/listener cleanup.
-- The final candidate manifest is emitted only after every mandatory gate passes on the exact target SHA.
+Memory and mutable state remain scoped by user/profile. Cross-user access is prohibited. Execution evidence and API status remain separate from provider-owned configuration.
 
-## Evidence rule
+## Validation boundary
 
-Each successful gate is recorded immediately. A later failure cannot erase earlier evidence. Final candidate success is derived only after all mandatory gates are successful.
+Local Python validation for this source set passed with 120 tests, 1 platform-specific skip, and 7 subtests. Service Smoke confirms 40 native skills, 0 context-only adapters, 5 tools, 5 agents, Drive runtime availability, user isolation, and the `10^10` ceiling.
+
+The Draft PR is not release-ready until Flutter and Windows Candidate validation run on the exact final GitHub SHA.

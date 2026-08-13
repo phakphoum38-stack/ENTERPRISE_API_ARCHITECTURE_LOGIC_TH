@@ -1,3 +1,4 @@
+from .agents import AgentDefinition, UnifiedAgentRegistry
 from .brain import BrainCore
 from .contracts import health_contract, master_contract, providers_contract
 from .execution import (
@@ -9,6 +10,7 @@ from .execution import (
     StageHandler,
 )
 from .factory import SoftwareFactory
+from .memory import MemoryRecord, MemoryStore
 from .models import OrchestrationDecision, ScaleProfile, ScaleTier, Workload
 from .orchestrator import UnifiedMasterOrchestrator
 from .providers import (
@@ -31,12 +33,17 @@ from .secrets import (
     WindowsCredentialManagerSecretSource,
     default_secret_source,
 )
-from .service import PROFILE_HEADER, USER_HEADER, V3LocalService
+from .service import APPROVAL_HEADER, PROFILE_HEADER, USER_HEADER, V3LocalService
+from .skill_runtime import NativeSkillRuntime, SkillRuntimeContext
 from .skills import SkillDefinition, SkillOrigin, UnifiedSkillRegistry
+from .drive_runtime import DriveToolPackage, DriveToolRuntimeAdapter
 from .storage import DataLayout, UserDataLayout
+from .tools import ToolDefinition, ToolRisk, UnifiedToolRegistry
 from .user_context import UserContext, safe_local_user_id
 
 __all__ = [
+    "APPROVAL_HEADER",
+    "AgentDefinition",
     "AtomicExecutionEvidenceStore",
     "BrainCore",
     "CircuitBreakerPolicy",
@@ -45,10 +52,15 @@ __all__ = [
     "CompletionResponse",
     "CompositeSecretSource",
     "DataLayout",
+    "DriveToolPackage",
+    "DriveToolRuntimeAdapter",
     "EnvironmentSecretSource",
     "FactoryExecutionContext",
     "FactoryExecutionEngine",
     "FactoryExecutionResult",
+    "MemoryRecord",
+    "MemoryStore",
+    "NativeSkillRuntime",
     "MockProvider",
     "OpenAICompatibleProvider",
     "OrchestrationDecision",
@@ -61,12 +73,17 @@ __all__ = [
     "ScaleTier",
     "SkillDefinition",
     "SkillOrigin",
+    "SkillRuntimeContext",
     "SoftwareFactory",
     "StageEvidence",
     "StageHandler",
+    "ToolDefinition",
+    "ToolRisk",
     "USER_HEADER",
+    "UnifiedAgentRegistry",
     "UnifiedMasterOrchestrator",
     "UnifiedSkillRegistry",
+    "UnifiedToolRegistry",
     "UserContext",
     "UserDataLayout",
     "V3LocalService",
