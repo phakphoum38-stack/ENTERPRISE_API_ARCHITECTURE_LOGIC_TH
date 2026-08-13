@@ -1,0 +1,182 @@
+name: Research OS Self-Build Full Control Center Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/research-os-self-build-lab-2026-08-13
+    paths:
+      - 'v3/self_build/OWNER_REQUIREMENT_FULL_CONTROL_CENTER.json'
+      - 'v3/scripts/self_build_full_control_center.py'
+      - 'v3/scripts/self_build_full_control_center_tests.py'
+      - '.github/workflows/v3-self-build-full-control-center.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-self-build-full-control-center-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  self-build-full-control-center:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      SELF_WORKSPACE: D:\research-os-full-control-self-build
+
+    steps:
+      - name: Checkout teaching source
+        uses: actions/checkout@v4
+
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Gate 1 - validate Research OS teacher and policies
+        shell: pwsh
+        run: |
+          python -m unittest discover -s v3/tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS V3 teacher tests failed' }
+
+      - name: Gate 2 - Research OS creates isolated copy of itself
+        shell: pwsh
+        run: |
+          if (Test-Path $env:SELF_WORKSPACE) { Remove-Item $env:SELF_WORKSPACE -Recurse -Force }
+          python v3/scripts/self_build_lab.py --source "$env:GITHUB_WORKSPACE" --workspace "$env:SELF_WORKSPACE" --source-sha "$env:GITHUB_SHA"
+          if ($LASTEXITCODE -ne 0) { throw 'Self-build workspace staging failed' }
+          if (-not (Test-Path "$env:SELF_WORKSPACE\SELF_BUILD_MANIFEST.json")) { throw 'Self-build manifest missing' }
+
+      - name: Gate 3 - Research OS reads owner requirement and generates Full Control Center
+        shell: pwsh
+        run: |
+          python "$env:SELF_WORKSPACE\v3\scripts\self_build_full_control_center.py" `
+            --workspace "$env:SELF_WORKSPACE" `
+            --requirement "$env:SELF_WORKSPACE\v3\self_build\OWNER_REQUIREMENT_FULL_CONTROL_CENTER.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Full Control Center generation failed' }
+          python "$env:SELF_WORKSPACE\v3\scripts\self_build_full_control_center_tests.py" --workspace "$env:SELF_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { throw 'Generated UI acceptance tests failed to stage' }
+          $app = "$env:SELF_WORKSPACE\v3\flutter_app\lib\src\research_os_v3_app.dart"
+          foreach ($label in @('Chat AI','Files','Repositories','GitHub','Drive','Runtime','Installer','Backup','Restore','Shell','Tool Discovery')) {
+            if (-not (Select-String -Path $app -SimpleMatch $label -Quiet)) { throw "Generated GUI missing required surface: $label" }
+          }
+
+      - name: Gate 4 - prove V3 core from generated self-build workspace
+        working-directory: D:\research-os-full-control-self-build\v3
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Self-built V3 core tests failed' }
+          python scripts/factory_execution_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'Self-built factory execution smoke failed' }
+
+      - name: Gate 5 - analyze test and build generated Windows GUI EXE
+        working-directory: D:\research-os-full-control-self-build\v3\flutter_app
+        shell: pwsh
+        run: |
+          flutter create --platforms=windows --project-name=research_os_v3_flutter .
+          if ($LASTEXITCODE -ne 0) { throw 'flutter create failed' }
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+          dart format --output=none --set-exit-if-changed lib test
+          if ($LASTEXITCODE -ne 0) { throw 'generated Flutter source is not formatted' }
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw 'generated Flutter analyze failed' }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw 'generated Flutter tests failed' }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'generated Flutter Windows build failed' }
+          $exe = 'build\windows\x64\runner\Release\research_os_v3_flutter.exe'
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "self-built Full Control Center EXE missing: $exe" }
+
+      - name: Gate 6 - build ServiceHost from self-built workspace
+        shell: pwsh
+        run: |
+          $out = "$env:SELF_WORKSPACE\out\service"
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          dotnet publish "$env:SELF_WORKSPACE\v3\windows_service\ResearchOS.V3.ServiceHost.csproj" `
+            -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o $out
+          if ($LASTEXITCODE -ne 0) { throw 'self-built ServiceHost publish failed' }
+          if (-not (Test-Path "$out\ResearchOS.V3.ServiceHost.exe" -PathType Leaf)) { throw 'self-built ServiceHost EXE missing' }
+
+      - name: Gate 7 - write hashes and candidate evidence
+        shell: pwsh
+        run: |
+          $appRelease = "$env:SELF_WORKSPACE\v3\flutter_app\build\windows\x64\runner\Release"
+          $appExe = Join-Path $appRelease 'research_os_v3_flutter.exe'
+          $serviceExe = "$env:SELF_WORKSPACE\out\service\ResearchOS.V3.ServiceHost.exe"
+          $requirement = "$env:SELF_WORKSPACE\v3\self_build\OWNER_REQUIREMENT_FULL_CONTROL_CENTER.json"
+          $generated = "$env:SELF_WORKSPACE\SELF_BUILD_FULL_CONTROL_CENTER.json"
+          $manifest = "$env:SELF_WORKSPACE\SELF_BUILD_MANIFEST.json"
+          $evidence = [ordered]@{
+            schema_version = 1
+            contract = 'research-os-self-built-full-control-center-candidate-v1'
+            status = 'passed'
+            source_sha = $env:GITHUB_SHA
+            virtual_workspace = $env:SELF_WORKSPACE
+            owner_requirement_sha256 = (Get-FileHash $requirement -Algorithm SHA256).Hash.ToLowerInvariant()
+            generated_ui_sha256 = (Get-FileHash "$env:SELF_WORKSPACE\v3\flutter_app\lib\src\research_os_v3_app.dart" -Algorithm SHA256).Hash.ToLowerInvariant()
+            app_exe = [ordered]@{ filename = 'research_os_v3_flutter.exe'; size = (Get-Item $appExe).Length; sha256 = (Get-FileHash $appExe -Algorithm SHA256).Hash.ToLowerInvariant() }
+            service_exe = [ordered]@{ filename = 'ResearchOS.V3.ServiceHost.exe'; size = (Get-Item $serviceExe).Length; sha256 = (Get-FileHash $serviceExe -Algorithm SHA256).Hash.ToLowerInvariant() }
+            gates = [ordered]@{ teacher_tests = $true; self_stage = $true; requirement_generation = $true; core_tests = $true; factory_smoke = $true; flutter_analyze = $true; flutter_tests = $true; windows_exe = $true; service_host = $true }
+            canonical_source_mutated_by_builder = $false
+            merged = $false
+            deployed = $false
+            drive_upload_allowed = $true
+          }
+          $evidence | ConvertTo-Json -Depth 8 | Set-Content "$env:SELF_WORKSPACE\SELF_BUILD_FULL_CONTROL_CANDIDATE_EVIDENCE.json" -Encoding UTF8
+          Get-Content $generated
+          Get-Content $manifest | Select-Object -First 40
+          Get-Content "$env:SELF_WORKSPACE\SELF_BUILD_FULL_CONTROL_CANDIDATE_EVIDENCE.json"
+
+      - name: Assemble self-built candidate package
+        shell: pwsh
+        run: |
+          $package = "$env:SELF_WORKSPACE\candidate"
+          New-Item -ItemType Directory -Path "$package\app" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$package\service" -Force | Out-Null
+          Copy-Item "$env:SELF_WORKSPACE\v3\flutter_app\build\windows\x64\runner\Release\*" "$package\app" -Recurse -Force
+          Copy-Item "$env:SELF_WORKSPACE\out\service\*" "$package\service" -Recurse -Force
+          Copy-Item "$env:SELF_WORKSPACE\SELF_BUILD_MANIFEST.json" $package -Force
+          Copy-Item "$env:SELF_WORKSPACE\SELF_BUILD_FULL_CONTROL_CENTER.json" $package -Force
+          Copy-Item "$env:SELF_WORKSPACE\SELF_BUILD_FULL_CONTROL_CANDIDATE_EVIDENCE.json" $package -Force
+          Copy-Item "$env:SELF_WORKSPACE\v3\self_build\OWNER_REQUIREMENT_FULL_CONTROL_CENTER.json" $package -Force
+          $short = $env:GITHUB_SHA.Substring(0, 12)
+          $zip = "$env:SELF_WORKSPACE\Research_OS_Full_Control_Center_SELF_BUILT_$short.zip"
+          Compress-Archive -Path "$package\*" -DestinationPath $zip -CompressionLevel Optimal
+          "SELF_BUILT_ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SELF_BUILT_NAME=Research_OS_Full_Control_Center_SELF_BUILT_$short.zip" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item $zip).Length
+          Write-Host "Candidate ZIP: $zip"
+          Write-Host "ZIP SHA256: $hash"
+          Write-Host "ZIP bytes: $size"
+
+      - name: Upload passed self-built candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-self-built-full-control-center-${{ github.sha }}
+          path: |
+            ${{ env.SELF_BUILT_ZIP }}
+            ${{ env.SELF_WORKSPACE }}\SELF_BUILD_FULL_CONTROL_CANDIDATE_EVIDENCE.json
+            ${{ env.SELF_WORKSPACE }}\SELF_BUILD_FULL_CONTROL_CENTER.json
+          if-no-files-found: error
+          retention-days: 14
