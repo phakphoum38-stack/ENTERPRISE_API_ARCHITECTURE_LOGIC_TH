@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Callable
 
 from .drive_runtime import DriveToolRuntimeAdapter
+from .workspace_runtime import WorkspaceRuntime
 
 
 class ToolRisk(str, Enum):
@@ -31,6 +32,7 @@ class UnifiedToolRegistry:
         self._definitions: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, ToolHandler] = {}
         self.drive_runtime = drive_runtime or DriveToolRuntimeAdapter()
+        self.workspace_runtime = WorkspaceRuntime()
         self._register_defaults()
 
     def _register_defaults(self) -> None:
@@ -81,21 +83,50 @@ class UnifiedToolRegistry:
             self.drive_runtime.execute,
         )
 
-        # Full Control Center read surfaces. These handlers are user-scoped by
-        # V3LocalService because they need UserContext and DataLayout.
-        for name, capability, description in (
-            ("workspace-status", "workspace", "Inspect Research OS user and Drive workspace roots."),
-            ("workspace-files-list", "files", "List files inside an allowed Research OS workspace root."),
-            ("workspace-file-read", "files", "Preview a bounded text file inside an allowed Research OS workspace root."),
-            ("workspace-repositories", "repositories", "Inventory repository snapshots and bundle hashes from the Drive mirror."),
-            ("github-status", "github", "Inspect the local GitHub repository mirror without requiring network access."),
-            ("drive-status", "drive", "Inspect the configured DRIVE_VIRTUAL_CLOUD mirror and its top-level directories."),
-            ("runtime-status", "runtime", "Inspect the running Research OS service runtime and user data root."),
-            ("installer-status", "installer", "Inspect the installed Research OS runtime location and build metadata."),
-            ("backups-list", "backup", "List user/profile-scoped Research OS backup archives."),
-            ("research-shell", "diagnostics", "Run the bounded Research OS diagnostic command console; arbitrary OS shell execution is disabled."),
-        ):
-            self.register(ToolDefinition(name, capability, description))
+        self.register(
+            ToolDefinition("workspace-status", "workspace", "Inspect the configured Research OS Drive workspace."),
+            lambda args: self.workspace_runtime.status(),
+        )
+        self.register(
+            ToolDefinition("workspace-files-list", "files", "List files inside DRIVE_VIRTUAL_CLOUD with strict path confinement."),
+            self.workspace_runtime.list_files,
+        )
+        self.register(
+            ToolDefinition("workspace-file-read", "files", "Preview a bounded UTF-8 text file inside DRIVE_VIRTUAL_CLOUD."),
+            self.workspace_runtime.read_text,
+        )
+        self.register(
+            ToolDefinition("workspace-repositories", "repositories", "Inventory repository snapshots and bundle hashes from the Drive mirror."),
+            lambda args: {"repositories": self.workspace_runtime.repositories()},
+        )
+        self.register(
+            ToolDefinition("github-status", "github", "Inspect the local GitHub repository mirror without requiring network access."),
+            lambda args: self.workspace_runtime.github_status(),
+        )
+        self.register(
+            ToolDefinition("drive-status", "drive", "Inspect DRIVE_VIRTUAL_CLOUD and its top-level directories."),
+            lambda args: self.workspace_runtime.drive_status(),
+        )
+        self.register(
+            ToolDefinition("runtime-status", "runtime", "Inspect the running Research OS service runtime."),
+            lambda args: self.workspace_runtime.runtime_status(),
+        )
+        self.register(
+            ToolDefinition("installer-status", "installer", "Inspect the installed Research OS runtime location and build metadata."),
+            lambda args: self.workspace_runtime.installer_status(),
+        )
+        self.register(
+            ToolDefinition("backups-list", "backup", "List Research OS backup archives visible in the Drive mirror."),
+            lambda args: {"backups": self.workspace_runtime.backups()},
+        )
+        self.register(
+            ToolDefinition(
+                "research-shell",
+                "diagnostics",
+                "Run the bounded Research OS diagnostic command console; arbitrary OS shell execution is disabled.",
+            ),
+            self.workspace_runtime.shell,
+        )
 
     def register(
         self,
