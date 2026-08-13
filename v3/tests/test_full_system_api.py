@@ -101,7 +101,8 @@ class FullSystemApiTests(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         self.assertEqual(analysis["runtime_mode"], "native")
-        self.assertEqual(analysis["result"]["text"], "analysis: inspect evidence")
+        self.assertEqual(analysis["result"]["summary"], "inspect evidence")
+        self.assertGreater(analysis["result"]["words"], 0)
 
         self.post(
             "/v3/memory",
