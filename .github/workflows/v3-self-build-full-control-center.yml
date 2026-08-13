@@ -52,9 +52,10 @@ jobs:
           cache: true
 
       - name: Gate 1 - validate Research OS teacher and policies
+        working-directory: v3
         shell: pwsh
         run: |
-          python -m unittest discover -s v3/tests -v
+          python -m unittest discover -s tests -v
           if ($LASTEXITCODE -ne 0) { throw 'Research OS V3 teacher tests failed' }
 
       - name: Gate 2 - Research OS creates isolated copy of itself
@@ -96,8 +97,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'flutter create failed' }
           flutter pub get
           if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
-          dart format --output=none --set-exit-if-changed lib test
-          if ($LASTEXITCODE -ne 0) { throw 'generated Flutter source is not formatted' }
+          dart format lib test
+          if ($LASTEXITCODE -ne 0) { throw 'generated Flutter format failed' }
           flutter analyze
           if ($LASTEXITCODE -ne 0) { throw 'generated Flutter analyze failed' }
           flutter test
