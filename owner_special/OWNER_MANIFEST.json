@@ -34,13 +34,16 @@
   ],
   "adaptive_profiles": {
     "1^3": 1,
+    "3^1": 3,
     "3^3": 27,
     "6^3": 216,
+    "3^6": 729,
     "6^6": 46656,
-    "fast-1m": 1000000
+    "fast-1m": 1000000,
+    "10^10": 10000000000
   },
   "helper_execution": {
-    "logical_capacity": 1000000,
+    "logical_capacity": 10000000000,
     "max_active_workers": 128,
     "strategy": "bounded adaptive batches"
   },
@@ -81,6 +84,26 @@
       "windows-service",
       "PowerShell service scripts",
       "generated runtime data"
+    ]
+  },
+  "v3_1_full_10x10_source": {
+    "schema": "research-os.v3-full-10x10-source.v1",
+    "source_drive_folder": "Research OS V3.1 Full 10x10",
+    "source_drive_folder_id": "1x7vvs5bgZz81P1jM2Jx8JQ7bH_noe1IQ",
+    "source_branch": "agent/v3-full-system-10x10",
+    "source_branch_head": "0598946440e214cfb8f2e51f7a635eaee52116b3",
+    "drive_master_manifest_id": "17qSMtyQ3BpyCcQWrXn9wAd2UclOUKVlh",
+    "master_all_in_one_sha256": "a4e47ad4731713f544c4b68a0cfe917ce57f4ebc3c307109896fe31c2a5688e6",
+    "full_10x10_all_skills_sha256": "b37854a8eca3a1aafe02de1203decc3fd9ea6908f3010b4c95b3ccabc561da4a",
+    "integration_policy": "newer-wins-preserve-v3.2-chat",
+    "integration_status": "integrating",
+    "logical_maximum": 10000000000,
+    "runtime_policy": "lazy-bounded-execution",
+    "preserve": [
+      "v3.2 /v3/chat canonical contract",
+      "Friend Brain Special overlay",
+      "owner/profile/session isolation",
+      "provider secret boundaries"
     ]
   }
 }
