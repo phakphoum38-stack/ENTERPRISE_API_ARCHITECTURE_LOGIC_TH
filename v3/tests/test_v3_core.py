@@ -90,12 +90,15 @@ class V3CleanCoreTests(unittest.TestCase):
             self.assertIsInstance(decoded, dict)
             return status, decoded
 
-    def test_adaptive_scale_profiles(self) -> None:
+    def test_adaptive_scale_profiles_through_10x10(self) -> None:
         cases = (
             (Workload(estimated_leaf_tasks=1), ScaleTier.TIER_1_3, 1),
-            (Workload(estimated_leaf_tasks=2), ScaleTier.TIER_3_3, 27),
+            (Workload(estimated_leaf_tasks=2), ScaleTier.TIER_3_1, 3),
+            (Workload(estimated_leaf_tasks=4), ScaleTier.TIER_3_3, 27),
             (Workload(estimated_leaf_tasks=30), ScaleTier.TIER_6_3, 216),
-            (Workload(estimated_leaf_tasks=217), ScaleTier.TIER_6_6, 46656),
+            (Workload(estimated_leaf_tasks=217), ScaleTier.TIER_3_6, 729),
+            (Workload(estimated_leaf_tasks=730), ScaleTier.TIER_6_6, 46656),
+            (Workload(estimated_leaf_tasks=46657), ScaleTier.TIER_10_10, 10_000_000_000),
         )
         for workload, expected_tier, expected_capacity in cases:
             with self.subTest(workload=workload):
@@ -103,9 +106,9 @@ class V3CleanCoreTests(unittest.TestCase):
                 self.assertEqual(decision.profile.tier, expected_tier)
                 self.assertEqual(decision.profile.capacity, expected_capacity)
 
-    def test_max_profile_uses_backpressure_when_demand_exceeds_capacity(self) -> None:
-        decision = self.master.decide(Workload(estimated_leaf_tasks=50000))
-        self.assertEqual(decision.profile.tier, ScaleTier.TIER_6_6)
+    def test_max_profile_uses_backpressure_when_demand_exceeds_10x10(self) -> None:
+        decision = self.master.decide(Workload(estimated_leaf_tasks=10_000_000_001))
+        self.assertEqual(decision.profile.tier, ScaleTier.TIER_10_10)
         self.assertIn("queue/backpressure", decision.reason)
 
     def test_factory_pipeline_is_deterministic(self) -> None:
@@ -222,12 +225,12 @@ class V3CleanCoreTests(unittest.TestCase):
             )
             self.assertTrue(all(path.is_dir() for path in second.directories().values()))
 
-    def test_master_contract_is_stable(self) -> None:
+    def test_master_contract_is_stable_with_10x10_scale(self) -> None:
         decision = self.master.decide(Workload(estimated_leaf_tasks=217))
         payload = master_contract(decision)
         self.assertEqual(payload["contract"], "unified-master-orchestrator-v3-clean")
-        self.assertEqual(payload["scale"], "6^6")
-        self.assertEqual(payload["maximum_leaf_capacity"], 46656)
+        self.assertEqual(payload["scale"], "3^6")
+        self.assertEqual(payload["maximum_leaf_capacity"], 729)
 
 
 if __name__ == "__main__":
