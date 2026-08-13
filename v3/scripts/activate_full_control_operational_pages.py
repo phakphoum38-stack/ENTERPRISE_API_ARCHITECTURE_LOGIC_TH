@@ -52,9 +52,20 @@ def main() -> int:
         raise SystemExit('could not normalize Full Product Flutter entrypoint')
     main_path.write_text(main_text, encoding='utf-8', newline='\n')
 
+    # These were temporary direct-shell prototypes used while converging on
+    # the canonical generated morning Full Control Center. They are not part
+    # of the product runtime and must not enter the staged Full Product tree.
+    retired: list[str] = []
+    for name in ('research_os_full_app.dart', 'full_control_operational.dart'):
+        candidate = src / name
+        if candidate.is_file():
+            candidate.unlink()
+            retired.append(name)
+
     print('activated live operational pages in generated Research OS Full Control Center')
     print('removed obsolete generated _OperationalPage placeholder')
     print('normalized Flutter entrypoint to ResearchOSV3App')
+    print(f'retired duplicate experimental UI files from isolated product workspace: {retired}')
     return 0
 
 
