@@ -34,14 +34,18 @@ class UnifiedSkillRegistry:
     def default_skills() -> tuple[SkillDefinition, ...]:
         return (
             SkillDefinition("memory-retrieval", SkillOrigin.V1, "memory", "Retrieve durable local knowledge."),
+            SkillDefinition("memory-persistence", SkillOrigin.V3, "memory", "Persist explicit user-scoped durable memory."),
             SkillDefinition("conversation-analysis", SkillOrigin.V1, "analysis", "Analyze conversations without mutating source data."),
+            SkillDefinition("chat-runtime", SkillOrigin.V3, "chat", "Execute provider-backed conversations with optional local memory context."),
             SkillDefinition("provider-routing", SkillOrigin.V1, "providers", "Select a ready AI provider without exposing credentials."),
             SkillDefinition("agent-routing", SkillOrigin.V2, "orchestration", "Route work to capability-matched agents."),
+            SkillDefinition("agent-execution", SkillOrigin.V3, "agents", "Run bounded role-based V3 agents on demand."),
             SkillDefinition("durable-orchestration", SkillOrigin.V2, "orchestration", "Persist, resume, retry, and cancel orchestration runs."),
             SkillDefinition("workspace-knowledge", SkillOrigin.V2, "knowledge", "Search workspace knowledge with provenance."),
             SkillDefinition("developer-access", SkillOrigin.V2, "security", "Enforce owner-controlled developer access and trial isolation."),
-            SkillDefinition("adaptive-hierarchy", SkillOrigin.V3, "scaling", "Select the smallest safe 3^1-to-6^6 logical hierarchy."),
+            SkillDefinition("adaptive-hierarchy", SkillOrigin.V3, "scaling", "Select the smallest safe 3^1-to-10^10 logical hierarchy."),
             SkillDefinition("factory-execution", SkillOrigin.V3, "execution", "Execute deterministic factory stages with evidence."),
+            SkillDefinition("governed-tool-execution", SkillOrigin.V3, "tools", "Resolve tools through explicit risk and approval policy."),
             SkillDefinition("provider-resilience", SkillOrigin.V3, "resilience", "Apply retry, circuit-breaker, and provider failover policy."),
             SkillDefinition("user-isolation", SkillOrigin.V3, "security", "Keep user/profile data and service context isolated."),
         )
