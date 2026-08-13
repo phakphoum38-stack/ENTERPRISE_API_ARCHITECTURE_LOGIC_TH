@@ -81,6 +81,22 @@ class UnifiedToolRegistry:
             self.drive_runtime.execute,
         )
 
+        # Full Control Center read surfaces. These handlers are user-scoped by
+        # V3LocalService because they need UserContext and DataLayout.
+        for name, capability, description in (
+            ("workspace-status", "workspace", "Inspect Research OS user and Drive workspace roots."),
+            ("workspace-files-list", "files", "List files inside an allowed Research OS workspace root."),
+            ("workspace-file-read", "files", "Preview a bounded text file inside an allowed Research OS workspace root."),
+            ("workspace-repositories", "repositories", "Inventory repository snapshots and bundle hashes from the Drive mirror."),
+            ("github-status", "github", "Inspect the local GitHub repository mirror without requiring network access."),
+            ("drive-status", "drive", "Inspect the configured DRIVE_VIRTUAL_CLOUD mirror and its top-level directories."),
+            ("runtime-status", "runtime", "Inspect the running Research OS service runtime and user data root."),
+            ("installer-status", "installer", "Inspect the installed Research OS runtime location and build metadata."),
+            ("backups-list", "backup", "List user/profile-scoped Research OS backup archives."),
+            ("research-shell", "diagnostics", "Run the bounded Research OS diagnostic command console; arbitrary OS shell execution is disabled."),
+        ):
+            self.register(ToolDefinition(name, capability, description))
+
     def register(
         self,
         definition: ToolDefinition,
