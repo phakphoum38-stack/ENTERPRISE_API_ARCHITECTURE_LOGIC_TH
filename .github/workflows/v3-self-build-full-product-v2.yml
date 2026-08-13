@@ -1,0 +1,214 @@
+name: Research OS Full Product Self-Build V2
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/research-os-self-build-lab-2026-08-13
+    paths:
+      - '.github/workflows/v3-self-build-full-product-v2.yml'
+      - 'v3/flutter_app/lib/src/operational_pages.dart'
+      - 'v3/scripts/activate_full_control_operational_pages.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-full-product-v2-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  full-product:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      SELF_WORKSPACE: D:\research-os-full-product-v2
+
+    steps:
+      - name: Checkout teaching source
+        uses: actions/checkout@v4
+
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Gate 1 - validate V3 runtime
+        working-directory: v3
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'V3 tests failed' }
+          python scripts/factory_execution_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'factory smoke failed' }
+
+      - name: Gate 2 - create isolated self-build workspace
+        shell: pwsh
+        run: |
+          if (Test-Path $env:SELF_WORKSPACE) { Remove-Item $env:SELF_WORKSPACE -Recurse -Force }
+          python v3/scripts/self_build_lab.py --source "$env:GITHUB_WORKSPACE" --workspace "$env:SELF_WORKSPACE" --source-sha "$env:GITHUB_SHA"
+          if ($LASTEXITCODE -ne 0) { throw 'self-build staging failed' }
+
+      - name: Gate 3 - generate one Full Control Center shell
+        shell: pwsh
+        run: |
+          python "$env:SELF_WORKSPACE\v3\scripts\self_build_full_control_center.py" --workspace "$env:SELF_WORKSPACE" --requirement "$env:SELF_WORKSPACE\v3\self_build\OWNER_REQUIREMENT_FULL_CONTROL_CENTER.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Full Control Center generation failed' }
+          python "$env:SELF_WORKSPACE\v3\scripts\activate_full_control_operational_pages.py" --workspace "$env:SELF_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { throw 'operational page activation failed' }
+          python "$env:SELF_WORKSPACE\v3\scripts\self_build_full_control_center_tests.py" --workspace "$env:SELF_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { throw 'UI acceptance test staging failed' }
+
+          $obsoleteTest = "$env:SELF_WORKSPACE\v3\flutter_app\test\full_control_app_test.dart"
+          if (Test-Path $obsoleteTest) { Remove-Item $obsoleteTest -Force }
+
+          $app = "$env:SELF_WORKSPACE\v3\flutter_app\lib\src\research_os_v3_app.dart"
+          $appText = Get-Content $app -Raw
+          $legacy = 'class _OperationalPage extends StatelessWidget {'
+          if ($appText.Contains($legacy)) {
+            $appText = $appText.Replace($legacy, "// ignore: unused_element`r`nclass _OperationalPage extends StatelessWidget {")
+            Set-Content $app $appText -Encoding UTF8
+          }
+
+          foreach ($label in @('Home','Chat AI','Agents','Memory','Skills','Tools','Factory','Providers','Files','Repositories','GitHub','Drive','Runtime','Installer','Backup','Restore','Shell')) {
+            if (-not (Select-String -Path $app -SimpleMatch $label -Quiet)) { throw "missing page: $label" }
+          }
+          foreach ($tool in @('workspace-files-list','workspace-repositories','github-status','drive-status','runtime-status','installer-status','backups-list','research-shell')) {
+            if (-not (Select-String -Path "$env:SELF_WORKSPACE\v3\flutter_app\lib\src\operational_pages.dart" -SimpleMatch $tool -Quiet)) { throw "missing operational tool binding: $tool" }
+          }
+
+      - name: Gate 4 - analyze test and build one Windows Research OS app
+        working-directory: D:\research-os-full-product-v2\v3\flutter_app
+        shell: pwsh
+        run: |
+          flutter create --platforms=windows --project-name=research_os_v3_flutter .
+          if ($LASTEXITCODE -ne 0) { throw 'flutter create failed' }
+          if (Test-Path 'test\widget_test.dart') { Remove-Item 'test\widget_test.dart' -Force }
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+          dart fix --apply
+          if ($LASTEXITCODE -ne 0) { throw 'dart fix failed' }
+          dart format lib test
+          if ($LASTEXITCODE -ne 0) { throw 'dart format failed' }
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw 'flutter analyze failed' }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw 'flutter tests failed' }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Windows build failed' }
+          if (-not (Test-Path 'build\windows\x64\runner\Release\research_os_v3_flutter.exe')) { throw 'Research OS app EXE missing' }
+
+      - name: Gate 5 - build ServiceHost
+        shell: pwsh
+        run: |
+          $out = "$env:SELF_WORKSPACE\out\service"
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          dotnet publish "$env:SELF_WORKSPACE\v3\windows_service\ResearchOS.V3.ServiceHost.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o $out
+          if ($LASTEXITCODE -ne 0) { throw 'ServiceHost publish failed' }
+          if (-not (Test-Path "$out\ResearchOS.V3.ServiceHost.exe")) { throw 'ServiceHost EXE missing' }
+
+      - name: Gate 6 - stage full runtime with bundled Python and V3 Core
+        shell: pwsh
+        run: |
+          & "$env:SELF_WORKSPACE\v3\scripts\stage_candidate.ps1" -FlutterReleaseDir "$env:SELF_WORKSPACE\v3\flutter_app\build\windows\x64\runner\Release" -ServiceHostDir "$env:SELF_WORKSPACE\out\service" -FlutterIconPath "$env:SELF_WORKSPACE\v3\flutter_app\windows\runner\resources\app_icon.ico"
+          if ($LASTEXITCODE -ne 0) { throw 'full runtime staging failed' }
+          $package = "$env:SELF_WORKSPACE\v3\installer\package"
+          foreach ($required in @('app\research_os_v3_flutter.exe','service\ResearchOS.V3.ServiceHost.exe','v3\runtime\python\python.exe','v3\research_os_v3\__init__.py','scripts\v3-service.ps1')) {
+            if (-not (Test-Path (Join-Path $package $required))) { throw "full runtime missing: $required" }
+          }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Gate 7 - compile Research OS Setup EXE
+        shell: pwsh
+        run: |
+          $output = "$env:SELF_WORKSPACE\v3\installer\output"
+          if (Test-Path $output) { Remove-Item $output -Recurse -Force }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "$env:SELF_WORKSPACE\v3\installer\research-os-v3.iss"
+          if ($LASTEXITCODE -ne 0) { throw 'installer compilation failed' }
+          $setup = Get-ChildItem $output -Filter 'Research-OS-V3-Setup-*-x64.exe' -File | Select-Object -First 1
+          if (-not $setup) { throw 'Setup EXE missing' }
+          "FULL_SETUP=$($setup.FullName)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Gate 8 - installed product E2E
+        shell: pwsh
+        run: |
+          & "$env:SELF_WORKSPACE\v3\scripts\candidate_validate.ps1" -SetupPath $env:FULL_SETUP -EvidencePath "$env:SELF_WORKSPACE\FULL_PRODUCT_E2E.json"
+          if ($LASTEXITCODE -ne 0) { throw 'installed product validation failed' }
+
+      - name: Gate 9 - assemble Full Owner Archive
+        shell: pwsh
+        run: |
+          $root = "$env:SELF_WORKSPACE\FULL_ARCHIVE"
+          New-Item -ItemType Directory -Path "$root\01_INSTALLER" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$root\02_PORTABLE_RUNTIME" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$root\03_SOURCE" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$root\04_EVIDENCE" -Force | Out-Null
+          Copy-Item $env:FULL_SETUP "$root\01_INSTALLER\Research-OS-Setup.exe" -Force
+          Copy-Item "$env:SELF_WORKSPACE\v3\installer\package\*" "$root\02_PORTABLE_RUNTIME" -Recurse -Force
+          foreach ($dir in @('v3','apps','owner_special','docs','scripts','tools','installer','research','house')) {
+            $src = Join-Path $env:SELF_WORKSPACE $dir
+            if (Test-Path $src) { Copy-Item $src "$root\03_SOURCE\$dir" -Recurse -Force }
+          }
+          foreach ($file in @('SELF_BUILD_MANIFEST.json','SELF_BUILD_FULL_CONTROL_CENTER.json','FULL_PRODUCT_E2E.json')) {
+            $src = Join-Path $env:SELF_WORKSPACE $file
+            if (Test-Path $src) { Copy-Item $src "$root\04_EVIDENCE\$file" -Force }
+          }
+          $inventory = Get-ChildItem $root -File -Recurse
+          $total = [long](($inventory | Measure-Object Length -Sum).Sum)
+          $manifest = [ordered]@{
+            schema_version = 1
+            contract = 'research-os-full-product-owner-archive-v2'
+            status = 'passed'
+            source_sha = $env:GITHUB_SHA
+            file_count = $inventory.Count
+            uncompressed_bytes = $total
+            setup = [ordered]@{ size = (Get-Item "$root\01_INSTALLER\Research-OS-Setup.exe").Length; sha256 = (Get-FileHash "$root\01_INSTALLER\Research-OS-Setup.exe" -Algorithm SHA256).Hash.ToLowerInvariant() }
+            app = [ordered]@{ sha256 = (Get-FileHash "$root\02_PORTABLE_RUNTIME\app\research_os_v3_flutter.exe" -Algorithm SHA256).Hash.ToLowerInvariant() }
+            service = [ordered]@{ sha256 = (Get-FileHash "$root\02_PORTABLE_RUNTIME\service\ResearchOS.V3.ServiceHost.exe" -Algorithm SHA256).Hash.ToLowerInvariant() }
+            bundled_python = Test-Path "$root\02_PORTABLE_RUNTIME\v3\runtime\python\python.exe"
+            full_control_center = $true
+            single_app_shell = $true
+            operational_pages = @('Files','Repositories','GitHub','Drive','Runtime','Installer','Backup','Restore','Shell')
+            merged = $false
+            deployed = $false
+          }
+          $manifest | ConvertTo-Json -Depth 8 | Set-Content "$root\04_EVIDENCE\FULL_PRODUCT_MANIFEST.json" -Encoding utf8
+          $short = $env:GITHUB_SHA.Substring(0,12)
+          $zip = "$env:SELF_WORKSPACE\Research_OS_FULL_PRODUCT_V2_$short.zip"
+          Compress-Archive -Path "$root\*" -DestinationPath $zip -CompressionLevel Optimal
+          "FULL_ARCHIVE_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "FULL archive uncompressed bytes: $total"
+          Write-Host "FULL archive ZIP bytes: $((Get-Item $zip).Length)"
+          Get-Content "$root\04_EVIDENCE\FULL_PRODUCT_MANIFEST.json"
+
+      - name: Upload passed Full Product V2
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-full-product-v2-${{ github.sha }}
+          path: |
+            ${{ env.FULL_ARCHIVE_ZIP }}
+            ${{ env.FULL_SETUP }}
+            ${{ env.SELF_WORKSPACE }}\FULL_ARCHIVE\04_EVIDENCE\FULL_PRODUCT_MANIFEST.json
+          if-no-files-found: error
+          retention-days: 14
