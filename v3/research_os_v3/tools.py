@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
 
+from .drive_runtime import DriveToolRuntimeAdapter
+
 
 class ToolRisk(str, Enum):
     READ_ONLY = "read-only"
@@ -25,9 +27,10 @@ ToolHandler = Callable[[dict[str, object]], dict[str, object]]
 class UnifiedToolRegistry:
     """Native V3 tool catalog with explicit risk and approval metadata."""
 
-    def __init__(self) -> None:
+    def __init__(self, drive_runtime: DriveToolRuntimeAdapter | None = None) -> None:
         self._definitions: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, ToolHandler] = {}
+        self.drive_runtime = drive_runtime or DriveToolRuntimeAdapter()
         self._register_defaults()
 
     def _register_defaults(self) -> None:
@@ -55,6 +58,27 @@ class UnifiedToolRegistry:
                 risk=ToolRisk.WRITE,
                 approval_required=True,
             )
+        )
+        self.register(
+            ToolDefinition(
+                "drive-tools-list",
+                "drive-runtime",
+                "List checksum-governed tool packages from the configured local Google Drive mirror.",
+            ),
+            lambda args: {
+                "status": self.drive_runtime.status(),
+                "packages": self.drive_runtime.discover(),
+            },
+        )
+        self.register(
+            ToolDefinition(
+                "drive-tool-execute",
+                "drive-runtime",
+                "Execute a verified Drive tool package without a shell through the local mirror adapter.",
+                risk=ToolRisk.WRITE,
+                approval_required=True,
+            ),
+            self.drive_runtime.execute,
         )
 
     def register(

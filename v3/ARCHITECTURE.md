@@ -1,77 +1,40 @@
 # Research OS V3 Architecture
 
-## Purpose
-
-V3 is the clean local-first Research OS architecture. It keeps one coordination authority and separates planning capacity from actual runtime concurrency.
-
 ## One Truth
 
-`UnifiedMasterOrchestrator` is the only V3 coordination and execution authority. Brain, Providers, Skills, Tools, Agents, Memory, and Factory compose under this master. Preserved V1/V2, Owner/Friend, House Command, Research Curator, and other legacy capabilities must not be started as competing masters.
+`UnifiedMasterOrchestrator` is the only V3 coordination and execution authority. Brain, Providers, Skills, Tools, Agents, Memory, and Factory compose under this master. Restored Owner/Friend and legacy source never starts a competing master.
 
-## Adaptive hierarchy
+## Capacity
 
-Logical profiles are selected lazily from the smallest safe tier:
+The hierarchy selects the smallest safe logical tier from `3^1`, `3^3`, `6^3`, `3^6`, `6^6`, and `10^10`. The top tier is a logical ceiling of 10,000,000,000 leaf slots. Actual execution remains bounded and queued above active capacity.
 
-- `3^1`
-- `3^3`
-- `6^3`
-- `3^6`
-- `6^6`
-- `10^10`
+## Skills
 
-The `10^10` profile is a logical planning ceiling of 10,000,000,000 leaf slots. It does not create ten billion workers. Real execution is bounded by explicit concurrency limits and queue/backpressure.
+`UnifiedSkillRegistry` contains 40 capabilities across V1, V2, V3, Owner/Friend, and legacy origins. All current entries have a native V3 execution path.
 
-## Brain and AI conversation
+- `v3-core` identifies existing V3 implementations.
+- `v3-adapter` identifies migrated implementations hosted by `NativeSkillRuntime`.
+- `POST /v3/skills/execute` supplies explicit runtime evidence.
+- Persisting or mutating actions fail closed without request approval.
 
-The AI conversation flow is:
+The restored `owner_special/research_os_friend/` package is kept as provenance and compatibility source. V3 does not activate `FriendOrchestrator`.
 
-`Flutter Chat -> loopback POST /v3/chat -> V3 Local Service -> Unified Master -> Provider Registry -> provider response`
+## Tools and Drive
 
-Optional user/profile memory is resolved before the master calls the provider. The master injects the unified secret-free skill catalog as context. Provider secrets remain service-owned and are never returned in API status or stored in Flutter.
+`UnifiedToolRegistry` applies risk and approval policy to tool execution. `DriveToolRuntimeAdapter` reads packages from a locally synchronized Google Drive root; Drive itself is not treated as a process host.
 
-The desktop Flutter shell that historically used the V1/Gemini generation endpoints now routes Chat through `/v3/chat`. Non-chat V1/V2 compatibility APIs may remain while migration continues, but they are not independent Chat brains.
+The adapter checks package path containment and SHA-256 integrity, invokes supported runtimes without a shell, and bounds execution. `drive-tools-list` is read-only; `drive-tool-execute` requires approval.
 
-## Unified skills
+## Agents and conversation
 
-`UnifiedSkillRegistry` contains the capability catalog across V1, V2, V3, Owner/Friend, and preserved legacy sources.
+Researcher, architect, builder, reviewer, and release-guardian remain on-demand roles under the Unified Master. Flutter Chat routes through the loopback V3 chat endpoint and does not create an independent AI brain.
 
-Each skill records:
+## Data boundary
 
-- `origin`
-- `capability`
-- `description`
-- `native_v3`
-- `runtime_mode`
-- `source`
-
-`runtime_mode: native` means the capability has a V3-native executable implementation. `runtime_mode: context-adapter` means the capability is preserved for reasoning/routing context and must not be represented as executed unless an explicit V3 runtime, agent, or tool invocation proves execution. The metadata enforces `native_v3 = false` for context adapters.
-
-Owner/Friend capability names preserved in the registry include analysis, planning, coding, research, data, documents, automation, memory, security, and quality. Legacy catalog entries include Research Curator, House Command, integration, developer identity, quality gates, evidence, and the preserved V3 bridge.
-
-## Agents
-
-The default on-demand V3 roles remain:
-
-- researcher
-- architect
-- builder
-- reviewer
-- release-guardian
-
-Agents are capability-validated against the unified skill/tool registries. Role prompts receive only their assigned skill context, and context-adapter skills do not grant implicit execution authority.
-
-## Governed tools
-
-Tool execution flows through `UnifiedToolRegistry`. Write-capable operations fail closed without explicit approval. Tool results, not model claims, are the evidence that an action ran.
-
-## Memory and user isolation
-
-Durable memory is scoped by user and profile. User/profile identifiers travel through V3 request headers, and storage layout keeps mutable data isolated. Cross-user memory leakage is prohibited and covered by tests.
-
-## Provider boundary
-
-Provider routing is service-side. OpenAI-compatible credentials can be resolved from configured secret sources; deterministic mock remains available for offline tests. Status contracts are credential-redacted.
+Memory and mutable state remain scoped by user/profile. Cross-user access is prohibited. Execution evidence and API status remain separate from provider-owned configuration.
 
 ## Validation boundary
 
-A change is not release-ready merely because source exists. Python tests, service smoke, Flutter tests, platform build checks, and Windows Candidate validation should be run against the exact final SHA before a PR is marked Ready or merged.
+Local Python validation for this source set passed with 120 tests, 1 platform-specific skip, and 7 subtests. Service Smoke confirms 40 native skills, 0 context-only adapters, 5 tools, 5 agents, Drive runtime availability, user isolation, and the `10^10` ceiling.
+
+The Draft PR is not release-ready until Flutter and Windows Candidate validation run on the exact final GitHub SHA.

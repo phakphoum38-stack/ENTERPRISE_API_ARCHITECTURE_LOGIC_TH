@@ -1,68 +1,42 @@
-# Research OS V3 — Clean Architecture Workspace
+# Research OS V3 — Full System
 
-Research OS V3 is the clean rebuild line for the local-first Research OS runtime and Flutter workspace. V3 keeps one coordination authority, bounded lazy execution, loopback-only local APIs, durable user/profile isolation, governed tools, and provider secrets owned by the service layer.
+Research OS V3 is the local-first full-system line with one coordination authority: `UnifiedMasterOrchestrator`.
 
-## V3.1 Full System
+## Current capability state
 
-The current feature line expands the clean V3 shell into a full local workspace with:
+- Adaptive logical hierarchy: `3^1`, `3^3`, `6^3`, `3^6`, `6^6`, `10^10`.
+- `10^10` is a planning ceiling, not a live worker count.
+- Unified skill registry: 40 capabilities.
+- Native execution paths: 40.
+- Context-only adapters: 0.
+- Owner/Friend source is restored under `owner_special/research_os_friend/` for provenance and compatibility; its orchestrator is not started.
+- Migrated capability lines execute only through `NativeSkillRuntime` under the V3 master.
+- Five governed tools are registered, including Drive package discovery and Drive package invocation.
+- Five on-demand role agents remain under the same master.
 
-- Unified Master Orchestrator
-- adaptive hierarchy through `10^10` logical capacity
-- Brain, Providers, Factory, Skills, Tools, Agents, and Memory
-- loopback V3 local API
-- Flutter workspaces for Home, Chat, Agents, Memory, Skills, Tools, Factory, and Providers
-- Windows service/installer Candidate gates
+## Native skill contract
 
-`10^10` means a planning ceiling of 10,000,000,000 logical leaf slots. It is never interpreted as ten billion live processes, threads, or agents. Real execution remains bounded and uses queue/backpressure.
+Each skill exposes origin, capability, runtime mode, source, and execution adapter. Existing V3 implementations use `v3-core`; migrated V1/V2, Owner/Friend, and legacy implementations use `v3-adapter`.
 
-## Unified Brain, Skills, and Chat
+`POST /v3/skills/execute` is the explicit execution boundary. Actions that can change persisted state require per-request approval. A model response is not evidence that an action ran; an explicit runtime result is required.
 
-V3 is the single execution and coordination authority. The V3 `UnifiedSkillRegistry` exposes native V3 capabilities plus preserved V1/V2, Owner/Friend, and legacy capability knowledge through explicit provenance.
+## Drive Tool Runtime Adapter
 
-- `runtime_mode: native` means the capability has a V3-native executable implementation.
-- `runtime_mode: context-adapter` means the capability is represented for routing/reasoning but must not be claimed as executed without an explicit V3 runtime/tool/agent result.
-- `/v3/skills` exposes skill origin, capability, runtime mode, source, and the single authority contract.
-- General chat and role agents receive this governed capability context.
-- Desktop Flutter chat routes through the loopback V3 `POST /v3/chat` endpoint instead of hard-coding the legacy V1/Gemini path.
+Google Drive remains storage. `DriveToolRuntimeAdapter` consumes tool packages from a locally synchronized Drive root configured by `RESEARCH_OS_DRIVE_TOOL_ROOT`. Packages are checked for path containment and SHA-256 integrity before a supported runtime is invoked. Shell invocation is disabled and runtime duration/output are bounded.
 
-This preserves older capability knowledge without starting competing brains or orchestrators.
+Registered Drive tools:
 
-## Local API
+- `drive-tools-list` — read-only discovery.
+- `drive-tool-execute` — approval required.
 
-Read/status endpoints:
+## API
 
-- `GET /health`
-- `GET /v3/master`
-- `GET /v3/factory/plan`
-- `GET /v3/providers`
-- `GET /v3/skills`
-- `GET /v3/tools`
-- `GET /v3/agents`
-- `GET /v3/user`
-- `GET /v3/memory`
+Read/status: `/health`, `/v3/master`, `/v3/factory/plan`, `/v3/providers`, `/v3/skills`, `/v3/tools`, `/v3/agents`, `/v3/user`, `/v3/memory`.
 
-Governed execution endpoints:
-
-- `POST /v3/chat`
-- `POST /v3/memory`
-- `POST /v3/agents/run`
-- `POST /v3/tools/execute`
-
-Write-capable tools fail closed unless the request includes explicit approval through `X-Research-OS-Approval: granted`.
-
-## Provider configuration
-
-The V3 service can reuse an existing OpenAI-compatible credential without placing the secret in Flutter or status contracts:
-
-- `RESEARCH_OS_OPENAI_API_KEY` preferred alias
-- `OPENAI_API_KEY` compatibility alias
-- `RESEARCH_OS_OPENAI_ENDPOINT` optional endpoint override
-- `RESEARCH_OS_OPENAI_MODEL` optional model override
-
-When no real provider is ready, the deterministic local mock provider remains available for offline validation.
+Governed operations: `/v3/chat`, `/v3/memory`, `/v3/agents/run`, `/v3/skills/execute`, `/v3/tools/execute`.
 
 ## Validation
 
-Run the Python core and full API tests from the repository root with V3 on `PYTHONPATH`, then run `v3/scripts/service_smoke.py`. Flutter tests and Windows Candidate validation should also be run on the exact final SHA before marking a release or PR ready.
+Local Python validation for this source set: **120 passed, 1 skipped, 7 subtests passed**. Service Smoke confirms 40 native skills, 0 context-only adapters, 5 tools, 5 agents, Drive runtime availability, Chat/Memory flow, user isolation, and the `10^10` logical ceiling.
 
-The architecture intentionally separates source presence from runtime execution: a preserved legacy skill in the unified registry is not automatically an executable V3 skill unless its runtime mode says `native` or an explicit adapter/tool implementation is invoked through V3 policy.
+Flutter validation and Windows Candidate validation are still required on the exact final GitHub SHA before PR #41 is marked Ready or merged.

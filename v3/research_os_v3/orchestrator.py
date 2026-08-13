@@ -9,6 +9,7 @@ from .execution import FactoryExecutionEngine, FactoryExecutionResult, StageHand
 from .factory import SoftwareFactory, SoftwareFactoryPlan
 from .models import OrchestrationDecision, Workload
 from .providers import CompletionRequest, CompletionResponse, ProviderRegistry
+from .skill_runtime import NativeSkillRuntime, SkillRuntimeContext
 from .skills import UnifiedSkillRegistry
 from .tools import UnifiedToolRegistry
 
@@ -37,6 +38,7 @@ class UnifiedMasterOrchestrator:
         self.factory = factory or SoftwareFactory()
         self.skills = skills or UnifiedSkillRegistry()
         self.tools = tools or UnifiedToolRegistry()
+        self.skill_runtime = NativeSkillRuntime(self.skills)
         self.agents = agents or UnifiedAgentRegistry(skills=self.skills, tools=self.tools)
 
     def decide(self, workload: Workload) -> OrchestrationDecision:
@@ -93,6 +95,16 @@ class UnifiedMasterOrchestrator:
         approved: bool = False,
     ) -> dict[str, object]:
         return self.tools.execute(name, arguments, approved=approved)
+
+    def execute_skill(
+        self,
+        name: str,
+        text: str = "",
+        *,
+        arguments: dict[str, object] | None = None,
+        context: SkillRuntimeContext,
+    ) -> dict[str, object]:
+        return self.skill_runtime.execute(name, text, arguments=arguments, context=context)
 
     def execute_factory(
         self,

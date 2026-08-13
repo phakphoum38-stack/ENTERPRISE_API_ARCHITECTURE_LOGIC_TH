@@ -14,6 +14,7 @@ from .contracts import health_contract, master_contract, providers_contract
 from .memory import MemoryStore
 from .models import Workload
 from .orchestrator import UnifiedMasterOrchestrator
+from .skill_runtime import SkillRuntimeContext
 from .storage import DataLayout
 from .user_context import UserContext
 
@@ -138,6 +139,71 @@ class V3LocalService:
                     self._write_json(400, {"error": "invalid workload parameters"}, method="GET")
                     return None
 
+            def _skill_context(
+                self,
+                context: UserContext,
+                *,
+                approved: bool,
+            ) -> SkillRuntimeContext:
+                user_layout = data_layout.for_user(context).ensure()
+
+                def memory_search(query: str, limit: int) -> list[dict[str, object]]:
+                    return [item.to_dict() for item in memory.search(context, query, limit=limit)]
+
+                def memory_add(text: str, tags: tuple[str, ...]) -> dict[str, object]:
+                    return memory.add(context, text, tags=tags).to_dict()
+
+                def provider_complete(prompt: str, preferred: str | None) -> dict[str, object]:
+                    response = orchestrator.answer(prompt, preferred_provider=preferred)
+                    return {"text": response.text, "provider": response.provider, "model": response.model}
+
+                def provider_snapshot() -> list[dict[str, object]]:
+                    return [item.to_safe_dict() for item in orchestrator.providers.statuses()]
+
+                def agent_snapshot() -> list[dict[str, object]]:
+                    return [
+                        {
+                            "name": item.name,
+                            "role": item.role,
+                            "description": item.description,
+                            "skills": list(item.skills),
+                            "tools": list(item.tools),
+                        }
+                        for item in orchestrator.agents.list()
+                    ]
+
+                def agent_run(agent_name: str, prompt: str) -> dict[str, object]:
+                    response = orchestrator.answer(prompt, agent_name=agent_name)
+                    return {"agent": agent_name, "text": response.text, "provider": response.provider, "model": response.model}
+
+                def tool_run(tool_name: str, arguments: dict[str, object], is_approved: bool) -> dict[str, object]:
+                    return orchestrator.execute_tool(tool_name, arguments, approved=is_approved)
+
+                def factory_plan(tasks: int) -> dict[str, object]:
+                    decision, plan = orchestrator.plan(Workload(estimated_leaf_tasks=tasks))
+                    return {
+                        "decision": master_contract(decision),
+                        "stage_order": list(plan.stage_order),
+                        "scale": plan.profile.tier.value,
+                        "maximum_leaf_capacity": plan.profile.capacity,
+                    }
+
+                return SkillRuntimeContext(
+                    user_id=context.user_id,
+                    profile_id=context.profile_id,
+                    user_data_root=user_layout.root,
+                    repository_root=Path(__file__).resolve().parents[2],
+                    approved=approved,
+                    memory_search=memory_search,
+                    memory_add=memory_add,
+                    provider_complete=provider_complete,
+                    provider_snapshot=provider_snapshot,
+                    agent_run=agent_run,
+                    agent_snapshot=agent_snapshot,
+                    tool_run=tool_run,
+                    factory_plan=factory_plan,
+                )
+
             def do_GET(self) -> None:  # noqa: N802 - stdlib handler contract
                 parsed = urlparse(self.path)
                 if parsed.path == "/health":
@@ -182,10 +248,13 @@ class V3LocalService:
                                     "native_v3": item.native_v3,
                                     "runtime_mode": item.runtime_mode,
                                     "source": item.source,
+                                    "execution_adapter": item.execution_adapter,
                                 }
                                 for item in orchestrator.skills.list()
                             ],
                             "count": len(orchestrator.skills.list()),
+                            "native_count": sum(1 for item in orchestrator.skills.list() if item.native_v3),
+                            "context_adapter_count": sum(1 for item in orchestrator.skills.list() if item.runtime_mode == "context-adapter"),
                             "origins": [origin.value for origin in orchestrator.skills.origins()],
                             "single_authority": orchestrator.contract,
                         },
@@ -348,6 +417,43 @@ class V3LocalService:
                         },
                         method="POST",
                     )
+                    return
+
+                if parsed.path == "/v3/skills/execute":
+                    context = self._required_user_context(method="POST")
+                    if context is None:
+                        return
+                    name = str(body.get("name", "")).strip()
+                    text = str(body.get("text", ""))
+                    arguments = body.get("arguments", {})
+                    if not name:
+                        self._write_json(400, {"error": "skill name is required"}, method="POST")
+                        return
+                    if not isinstance(arguments, dict):
+                        self._write_json(400, {"error": "arguments must be an object"}, method="POST")
+                        return
+                    approved = self.headers.get(APPROVAL_HEADER, "").strip().lower() == "granted"
+                    runtime_context = self._skill_context(context, approved=approved)
+                    try:
+                        result = orchestrator.execute_skill(
+                            name,
+                            text,
+                            arguments=dict(arguments),
+                            context=runtime_context,
+                        )
+                    except KeyError:
+                        self._write_json(404, {"error": f"unknown skill or resource: {name}"}, method="POST")
+                        return
+                    except PermissionError as exc:
+                        self._write_json(403, {"error": str(exc), "approval_header": APPROVAL_HEADER}, method="POST")
+                        return
+                    except ValueError as exc:
+                        self._write_json(400, {"error": str(exc)}, method="POST")
+                        return
+                    except RuntimeError as exc:
+                        self._write_json(503, {"error": str(exc)}, method="POST")
+                        return
+                    self._write_json(200, result, method="POST")
                     return
 
                 if parsed.path == "/v3/tools/execute":

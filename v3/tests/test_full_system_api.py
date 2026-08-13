@@ -86,10 +86,54 @@ class FullSystemApiTests(unittest.TestCase):
         by_name = {item["name"]: item for item in skills["skills"]}
         names = set(by_name)
         self.assertTrue({"analysis", "coding", "research-curation", "v3-bridge"} <= names)
+        self.assertEqual(skills["native_count"], skills["count"])
+        self.assertEqual(skills["context_adapter_count"], 0)
         self.assertTrue(by_name["chat-runtime"]["native_v3"])
         self.assertEqual(by_name["chat-runtime"]["runtime_mode"], "native")
-        self.assertFalse(by_name["coding"]["native_v3"])
-        self.assertEqual(by_name["coding"]["runtime_mode"], "context-adapter")
+        self.assertTrue(by_name["coding"]["native_v3"])
+        self.assertEqual(by_name["coding"]["runtime_mode"], "native")
+        self.assertEqual(by_name["coding"]["execution_adapter"], "v3-adapter")
+
+    def test_native_skill_execution_uses_v3_runtime_and_approval_boundaries(self) -> None:
+        status, analysis = self.post(
+            "/v3/skills/execute",
+            {"name": "analysis", "text": "inspect evidence"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(analysis["runtime_mode"], "native")
+        self.assertEqual(analysis["result"]["text"], "analysis: inspect evidence")
+
+        self.post(
+            "/v3/memory",
+            {"text": "native skill retrieval proof", "tags": ["skill-runtime"]},
+        )
+        status, memory = self.post(
+            "/v3/skills/execute",
+            {
+                "name": "memory-retrieval",
+                "arguments": {"query": "retrieval proof", "limit": 4},
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(memory["result"]["hits"])
+
+        payload = {
+            "name": "durable-orchestration",
+            "text": "plan native migration",
+            "arguments": {"action": "create", "tasks": 40},
+        }
+        request = urllib.request.Request(
+            self.base + "/v3/skills/execute",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={**self.headers, "Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as captured:
+            urllib.request.urlopen(request, timeout=3)
+        self.assertEqual(captured.exception.code, 403)
+        status, created = self.post("/v3/skills/execute", payload, approved=True)
+        self.assertEqual(status, 200)
+        self.assertEqual(created["result"]["status"], "planned")
 
     def test_master_and_factory_plan_select_10x10_without_spawning_it(self) -> None:
         status, master = self.get("/v3/master?tasks=46657")

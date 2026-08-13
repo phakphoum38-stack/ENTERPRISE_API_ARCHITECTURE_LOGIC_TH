@@ -107,8 +107,8 @@ class UnifiedAgentRegistry:
             f"You are the Research OS V3 agent '{agent.name}' with role '{agent.role}'. "
             f"Use only the capabilities assigned to this agent. Skills: {skill_context}. "
             f"Tools available by policy: {', '.join(agent.tools) if agent.tools else 'none'}. "
-            "V3 remains the single execution authority. Context-adapter skills are knowledge only "
-            "unless an explicit V3 runtime/tool result proves execution. Be concise, evidence-aware, "
+            "V3 remains the single execution authority. Assigned migrated skills run only through "
+            "their governed V3 adapters. Be concise, evidence-aware, "
             "and do not claim actions that were not executed."
         )
         if context_text:
