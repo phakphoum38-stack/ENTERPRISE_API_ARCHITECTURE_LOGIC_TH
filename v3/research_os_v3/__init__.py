@@ -1,5 +1,6 @@
 from .brain import BrainCore
 from .contracts import health_contract, master_contract, providers_contract
+from .drive_runtime import DriveToolPackage, DriveToolRuntimeAdapter
 from .execution import (
     AtomicExecutionEvidenceStore,
     FactoryExecutionContext,
@@ -9,6 +10,7 @@ from .execution import (
     StageHandler,
 )
 from .factory import SoftwareFactory
+from .memory import MemoryRecord, MemoryStore
 from .models import OrchestrationDecision, ScaleProfile, ScaleTier, Workload
 from .orchestrator import UnifiedMasterOrchestrator
 from .providers import (
@@ -44,10 +46,14 @@ __all__ = [
     "CompletionResponse",
     "CompositeSecretSource",
     "DataLayout",
+    "DriveToolPackage",
+    "DriveToolRuntimeAdapter",
     "EnvironmentSecretSource",
     "FactoryExecutionContext",
     "FactoryExecutionEngine",
     "FactoryExecutionResult",
+    "MemoryRecord",
+    "MemoryStore",
     "MockProvider",
     "OpenAICompatibleProvider",
     "OrchestrationDecision",
