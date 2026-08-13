@@ -1,0 +1,216 @@
+name: Research OS Full Product V3 Drive Transport Split
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/research-os-self-build-lab-2026-08-13
+    paths:
+      - '.github/workflows/v3-full-product-drive-transport-split.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  drive-safe-split:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_RUN_ID: '31706836322'
+      SOURCE_SHA: '9fe426891fe1abf58c07a020baa0fea4a23b8d77'
+      SOURCE_ARTIFACT: 'research-os-full-product-v3-9fe426891fe1abf58c07a020baa0fea4a23b8d77'
+
+    steps:
+      - name: Checkout transport workflow
+        uses: actions/checkout@v4
+
+      - name: Download exact passed Full Product V3 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SOURCE_ARTIFACT }}
+          path: transport/input
+          github-token: ${{ github.token }}
+          repository: phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Split archive and setup into Drive-safe opaque chunks
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path transport/out/archive -Force | Out-Null
+          New-Item -ItemType Directory -Path transport/out/setup -Force | Out-Null
+          New-Item -ItemType Directory -Path transport/out/meta -Force | Out-Null
+
+          $archive = Get-ChildItem transport/input -Recurse -File -Filter 'Research_OS_FULL_PRODUCT_V3_*.zip' | Select-Object -First 1
+          if (-not $archive) { throw 'Original Full Product V3 archive not found' }
+          $setup = Get-ChildItem transport/input -Recurse -File -Filter 'Research-OS-V3-Setup-*-x64.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Original Setup EXE not found' }
+          $productManifest = Get-ChildItem transport/input -Recurse -File -Filter 'FULL_PRODUCT_MANIFEST.json' | Select-Object -First 1
+          if ($productManifest) { Copy-Item $productManifest.FullName transport/out/meta/FULL_PRODUCT_MANIFEST.json -Force }
+
+          function Split-OpaqueFile {
+            param(
+              [System.IO.FileInfo]$Source,
+              [string]$OutputDirectory,
+              [string]$Prefix,
+              [long]$ChunkBytes
+            )
+            $buffer = New-Object byte[] (4MB)
+            $input = [System.IO.File]::OpenRead($Source.FullName)
+            $parts = @()
+            try {
+              $index = 1
+              while ($input.Position -lt $input.Length) {
+                $name = "$Prefix.chunk{0:d3}.bin" -f $index
+                $path = Join-Path $OutputDirectory $name
+                $output = [System.IO.File]::Create($path)
+                try {
+                  $remaining = [Math]::Min($ChunkBytes, $input.Length - $input.Position)
+                  while ($remaining -gt 0) {
+                    $want = [int][Math]::Min([long]$buffer.Length, $remaining)
+                    $read = $input.Read($buffer, 0, $want)
+                    if ($read -le 0) { throw 'Unexpected EOF during split' }
+                    $output.Write($buffer, 0, $read)
+                    $remaining -= $read
+                  }
+                } finally { $output.Dispose() }
+                $part = Get-Item $path
+                $parts += [ordered]@{
+                  name = $part.Name
+                  size = $part.Length
+                  sha256 = (Get-FileHash $part.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+                }
+                $index++
+              }
+            } finally { $input.Dispose() }
+            return $parts
+          }
+
+          $chunkBytes = 80MB
+          $archiveParts = Split-OpaqueFile -Source $archive -OutputDirectory 'transport/out/archive' -Prefix 'Research_OS_FULL_ARCHIVE' -ChunkBytes $chunkBytes
+          $setupParts = Split-OpaqueFile -Source $setup -OutputDirectory 'transport/out/setup' -Prefix 'Research_OS_SETUP_PAYLOAD' -ChunkBytes $chunkBytes
+
+          if ($archiveParts.Count -ne 7) { throw "Expected 7 archive chunks, got $($archiveParts.Count)" }
+          if ($setupParts.Count -ne 2) { throw "Expected 2 setup chunks, got $($setupParts.Count)" }
+          foreach ($part in @($archiveParts + $setupParts)) {
+            if ([long]$part.size -gt 90MB) { throw "Drive transport chunk unexpectedly large: $($part.name)" }
+          }
+
+          $manifest = [ordered]@{
+            schema_version = 1
+            contract = 'research-os-full-product-v3-drive-transport-only'
+            status = 'passed-source-preserved'
+            source_run_id = [long]$env:SOURCE_RUN_ID
+            source_sha = $env:SOURCE_SHA
+            source_artifact = $env:SOURCE_ARTIFACT
+            content_changed = $false
+            transport_only = $true
+            chunk_size_bytes = [long]$chunkBytes
+            connector_limit_bytes = 104857600
+            original_archive = [ordered]@{
+              name = $archive.Name
+              size = $archive.Length
+              sha256 = (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              chunks = $archiveParts
+            }
+            original_setup = [ordered]@{
+              name = $setup.Name
+              size = $setup.Length
+              sha256 = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              chunks = $setupParts
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content transport/out/meta/DRIVE_TRANSPORT_MANIFEST.json -Encoding utf8
+
+          $script = @'
+          param(
+            [string]$PayloadDirectory = '.',
+            [string]$ManifestPath = '.\DRIVE_TRANSPORT_MANIFEST.json'
+          )
+          $ErrorActionPreference = 'Stop'
+          $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
+          function Join-VerifiedPayload {
+            param($Spec)
+            $target = Join-Path $PayloadDirectory $Spec.name
+            $output = [System.IO.File]::Create($target)
+            try {
+              foreach ($chunk in $Spec.chunks) {
+                $path = Join-Path $PayloadDirectory $chunk.name
+                if (-not (Test-Path $path)) { throw "Missing chunk: $($chunk.name)" }
+                $hash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+                if ($hash -ne $chunk.sha256) { throw "Chunk checksum mismatch: $($chunk.name)" }
+                $input = [System.IO.File]::OpenRead($path)
+                try { $input.CopyTo($output) } finally { $input.Dispose() }
+              }
+            } finally { $output.Dispose() }
+            $actualSize = (Get-Item $target).Length
+            if ($actualSize -ne [long]$Spec.size) { throw "Size mismatch: $($Spec.name)" }
+            $actualHash = (Get-FileHash $target -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualHash -ne $Spec.sha256) { throw "Final checksum mismatch: $($Spec.name)" }
+            Write-Host "PASS: $target"
+            Write-Host "SHA256: $actualHash"
+          }
+          Join-VerifiedPayload $manifest.original_archive
+          Join-VerifiedPayload $manifest.original_setup
+          '@
+          $script | Set-Content transport/out/meta/REASSEMBLE_DRIVE_PAYLOADS.ps1 -Encoding utf8
+
+          Get-Content transport/out/meta/DRIVE_TRANSPORT_MANIFEST.json
+
+      - name: Verify archive and setup reassemble exactly
+        shell: pwsh
+        run: |
+          $manifest = Get-Content transport/out/meta/DRIVE_TRANSPORT_MANIFEST.json -Raw | ConvertFrom-Json
+          function Verify-Reassembly {
+            param($Spec, [string]$ChunkDirectory)
+            $target = Join-Path $env:RUNNER_TEMP $Spec.name
+            $output = [System.IO.File]::Create($target)
+            try {
+              foreach ($chunk in $Spec.chunks) {
+                $input = [System.IO.File]::OpenRead((Join-Path $ChunkDirectory $chunk.name))
+                try { $input.CopyTo($output) } finally { $input.Dispose() }
+              }
+            } finally { $output.Dispose() }
+            if ((Get-Item $target).Length -ne [long]$Spec.size) { throw "Reassembled size mismatch: $($Spec.name)" }
+            $hash = (Get-FileHash $target -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($hash -ne $Spec.sha256) { throw "Reassembled checksum mismatch: $($Spec.name)" }
+            Remove-Item $target -Force
+            Write-Host "PASS exact payload: $($Spec.name) $hash"
+          }
+          Verify-Reassembly $manifest.original_archive 'transport/out/archive'
+          Verify-Reassembly $manifest.original_setup 'transport/out/setup'
+
+      - name: Upload archive chunk 001
+        uses: actions/upload-artifact@v4
+        with: { name: drive-archive-chunk001-${{ env.SOURCE_SHA }}, path: transport/out/archive/*chunk001.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload archive chunk 002
+        uses: actions/upload-artifact@v4
+        with: { name: drive-archive-chunk002-${{ env.SOURCE_SHA }}, path: transport/out/archive/*chunk002.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload archive chunk 003
+        uses: actions/upload-artifact@v4
+        with: { name: drive-archive-chunk003-${{ env.SOURCE_SHA }}, path: transport/out/archive/*chunk003.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload archive chunk 004
+        uses: actions/upload-artifact@v4
+        with: { name: drive-archive-chunk004-${{ env.SOURCE_SHA }}, path: transport/out/archive/*chunk004.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload archive chunk 005
+        uses: actions/upload-artifact@v4
+        with: { name: drive-archive-chunk005-${{ env.SOURCE_SHA }}, path: transport/out/archive/*chunk005.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload archive chunk 006
+        uses: actions/upload-artifact@v4
+        with: { name: drive-archive-chunk006-${{ env.SOURCE_SHA }}, path: transport/out/archive/*chunk006.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload archive chunk 007
+        uses: actions/upload-artifact@v4
+        with: { name: drive-archive-chunk007-${{ env.SOURCE_SHA }}, path: transport/out/archive/*chunk007.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload setup chunk 001
+        uses: actions/upload-artifact@v4
+        with: { name: drive-setup-chunk001-${{ env.SOURCE_SHA }}, path: transport/out/setup/*chunk001.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload setup chunk 002
+        uses: actions/upload-artifact@v4
+        with: { name: drive-setup-chunk002-${{ env.SOURCE_SHA }}, path: transport/out/setup/*chunk002.bin, if-no-files-found: error, compression-level: 0, retention-days: 14 }
+      - name: Upload Drive transport metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: drive-transport-meta-${{ env.SOURCE_SHA }}
+          path: transport/out/meta/*
+          if-no-files-found: error
+          retention-days: 14
