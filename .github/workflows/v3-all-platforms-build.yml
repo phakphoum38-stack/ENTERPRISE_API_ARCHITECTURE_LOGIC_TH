@@ -5,10 +5,15 @@ on:
   push:
     branches:
       - architecture/v3-clean
+      - agent/v3-full-system-10x10
     paths:
       - 'v3/flutter_app/**'
+      - 'v3/research_os_v3/**'
+      - 'v3/tests/**'
+      - 'owner_special/research_os_friend/**'
       - 'apps/research_os_flutter/assets/branding/**'
       - 'scripts/apply-research-os-branding.py'
+      - '.github/workflows/v3-clean-core.yml'
       - '.github/workflows/v3-all-platforms-build.yml'
 
 permissions:
