@@ -1,0 +1,184 @@
+name: Research OS Full Product V3 Existing Artifact Transport
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/research-os-self-build-lab-2026-08-13
+    paths:
+      - '.github/workflows/v3-full-product-transport-existing-artifact.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  split-verified-artifact:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_RUN_ID: '31706836322'
+      SOURCE_ARTIFACT: research-os-full-product-v3-9fe426891fe1abf58c07a020baa0fea4a23b8d77
+      PRODUCT_SHA: 9fe426891fe1abf58c07a020baa0fea4a23b8d77
+      DOWNLOAD_DIR: D:\research-os-existing-artifact
+      TRANSPORT_DIR: D:\research-os-existing-transport
+
+    steps:
+      - name: Download already-verified Full Product artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SOURCE_ARTIFACT }}
+          path: ${{ env.DOWNLOAD_DIR }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Verify and split original Full Product archive
+        shell: pwsh
+        run: |
+          if (Test-Path $env:TRANSPORT_DIR) { Remove-Item $env:TRANSPORT_DIR -Recurse -Force }
+          New-Item -ItemType Directory -Path "$env:TRANSPORT_DIR\setup" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$env:TRANSPORT_DIR\manifest" -Force | Out-Null
+          foreach ($i in 1..5) { New-Item -ItemType Directory -Path ("$env:TRANSPORT_DIR\part{0:D3}" -f $i) -Force | Out-Null }
+
+          $source = Get-ChildItem $env:DOWNLOAD_DIR -Recurse -File -Filter '*.zip' | Sort-Object Length -Descending | Select-Object -First 1
+          if (-not $source) { throw 'Verified Full Product ZIP not found inside source artifact' }
+          Write-Host "Source archive: $($source.FullName)"
+          Write-Host "Source bytes: $($source.Length)"
+          $sourceHash = (Get-FileHash $source.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "Source SHA256: $sourceHash"
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($source.FullName)
+          try {
+            $setupEntry = $zip.Entries | Where-Object { $_.FullName -match '(^|/)01_INSTALLER/Research-OS-Setup\.exe$' } | Select-Object -First 1
+            if (-not $setupEntry) { throw 'Setup EXE entry not found in verified Full Product archive' }
+            $setupPath = "$env:TRANSPORT_DIR\setup\Research-OS-V3-Setup-x64.exe"
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($setupEntry, $setupPath, $true)
+
+            foreach ($entryName in @('FULL_PRODUCT_MANIFEST.json','FULL_PRODUCT_E2E.json')) {
+              $entry = $zip.Entries | Where-Object { $_.Name -eq $entryName } | Select-Object -First 1
+              if ($entry) {
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$env:TRANSPORT_DIR\manifest\$entryName", $true)
+              }
+            }
+          } finally { $zip.Dispose() }
+
+          $chunkSize = 200MB
+          $buffer = New-Object byte[] (4MB)
+          $input = [System.IO.File]::OpenRead($source.FullName)
+          $parts = @()
+          try {
+            $partIndex = 1
+            while ($input.Position -lt $input.Length) {
+              if ($partIndex -gt 5) { throw 'Archive exceeded five 200MiB transport parts' }
+              $partName = 'Research_OS_FULL_PRODUCT_V3_9fe426891fe1.zip.part{0:D3}' -f $partIndex
+              $partPath = Join-Path ("$env:TRANSPORT_DIR\part{0:D3}" -f $partIndex) $partName
+              $output = [System.IO.File]::Create($partPath)
+              try {
+                $remaining = [Math]::Min([long]$chunkSize, $input.Length - $input.Position)
+                while ($remaining -gt 0) {
+                  $want = [int][Math]::Min([long]$buffer.Length, $remaining)
+                  $read = $input.Read($buffer, 0, $want)
+                  if ($read -le 0) { throw 'Unexpected end of source archive while splitting' }
+                  $output.Write($buffer, 0, $read)
+                  $remaining -= $read
+                }
+              } finally { $output.Dispose() }
+              $part = Get-Item $partPath
+              $parts += [ordered]@{
+                index = $partIndex
+                name = $part.Name
+                size = $part.Length
+                sha256 = (Get-FileHash $part.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              }
+              $partIndex++
+            }
+          } finally { $input.Dispose() }
+
+          $setup = Get-Item "$env:TRANSPORT_DIR\setup\Research-OS-V3-Setup-x64.exe"
+          $transport = [ordered]@{
+            schema_version = 1
+            contract = 'research-os-full-product-v3-existing-artifact-transport'
+            verified_source_run_id = [long]$env:SOURCE_RUN_ID
+            verified_source_artifact = $env:SOURCE_ARTIFACT
+            product_sha = $env:PRODUCT_SHA
+            original_archive = [ordered]@{
+              name = $source.Name
+              size = $source.Length
+              sha256 = $sourceHash
+            }
+            setup = [ordered]@{
+              name = $setup.Name
+              size = $setup.Length
+              sha256 = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            chunk_size_bytes = [long]$chunkSize
+            part_count = $parts.Count
+            parts = $parts
+            reassemble_windows = 'copy /b Research_OS_FULL_PRODUCT_V3_9fe426891fe1.zip.part001+Research_OS_FULL_PRODUCT_V3_9fe426891fe1.zip.part002+Research_OS_FULL_PRODUCT_V3_9fe426891fe1.zip.part003+Research_OS_FULL_PRODUCT_V3_9fe426891fe1.zip.part004 Research_OS_FULL_PRODUCT_V3_9fe426891fe1.zip'
+          }
+          $transport | ConvertTo-Json -Depth 10 | Set-Content "$env:TRANSPORT_DIR\manifest\TRANSPORT_MANIFEST.json" -Encoding utf8
+          Get-Content "$env:TRANSPORT_DIR\manifest\TRANSPORT_MANIFEST.json"
+
+      - name: Upload Setup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-setup-9fe426891fe1
+          path: D:\research-os-existing-transport\setup\*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-transport-manifest-9fe426891fe1
+          path: D:\research-os-existing-transport\manifest\*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 001
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-full-9fe426891fe1-part001
+          path: D:\research-os-existing-transport\part001\*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 002
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-full-9fe426891fe1-part002
+          path: D:\research-os-existing-transport\part002\*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 003
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-full-9fe426891fe1-part003
+          path: D:\research-os-existing-transport\part003\*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 004
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-full-9fe426891fe1-part004
+          path: D:\research-os-existing-transport\part004\*
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload archive part 005
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-full-9fe426891fe1-part005
+          path: D:\research-os-existing-transport\part005\*
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 14
