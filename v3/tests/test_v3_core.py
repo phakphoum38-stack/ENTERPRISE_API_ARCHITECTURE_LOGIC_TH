@@ -45,11 +45,83 @@ class V3CleanCoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             context = SkillRuntimeContext(user_id="owner", profile_id="default", user_data_root=Path(temporary), repository_root=Path(__file__).resolve().parents[2], approved=True)
             analysis = self.master.execute_skill("analysis", "inspect evidence", context=context)
-            self.assertEqual(analysis["result"]["text"], "analysis: inspect evidence")
+            self.assertEqual(analysis["result"]["summary"], "inspect evidence")
             gate = self.master.execute_skill("quality-gate", arguments={"checks": {"tests": True}}, context=context)
             self.assertTrue(gate["result"]["passed"])
             bridge = self.master.execute_skill("v3-bridge", context=context)
             self.assertFalse(bridge["result"]["legacy_master_started"])
+
+    def test_owner_friend_native_skills_have_distinct_runtime_behavior(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            memories: list[dict[str, object]] = []
+
+            def memory_add(value: str, tags: tuple[str, ...]) -> dict[str, object]:
+                item = {"text": value, "tags": list(tags)}
+                memories.append(item)
+                return item
+
+            def memory_search(query: str, limit: int) -> list[dict[str, object]]:
+                wanted = query.lower()
+                return [item for item in memories if wanted in str(item["text"]).lower()][:limit]
+
+            def factory_plan(tasks: int) -> dict[str, object]:
+                return {"tasks": tasks, "bounded": True}
+
+            context = SkillRuntimeContext(
+                user_id="owner",
+                profile_id="default",
+                user_data_root=Path(temporary),
+                repository_root=Path(__file__).resolve().parents[2],
+                approved=True,
+                memory_search=memory_search,
+                memory_add=memory_add,
+                factory_plan=factory_plan,
+            )
+
+            analysis = self.master.execute_skill("analysis", "inspect constraints?", arguments={"constraints": ["one-master"]}, context=context)
+            self.assertEqual(analysis["result"]["constraints"], ["one-master"])
+            self.assertGreater(analysis["result"]["words"], 0)
+
+            planning = self.master.execute_skill("planning", arguments={"goal": "ship V3", "tasks": 6}, context=context)
+            self.assertEqual(planning["result"]["factory"]["tasks"], 6)
+            self.assertIn("validate", planning["result"]["steps"])
+
+            coding = self.master.execute_skill("coding", "UnifiedMasterOrchestrator", context=context)
+            self.assertFalse(coding["result"]["mutation_performed"])
+            self.assertEqual(coding["result"]["write_boundary"], "governed-tool-execution")
+
+            research = self.master.execute_skill("research", "UnifiedMasterOrchestrator", context=context)
+            self.assertTrue(research["result"]["provenance"])
+            self.assertGreaterEqual(research["result"]["source_count"], 0)
+
+            data = self.master.execute_skill("data", arguments={"rows": [{"value": 1}, {"value": 2, "label": "ok"}]}, context=context)
+            self.assertEqual(data["result"]["row_count"], 2)
+            self.assertEqual(data["result"]["numeric_sums"]["value"], 3.0)
+
+            documents = self.master.execute_skill("documents", "evidence body", arguments={"title": "Evidence"}, context=context)
+            self.assertTrue(documents["result"]["markdown"].startswith("# Evidence"))
+            self.assertFalse(documents["result"]["persisted"])
+
+            automation = self.master.execute_skill("automation", "run quality gate", arguments={"action": "register", "schedule": "manual", "automation_id": "owner-quality"}, context=context)
+            self.assertEqual(automation["result"]["status"], "registered")
+            self.assertTrue((Path(temporary) / "automation" / "owner-quality.json").is_file())
+
+            added = self.master.execute_skill("memory", "native memory", arguments={"action": "add", "tags": ["v3"]}, context=context)
+            self.assertEqual(added["result"]["memory"]["text"], "native memory")
+            recalled = self.master.execute_skill("memory", arguments={"action": "search", "query": "native"}, context=context)
+            self.assertEqual(len(recalled["result"]["hits"]), 1)
+
+            security = self.master.execute_skill("security", arguments={"write": True, "api_key": "not-read"}, context=context)
+            self.assertTrue(security["result"]["write_allowed"])
+            self.assertEqual(security["result"]["secret_fields_detected"], ["api_key"])
+            self.assertFalse(security["result"]["credential_access"])
+
+            quality = self.master.execute_skill("quality", arguments={"checks": {"tests": True, "evidence": True}}, context=context)
+            self.assertTrue(quality["result"]["passed"])
+            self.assertTrue(quality["result"]["evidence_required"])
+
+            executed = {analysis["skill"], planning["skill"], coding["skill"], research["skill"], data["skill"], documents["skill"], automation["skill"], added["skill"], security["skill"], quality["skill"]}
+            self.assertEqual(executed, {"analysis", "planning", "coding", "research", "data", "documents", "automation", "memory", "security", "quality"})
 
     def test_memory_agents_tools_and_factory_remain_governed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
