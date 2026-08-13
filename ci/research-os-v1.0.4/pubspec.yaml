@@ -1,0 +1,26 @@
+name: research_os_control_center
+description: Research OS full GUI/UX control center for Drive Virtual Cloud, AI providers, GitHub mirrors, backup and restore.
+publish_to: 'none'
+version: 1.0.4+104
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/scripts/bootstrap.ps1
+    - assets/scripts/mirror-worker.ps1
+    - assets/scripts/provider-vault.ps1
+    - assets/config/bootstrap.template.json
+    - assets/config/providers.example.json
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

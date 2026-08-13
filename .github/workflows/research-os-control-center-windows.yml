@@ -1,0 +1,108 @@
+name: Research OS Control Center - Windows YAML Build
+
+on:
+  push:
+    branches:
+      - agent/research-os-v1-yaml-build
+    paths:
+      - 'ci/research-os-v1.0.4/**'
+      - '.github/workflows/research-os-control-center-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-v1-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-build:
+    name: Analyze Test Build Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: ci/research-os-v1.0.4
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.44.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.4'
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: |
+          flutter --version
+          flutter doctor -v
+          flutter config --enable-windows-desktop
+
+      - name: Generate Windows runner
+        run: |
+          if (-not (Test-Path '.\\windows')) {
+            flutter create --platforms=windows .
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Resolve dependencies
+        run: |
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Apply safe Dart fixes and format
+        run: |
+          dart fix --apply
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dart format .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Analyze gate
+        run: |
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Test gate
+        run: |
+          flutter test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build Windows release
+        run: |
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify release executable
+        run: |
+          $exe = '.\\build\\windows\\x64\\runner\\Release\\research_os_control_center.exe'
+          if (-not (Test-Path $exe)) {
+            throw "Missing release executable: $exe"
+          }
+          Get-Item $exe | Format-List FullName,Length,LastWriteTime
+
+      - name: Package complete Windows release
+        run: |
+          $release = '.\\build\\windows\\x64\\runner\\Release'
+          $zip = Join-Path $env:RUNNER_TEMP 'Research_OS_Control_Center_Windows_v1.0.4.zip'
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "$release\\*" -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "SHA256=$hash" | Set-Content (Join-Path $env:RUNNER_TEMP 'Research_OS_Control_Center_Windows_v1.0.4.sha256.txt')
+          Write-Host "Package: $zip"
+          Write-Host "SHA256: $hash"
+
+      - name: Upload Windows release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Research-OS-Control-Center-Windows-v1.0.4
+          path: |
+            ${{ runner.temp }}/Research_OS_Control_Center_Windows_v1.0.4.zip
+            ${{ runner.temp }}/Research_OS_Control_Center_Windows_v1.0.4.sha256.txt
+          if-no-files-found: error
+          retention-days: 30

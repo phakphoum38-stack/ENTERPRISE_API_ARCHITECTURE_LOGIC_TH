@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "root_provider": "google-drive",
+  "root_name": "DRIVE_VIRTUAL_CLOUD",
+  "root_path": "__DRIVE_ROOT__",
+  "drive_folder_id": "1FqR9bfxgaSNL99jmSR9hRPdmkhFyKlEY",
+  "local_program_root": "C:\\Program Files\\Drive Virtual Cloud",
+  "local_state_root": "C:\\ProgramData\\DriveVirtualCloud",
+  "worker_mode": "scheduled-task",
+  "github_owner": "phakphoum38-stack",
+  "github_mirror": true,
+  "auto_sync": true,
+  "restore_enabled": true,
+  "secrets_policy": "local-credential-store-only"
+}

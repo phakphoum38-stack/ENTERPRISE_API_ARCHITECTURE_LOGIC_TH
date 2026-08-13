@@ -1,0 +1,12 @@
+{
+  "providers": [
+    {
+      "id": "local-openai-compatible",
+      "name": "Local OpenAI-compatible",
+      "baseUrl": "http://127.0.0.1:8000/v1",
+      "model": "default",
+      "enabled": false,
+      "apiStyle": "openai-compatible"
+    }
+  ]
+}
