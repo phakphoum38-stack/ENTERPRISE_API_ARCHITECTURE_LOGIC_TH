@@ -42,7 +42,8 @@ final class HttpV3Api implements V3Api {
     required String baseUrl,
     required this.userId,
     this.profileId = 'default',
-    this.timeout = const Duration(seconds: 30),
+    this.timeout = const Duration(seconds: 2),
+    this.executionTimeout = const Duration(seconds: 30),
   }) : baseUrl = baseUrl.endsWith('/')
             ? baseUrl.substring(0, baseUrl.length - 1)
             : baseUrl;
@@ -51,6 +52,7 @@ final class HttpV3Api implements V3Api {
   final String userId;
   final String profileId;
   final Duration timeout;
+  final Duration executionTimeout;
 
   @override
   Future<Map<String, dynamic>> health() => _get('/health');
@@ -64,9 +66,7 @@ final class HttpV3Api implements V3Api {
     int risk = 1,
     int parallelism = 1,
   }) =>
-      _get(
-        '/v3/master?tasks=$tasks&risk=$risk&parallelism=$parallelism',
-      );
+      _get('/v3/master?tasks=$tasks&risk=$risk&parallelism=$parallelism');
 
   @override
   Future<Map<String, dynamic>> user() => _get('/v3/user');
@@ -112,6 +112,7 @@ final class HttpV3Api implements V3Api {
           if (preferredProvider != null && preferredProvider.isNotEmpty)
             'preferred_provider': preferredProvider,
         },
+        requestTimeout: executionTimeout,
       );
 
   @override
@@ -122,8 +123,11 @@ final class HttpV3Api implements V3Api {
       _post('/v3/memory', <String, dynamic>{'text': text, 'tags': tags});
 
   @override
-  Future<Map<String, dynamic>> runAgent(String name, String prompt) =>
-      _post('/v3/agents/run', <String, dynamic>{'name': name, 'prompt': prompt});
+  Future<Map<String, dynamic>> runAgent(String name, String prompt) => _post(
+        '/v3/agents/run',
+        <String, dynamic>{'name': name, 'prompt': prompt},
+        requestTimeout: executionTimeout,
+      );
 
   @override
   Future<Map<String, dynamic>> executeTool(
@@ -135,6 +139,7 @@ final class HttpV3Api implements V3Api {
         '/v3/tools/execute',
         <String, dynamic>{'name': name, 'arguments': arguments},
         approved: approved,
+        requestTimeout: executionTimeout,
       );
 
   Future<Map<String, dynamic>> _get(String path) => _request('GET', path);
@@ -143,33 +148,40 @@ final class HttpV3Api implements V3Api {
     String path,
     Map<String, dynamic> payload, {
     bool approved = false,
+    Duration? requestTimeout,
   }) =>
-      _request('POST', path, payload: payload, approved: approved);
+      _request(
+        'POST',
+        path,
+        payload: payload,
+        approved: approved,
+        requestTimeout: requestTimeout,
+      );
 
   Future<Map<String, dynamic>> _request(
     String method,
     String path, {
     Map<String, dynamic>? payload,
     bool approved = false,
+    Duration? requestTimeout,
   }) async {
+    final operationTimeout = requestTimeout ?? timeout;
     final client = HttpClient();
     final uri = Uri.parse('$baseUrl$path');
     try {
       final request = method == 'POST'
-          ? await client.postUrl(uri).timeout(timeout)
-          : await client.getUrl(uri).timeout(timeout);
+          ? await client.postUrl(uri).timeout(operationTimeout)
+          : await client.getUrl(uri).timeout(operationTimeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set('X-Research-OS-User', userId);
       request.headers.set('X-Research-OS-Profile', profileId);
-      if (approved) {
-        request.headers.set('X-Research-OS-Approval', 'granted');
-      }
+      if (approved) request.headers.set('X-Research-OS-Approval', 'granted');
       if (payload != null) {
         request.headers.contentType = ContentType.json;
         request.write(jsonEncode(payload));
       }
-      final response = await request.close().timeout(timeout);
-      final body = await utf8.decoder.bind(response).join().timeout(timeout);
+      final response = await request.close().timeout(operationTimeout);
+      final body = await utf8.decoder.bind(response).join().timeout(operationTimeout);
       final decoded = body.isEmpty ? <String, dynamic>{} : jsonDecode(body);
       if (decoded is! Map) {
         throw const FormatException(
