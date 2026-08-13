@@ -96,9 +96,20 @@
     "master_all_in_one_sha256": "a4e47ad4731713f544c4b68a0cfe917ce57f4ebc3c307109896fe31c2a5688e6",
     "full_10x10_all_skills_sha256": "b37854a8eca3a1aafe02de1203decc3fd9ea6908f3010b4c95b3ccabc561da4a",
     "integration_policy": "newer-wins-preserve-v3.2-chat",
-    "integration_status": "integrating",
+    "integration_status": "core-merged-runtime-gated",
     "logical_maximum": 10000000000,
     "runtime_policy": "lazy-bounded-execution",
+    "integrated_components": [
+      "adaptive 10x10 scale model",
+      "durable V3 memory store",
+      "checksum-governed Drive runtime adapter",
+      "10x10 regression coverage",
+      "source lineage"
+    ],
+    "safety_gated_components": [
+      "automatic Drive package execution route",
+      "full migrated skill command adapters"
+    ],
     "preserve": [
       "v3.2 /v3/chat canonical contract",
       "Friend Brain Special overlay",
