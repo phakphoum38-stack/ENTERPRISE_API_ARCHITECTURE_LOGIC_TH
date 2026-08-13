@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from self_repair_generated_dart import repair
+
 TEST = r'''import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_v3_flutter/src/api/v3_api.dart';
@@ -109,6 +111,11 @@ def main() -> int:
     parser.add_argument('--workspace', required=True)
     args = parser.parse_args()
     workspace = Path(args.workspace).resolve()
+    app_target = workspace / 'v3' / 'flutter_app' / 'lib' / 'src' / 'research_os_v3_app.dart'
+    repaired = repair(app_target)
+    if repaired < 1:
+        raise SystemExit('expected Research OS generated GUI to require at least one strict style repair')
+    print(f'self-repaired generated GUI control-flow statements: {repaired}')
     target = workspace / 'v3' / 'flutter_app' / 'test' / 'app_shell_test.dart'
     target.write_text(TEST, encoding='utf-8', newline='\n')
     print(target)
