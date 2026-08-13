@@ -20,6 +20,10 @@ class SoftwareFactoryPlan:
     def maximum_leaf_capacity(self) -> int:
         return self.profile.capacity
 
+    @property
+    def stage_order(self) -> tuple[str, ...]:
+        return tuple(stage.name for stage in self.stages)
+
 
 class SoftwareFactory:
     def plan(self, profile: ScaleProfile) -> SoftwareFactoryPlan:
