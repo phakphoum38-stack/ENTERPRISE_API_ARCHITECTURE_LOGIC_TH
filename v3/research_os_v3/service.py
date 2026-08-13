@@ -11,11 +11,14 @@ from urllib.parse import parse_qs, urlparse
 from .contracts import health_contract, master_contract, providers_contract
 from .models import Workload
 from .orchestrator import UnifiedMasterOrchestrator
+from .providers import CompletionRequest
 from .storage import DataLayout
 from .user_context import UserContext
 
 USER_HEADER = "X-Research-OS-User"
 PROFILE_HEADER = "X-Research-OS-Profile"
+_MAX_REQUEST_BODY = 1024 * 1024
+_CHAT_INPUT_FIELDS = ("message", "text", "prompt", "question")
 
 
 class V3LocalService:
@@ -69,12 +72,14 @@ class V3LocalService:
                 return
 
             def _write_json(self, status: int, payload: dict[str, object]) -> None:
-                body = json.dumps(payload, sort_keys=True).encode("utf-8")
+                body = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode(
+                    "utf-8"
+                )
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                write_audit("GET", urlparse(self.path).path, status)
+                write_audit(self.command, urlparse(self.path).path, status)
                 self.wfile.write(body)
 
             def _required_user_context(self) -> UserContext | None:
@@ -97,6 +102,35 @@ class V3LocalService:
                         {"error": "invalid user context", "detail": str(exc)},
                     )
                     return None
+
+            def _read_json_object(self) -> dict[str, object]:
+                raw_length = self.headers.get("Content-Length", "").strip()
+                if not raw_length:
+                    raise ValueError("request body is required")
+                try:
+                    length = int(raw_length)
+                except ValueError as exc:
+                    raise ValueError("invalid Content-Length") from exc
+                if length <= 0:
+                    raise ValueError("request body is required")
+                if length > _MAX_REQUEST_BODY:
+                    raise ValueError("request body exceeds 1 MiB limit")
+                try:
+                    decoded = json.loads(self.rfile.read(length).decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ValueError("request body must be valid JSON") from exc
+                if not isinstance(decoded, dict):
+                    raise ValueError("request body must be a JSON object")
+                return decoded
+
+            def _chat_input(self, payload: dict[str, object]) -> tuple[str, str]:
+                for field in _CHAT_INPUT_FIELDS:
+                    value = payload.get(field)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip(), field
+                raise ValueError(
+                    "one of message, text, prompt, or question is required"
+                )
 
             def do_GET(self) -> None:  # noqa: N802 - stdlib handler contract
                 parsed = urlparse(self.path)
@@ -137,6 +171,108 @@ class V3LocalService:
                     )
                     return
                 self._write_json(404, {"error": "not found"})
+
+            def do_POST(self) -> None:  # noqa: N802 - stdlib handler contract
+                parsed = urlparse(self.path)
+                if parsed.path != "/v3/chat":
+                    self._write_json(404, {"error": "not found"})
+                    return
+
+                context = self._required_user_context()
+                if context is None:
+                    return
+
+                try:
+                    payload = self._read_json_object()
+                    message, input_field = self._chat_input(payload)
+                    workload = Workload(
+                        estimated_leaf_tasks=int(payload.get("tasks", 1)),
+                        risk=int(payload.get("risk", 1)),
+                        parallelism=int(payload.get("parallelism", 1)),
+                    )
+                except (TypeError, ValueError) as exc:
+                    self._write_json(
+                        400,
+                        {
+                            "error": "invalid request body",
+                            "detail": str(exc),
+                            "accepted_input_fields": list(_CHAT_INPUT_FIELDS),
+                        },
+                    )
+                    return
+
+                raw_provider = payload.get("provider")
+                preferred_provider = (
+                    raw_provider.strip()
+                    if isinstance(raw_provider, str) and raw_provider.strip()
+                    else None
+                )
+                if preferred_provider == "auto":
+                    preferred_provider = None
+
+                raw_system = payload.get("system_prompt", payload.get("system"))
+                system_prompt = (
+                    raw_system.strip()
+                    if isinstance(raw_system, str) and raw_system.strip()
+                    else None
+                )
+                session_id = str(payload.get("session_id", "default")).strip() or "default"
+                mode = str(payload.get("mode", "answer")).strip() or "answer"
+
+                try:
+                    decision = orchestrator.decide(workload)
+                    completion = orchestrator.providers.complete(
+                        CompletionRequest(
+                            prompt=message,
+                            system_prompt=system_prompt,
+                        ),
+                        preferred=preferred_provider,
+                    )
+                except KeyError:
+                    self._write_json(
+                        400,
+                        {
+                            "error": "invalid provider",
+                            "provider": preferred_provider or "auto",
+                        },
+                    )
+                    return
+                except RuntimeError as exc:
+                    self._write_json(
+                        502,
+                        {
+                            "error": "provider unavailable",
+                            "detail": str(exc),
+                        },
+                    )
+                    return
+
+                data_layout.for_user(context).ensure()
+                self._write_json(
+                    200,
+                    {
+                        "contract": "research-os-v3-chat-v1",
+                        "text": completion.text,
+                        "answer": completion.text,
+                        "provider": completion.provider,
+                        "model": completion.model,
+                        "user_id": context.user_id,
+                        "profile_id": context.profile_id,
+                        "scope": f"users/{context.user_id}/profiles/{context.profile_id}",
+                        "session_id": session_id,
+                        "mode": mode,
+                        "input_field": input_field,
+                        "memory_hits": [],
+                        "memory_count": 0,
+                        "decision": {
+                            "scale": decision.profile.tier.value,
+                            "maximum_leaf_capacity": decision.profile.capacity,
+                            "demand": decision.demand,
+                            "reason": decision.reason,
+                            "orchestrated_provider": decision.provider,
+                        },
+                    },
+                )
 
         server = ThreadingHTTPServer((self.host, self.port), Handler)
         self._server = server
