@@ -3,11 +3,14 @@ from __future__ import annotations
 import http.client
 import json
 import os
+import secrets
 import tempfile
 import threading
+import time
 import unittest
 from http.server import ThreadingHTTPServer
 
+from developer_identity import IdentityAssertionVerifier
 from developer_server import DeveloperPlatformHandler
 
 
@@ -43,8 +46,16 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         conn = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=5)
         headers = {"Content-Type": "application/json"}
         if principal is not None:
+            issued_at = int(time.time())
+            nonce = secrets.token_hex(16)
+            signing_secret = secret if len(secret.encode("utf-8")) >= 16 else secret.ljust(16, "!")
+            verifier = IdentityAssertionVerifier(signing_secret)
             headers["X-ResearchOS-Principal"] = principal
-            headers["X-ResearchOS-Identity-Secret"] = secret
+            headers["X-ResearchOS-Identity-Timestamp"] = str(issued_at)
+            headers["X-ResearchOS-Identity-Nonce"] = nonce
+            headers["X-ResearchOS-Identity-Signature"] = verifier.signature_for(
+                principal, issued_at, nonce
+            )
         payload = json.dumps(body or {}) if body is not None else None
         conn.request(method, path, body=payload, headers=headers)
         response = conn.getresponse()

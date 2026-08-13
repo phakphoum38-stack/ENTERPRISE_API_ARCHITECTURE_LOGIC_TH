@@ -37,35 +37,35 @@ class UnifiedAgentRegistry:
                 "researcher",
                 "research",
                 "Synthesizes evidence and workspace knowledge.",
-                ("memory-retrieval", "workspace-knowledge", "conversation-analysis"),
+                ("memory-retrieval", "workspace-knowledge", "conversation-analysis", "research", "analysis", "research-curation"),
                 ("capacity-inspect",),
             ),
             AgentDefinition(
                 "architect",
                 "architecture",
                 "Designs system structure and orchestration plans.",
-                ("adaptive-hierarchy", "durable-orchestration", "factory-execution"),
+                ("adaptive-hierarchy", "durable-orchestration", "factory-execution", "planning", "quality-gate"),
                 ("capacity-inspect",),
             ),
             AgentDefinition(
                 "builder",
                 "implementation",
                 "Produces implementation guidance under governed execution.",
-                ("factory-execution", "provider-routing"),
+                ("factory-execution", "provider-routing", "coding", "planning"),
                 ("echo",),
             ),
             AgentDefinition(
                 "reviewer",
                 "quality",
                 "Reviews work for correctness, risk, and evidence quality.",
-                ("conversation-analysis", "provider-resilience", "user-isolation"),
+                ("conversation-analysis", "provider-resilience", "user-isolation", "quality", "security", "evidence-recording"),
                 (),
             ),
             AgentDefinition(
                 "release-guardian",
                 "release",
                 "Checks release readiness and evidence boundaries.",
-                ("factory-execution", "developer-access", "user-isolation"),
+                ("factory-execution", "developer-access", "user-isolation", "quality", "security", "quality-gate"),
                 (),
             ),
         )
@@ -98,11 +98,18 @@ class UnifiedAgentRegistry:
         agent = self._agents.get(name)
         if agent is None:
             raise KeyError(name)
+        skill_context = "; ".join(
+            f"{skill.name}: {skill.description}"
+            for name in agent.skills
+            if (skill := self.skills.get(name)) is not None
+        )
         system_prompt = (
             f"You are the Research OS V3 agent '{agent.name}' with role '{agent.role}'. "
-            f"Use only the capabilities assigned to this agent. Skills: {', '.join(agent.skills)}. "
+            f"Use only the capabilities assigned to this agent. Skills: {skill_context}. "
             f"Tools available by policy: {', '.join(agent.tools) if agent.tools else 'none'}. "
-            "Be concise, evidence-aware, and do not claim actions that were not executed."
+            "V3 remains the single execution authority. Context-adapter skills are knowledge only "
+            "unless an explicit V3 runtime/tool result proves execution. Be concise, evidence-aware, "
+            "and do not claim actions that were not executed."
         )
         if context_text:
             system_prompt += f"\n\nRelevant local memory/context:\n{context_text}"

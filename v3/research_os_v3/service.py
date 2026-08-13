@@ -180,9 +180,14 @@ class V3LocalService:
                                     "capability": item.capability,
                                     "description": item.description,
                                     "native_v3": item.native_v3,
+                                    "runtime_mode": item.runtime_mode,
+                                    "source": item.source,
                                 }
                                 for item in orchestrator.skills.list()
-                            ]
+                            ],
+                            "count": len(orchestrator.skills.list()),
+                            "origins": [origin.value for origin in orchestrator.skills.origins()],
+                            "single_authority": orchestrator.contract,
                         },
                         method="GET",
                     )

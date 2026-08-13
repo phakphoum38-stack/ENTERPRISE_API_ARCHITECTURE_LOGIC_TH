@@ -66,6 +66,7 @@ class FullSystemApiTests(unittest.TestCase):
         self.assertEqual(health["maximum_logical_capacity"], 10_000_000_000)
         self.assertEqual(health["capacity_policy"], "lazy-bounded-execution")
 
+        catalogs = {}
         for path, key in (
             ("/v3/skills", "skills"),
             ("/v3/tools", "tools"),
@@ -75,6 +76,20 @@ class FullSystemApiTests(unittest.TestCase):
             status, payload = self.get(path)
             self.assertEqual(status, 200)
             self.assertTrue(payload[key])
+            catalogs[path] = payload
+
+        skills = catalogs["/v3/skills"]
+        self.assertGreaterEqual(skills["count"], 40)
+        self.assertEqual(skills["single_authority"], "unified-master-orchestrator-v3-full")
+        self.assertIn("owner-friend", skills["origins"])
+        self.assertIn("legacy", skills["origins"])
+        by_name = {item["name"]: item for item in skills["skills"]}
+        names = set(by_name)
+        self.assertTrue({"analysis", "coding", "research-curation", "v3-bridge"} <= names)
+        self.assertTrue(by_name["chat-runtime"]["native_v3"])
+        self.assertEqual(by_name["chat-runtime"]["runtime_mode"], "native")
+        self.assertFalse(by_name["coding"]["native_v3"])
+        self.assertEqual(by_name["coding"]["runtime_mode"], "context-adapter")
 
     def test_master_and_factory_plan_select_10x10_without_spawning_it(self) -> None:
         status, master = self.get("/v3/master?tasks=46657")

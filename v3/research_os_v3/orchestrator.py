@@ -73,9 +73,10 @@ class UnifiedMasterOrchestrator:
                 context_text=memory_context,
             )
         system_prompt = (
-            "You are Research OS V3. Follow governed execution boundaries, "
-            "use provided local memory only as context, never expose secrets, "
-            "and never claim a tool/action ran unless its result is supplied."
+            "You are Research OS V3. The Unified Master is the single coordination authority. "
+            "Follow governed execution boundaries, use provided local memory only as context, "
+            "never expose secrets, and never claim a tool/action ran unless its result is supplied."
+            f"\n\n{self.skills.conversation_context()}"
         )
         if memory_context:
             system_prompt += f"\n\nRelevant local memory/context:\n{memory_context}"

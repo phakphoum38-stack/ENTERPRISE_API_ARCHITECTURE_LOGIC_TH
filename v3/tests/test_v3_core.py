@@ -79,22 +79,52 @@ class V3CleanCoreTests(unittest.TestCase):
         self.assertEqual(payload["maximum_logical_capacity"], 10_000_000_000)
         self.assertEqual(payload["capacity_policy"], "lazy-bounded-execution")
 
-    def test_unified_skill_registry_contains_v1_v2_v3_native_skills(self) -> None:
+    def test_unified_skill_registry_contains_all_migrated_skill_lines(self) -> None:
         registry = UnifiedSkillRegistry()
-        self.assertEqual(registry.origins(), (SkillOrigin.V1, SkillOrigin.V2, SkillOrigin.V3))
-        self.assertTrue(registry.by_origin(SkillOrigin.V1))
-        self.assertTrue(registry.by_origin(SkillOrigin.V2))
-        self.assertTrue(registry.by_origin(SkillOrigin.V3))
-        self.assertTrue(all(skill.native_v3 for skill in registry.list()))
+        self.assertEqual(
+            registry.origins(),
+            (
+                SkillOrigin.V1,
+                SkillOrigin.V2,
+                SkillOrigin.V3,
+                SkillOrigin.OWNER_FRIEND,
+                SkillOrigin.LEGACY,
+            ),
+        )
+        self.assertTrue(
+            all(skill.native_v3 == (skill.runtime_mode == "native") for skill in registry.list())
+        )
+        self.assertTrue(registry.get("chat-runtime").native_v3)
+        self.assertFalse(registry.get("coding").native_v3)
+        self.assertFalse(registry.get("research-curation").native_v3)
         for required in (
             "adaptive-hierarchy",
             "chat-runtime",
             "memory-persistence",
             "agent-execution",
             "governed-tool-execution",
+            "analysis",
+            "planning",
+            "coding",
+            "research",
+            "data",
+            "documents",
+            "automation",
+            "memory",
+            "security",
+            "quality",
+            "research-curation",
+            "house-command-dispatch",
+            "google-workspace-integration",
+            "developer-identity",
+            "v3-bridge",
         ):
-            self.assertIsNotNone(registry.get(required))
+            self.assertIsNotNone(registry.get(required), required)
         self.assertIs(self.master.skills.get("adaptive-hierarchy").origin, SkillOrigin.V3)
+        context = registry.conversation_context()
+        self.assertIn("V3 is the single execution authority", context)
+        self.assertIn("coding [owner-friend/engineering", context)
+        self.assertIn("v3-bridge [legacy/integration", context)
 
     def test_unified_tools_enforce_write_approval(self) -> None:
         echo = self.master.execute_tool("echo", {"text": "ok"})

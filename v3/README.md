@@ -1,36 +1,35 @@
-# Research OS V3 Full System
+# Research OS V3 — Clean Architecture Workspace
 
-Research OS V3 is the unified local-first runtime and workspace. The system keeps one coordination authority while exposing Chat, Memory, Skills, Tools, Agents, Providers, Software Factory, evidence, and user isolation through one V3 service boundary.
+Research OS V3 is the clean rebuild line for the local-first Research OS runtime and Flutter workspace. V3 keeps one coordination authority, bounded lazy execution, loopback-only local APIs, durable user/profile isolation, governed tools, and provider secrets owned by the service layer.
 
-## Core rules
+## V3.1 Full System
 
-- One `UnifiedMasterOrchestrator` is the coordination authority.
-- Brain capacity is adaptive and lazy. Logical capacity is never interpreted as a request to pre-spawn workers.
-- Scale profiles are `3^1`, `3^3`, `6^3`, `3^6`, `6^6`, and `10^10`.
-- `10^10 = 10,000,000,000` is the maximum logical planning ceiling; real execution remains bounded by explicit concurrency limits and queue/backpressure.
-- Provider secrets stay outside Flutter and are never returned by status contracts.
-- Existing `RESEARCH_OS_OPENAI_API_KEY` or `OPENAI_API_KEY` can be used by the installed service; OpenAI-compatible execution is preferred when ready and mock remains an offline fallback.
-- Mutable data is user/profile isolated under the V3 data root.
-- Write-capable tools fail closed unless explicit approval is supplied.
-- Software Factory execution remains deterministic: Master -> Factory -> Team -> Tests -> Release.
-- Evidence is incremental; later failures cannot erase earlier passed evidence.
+The current feature line expands the clean V3 shell into a full local workspace with:
 
-## Native V3 capability layers
+- Unified Master Orchestrator
+- adaptive hierarchy through `10^10` logical capacity
+- Brain, Providers, Factory, Skills, Tools, Agents, and Memory
+- loopback V3 local API
+- Flutter workspaces for Home, Chat, Agents, Memory, Skills, Tools, Factory, and Providers
+- Windows service/installer Candidate gates
 
-- `research_os_v3/brain.py` — adaptive scale selection.
-- `research_os_v3/orchestrator.py` — Unified Master composition and Chat/Tool execution entrypoints.
-- `research_os_v3/providers.py` — secret-safe provider adapters, retry, circuit breaker, and fallback.
-- `research_os_v3/skills.py` — V1/V2/V3 skills represented as native V3 capabilities with provenance.
-- `research_os_v3/tools.py` — governed tool registry with read/write risk and approval metadata.
-- `research_os_v3/agents.py` — role-based agents activated on demand rather than permanently running workers.
-- `research_os_v3/memory.py` — explicit durable per-user memory and deterministic local retrieval.
-- `research_os_v3/factory.py` / `execution.py` — bounded Software Factory planning and execution.
-- `research_os_v3/service.py` — loopback-only Full System API.
-- `flutter_app/` — Home, Chat, Agents, Memory, Skills, Tools, Factory, and Providers workspaces.
+`10^10` means a planning ceiling of 10,000,000,000 logical leaf slots. It is never interpreted as ten billion live processes, threads, or agents. Real execution remains bounded and uses queue/backpressure.
 
-## Full System API
+## Unified Brain, Skills, and Chat
 
-Read contracts:
+V3 is the single execution and coordination authority. The V3 `UnifiedSkillRegistry` exposes native V3 capabilities plus preserved V1/V2, Owner/Friend, and legacy capability knowledge through explicit provenance.
+
+- `runtime_mode: native` means the capability has a V3-native executable implementation.
+- `runtime_mode: context-adapter` means the capability is represented for routing/reasoning but must not be claimed as executed without an explicit V3 runtime/tool/agent result.
+- `/v3/skills` exposes skill origin, capability, runtime mode, source, and the single authority contract.
+- General chat and role agents receive this governed capability context.
+- Desktop Flutter chat routes through the loopback V3 `POST /v3/chat` endpoint instead of hard-coding the legacy V1/Gemini path.
+
+This preserves older capability knowledge without starting competing brains or orchestrators.
+
+## Local API
+
+Read/status endpoints:
 
 - `GET /health`
 - `GET /v3/master`
@@ -42,15 +41,28 @@ Read contracts:
 - `GET /v3/user`
 - `GET /v3/memory`
 
-Governed execution:
+Governed execution endpoints:
 
 - `POST /v3/chat`
 - `POST /v3/memory`
 - `POST /v3/agents/run`
 - `POST /v3/tools/execute`
 
-User-owned endpoints require `X-Research-OS-User` and optional `X-Research-OS-Profile`. Write tools that require approval additionally require `X-Research-OS-Approval: granted`.
+Write-capable tools fail closed unless the request includes explicit approval through `X-Research-OS-Approval: granted`.
+
+## Provider configuration
+
+The V3 service can reuse an existing OpenAI-compatible credential without placing the secret in Flutter or status contracts:
+
+- `RESEARCH_OS_OPENAI_API_KEY` preferred alias
+- `OPENAI_API_KEY` compatibility alias
+- `RESEARCH_OS_OPENAI_ENDPOINT` optional endpoint override
+- `RESEARCH_OS_OPENAI_MODEL` optional model override
+
+When no real provider is ready, the deterministic local mock provider remains available for offline validation.
 
 ## Validation
 
-The V3 test suite covers adaptive 10^10 selection, backpressure above the maximum ceiling, provider secret redaction, user/profile isolation, durable memory retrieval, Skills/Tools/Agents catalogs, approval gating, Chat/Agent execution, Software Factory determinism, and local API end-to-end behavior.
+Run the Python core and full API tests from the repository root with V3 on `PYTHONPATH`, then run `v3/scripts/service_smoke.py`. Flutter tests and Windows Candidate validation should also be run on the exact final SHA before marking a release or PR ready.
+
+The architecture intentionally separates source presence from runtime execution: a preserved legacy skill in the unified registry is not automatically an executable V3 skill unless its runtime mode says `native` or an explicit adapter/tool implementation is invoked through V3 policy.
