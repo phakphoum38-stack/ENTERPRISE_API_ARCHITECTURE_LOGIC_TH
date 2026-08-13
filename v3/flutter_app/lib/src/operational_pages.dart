@@ -25,6 +25,7 @@ class _ResearchOSOperationalPageState
   Map<String, dynamic>? _result;
   Object? _error;
   bool _running = false;
+  bool _mutating = false;
 
   static const _toolByPage = <String, String>{
     'Files': 'workspace-files-list',
@@ -45,8 +46,8 @@ class _ResearchOSOperationalPageState
     'Drive': 'Inspect Research OS persistent Drive workspace status.',
     'Runtime': 'Inspect the active local Research OS service runtime.',
     'Installer': 'Inspect installed runtime and build metadata.',
-    'Backup': 'List checksum-evidenced Research OS restore points.',
-    'Restore': 'Review restore points. Restore mutation stays owner-gated.',
+    'Backup': 'List restore points and run a verified backup tool through the Owner Gate.',
+    'Restore': 'Review restore points and run a verified restore tool through the Owner Gate.',
     'Shell': 'Run bounded Research OS diagnostic commands only.',
   };
 
@@ -57,6 +58,7 @@ class _ResearchOSOperationalPageState
       text: switch (widget.label) {
         'Files' => '',
         'Shell' => 'help',
+        'Restore' => '',
         _ => '',
       },
     );
@@ -78,6 +80,19 @@ class _ResearchOSOperationalPageState
     };
   }
 
+  Map<String, dynamic> _unwrap(Map<String, dynamic> response) {
+    final result = response['result'];
+    return result is Map ? Map<String, dynamic>.from(result) : response;
+  }
+
+  List<Map<String, dynamic>> _mapList(dynamic value) {
+    if (value is! List) return const <Map<String, dynamic>>[];
+    return value
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
   Future<void> _run() async {
     final tool = _toolByPage[widget.label];
     if (tool == null || _running) return;
@@ -97,11 +112,94 @@ class _ResearchOSOperationalPageState
     }
   }
 
+  Future<bool> _confirm(String title, String message) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Approve & Run'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _runGovernedMutation(String capability) async {
+    if (_mutating) return;
+    setState(() {
+      _mutating = true;
+      _error = null;
+    });
+    try {
+      final catalogResponse =
+          await widget.api.executeTool('drive-tools-list', const {});
+      final catalog = _unwrap(catalogResponse);
+      final packages = _mapList(catalog['packages']);
+      Map<String, dynamic>? selected;
+      for (final package in packages) {
+        final name = package['name']?.toString().toLowerCase() ?? '';
+        if (name.contains(capability)) {
+          selected = package;
+          break;
+        }
+      }
+      if (selected == null) {
+        throw StateError(
+          'No checksum-governed $capability tool package is configured in the Research OS Drive tool mirror.',
+        );
+      }
+
+      final packageName = selected['name']?.toString() ?? '';
+      final backupName = _argumentController.text.trim();
+      if (capability == 'restore' && backupName.isEmpty) {
+        throw StateError('Enter a restore-point filename before running restore.');
+      }
+      if (!mounted) return;
+      final approved = await _confirm(
+        capability == 'backup' ? 'Create Backup' : 'Restore Research OS',
+        'Run verified package "$packageName" through the V3 Owner Gate? '
+        'Research OS will record the governed tool result as evidence.',
+      );
+      if (!approved) return;
+
+      final arguments = <String, dynamic>{'action': capability};
+      if (capability == 'restore') arguments['backup'] = backupName;
+      final response = await widget.api.executeTool(
+        'drive-tool-execute',
+        <String, dynamic>{
+          'name': packageName,
+          'arguments': arguments,
+        },
+        approved: true,
+      );
+      if (!mounted) return;
+      setState(() => _result = response);
+      await _run();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tool = _toolByPage[widget.label] ?? '-';
     final details = _descriptionByPage[widget.label] ??
         'Research OS governed operational surface.';
+    final inputPage = widget.label == 'Files' ||
+        widget.label == 'Shell' ||
+        widget.label == 'Restore';
     return Column(
       children: [
         Padding(
@@ -126,8 +224,26 @@ class _ResearchOSOperationalPageState
               FilledButton.tonalIcon(
                 onPressed: _running ? null : _run,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Run'),
+                label: const Text('Refresh'),
               ),
+              if (widget.label == 'Backup') ...[
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed:
+                      _mutating ? null : () => _runGovernedMutation('backup'),
+                  icon: const Icon(Icons.backup_outlined),
+                  label: const Text('Create Backup'),
+                ),
+              ],
+              if (widget.label == 'Restore') ...[
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed:
+                      _mutating ? null : () => _runGovernedMutation('restore'),
+                  icon: const Icon(Icons.restore),
+                  label: const Text('Restore'),
+                ),
+              ],
             ],
           ),
         ),
@@ -136,7 +252,7 @@ class _ResearchOSOperationalPageState
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              if (widget.label == 'Files' || widget.label == 'Shell')
+              if (inputPage)
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -145,42 +261,54 @@ class _ResearchOSOperationalPageState
                         Expanded(
                           child: TextField(
                             controller: _argumentController,
-                            onSubmitted: (_) => _run(),
+                            onSubmitted: (_) {
+                              if (widget.label != 'Restore') _run();
+                            },
                             decoration: InputDecoration(
-                              labelText: widget.label == 'Files'
-                                  ? 'Workspace relative path'
-                                  : 'Research OS command',
-                              hintText: widget.label == 'Files'
-                                  ? 'github/repositories'
-                                  : 'help | workspace | drive | repos | backups | runtime | installer',
+                              labelText: switch (widget.label) {
+                                'Files' => 'Workspace relative path',
+                                'Shell' => 'Research OS command',
+                                _ => 'Restore-point filename',
+                              },
+                              hintText: switch (widget.label) {
+                                'Files' => 'github/repositories',
+                                'Shell' =>
+                                  'help | workspace | drive | repos | backups | runtime | installer',
+                                _ => 'ResearchOS-backup.zip',
+                              },
                               border: const OutlineInputBorder(),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        FilledButton(
-                          onPressed: _running ? null : _run,
-                          child: Text(widget.label == 'Files' ? 'Browse' : 'Execute'),
-                        ),
+                        if (widget.label != 'Restore') ...[
+                          const SizedBox(width: 10),
+                          FilledButton(
+                            onPressed: _running ? null : _run,
+                            child: Text(widget.label == 'Files'
+                                ? 'Browse'
+                                : 'Execute'),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ),
-              if (widget.label == 'Restore')
+              if (widget.label == 'Backup' || widget.label == 'Restore')
                 const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.only(top: 12, bottom: 12),
                   child: Card(
                     child: ListTile(
                       leading: Icon(Icons.shield_outlined,
                           color: Color(0xFFFFB74D)),
-                      title: Text('Owner Gate'),
+                      title: Text('Owner Gate + checksum verification'),
                       subtitle: Text(
-                          'This page verifies and lists restore points. Applying a restore is intentionally blocked until an approval-gated restore tool is selected.'),
+                        'Backup/Restore mutation is executed only through a verified Drive tool package and explicit owner approval. Missing packages fail closed.',
+                      ),
                     ),
                   ),
                 ),
               const SizedBox(height: 12),
-              if (_running)
+              if (_running || _mutating)
                 const LinearProgressIndicator()
               else if (_error != null)
                 Card(
