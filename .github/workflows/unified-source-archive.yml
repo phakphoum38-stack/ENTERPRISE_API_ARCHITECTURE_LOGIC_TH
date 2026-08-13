@@ -1,0 +1,88 @@
+name: Research OS Unified Source Archive
+
+on:
+  push:
+    branches:
+      - archive/unified-source-v1-to-v3.1-2026-08-13
+    paths:
+      - 'tools/build_unified_source.py'
+      - '.github/workflows/unified-source-archive.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-unified-source-archive
+  cancel-in-progress: false
+
+jobs:
+  build-unified-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_SHA: 0598946440e214cfb8f2e51f7a635eaee52116b3
+      OUTPUT_DIR: unified-source-output
+      PROJECT_NAME: Research_OS_UNIFIED_SOURCE_v0.1_to_v3.1
+
+    steps:
+      - name: Checkout archive tooling branch with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch every repository branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+          git cat-file -e "${TARGET_SHA}^{commit}"
+          echo "Target: ${TARGET_SHA}"
+          echo "Reachable commits: $(git rev-list --count --all)"
+          echo "Remote branches: $(git for-each-ref refs/remotes/origin/ --format='%(refname)' | wc -l)"
+
+      - name: Build one deduplicated source project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/build_unified_source.py \
+            --target "${TARGET_SHA}" \
+            --output-dir "${OUTPUT_DIR}" \
+            --name "${PROJECT_NAME}"
+
+      - name: Verify bundle and dedup manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path('unified-source-output')
+          summary = json.loads((root / 'BUILD_SUMMARY.json').read_text(encoding='utf-8'))
+          zpath = Path(summary['zip'])
+          if not zpath.is_absolute():
+              zpath = Path.cwd() / zpath
+          if not zpath.exists():
+              raise SystemExit(f'Unified source ZIP missing: {zpath}')
+          digest = hashlib.sha256(zpath.read_bytes()).hexdigest()
+          if digest != summary['zip_sha256']:
+              raise SystemExit('Unified source ZIP SHA-256 mismatch')
+          if summary['target_sha'] != '0598946440e214cfb8f2e51f7a635eaee52116b3':
+              raise SystemExit('Wrong canonical target SHA')
+          if summary['canonical_files'] <= 0:
+              raise SystemExit('No canonical source files were retained')
+          print(json.dumps(summary, indent=2))
+          PY
+
+      - name: Upload unified source evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-unified-source-v0.1-to-v3.1-${{ env.TARGET_SHA }}
+          path: |
+            unified-source-output/Research_OS_UNIFIED_SOURCE_v0.1_to_v3.1_*.zip
+            unified-source-output/Research_OS_UNIFIED_SOURCE_v0.1_to_v3.1_*.zip.sha256
+            unified-source-output/BUILD_SUMMARY.json
+          if-no-files-found: error
+          retention-days: 30
