@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "owner_requirement": "Build Research OS with the morning Full Control Center GUI while keeping V3.1 as the single backend authority.",
+  "ui_source_of_truth": "morning-full-control-center",
+  "backend_source_of_truth": "v3-single-authority",
+  "required_navigation": [
+    "Home",
+    "Chat AI",
+    "Agents",
+    "Memory",
+    "Skills",
+    "Tools",
+    "Factory",
+    "Providers",
+    "Files",
+    "Repositories",
+    "GitHub",
+    "Drive",
+    "Runtime",
+    "Installer",
+    "Backup",
+    "Restore",
+    "Shell"
+  ],
+  "chat_layout": {
+    "conversation_list": true,
+    "provider_selector": true,
+    "context_panel": true,
+    "quick_actions": true,
+    "tool_discovery_panel": true
+  },
+  "data_binding": {
+    "health": "/health",
+    "master": "/v3/master",
+    "skills": "/v3/skills",
+    "tools": "/v3/tools",
+    "agents": "/v3/agents",
+    "providers": "/v3/providers",
+    "memory": "/v3/memory",
+    "factory": "/v3/factory/plan",
+    "chat": "/v3/chat"
+  },
+  "tool_discovery_skill": [
+    "analysis",
+    "research",
+    "governed-tool-execution",
+    "security",
+    "drive-tools-list",
+    "planning",
+    "quality"
+  ],
+  "release_policy": {
+    "mutate_canonical_source": false,
+    "merge": false,
+    "deploy": false,
+    "build_candidate": true,
+    "upload_to_drive_only_after_all_gates_pass": true
+  }
+}
