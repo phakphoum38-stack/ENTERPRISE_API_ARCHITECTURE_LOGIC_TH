@@ -64,6 +64,7 @@ class FullSystemApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(health["maximum_scale"], "10^10")
         self.assertEqual(health["maximum_logical_capacity"], 10_000_000_000)
+        self.assertEqual(health["capacity_policy"], "lazy-bounded-execution")
 
         for path, key in (
             ("/v3/skills", "skills"),
@@ -80,17 +81,26 @@ class FullSystemApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(master["scale"], "10^10")
         self.assertEqual(master["maximum_leaf_capacity"], 10_000_000_000)
-        self.assertEqual(master["capacity_policy"] if "capacity_policy" in master else "lazy", "lazy")
+        self.assertEqual(master["system_maximum_scale"], "10^10")
+        self.assertEqual(master["system_maximum_logical_capacity"], 10_000_000_000)
+        self.assertNotIn("active_workers", master)
 
         status, plan = self.get("/v3/factory/plan?tasks=46657")
         self.assertEqual(status, 200)
         self.assertEqual(plan["scale"], "10^10")
-        self.assertEqual(plan["stage_order"], ["master", "factory", "team", "tests", "release"])
+        self.assertEqual(plan["maximum_leaf_capacity"], 10_000_000_000)
+        self.assertEqual(
+            plan["stage_order"],
+            ["master", "factory", "team", "tests", "release"],
+        )
 
     def test_memory_chat_agent_and_readonly_tool_flow(self) -> None:
         status, created = self.post(
             "/v3/memory",
-            {"text": "Research OS full system uses ten to the tenth logical capacity", "tags": ["10x10"]},
+            {
+                "text": "Research OS full system uses ten to the tenth logical capacity",
+                "tags": ["10x10"],
+            },
         )
         self.assertEqual(status, 201)
         self.assertIn("memory", created)
