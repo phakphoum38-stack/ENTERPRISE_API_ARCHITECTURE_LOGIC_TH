@@ -7,6 +7,10 @@ from pathlib import Path
 from research_os_friend import FriendRequest, FriendRuntime, OwnerBundleBuilder
 
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+OWNER_SPECIAL_ROOT = REPOSITORY_ROOT / "owner_special"
+
+
 class FriendPersistenceTests(unittest.TestCase):
     def test_persistent_memory_survives_runtime_restart(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -14,7 +18,7 @@ class FriendPersistenceTests(unittest.TestCase):
             runtime = FriendRuntime.create_owner_special(
                 "phakphum",
                 data_root=root,
-                repository_root=Path.cwd(),
+                repository_root=REPOSITORY_ROOT,
             )
             runtime.ask(
                 FriendRequest(
@@ -27,7 +31,7 @@ class FriendPersistenceTests(unittest.TestCase):
             restarted = FriendRuntime.create_owner_special(
                 "phakphum",
                 data_root=root,
-                repository_root=Path.cwd(),
+                repository_root=REPOSITORY_ROOT,
             )
             items = restarted.orchestrator.memory.recall(
                 owner_id="phakphum",
@@ -53,7 +57,7 @@ class FriendPersistenceTests(unittest.TestCase):
             )
 
     def test_capability_manifest_contains_complete_friend_layers(self) -> None:
-        runtime = FriendRuntime.create_owner_special("phakphum", repository_root=Path.cwd())
+        runtime = FriendRuntime.create_owner_special("phakphum", repository_root=REPOSITORY_ROOT)
         names = set(runtime.architecture()["capabilities"])
         required = {
             "identity",
@@ -75,7 +79,7 @@ class FriendPersistenceTests(unittest.TestCase):
         self.assertTrue(required.issubset(names))
 
     def test_v3_bridge_detects_owned_core(self) -> None:
-        runtime = FriendRuntime.create_owner_special("phakphum", repository_root=Path.cwd())
+        runtime = FriendRuntime.create_owner_special("phakphum", repository_root=REPOSITORY_ROOT)
         bridge = runtime.architecture()["v3_bridge"]
         self.assertTrue(bridge["available"], bridge.get("reason"))
         self.assertIn("UnifiedMasterOrchestrator", bridge["exports"])
@@ -86,8 +90,7 @@ class FriendPersistenceTests(unittest.TestCase):
     def test_owner_bundle_contains_architecture_not_runtime_owner_data(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary) / "friend-complete.zip"
-            root = Path.cwd() / "owner_special"
-            result = OwnerBundleBuilder(root).build(destination)
+            result = OwnerBundleBuilder(OWNER_SPECIAL_ROOT).build(destination)
             self.assertTrue(result["source_only"])
             with zipfile.ZipFile(destination) as archive:
                 names = set(archive.namelist())
