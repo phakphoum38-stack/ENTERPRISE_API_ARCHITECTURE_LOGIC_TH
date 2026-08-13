@@ -38,6 +38,8 @@ class FakeApi implements V3Api {
   Future<Map<String, dynamic>> tools() async => {'tools': [
         {'name': 'echo', 'description': 'Echo', 'risk': 'read-only'},
         {'name': 'drive-tools-list', 'description': 'Discover tools', 'risk': 'read-only'},
+        {'name': 'workspace-files-list', 'description': 'Files', 'risk': 'read-only'},
+        {'name': 'research-shell', 'description': 'Diagnostics', 'risk': 'read-only'},
       ]};
   @override
   Future<Map<String, dynamic>> agents() async => {'agents': [
@@ -58,11 +60,40 @@ class FakeApi implements V3Api {
   @override
   Future<Map<String, dynamic>> runAgent(String name, String prompt) async => {'agent': name, 'text': prompt};
   @override
-  Future<Map<String, dynamic>> executeTool(String name, Map<String, dynamic> arguments, {bool approved = false}) async => {'tool': name, 'result': arguments};
+  Future<Map<String, dynamic>> executeTool(String name, Map<String, dynamic> arguments, {bool approved = false}) async {
+    switch (name) {
+      case 'workspace-files-list':
+        return {'tool': name, 'result': {'root': r'G:\DRIVE_VIRTUAL_CLOUD', 'path': arguments['path'] ?? '', 'entries': [
+          {'name': 'README.txt', 'path': 'README.txt', 'directory': false, 'size': 120}
+        ]}};
+      case 'workspace-repositories':
+        return {'tool': name, 'result': {'repositories': [
+          {'owner': 'owner', 'name': 'research-os', 'files': 232}
+        ]}};
+      case 'github-status':
+        return {'tool': name, 'result': {'mode': 'local-mirror', 'repository_count': 1}};
+      case 'drive-status':
+        return {'tool': name, 'result': {'available': true, 'root': r'G:\DRIVE_VIRTUAL_CLOUD'}};
+      case 'runtime-status':
+        return {'tool': name, 'result': {'python': '3.12', 'service_process': true}};
+      case 'installer-status':
+        return {'tool': name, 'result': {'installed': true, 'build_sha': 'candidate'}};
+      case 'backups-list':
+        return {'tool': name, 'result': {'backups': [
+          {'name': 'ResearchOS-backup.zip', 'size': 1048576, 'sha256': 'abcdef123456'}
+        ]}};
+      case 'research-shell':
+        return {'tool': name, 'result': {'command': arguments['command'] ?? 'help', 'commands': ['help','workspace','drive','repos','backups','runtime','installer']}};
+      case 'drive-tools-list':
+        return {'tool': name, 'result': {'status': {'available': true}, 'packages': <Map<String, dynamic>>[]}};
+      default:
+        return {'tool': name, 'result': arguments, 'approved': approved};
+    }
+  }
 }
 
 void main() {
-  testWidgets('self-built morning Full Control Center renders V3-backed shell and chat', (tester) async {
+  testWidgets('self-built Full Control Center renders V3-backed shell and chat', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1800, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ResearchOSV3App(api: FakeApi()));
@@ -89,7 +120,7 @@ void main() {
     expect(find.text('answer:hello self build'), findsOneWidget);
   });
 
-  testWidgets('workspace and system destinations remain available', (tester) async {
+  testWidgets('workspace and system pages execute V3 tools instead of placeholder cards', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1800, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ResearchOSV3App(api: FakeApi()));
@@ -97,12 +128,25 @@ void main() {
 
     await tester.tap(find.text('Drive').first);
     await tester.pumpAndSettle();
-    expect(find.text('Google Drive is persistent storage/tool source; executable packages require checksum validation.'), findsOneWidget);
-    expect(find.text('Tool Discovery Skills'), findsOneWidget);
+    expect(find.text('drive-status'), findsOneWidget);
+    expect(find.textContaining('DRIVE_VIRTUAL_CLOUD'), findsWidgets);
+    expect(find.text('Tool Discovery & Governance'), findsOneWidget);
 
     await tester.tap(find.text('Installer').first);
     await tester.pumpAndSettle();
-    expect(find.text('Windows installer staging and validation remain release-gated.'), findsOneWidget);
+    expect(find.text('installer-status'), findsOneWidget);
+    expect(find.textContaining('candidate'), findsWidgets);
+
+    await tester.tap(find.text('Backup').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Create Backup'), findsOneWidget);
+    expect(find.textContaining('Owner Gate'), findsOneWidget);
+    expect(find.textContaining('ResearchOS-backup.zip'), findsWidgets);
+
+    await tester.tap(find.text('Shell').first);
+    await tester.pumpAndSettle();
+    expect(find.text('research-shell'), findsOneWidget);
+    expect(find.textContaining('workspace'), findsWidgets);
   });
 }
 '''
