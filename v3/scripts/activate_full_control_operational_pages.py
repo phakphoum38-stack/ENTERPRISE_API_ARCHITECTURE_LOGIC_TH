@@ -23,11 +23,19 @@ def main() -> int:
     if import_old not in text or route_old not in text:
         raise SystemExit('generated app contract changed; activation patch refused')
     text = text.replace(import_old, import_new, 1).replace(route_old, route_new, 1)
+
+    # Once all Workspace/System routes are tool-backed, the old placeholder
+    # class is obsolete. Remove it from the generated product source instead
+    # of suppressing the analyzer warning.
+    placeholder_start = text.find('\nclass _OperationalPage extends StatelessWidget {')
+    placeholder_end = text.find('\nclass _ToolDiscoveryCard extends StatelessWidget {', placeholder_start)
+    if placeholder_start < 0 or placeholder_end < 0:
+        raise SystemExit('obsolete operational placeholder block not found')
+    text = text[:placeholder_start] + text[placeholder_end:]
     target.write_text(text, encoding='utf-8', newline='\n')
 
-    # The isolated product build must launch exactly the generated Full Control
-    # Center shell. Keep the source branch free to evolve, but make the staged
-    # product entrypoint deterministic before duplicate UI sources are retired.
+    # The isolated Full Product build launches the generated morning-style
+    # Full Control Center as the one canonical application shell.
     main_path = app_root / 'main.dart'
     if not main_path.is_file():
         raise SystemExit(f'missing Flutter entrypoint: {main_path}')
@@ -44,19 +52,9 @@ def main() -> int:
         raise SystemExit('could not normalize Full Product Flutter entrypoint')
     main_path.write_text(main_text, encoding='utf-8', newline='\n')
 
-    # The full product has one canonical app shell. Retire older experimental
-    # UI files only inside the isolated self-build workspace so analyzer/build
-    # cannot accidentally validate or package competing application shells.
-    retired: list[str] = []
-    for name in ('research_os_full_app.dart', 'full_control_operational.dart'):
-        candidate = src / name
-        if candidate.is_file():
-            candidate.unlink()
-            retired.append(name)
-
     print('activated live operational pages in generated Research OS Full Control Center')
+    print('removed obsolete generated _OperationalPage placeholder')
     print('normalized Flutter entrypoint to ResearchOSV3App')
-    print(f'retired duplicate UI sources in self-build workspace: {retired}')
     return 0
 
 
