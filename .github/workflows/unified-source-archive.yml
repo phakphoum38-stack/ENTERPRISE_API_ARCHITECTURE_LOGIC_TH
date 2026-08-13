@@ -5,7 +5,7 @@ on:
     branches:
       - archive/unified-source-v1-to-v3.1-2026-08-13
     paths:
-      - 'tools/build_unified_source.py'
+      - 'tools/build_unified_source_v2.py'
       - '.github/workflows/unified-source-archive.yml'
   workflow_dispatch:
 
@@ -22,8 +22,8 @@ jobs:
     timeout-minutes: 45
     env:
       TARGET_SHA: 0598946440e214cfb8f2e51f7a635eaee52116b3
-      OUTPUT_DIR: unified-source-output
-      PROJECT_NAME: Research_OS_UNIFIED_SOURCE_v0.1_to_v3.1
+      OUTPUT_DIR: unified-source-output-v2
+      PROJECT_NAME: Research_OS_UNIFIED_SOURCE_FIRST_to_V3.1_NO_DUP
 
     steps:
       - name: Checkout archive tooling branch with full history
@@ -41,25 +41,26 @@ jobs:
           echo "Reachable commits: $(git rev-list --count --all)"
           echo "Remote branches: $(git for-each-ref refs/remotes/origin/ --format='%(refname)' | wc -l)"
 
-      - name: Build one deduplicated source project
+      - name: Build one logical no-duplicate source project
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/build_unified_source.py \
+          python3 tools/build_unified_source_v2.py \
             --target "${TARGET_SHA}" \
             --output-dir "${OUTPUT_DIR}" \
             --name "${PROJECT_NAME}"
 
-      - name: Verify bundle and dedup manifest
+      - name: Verify unified source and no-version-copy policy
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import hashlib
           import json
+          import zipfile
           from pathlib import Path
 
-          root = Path('unified-source-output')
+          root = Path('unified-source-output-v2')
           summary = json.loads((root / 'BUILD_SUMMARY.json').read_text(encoding='utf-8'))
           zpath = Path(summary['zip'])
           if not zpath.is_absolute():
@@ -72,17 +73,25 @@ jobs:
           if summary['target_sha'] != '0598946440e214cfb8f2e51f7a635eaee52116b3':
               raise SystemExit('Wrong canonical target SHA')
           if summary['canonical_files'] <= 0:
-              raise SystemExit('No canonical source files were retained')
+              raise SystemExit('No canonical source files retained')
+          if summary['exact_duplicate_groups_final'] != 0:
+              raise SystemExit(f"Exact duplicate groups remain: {summary['exact_duplicate_groups_final']}")
+          with zipfile.ZipFile(zpath) as zf:
+              names = zf.namelist()
+          forbidden = ['/versions/', '/current/', '/ci/research-os-v']
+          bad = [n for n in names if any(marker in n for marker in forbidden)]
+          if bad:
+              raise SystemExit(f'Version snapshot paths remain in final archive: {bad[:10]}')
           print(json.dumps(summary, indent=2))
           PY
 
-      - name: Upload unified source evidence artifact
+      - name: Upload final unified source artifact
         uses: actions/upload-artifact@v4
         with:
-          name: research-os-unified-source-v0.1-to-v3.1-${{ env.TARGET_SHA }}
+          name: research-os-unified-source-FIRST-to-v3.1-NO-DUP-${{ env.TARGET_SHA }}
           path: |
-            unified-source-output/Research_OS_UNIFIED_SOURCE_v0.1_to_v3.1_*.zip
-            unified-source-output/Research_OS_UNIFIED_SOURCE_v0.1_to_v3.1_*.zip.sha256
-            unified-source-output/BUILD_SUMMARY.json
+            unified-source-output-v2/Research_OS_UNIFIED_SOURCE_FIRST_to_V3.1_NO_DUP_*.zip
+            unified-source-output-v2/Research_OS_UNIFIED_SOURCE_FIRST_to_V3.1_NO_DUP_*.zip.sha256
+            unified-source-output-v2/BUILD_SUMMARY.json
           if-no-files-found: error
           retention-days: 30
