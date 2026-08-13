@@ -50,6 +50,24 @@ jobs:
             flutter create --platforms=windows .
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+          if (Test-Path '.\\test\\widget_test.dart') {
+            Remove-Item '.\\test\\widget_test.dart' -Force
+          }
+
+      - name: Apply targeted context fixes
+        run: |
+          $targets = @(
+            '.\\lib\\screens\\providers_page.dart',
+            '.\\lib\\screens\\restore_page.dart'
+          )
+          foreach ($file in $targets) {
+            $text = Get-Content $file -Raw
+            $text = $text.Replace(
+              'if (context.mounted) ScaffoldMessenger.of(context)',
+              'if (mounted) ScaffoldMessenger.of(context)'
+            )
+            Set-Content $file $text -Encoding utf8
+          }
 
       - name: Resolve dependencies
         run: |
