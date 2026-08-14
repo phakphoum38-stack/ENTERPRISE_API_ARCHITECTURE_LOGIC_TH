@@ -1,0 +1,19 @@
+{
+  "edition": "owner-special",
+  "name": "Research OS Friend Complete",
+  "version": "1.3.0-owner",
+  "base": "v3-clean",
+  "owner_only": true,
+  "architecture": ["identity", "brain", "reasoning_summary", "skills", "memory", "persistent_memory", "context", "policy", "tools", "providers", "provider_settings", "os_native_secret_store", "v3_bridge", "capability_registry", "orchestrator", "million_helper_scheduler", "factory_bridge", "friend_service", "desktop_integration", "windows_service_host", "one_click_installer", "startup_probe", "evidence", "owner_bundle", "runtime", "tests"],
+  "adaptive_profiles": {"1^3": 1, "3^3": 27, "6^3": 216, "6^6": 46656, "fast-1m": 1000000},
+  "helper_execution": {"logical_capacity": 1000000, "max_active_workers": 128, "strategy": "bounded adaptive batches"},
+  "memory_scope": "owner/profile/session",
+  "memory_persistence": "atomic local owner store",
+  "service_boundary": "127.0.0.1 only",
+  "desktop_contract": "/owner/health + /owner/status + /owner/chat + /owner/memory + /owner/provider",
+  "provider_boundary": "OpenAI-compatible adapter with Windows DPAPI-protected credential storage and safe status",
+  "reasoning_storage": "high-level summaries only",
+  "v3_bridge": "BrainCore + UnifiedMasterOrchestrator + SoftwareFactory + FactoryExecutionEngine + ProviderRegistry + UserDataLayout",
+  "bundle_policy": "owned source and architecture only; runtime owner data remains external",
+  "status": "owner-development"
+}

@@ -1,0 +1,71 @@
+name: Research OS V3 Factory Execution
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - architecture/v3-clean
+    paths:
+      - 'v3/research_os_v3/execution.py'
+      - 'v3/research_os_v3/orchestrator.py'
+      - 'v3/research_os_v3/__init__.py'
+      - 'v3/tests/test_factory_execution.py'
+      - 'v3/scripts/factory_execution_smoke.py'
+      - 'v3/ROADMAP.md'
+      - '.github/workflows/v3-factory-execution.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-factory-execution-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  factory-execution:
+    name: Factory execution (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Initialize factory evidence
+        working-directory: v3
+        run: python scripts/evidence.py --output evidence/factory-progress.json --stage initialized --status passed --data '{"sha":"${{ github.sha }}","os":"${{ runner.os }}"}'
+
+      - name: Run factory execution unit tests
+        working-directory: v3
+        run: |
+          python -m unittest discover -s tests -p "test_factory_execution.py" -v
+          python scripts/evidence.py --output evidence/factory-progress.json --stage factory_unit_tests --status passed --data '{"pipeline":"master-factory-team-tests-release","fail_closed":true}'
+
+      - name: Run bounded execution smoke
+        working-directory: v3
+        run: |
+          python scripts/factory_execution_smoke.py
+          python scripts/evidence.py --output evidence/factory-progress.json --stage factory_execution --status passed --data '{"logical_capacity":46656,"hard_concurrency_limit":64,"incremental_stage_evidence":true,"reproducible_release_manifest":true}'
+
+      - name: Mark factory validation passed
+        working-directory: v3
+        run: python scripts/evidence.py --output evidence/factory-progress.json --stage factory_validation --status passed
+
+      - name: Upload factory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-factory-evidence-${{ runner.os }}-${{ github.sha }}
+          path: v3/evidence/factory-progress.json
+          if-no-files-found: warn
