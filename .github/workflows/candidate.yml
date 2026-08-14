@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_sha:
-        description: Exact commit SHA to build and validate
+        description: Exact source commit SHA to build and validate
         required: false
         type: string
         default: ""
@@ -36,6 +36,27 @@ jobs:
           path: src
           fetch-depth: 1
 
+      - name: Resolve immutable candidate identity
+        working-directory: src
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $checkoutSha = (git rev-parse HEAD).Trim()
+          if ($checkoutSha -ne $env:TARGET_SHA) {
+            throw "SOURCE_SHA_MISMATCH: target=$env:TARGET_SHA checkout=$checkoutSha"
+          }
+          $candidateId = "RO-WIN-$($checkoutSha.Substring(0,12))-$env:GITHUB_RUN_ID"
+          "CHECKOUT_SHA=$checkoutSha" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "CANDIDATE_ID=$candidateId" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          @{
+            candidate_id = $candidateId
+            source_sha = $checkoutSha
+            workflow_run_id = $env:GITHUB_RUN_ID
+            workflow_attempt = $env:GITHUB_RUN_ATTEMPT
+          } | ConvertTo-Json -Depth 5 | Set-Content "$env:GITHUB_WORKSPACE\candidate-manifest.json" -Encoding utf8
+          Write-Host "CANDIDATE_ID=$candidateId"
+          Write-Host "SOURCE_SHA=$checkoutSha"
+
       - name: Preflight repository and V3 gates
         working-directory: src
         shell: pwsh
@@ -48,6 +69,7 @@ jobs:
           $iss = Get-Content 'installer\research-os.iss' -Raw
           if ($iss -notmatch 'Source:\s*"\.\.\\v3\\\*"') { throw 'Installer is not configured to package V3 core.' }
           Write-Host "TARGET_SHA=$env:TARGET_SHA"
+          Write-Host "CHECKOUT_SHA=$env:CHECKOUT_SHA"
           Write-Host "V3 files=$($v3Files.Count)"
 
       - name: Enable Windows long paths
@@ -261,6 +283,7 @@ jobs:
         with:
           name: research-os-windows-candidate-${{ env.TARGET_SHA }}
           path: |
+            candidate-manifest.json
             src/installer/output/*.exe
             ${{ runner.temp }}/research-os-install.log
           if-no-files-found: warn
