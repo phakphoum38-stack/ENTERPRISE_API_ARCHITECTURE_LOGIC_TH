@@ -7,19 +7,23 @@ import 'src/api/v3_api.dart';
 import 'src/research_os_v3_app.dart';
 import 'src/startup_probe.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  const baseUrl = String.fromEnvironment(
+  const compiledBaseUrl = String.fromEnvironment(
     'RESEARCH_OS_V3_BASE_URL',
     defaultValue: 'http://127.0.0.1:8788',
   );
-  final rawUser = Platform.environment['RESEARCH_OS_V3_USER_ID'] ??
-      Platform.environment['USERNAME'] ??
-      Platform.environment['USER'] ??
+  final environment = Platform.environment;
+  final baseUrl = environment['RESEARCH_OS_V3_BASE_URL'] ?? compiledBaseUrl;
+  final rawUser = environment['RESEARCH_OS_V3_USER'] ??
+      environment['RESEARCH_OS_V3_USER_ID'] ??
+      environment['USERNAME'] ??
+      environment['USER'] ??
       'local-user';
-  final rawProfile =
-      Platform.environment['RESEARCH_OS_V3_PROFILE_ID'] ?? 'default';
+  final rawProfile = environment['RESEARCH_OS_V3_PROFILE'] ??
+      environment['RESEARCH_OS_V3_PROFILE_ID'] ??
+      'default';
 
   final api = HttpV3Api(
     baseUrl: baseUrl,
@@ -27,18 +31,28 @@ void main() {
     profileId: _safeIdentifier(rawProfile, fallbackPrefix: 'profile'),
   );
 
+  final proveInstalledChat = environment['RESEARCH_OS_V3_E2E_CHAT'] == '1';
+  if (proveInstalledChat) {
+    // CI-only installed-binary proof. Run it before creating the window so the
+    // HTTP evidence is deterministic even on a non-interactive Windows runner.
+    final connected = await StartupProbe(
+      api,
+      chatProbeMessage: 'installed-exe-e2e',
+    ).run();
+    if (!connected) {
+      stderr.writeln(
+        'Research OS V3 installed executable failed its end-to-end startup probe.',
+      );
+      exitCode = 2;
+      return;
+    }
+  }
+
   runApp(ResearchOSV3App(api: api));
 
-  final proveInstalledChat =
-      Platform.environment['RESEARCH_OS_V3_E2E_CHAT'] == '1';
-  unawaited(
-    StartupProbe(
-      api,
-      chatProbeMessage: proveInstalledChat
-          ? 'Research OS V3 installed app end-to-end probe'
-          : null,
-    ).run(),
-  );
+  if (!proveInstalledChat) {
+    unawaited(StartupProbe(api).run());
+  }
 }
 
 String _safeIdentifier(String raw, {required String fallbackPrefix}) {
