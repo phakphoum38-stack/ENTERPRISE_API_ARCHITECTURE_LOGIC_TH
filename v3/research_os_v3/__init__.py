@@ -16,10 +16,12 @@ from .orchestrator import UnifiedMasterOrchestrator
 from .providers import (
     CompletionRequest,
     CompletionResponse,
+    GeminiProvider,
     MockProvider,
     OpenAICompatibleProvider,
     ProviderRegistry,
     ProviderStatus,
+    runtime_provider_registry,
 )
 from .resilience import (
     CircuitBreakerPolicy,
@@ -52,6 +54,7 @@ __all__ = [
     "FactoryExecutionContext",
     "FactoryExecutionEngine",
     "FactoryExecutionResult",
+    "GeminiProvider",
     "MemoryRecord",
     "MemoryStore",
     "MockProvider",
@@ -78,5 +81,6 @@ __all__ = [
     "health_contract",
     "master_contract",
     "providers_contract",
+    "runtime_provider_registry",
     "safe_local_user_id",
 ]
