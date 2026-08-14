@@ -22,7 +22,7 @@ class UnifiedMasterOrchestrator:
     tool/skill governance.
     """
 
-    contract = "unified-master-orchestrator-v3.2-full-10x10"
+    contract = "unified-master-orchestrator-v3-full"
 
     def __init__(
         self,
