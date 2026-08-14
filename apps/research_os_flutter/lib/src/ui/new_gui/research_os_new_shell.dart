@@ -16,6 +16,7 @@ import '../../features/library/library_page.dart';
 import '../../features/settings/settings_page.dart';
 import 'backup_module_page.dart';
 import 'control_center_chrome.dart';
+import 'live_system_inspector.dart';
 import 'module_adapter_pages.dart';
 import 'registry_module_page.dart';
 import 'research_os_module_catalog.dart';
@@ -318,7 +319,9 @@ class _ResearchOSNewShellState extends State<ResearchOSNewShell> {
                           ),
                         ),
                         if (wide)
-                          ResearchSystemInspector(apiClient: widget.apiClient),
+                          ResearchLiveSystemInspector(
+                            apiClient: widget.apiClient,
+                          ),
                       ],
                     ),
                   ),
