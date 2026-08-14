@@ -166,8 +166,9 @@ const researchOSNewGuiModules = <ResearchOSModuleDefinition>[
     section: ResearchOSModuleSection.system,
     label: 'Installer',
     icon: Icons.install_desktop_outlined,
-    availability: 'planned',
-    backendSource: 'installer service/scripts',
+    availability: 'existing',
+    backendSource:
+        'LocalApiManager -> installer/output/Research-OS-Setup-*-x64.exe',
   ),
   ResearchOSModuleDefinition(
     id: ResearchOSModuleId.backup,
@@ -182,15 +183,15 @@ const researchOSNewGuiModules = <ResearchOSModuleDefinition>[
     section: ResearchOSModuleSection.system,
     label: 'Restore',
     icon: Icons.restore_outlined,
-    availability: 'planned',
-    backendSource: 'scripts/restore-research-os.ps1',
+    availability: 'existing',
+    backendSource: 'LocalApiManager -> scripts/restore-research-os.ps1',
   ),
   ResearchOSModuleDefinition(
     id: ResearchOSModuleId.shell,
     section: ResearchOSModuleSection.system,
     label: 'Shell',
     icon: Icons.terminal_outlined,
-    availability: 'planned',
-    backendSource: 'controlled local command surface',
+    availability: 'existing',
+    backendSource: 'LocalApiManager -> current-user powershell.exe command surface',
   ),
 ];
