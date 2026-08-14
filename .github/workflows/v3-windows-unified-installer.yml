@@ -109,7 +109,8 @@ jobs:
           & $iscc 'v3/installer/research-os-v3.iss'
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
           $setup = 'v3/installer/output/Research-OS-3.2-Unified-Setup-x64.exe'
-          if (-not (Test-Path $setup)) { throw "Installer missing: $setup" }
+          if (-not (Test-Path $setup)) { throw "Installer missing: $setup"
+          }
 
       - name: Install candidate silently
         shell: pwsh
@@ -252,6 +253,57 @@ jobs:
               Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
             }
           }
+
+      - name: Collect installed app diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          $diagnostics = Join-Path $env:RUNNER_TEMP 'research-os-v3-diagnostics'
+          Remove-Item $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+
+          $sources = @{
+            'http-audit.jsonl' = (Join-Path $env:ProgramData 'ResearchOSV3\logs\http-audit.jsonl')
+            'service.out.log' = (Join-Path $env:ProgramData 'ResearchOSV3\logs\service.out.log')
+            'service.err.log' = (Join-Path $env:ProgramData 'ResearchOSV3\logs\service.err.log')
+            'installed-app.out.log' = (Join-Path $env:RUNNER_TEMP 'research-os-v3-installed-app.out.log')
+            'installed-app.err.log' = (Join-Path $env:RUNNER_TEMP 'research-os-v3-installed-app.err.log')
+            'setup-validation.log' = (Join-Path $env:RUNNER_TEMP 'research-os-3.2-unified-setup.log')
+          }
+          foreach ($name in $sources.Keys) {
+            $source = $sources[$name]
+            if (Test-Path $source -PathType Leaf) {
+              Copy-Item $source (Join-Path $diagnostics $name) -Force
+            }
+          }
+
+          $builtApp = 'v3/flutter_app/build/windows/x64/runner/Release/research_os_v3_flutter.exe'
+          $stagedApp = 'v3/installer/package/app/research_os_v3_flutter.exe'
+          $installedApp = Join-Path $env:ProgramFiles 'Research OS 3.2 Unified\app\research_os_v3_flutter.exe'
+          $identity = [ordered]@{
+            github_sha = '${{ github.sha }}'
+            built_sha256 = if (Test-Path $builtApp) { (Get-FileHash $builtApp -Algorithm SHA256).Hash.ToLower() } else { $null }
+            staged_sha256 = if (Test-Path $stagedApp) { (Get-FileHash $stagedApp -Algorithm SHA256).Hash.ToLower() } else { $null }
+            installed_sha256 = if (Test-Path $installedApp) { (Get-FileHash $installedApp -Algorithm SHA256).Hash.ToLower() } else { $null }
+            service_status = (Get-Service -Name 'ResearchOSV3Service' -ErrorAction SilentlyContinue).Status.ToString()
+            listener_8788 = @(
+              Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue |
+                Select-Object LocalAddress,LocalPort,OwningProcess
+            )
+          }
+          $identity | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $diagnostics 'identity.json') -Encoding utf8
+
+          Write-Host "Persisted installed-app diagnostics to $diagnostics"
+          Get-ChildItem $diagnostics -File | Select-Object Name,Length
+
+      - name: Upload installed app diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-installed-app-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/research-os-v3-diagnostics/*
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Validate silent uninstall preserves data
         if: always()
