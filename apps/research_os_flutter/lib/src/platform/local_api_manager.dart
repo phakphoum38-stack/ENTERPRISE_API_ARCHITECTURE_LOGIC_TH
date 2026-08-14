@@ -19,7 +19,15 @@ class LocalApiManager {
   }
 
   Future<LocalApiCommandResult> backup() => impl.backup();
+  Future<LocalApiCommandResult> restore(String archivePath) =>
+      impl.restore(archivePath);
   Future<LocalApiCommandResult> openDataFolder() => impl.openDataFolder();
+  Future<LocalApiCommandResult> openInstallerOutput() =>
+      impl.openInstallerOutput();
+  Future<LocalApiCommandResult> runLatestInstaller() =>
+      impl.runLatestInstaller();
+  Future<LocalApiCommandResult> runShell(String command) =>
+      impl.runShell(command);
   Future<LocalApiCommandResult> enableAutostart() => impl.enableAutostart();
   Future<LocalApiCommandResult> disableAutostart() => impl.disableAutostart();
 
