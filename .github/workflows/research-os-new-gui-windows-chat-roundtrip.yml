@@ -1,0 +1,108 @@
+name: Research OS New GUI Windows Chat Roundtrip
+
+on:
+  push:
+    branches:
+      - 'work/research-os-new-gui-modular'
+    paths:
+      - 'tools/research_os_api/**'
+      - 'scripts/start-research-os-local.ps1'
+      - 'scripts/stop-research-os-local.ps1'
+      - 'scripts/research-os-service.ps1'
+      - '.github/workflows/research-os-new-gui-windows-chat-roundtrip.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-new-gui-windows-chat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-chat-roundtrip:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Prove local API health providers and chat roundtrip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $data = Join-Path $env:RUNNER_TEMP 'ResearchOSChatRoundtrip'
+          .\scripts\start-research-os-local.ps1 `
+            -DataDir $data `
+            -Provider mock `
+            -AiRoute direct-provider `
+            -Port 8787 `
+            -Background
+
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8787/health' -TimeoutSec 2
+                if ($health.status -eq 'ok') {
+                  $ready = $true
+                  break
+                }
+              }
+              catch {}
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $ready) { throw 'Research OS local API did not become ready' }
+
+            $providers = Invoke-RestMethod -Uri 'http://127.0.0.1:8787/v1/providers' -TimeoutSec 5
+            if ($providers.active -ne 'mock') {
+              throw "Expected mock provider, got $($providers.active)"
+            }
+
+            $payload = @{
+              question = 'สวัสดีเพื่อน ทดสอบแชท Windows แบบ HTTP roundtrip'
+              provider = 'mock'
+              session_id = 'windows-chat-roundtrip'
+            } | ConvertTo-Json -Depth 5
+
+            $reply = Invoke-RestMethod `
+              -Uri 'http://127.0.0.1:8787/v1/ai/answer-with-memory' `
+              -Method Post `
+              -ContentType 'application/json; charset=utf-8' `
+              -Body $payload `
+              -TimeoutSec 10
+
+            if (-not $reply.text) { throw 'Chat response text is empty' }
+            if ($reply.provider -ne 'mock') {
+              throw "Chat did not use mock provider: $($reply.provider)"
+            }
+            if ($reply.route -ne 'direct-provider') {
+              throw "Chat route mismatch: $($reply.route)"
+            }
+
+            $listeners = @(Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction Stop)
+            if (-not $listeners) { throw 'No listener found on port 8787' }
+            $unsafe = @(
+              $listeners | Where-Object {
+                $_.LocalAddress -notin @('127.0.0.1', '::1')
+              }
+            )
+            if ($unsafe) {
+              throw 'Research OS local API exposed a non-loopback listener'
+            }
+
+            Write-Host 'WINDOWS_CHAT_ROUNDTRIP=PASS'
+            Write-Host "PROVIDER=$($reply.provider)"
+            Write-Host "ROUTE=$($reply.route)"
+          }
+          finally {
+            .\scripts\stop-research-os-local.ps1 `
+              -Port 8787 `
+              -PidFile "$data\run\research-os-api.pid" `
+              -ErrorAction SilentlyContinue
+          }
