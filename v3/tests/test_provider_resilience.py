@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import json
 import os
 import unittest
+from unittest.mock import patch
 
 from research_os_v3 import (
     CircuitBreakerPolicy,
     CompletionRequest,
     CompletionResponse,
     CompositeSecretSource,
+    GeminiProvider,
     MockProvider,
     ProviderRegistry,
     ProviderStatus,
     RetryPolicy,
     WindowsCredentialManagerSecretSource,
+    runtime_provider_registry,
 )
 
 
@@ -22,6 +26,30 @@ class StaticSource:
 
     def get(self, name: str) -> str | None:
         return self.values.get(name)
+
+
+class FakeTransport:
+    def __init__(self, response: dict[str, object]) -> None:
+        self.response = response
+        self.calls: list[dict[str, object]] = []
+
+    def post_json(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        payload: dict[str, object],
+        timeout: float,
+    ) -> dict[str, object]:
+        self.calls.append(
+            {
+                "url": url,
+                "headers": dict(headers),
+                "payload": payload,
+                "timeout": timeout,
+            }
+        )
+        return self.response
 
 
 class FlakyProvider:
@@ -67,6 +95,78 @@ class ProviderResilienceTests(unittest.TestCase):
         )
         self.assertEqual(source.get("OPENAI_API_KEY"), "fallback-secret")
         self.assertIsNone(source.get("OTHER"))
+
+    def test_gemini_uses_header_credential_and_never_places_key_in_url(self) -> None:
+        secret = "gemini-secret"
+        transport = FakeTransport(
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": "gemini-ok"}],
+                        }
+                    }
+                ]
+            }
+        )
+        provider = GeminiProvider(
+            secret_source=StaticSource({"GEMINI_API_KEY": secret}),
+            transport=transport,
+            model="gemini-test",
+        )
+
+        response = provider.complete(CompletionRequest(prompt="hello"))
+        self.assertEqual(response.text, "gemini-ok")
+        self.assertEqual(response.provider, "gemini")
+        self.assertEqual(len(transport.calls), 1)
+        call = transport.calls[0]
+        self.assertEqual(
+            call["url"],
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent",
+        )
+        self.assertEqual(call["headers"]["x-goog-api-key"], secret)
+        self.assertNotIn(secret, str(call["url"]))
+        self.assertNotIn(secret, json.dumps(provider.status().to_safe_dict(), sort_keys=True))
+
+    def test_runtime_auto_uses_gemini_when_only_gemini_key_exists(self) -> None:
+        source = StaticSource({"RESEARCH_OS_GEMINI_API_KEY": "gemini-secret"})
+        with patch.dict(
+            os.environ,
+            {"RESEARCH_OS_PROVIDER": "auto"},
+            clear=False,
+        ):
+            registry = runtime_provider_registry(secret_source=source)
+        statuses = registry.statuses()
+        self.assertEqual([item.name for item in statuses], ["gemini"])
+        self.assertTrue(statuses[0].ready)
+        self.assertFalse(statuses[0].secret_exposed)
+
+    def test_runtime_auto_falls_back_to_mock_only_without_real_credentials(self) -> None:
+        source = StaticSource({})
+        with patch.dict(
+            os.environ,
+            {
+                "RESEARCH_OS_PROVIDER": "auto",
+                "RESEARCH_OS_PROVIDER_ORDER": "openai-compatible,gemini",
+            },
+            clear=False,
+        ):
+            registry = runtime_provider_registry(secret_source=source)
+        statuses = registry.statuses()
+        self.assertEqual([item.name for item in statuses], ["mock"])
+        self.assertTrue(statuses[0].ready)
+
+    def test_explicit_openai_without_key_does_not_silently_become_mock(self) -> None:
+        source = StaticSource({})
+        with patch.dict(
+            os.environ,
+            {"RESEARCH_OS_PROVIDER": "openai"},
+            clear=False,
+        ):
+            registry = runtime_provider_registry(secret_source=source)
+        statuses = registry.statuses()
+        self.assertEqual([item.name for item in statuses], ["openai-compatible"])
+        self.assertFalse(statuses[0].ready)
 
     def test_retry_policy_recovers_before_fallback(self) -> None:
         provider = FlakyProvider(failures_before_success=2)
