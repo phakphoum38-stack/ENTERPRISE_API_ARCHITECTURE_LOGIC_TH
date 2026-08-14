@@ -19,6 +19,7 @@ import 'control_center_chrome.dart';
 import 'module_adapter_pages.dart';
 import 'registry_module_page.dart';
 import 'research_os_module_catalog.dart';
+import 'system_action_module_pages.dart';
 
 class ResearchOSNewShell extends StatefulWidget {
   const ResearchOSNewShell({
@@ -214,11 +215,10 @@ class _ResearchOSNewShellState extends State<ResearchOSNewShell> {
           GoogleWorkspacePage(apiClient: widget.apiClient),
         ResearchOSModuleId.runtime =>
           ResearchRuntimeHub(apiClient: widget.apiClient),
+        ResearchOSModuleId.installer => const ResearchInstallerModulePage(),
         ResearchOSModuleId.backup => const ResearchBackupModulePage(),
-        ResearchOSModuleId.installer ||
-        ResearchOSModuleId.restore ||
-        ResearchOSModuleId.shell =>
-          ResearchModuleAdapterPage(module: _currentModule),
+        ResearchOSModuleId.restore => const ResearchRestoreModulePage(),
+        ResearchOSModuleId.shell => const ResearchShellModulePage(),
       };
 
   Widget _buildCurrentPage() {
