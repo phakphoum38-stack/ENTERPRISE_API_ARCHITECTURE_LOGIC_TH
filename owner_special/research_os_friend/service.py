@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .models import FriendRequest, ScaleProfile
+from .models import FriendRequest
 from .provider_settings import ProviderManager
 from .runtime import FriendRuntime
 
@@ -166,7 +166,7 @@ class OwnerFriendService:
                     )
                     response = service.runtime.ask(request)
                     helper_allocation = service.runtime.helpers.allocate(request, response.decision.scale)
-                    factory_scale = "6^6" if response.decision.scale is ScaleProfile.FAST_MILLION else response.decision.scale.value
+                    factory_scale = response.decision.scale.value
                     factory = service.runtime.bridge.factory_plan(factory_scale)
                     factory["requested_scale"] = response.decision.scale.value
                     self._send_json(200, {

@@ -53,6 +53,7 @@ class V3CleanCoreTests(unittest.TestCase):
             (Workload(estimated_leaf_tasks=2), ScaleTier.TIER_3_3, 27),
             (Workload(estimated_leaf_tasks=30), ScaleTier.TIER_6_3, 216),
             (Workload(estimated_leaf_tasks=217), ScaleTier.TIER_6_6, 46656),
+            (Workload(estimated_leaf_tasks=50000), ScaleTier.TIER_10_10, 10000000000),
         )
         for workload, expected_tier, expected_capacity in cases:
             with self.subTest(workload=workload):
@@ -61,8 +62,10 @@ class V3CleanCoreTests(unittest.TestCase):
                 self.assertEqual(decision.profile.capacity, expected_capacity)
 
     def test_max_profile_uses_backpressure_when_demand_exceeds_capacity(self) -> None:
-        decision = self.master.decide(Workload(estimated_leaf_tasks=50000))
-        self.assertEqual(decision.profile.tier, ScaleTier.TIER_6_6)
+        decision = self.master.decide(
+            Workload(estimated_leaf_tasks=10_000_000_001)
+        )
+        self.assertEqual(decision.profile.tier, ScaleTier.TIER_10_10)
         self.assertIn("queue/backpressure", decision.reason)
 
     def test_factory_pipeline_is_deterministic(self) -> None:
@@ -141,7 +144,9 @@ class V3CleanCoreTests(unittest.TestCase):
     def test_master_contract_is_stable(self) -> None:
         decision = self.master.decide(Workload(estimated_leaf_tasks=217))
         payload = master_contract(decision)
-        self.assertEqual(payload["contract"], "unified-master-orchestrator-v3-clean")
+        self.assertEqual(payload["contract"], "unified-master-orchestrator-v3-full")
+        self.assertEqual(payload["system_maximum_scale"], "10^10")
+        self.assertEqual(payload["system_maximum_logical_capacity"], 10_000_000_000)
         self.assertEqual(payload["scale"], "6^6")
         self.assertEqual(payload["maximum_leaf_capacity"], 46656)
 

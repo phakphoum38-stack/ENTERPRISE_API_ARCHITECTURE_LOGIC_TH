@@ -67,6 +67,68 @@ class V3Bridge:
         finally:
             self._remove_path(value, inserted)
 
+    def scale_profiles(self) -> dict[str, int]:
+        """Return scale profiles from the owned V3 core."""
+        status = self.probe()
+        if not status.available:
+            return {}
+
+        value, inserted = self._insert_path()
+        try:
+            models_module = importlib.import_module("research_os_v3.models")
+            return {
+                item.tier.value: int(item.capacity)
+                for item in models_module.SCALE_PROFILES
+            }
+        finally:
+            self._remove_path(value, inserted)
+
+    def master_decision(
+        self,
+        *,
+        estimated_leaf_tasks: int,
+        risk: int,
+        parallelism: int,
+    ) -> dict[str, object]:
+        """Delegate scale selection to the V3 UnifiedMasterOrchestrator."""
+        status = self.probe()
+        if not status.available:
+            return {
+                "available": False,
+                "reason": status.reason,
+            }
+
+        value, inserted = self._insert_path()
+        try:
+            module = importlib.import_module("research_os_v3")
+            models_module = importlib.import_module("research_os_v3.models")
+
+            master = module.UnifiedMasterOrchestrator()
+
+            workload = models_module.Workload(
+                estimated_leaf_tasks=max(1, int(estimated_leaf_tasks)),
+                risk=max(1, int(risk)),
+                parallelism=max(1, int(parallelism)),
+            )
+
+            decision = master.decide(workload)
+
+            return {
+                "available": True,
+                "contract": master.contract,
+                "scale": decision.profile.tier.value,
+                "capacity": int(decision.profile.capacity),
+                "demand": int(decision.demand),
+                "reason": decision.reason,
+            }
+        except Exception as exc:
+            return {
+                "available": False,
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
+        finally:
+            self._remove_path(value, inserted)
+
     def factory_plan(self, scale: str) -> dict[str, object]:
         """Return the certified V3 SoftwareFactory stage plan for a Friend scale."""
         status = self.probe()

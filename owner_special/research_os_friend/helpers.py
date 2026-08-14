@@ -24,7 +24,7 @@ class HelperScheduler:
     """Plans very large logical helper pools without spawning them all at once."""
 
     MAX_ACTIVE_WORKERS = 128
-    MAX_LOGICAL_HELPERS = 1_000_000
+    MAX_LOGICAL_HELPERS = 10_000_000_000
 
     def allocate(self, request: FriendRequest, scale: ScaleProfile) -> HelperAllocation:
         requested = request.helper_budget if request.helper_budget > 0 else max(1, request.parallelism)
@@ -34,7 +34,7 @@ class HelperScheduler:
         active = min(planned, self.MAX_ACTIVE_WORKERS)
         batches = max(1, math.ceil(planned / active))
         return HelperAllocation(
-            mode="adaptive-million" if logical_capacity == self.MAX_LOGICAL_HELPERS else "adaptive",
+            mode="adaptive-10x10" if logical_capacity == self.MAX_LOGICAL_HELPERS else "adaptive",
             requested_helpers=requested,
             logical_capacity=logical_capacity,
             planned_helpers=planned,

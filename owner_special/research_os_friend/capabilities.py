@@ -31,7 +31,7 @@ def install_friend_complete_capabilities() -> CapabilityRegistry:
     registry = CapabilityRegistry()
     capabilities = (
         Capability("identity", "boundary", "Owner identity and owner-only authorization."),
-        Capability("brain", "intelligence", "Adaptive 1^3, 3^3, 6^3 and 6^6 logical capacity selection."),
+        Capability("brain", "intelligence", "Adaptive logical-capacity selection delegated to the V3 UnifiedMasterOrchestrator up to 10^10."),
         Capability("reasoning-summary", "intelligence", "High-level decision plan and rationale summaries."),
         Capability("skills", "capability", "Owner-managed skill catalog and dispatch."),
         Capability("memory", "context", "Owner/profile/session scoped memory."),

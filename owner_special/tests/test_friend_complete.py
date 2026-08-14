@@ -17,7 +17,15 @@ class FriendCompleteTests(unittest.TestCase):
         architecture = runtime.architecture()
         self.assertEqual(architecture["edition"], "owner-special")
         self.assertEqual(architecture["brain_profiles"]["6^6"], 46656)
-        self.assertEqual(architecture["brain_profiles"]["fast-1m"], 1_000_000)
+        self.assertEqual(
+            architecture["brain_profiles"]["10^10"],
+            10_000_000_000,
+        )
+        self.assertEqual(
+            architecture["scale_authority"],
+            "v3-unified-master-orchestrator",
+        )
+        self.assertNotIn("fast-1m", architecture["brain_profiles"])
         self.assertEqual(architecture["helper_scheduler"]["max_active_workers"], 128)
         self.assertGreaterEqual(len(architecture["skills"]), 10)
         self.assertEqual(architecture["memory_scope"], "owner/profile/session")
@@ -28,13 +36,17 @@ class FriendCompleteTests(unittest.TestCase):
         self.assertEqual(response.decision.scale.value, "6^6")
         self.assertEqual(response.decision.maximum_leaf_capacity, 46656)
 
-    def test_turbo_million_is_logical_and_bounded(self) -> None:
+    def test_unified_10x10_scale_is_logical_and_bounded(self) -> None:
         runtime = FriendRuntime.create_owner_special("phakphum")
         request = FriendRequest(owner_id="phakphum", text="mega project", complexity=9, risk=7, parallelism=128, helper_budget=1_000_000)
         response = runtime.ask(request)
         allocation = runtime.helpers.allocate(request, response.decision.scale)
-        self.assertEqual(response.decision.scale.value, "fast-1m")
-        self.assertEqual(response.decision.maximum_leaf_capacity, 1_000_000)
+        self.assertEqual(response.decision.scale.value, "10^10")
+        self.assertEqual(
+            response.decision.maximum_leaf_capacity,
+            10_000_000_000,
+        )
+        self.assertEqual(allocation.logical_capacity, 10_000_000_000)
         self.assertEqual(allocation.planned_helpers, 1_000_000)
         self.assertLessEqual(allocation.active_workers, 128)
         self.assertGreater(allocation.batches, 1)
