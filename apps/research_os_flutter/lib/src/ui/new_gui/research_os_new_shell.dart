@@ -16,6 +16,7 @@ import '../../features/library/library_page.dart';
 import '../../features/settings/settings_page.dart';
 import 'control_center_chrome.dart';
 import 'module_adapter_pages.dart';
+import 'registry_module_page.dart';
 import 'research_os_module_catalog.dart';
 
 class ResearchOSNewShell extends StatefulWidget {
@@ -193,8 +194,14 @@ class _ResearchOSNewShellState extends State<ResearchOSNewShell> {
           AgentCenterPage(apiClient: widget.apiClient),
         ResearchOSModuleId.memory =>
           ResearchMemoryModulePage(apiClient: widget.apiClient),
-        ResearchOSModuleId.skills || ResearchOSModuleId.tools =>
-          ResearchModuleAdapterPage(module: _currentModule),
+        ResearchOSModuleId.skills => ResearchRegistryModulePage(
+            apiClient: widget.apiClient,
+            kind: ResearchRegistryKind.skills,
+          ),
+        ResearchOSModuleId.tools => ResearchRegistryModulePage(
+            apiClient: widget.apiClient,
+            kind: ResearchRegistryKind.tools,
+          ),
         ResearchOSModuleId.factory =>
           ResearchFactoryModulePage(apiClient: widget.apiClient),
         ResearchOSModuleId.providers =>
