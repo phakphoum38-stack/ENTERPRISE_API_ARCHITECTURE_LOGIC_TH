@@ -89,6 +89,14 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["api_version"], "v2")
         self.assertEqual(payload["master"]["authority"], "v3-owned-core")
+        self.assertEqual(
+            payload["master"]["contract"],
+            "unified-master-orchestrator-v3",
+        )
+        self.assertEqual(
+            payload["master"]["source_contract"],
+            "unified-master-orchestrator-v3-full",
+        )
         capacity = payload["master"]["capacity"]
         self.assertEqual(capacity["assistant_6x3_capacity"], 216)
         self.assertEqual(capacity["max_leaf_capacity"], 46656)
