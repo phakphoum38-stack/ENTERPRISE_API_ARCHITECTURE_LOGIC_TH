@@ -1,27 +1,45 @@
-# Research OS V3 Clean
+# Research OS V3.2 — Unified Full System 10x10
 
-This directory is the clean rebuild line for Research OS V3.
+Research OS V3.2 is the local-first unified line with one coordination authority: `UnifiedMasterOrchestrator`.
 
-## Goals
+## Current capability state
 
-- One Unified Master Orchestrator as the single coordination authority.
-- Adaptive hierarchy that scales by workload instead of spawning maximum capacity by default.
-- Explicit scale profiles for `1^3`, `3^3`, `6^3`, and `6^6`.
-- Provider adapters that expose capability/status metadata but never provider secrets.
-- A deterministic Software Factory plan: Master -> Factory -> Team -> Tests -> Release.
-- App/Service contracts separated from implementation so Flutter, Windows Service, and API can evolve independently.
-- Incremental evidence: a stage records success as soon as it succeeds; final candidate status is only `passed` after every required gate passes.
+- Adaptive logical hierarchy: `1^3`, `3^1`, `3^3`, `6^3`, `3^6`, `6^6`, `10^10`.
+- `10^10` is a logical planning ceiling, not a live worker count.
+- The Brain selects the smallest profile that satisfies the workload; real execution stays bounded.
+- Unified skills, governed tools, role agents, durable memory, provider routing, factory planning, and Drive runtime adapters share the same V3 authority.
+- Owner/Friend source remains available for provenance and compatibility without creating a competing control plane.
+- V3.2 preserves the chat contract `research-os-v3-chat-v1` and accepts `message` plus legacy aliases `text`, `prompt`, and `question`.
+- Provider secrets stay outside Flutter responses, status contracts, audit records, and evidence.
 
-## Layout
+## API surface
 
-- `research_os_v3/brain.py` - adaptive scale selection.
-- `research_os_v3/orchestrator.py` - Unified Master Orchestrator.
-- `research_os_v3/providers.py` - provider adapter and safe provider registry.
-- `research_os_v3/factory.py` - software factory planning.
-- `research_os_v3/contracts.py` - stable service-facing status contracts.
-- `tests/` - stdlib unit tests for the clean core.
-- `scripts/smoke.py` - zero-dependency smoke check.
+Read/status endpoints:
 
-## Current phase
+- `/health`
+- `/v3/master`
+- `/v3/factory/plan`
+- `/v3/providers`
+- `/v3/skills`
+- `/v3/tools`
+- `/v3/agents`
+- `/v3/user`
+- `/v3/memory`
 
-Phase 1: clean foundation and executable core logic. Existing V3 code remains untouched and acts only as a migration/reference source.
+Governed operation endpoints:
+
+- `/v3/chat`
+- `/v3/memory`
+- `/v3/agents/run`
+- `/v3/skills/execute`
+- `/v3/tools/execute`
+
+Write-capable operations fail closed unless their approval boundary is satisfied.
+
+## Desktop and Windows line
+
+The V3.2 Flutter surface exposes Home, Chat, Agents, Memory, Skills, Tools, Factory, and Providers. The Windows package keeps the service loopback-only on `127.0.0.1:8788`, preserves local data under `ProgramData\\ResearchOSV3`, and retains the installed-EXE startup proof for `/health`, `/v3/user`, `/v3/providers`, and `/v3/chat`.
+
+## Validation rule
+
+Source, Flutter, service, installer, installed executable, upgrade, uninstall, and evidence gates are validated from the exact candidate revision. A capability or action is never considered executed merely because a model says it ran; explicit runtime or validation evidence is required.
