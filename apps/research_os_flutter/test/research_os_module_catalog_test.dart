@@ -60,8 +60,13 @@ void main() {
 
   test('newly wired modules have a real backend source without fake legacy index', () {
     const wiredIds = <ResearchOSModuleId>{
+      ResearchOSModuleId.memory,
       ResearchOSModuleId.skills,
       ResearchOSModuleId.tools,
+      ResearchOSModuleId.factory,
+      ResearchOSModuleId.providers,
+      ResearchOSModuleId.files,
+      ResearchOSModuleId.repositories,
       ResearchOSModuleId.installer,
       ResearchOSModuleId.backup,
       ResearchOSModuleId.restore,
@@ -77,12 +82,20 @@ void main() {
     }
   });
 
-  test('planned modules never pretend to have a current page index', () {
-    for (final module in researchOSNewGuiModules.where(
-      (module) => module.availability == 'planned',
-    )) {
-      expect(module.legacyPageIndex, isNull);
-      expect(module.backendSource, isNotNull);
+  test('every visible top-level destination is backed by a real capability', () {
+    expect(researchOSNewGuiModules, isNotEmpty);
+    for (final module in researchOSNewGuiModules) {
+      expect(
+        module.availability,
+        'existing',
+        reason: '${module.label} must not ship as adapter/planned in the final GUI',
+      );
+      expect(
+        module.backendSource,
+        isNotNull,
+        reason: '${module.label} must identify its real source of truth',
+      );
+      expect(module.backendSource, isNotEmpty);
     }
   });
 }
