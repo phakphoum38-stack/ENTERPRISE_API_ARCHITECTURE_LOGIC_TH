@@ -46,8 +46,10 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
         request.headers.set('X-Research-OS-Session', sessionId);
       }
       if (body != null) {
+        final payload = utf8.encode(jsonEncode(body));
         request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
-        request.write(jsonEncode(body));
+        request.contentLength = payload.length;
+        request.add(payload);
       }
       final response = await request.close().timeout(timeout);
       final responseBody = await utf8.decoder.bind(response).join().timeout(timeout);
