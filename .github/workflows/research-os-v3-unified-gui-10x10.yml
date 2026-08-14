@@ -94,6 +94,8 @@ jobs:
           Set-Location $short
           flutter create --platforms=windows --project-name=research_os_flutter .
           if ($LASTEXITCODE -ne 0) { throw "Flutter Windows scaffold failed" }
+          python -m pip install --disable-pip-version-check --quiet pillow
+          if ($LASTEXITCODE -ne 0) { throw "Pillow installation failed" }
           python "$env:GITHUB_WORKSPACE\scripts\apply-research-os-branding.py" --app-root $short --platform windows
           if ($LASTEXITCODE -ne 0) { throw "Research OS branding failed" }
           flutter pub get
