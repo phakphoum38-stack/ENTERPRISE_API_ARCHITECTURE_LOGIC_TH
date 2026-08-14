@@ -29,6 +29,7 @@ RestartApplications=no
 
 [Files]
 Source: "package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\v3\*"; DestDir: "{app}\v3"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{commonappdata}\ResearchOS"
