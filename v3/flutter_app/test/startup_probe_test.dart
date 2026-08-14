@@ -15,15 +15,25 @@ class FakeApi implements V3Api {
   @override
   Future<Map<String, dynamic>> health() async {
     healthCalls++;
-    return {'status': 'ok', 'version': 'v3-clean'};
+    return {
+      'status': 'ok',
+      'version': 'v3.2-unified-full-10x10',
+      'maximum_scale': '10^10',
+      'maximum_logical_capacity': 10000000000,
+    };
   }
 
   @override
-  Future<Map<String, dynamic>> master({int tasks = 1}) async {
+  Future<Map<String, dynamic>> master({
+    int tasks = 1,
+    int risk = 1,
+    int parallelism = 1,
+  }) async {
     return {
-      'contract': 'unified-master-orchestrator-v3-clean',
+      'contract': 'unified-master-orchestrator-v3.2-full-10x10',
       'scale': '1^3',
       'maximum_leaf_capacity': 1,
+      'system_maximum_scale': '10^10',
     };
   }
 
@@ -54,24 +64,74 @@ class FakeApi implements V3Api {
   }
 
   @override
+  Future<Map<String, dynamic>> skills() async =>
+      {'skills': <Map<String, dynamic>>[]};
+
+  @override
+  Future<Map<String, dynamic>> tools() async =>
+      {'tools': <Map<String, dynamic>>[]};
+
+  @override
+  Future<Map<String, dynamic>> agents() async =>
+      {'agents': <Map<String, dynamic>>[]};
+
+  @override
+  Future<Map<String, dynamic>> memory({String query = '', int limit = 20}) async =>
+      {'memory': <Map<String, dynamic>>[]};
+
+  @override
+  Future<Map<String, dynamic>> factoryPlan({
+    int tasks = 1,
+    int risk = 1,
+    int parallelism = 1,
+  }) async => {
+        'scale': '1^3',
+        'maximum_leaf_capacity': 1,
+        'stage_order': ['master', 'factory', 'team', 'tests', 'release'],
+      };
+
+  @override
   Future<Map<String, dynamic>> chat(
     String message, {
     String sessionId = 'default',
     String provider = 'auto',
     String mode = 'answer',
+    String? agent,
+    String? preferredProvider,
+    int memoryLimit = 8,
   }) async {
     chatCalls++;
     lastChatMessage = message;
     lastChatSessionId = sessionId;
-    lastChatProvider = provider;
+    lastChatProvider = preferredProvider ?? provider;
     lastChatMode = mode;
     return {
       'contract': 'research-os-v3-chat-v1',
       'text': 'mock:$message',
-      'provider': 'mock',
+      'provider': preferredProvider ?? provider,
       'session_id': sessionId,
+      'mode': mode,
+      'agent': agent,
+      'memory_hits': <Map<String, dynamic>>[],
     };
   }
+
+  @override
+  Future<Map<String, dynamic>> addMemory(
+    String text, {
+    List<String> tags = const <String>[],
+  }) async => {'memory': {'text': text, 'tags': tags}};
+
+  @override
+  Future<Map<String, dynamic>> runAgent(String name, String prompt) async =>
+      {'agent': name, 'text': prompt};
+
+  @override
+  Future<Map<String, dynamic>> executeTool(
+    String name,
+    Map<String, dynamic> arguments, {
+    bool approved = false,
+  }) async => {'tool': name, 'result': arguments};
 }
 
 void main() {
