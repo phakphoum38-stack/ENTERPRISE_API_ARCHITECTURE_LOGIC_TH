@@ -85,7 +85,7 @@ class ResearchOsUpdateController extends ChangeNotifier {
           '-NoProfile',
           '-NonInteractive',
           '-Command',
-          '(Get-FileHash -Algorithm SHA256 -LiteralPath \"${path.replaceAll('"', '""')}\").Hash.ToLowerInvariant()',
+          '(Get-FileHash -Algorithm SHA256 -LiteralPath "${path.replaceAll('"', '""')}").Hash.ToLowerInvariant()',
         ],
       );
       if (hashResult.exitCode != 0) {
@@ -114,7 +114,7 @@ class ResearchOsUpdateController extends ChangeNotifier {
           '-NoProfile',
           '-NonInteractive',
           '-Command',
-          'Start-Process -FilePath \"${path.replaceAll('"', '""')}\" -Verb RunAs',
+          'Start-Process -FilePath "${path.replaceAll('"', '""')}" -Verb RunAs',
         ],
       );
       if (launch.exitCode != 0) {
