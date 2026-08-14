@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -106,6 +107,7 @@ class OpenAICompatibleProvider(ProviderAdapter):
                 "credential_available": credential_available,
                 "secret_store_policy": "environment-then-os-native",
                 "timeout_seconds": self.timeout,
+                "api_style": "chat-completions-compatible",
             },
         )
 
@@ -140,6 +142,206 @@ class OpenAICompatibleProvider(ProviderAdapter):
 
         self._connected = True
         return CompletionResponse(provider=self.name, model=self.model, text=text)
+
+
+class GeminiProvider(ProviderAdapter):
+    name = "gemini"
+
+    def __init__(
+        self,
+        *,
+        base_url: str = "https://generativelanguage.googleapis.com/v1beta",
+        model: str = "gemini-3.6-flash",
+        api_key_env: str = "GEMINI_API_KEY",
+        secret_source: SecretSource | None = None,
+        transport: JsonTransport | None = None,
+        timeout: float = 30.0,
+    ) -> None:
+        if timeout <= 0:
+            raise ValueError("provider timeout must be positive")
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.api_key_env = api_key_env
+        self.secret_source = secret_source or default_secret_source()
+        self.transport = transport or UrllibJsonTransport()
+        self.timeout = timeout
+        self._connected = False
+
+    def status(self) -> ProviderStatus:
+        try:
+            credential_available = bool(self.secret_source.get(self.api_key_env))
+        except Exception:
+            credential_available = False
+        return ProviderStatus(
+            name=self.name,
+            ready=credential_available and bool(self.base_url) and bool(self.model),
+            connected=self._connected,
+            secret_exposed=False,
+            metadata={
+                "base_url": self.base_url,
+                "model": self.model,
+                "credential_source": self.api_key_env,
+                "credential_reference": self.api_key_env,
+                "credential_available": credential_available,
+                "secret_store_policy": "environment-then-os-native",
+                "timeout_seconds": self.timeout,
+                "api_style": "generate-content",
+            },
+        )
+
+    def complete(self, request: CompletionRequest) -> CompletionResponse:
+        api_key = self.secret_source.get(self.api_key_env)
+        if not api_key:
+            raise RuntimeError(f"missing provider credential: {self.api_key_env}")
+
+        text = request.prompt
+        if request.system_prompt:
+            text = f"{request.system_prompt}\n\nUser request:\n{request.prompt}"
+        payload = self.transport.post_json(
+            f"{self.base_url}/models/{self.model}:generateContent",
+            headers={
+                "x-goog-api-key": api_key,
+                "Content-Type": "application/json",
+            },
+            payload={
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": text}],
+                    }
+                ]
+            },
+            timeout=self.timeout,
+        )
+        try:
+            candidates = payload["candidates"]
+            first = candidates[0]  # type: ignore[index]
+            content = first["content"]  # type: ignore[index]
+            parts = content["parts"]  # type: ignore[index]
+            fragments = [
+                part.get("text", "")
+                for part in parts  # type: ignore[union-attr]
+                if isinstance(part, dict) and isinstance(part.get("text"), str)
+            ]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise RuntimeError("Gemini response missing candidates[0].content.parts") from exc
+        response_text = "".join(fragments).strip()
+        if not response_text:
+            raise RuntimeError("Gemini completion content is empty")
+
+        self._connected = True
+        return CompletionResponse(provider=self.name, model=self.model, text=response_text)
+
+
+_PROVIDER_ALIASES = {
+    "openai": "openai-compatible",
+    "local": "openai-compatible",
+}
+
+
+def _normalized_provider_name(name: str) -> str:
+    normalized = name.strip().lower()
+    return _PROVIDER_ALIASES.get(normalized, normalized)
+
+
+def _first_available_secret_name(source: SecretSource, *names: str) -> str | None:
+    for name in names:
+        try:
+            if source.get(name):
+                return name
+        except Exception:
+            continue
+    return None
+
+
+def _env(name: str, default: str) -> str:
+    value = os.environ.get(name)
+    return value.strip() if value and value.strip() else default
+
+
+def runtime_provider_registry(
+    *,
+    secret_source: SecretSource | None = None,
+    transport: JsonTransport | None = None,
+) -> "ProviderRegistry":
+    """Build the runtime registry without embedding credentials in source.
+
+    ``RESEARCH_OS_PROVIDER=auto`` registers every provider whose credential can
+    be resolved from the process environment or OS-native secret store. Mock is
+    used only when auto mode finds no usable real-provider credential.
+    Explicit provider selection keeps that provider visible even when its
+    credential is missing, so readiness failures are observable instead of
+    silently pretending a mock response is real.
+    """
+
+    source = secret_source or default_secret_source()
+    selected = _normalized_provider_name(_env("RESEARCH_OS_PROVIDER", "auto"))
+    providers: list[ProviderAdapter] = []
+
+    openai_key_name = _first_available_secret_name(
+        source,
+        "RESEARCH_OS_OPENAI_API_KEY",
+        "OPENAI_API_KEY",
+    )
+    gemini_key_name = _first_available_secret_name(
+        source,
+        "RESEARCH_OS_GEMINI_API_KEY",
+        "GEMINI_API_KEY",
+    )
+
+    def openai_provider(key_name: str) -> OpenAICompatibleProvider:
+        return OpenAICompatibleProvider(
+            base_url=_env("RESEARCH_OS_OPENAI_BASE_URL", "https://api.openai.com/v1"),
+            model=_env("RESEARCH_OS_OPENAI_MODEL", "gpt-5"),
+            api_key_env=key_name,
+            secret_source=source,
+            transport=transport,
+            timeout=float(_env("RESEARCH_OS_PROVIDER_TIMEOUT", "30")),
+        )
+
+    def gemini_provider(key_name: str) -> GeminiProvider:
+        return GeminiProvider(
+            base_url=_env(
+                "RESEARCH_OS_GEMINI_BASE_URL",
+                "https://generativelanguage.googleapis.com/v1beta",
+            ),
+            model=_env("RESEARCH_OS_GEMINI_MODEL", "gemini-3.6-flash"),
+            api_key_env=key_name,
+            secret_source=source,
+            transport=transport,
+            timeout=float(_env("RESEARCH_OS_PROVIDER_TIMEOUT", "30")),
+        )
+
+    if selected == "auto":
+        order = [
+            _normalized_provider_name(item)
+            for item in _env(
+                "RESEARCH_OS_PROVIDER_ORDER",
+                "openai-compatible,gemini",
+            ).split(",")
+            if item.strip()
+        ]
+        for name in order:
+            if name == "openai-compatible" and openai_key_name and not any(
+                provider.name == "openai-compatible" for provider in providers
+            ):
+                providers.append(openai_provider(openai_key_name))
+            elif name == "gemini" and gemini_key_name and not any(
+                provider.name == "gemini" for provider in providers
+            ):
+                providers.append(gemini_provider(gemini_key_name))
+        if not providers:
+            providers.append(MockProvider())
+    elif selected == "openai-compatible":
+        providers.append(openai_provider(openai_key_name or "RESEARCH_OS_OPENAI_API_KEY"))
+    elif selected == "gemini":
+        providers.append(gemini_provider(gemini_key_name or "RESEARCH_OS_GEMINI_API_KEY"))
+    elif selected == "mock":
+        providers.append(MockProvider())
+    else:
+        raise ValueError(f"unsupported RESEARCH_OS_PROVIDER: {selected}")
+
+    return ProviderRegistry(providers)
 
 
 class ProviderRegistry:
@@ -206,6 +408,7 @@ class ProviderRegistry:
     ) -> CompletionResponse:
         ordered = list(self._providers)
         if preferred is not None:
+            preferred = _normalized_provider_name(preferred)
             preferred_provider = next(
                 (provider for provider in ordered if provider.name == preferred),
                 None,
@@ -232,7 +435,8 @@ class ProviderRegistry:
         raise RuntimeError(f"no provider completed request; attempted={attempted_text}")
 
     def get(self, name: str) -> ProviderAdapter:
+        wanted = _normalized_provider_name(name)
         for provider in self._providers:
-            if provider.name == name:
+            if provider.name == wanted:
                 return provider
-        raise KeyError(name)
+        raise KeyError(wanted)
