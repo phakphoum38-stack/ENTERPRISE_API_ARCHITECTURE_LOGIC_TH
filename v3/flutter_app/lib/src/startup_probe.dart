@@ -15,32 +15,53 @@ final class StartupProbe {
   final Duration retryDelay;
   final String? chatProbeMessage;
 
+  String? lastError;
+
   Future<bool> run() async {
+    lastError = null;
     for (var attempt = 0; attempt < attempts; attempt++) {
       try {
         final health = await api.health();
         final user = await api.user();
         final providers = await api.providers();
-        final providerList = providers['providers'];
-        if (health['status'] == 'ok' &&
-            user['isolated'] == true &&
-            providerList is List) {
-          final probe = chatProbeMessage?.trim();
-          if (probe != null && probe.isNotEmpty) {
-            final chat = await api.chat(
-              probe,
-              sessionId: 'installed-app-e2e',
-              provider: 'auto',
-              mode: 'answer',
-            );
-            if (chat['contract'] != 'research-os-v3-chat-v1') {
-              throw StateError('unexpected V3 chat contract');
-            }
-          }
+
+        final probe = chatProbeMessage?.trim();
+        Map<String, dynamic>? chat;
+        if (probe != null && probe.isNotEmpty) {
+          // The installed-binary proof must reach /v3/chat even when one of the
+          // preceding response schemas is unexpectedly shaped. We validate all
+          // contracts after the HTTP calls so CI can distinguish routing from a
+          // semantic contract regression instead of silently stopping at providers.
+          chat = await api.chat(
+            probe,
+            sessionId: 'installed-app-e2e',
+            provider: 'auto',
+            mode: 'answer',
+          );
+        }
+
+        final healthOk = health['status'] == 'ok';
+        final userOk = user['isolated'] == true;
+        final providersOk = providers['providers'] is List;
+        final chatOk = probe == null ||
+            probe.isEmpty ||
+            chat?['contract'] == 'research-os-v3-chat-v1';
+
+        if (healthOk && userOk && providersOk && chatOk) {
           return true;
         }
-      } catch (_) {
-        // Startup connectivity is best-effort. The visible shell can retry.
+
+        final failures = <String>[
+          if (!healthOk) 'health.status',
+          if (!userOk) 'user.isolated',
+          if (!providersOk) 'providers.providers',
+          if (!chatOk) 'chat.contract',
+        ];
+        throw StateError(
+          'startup contract mismatch: ${failures.join(', ')}',
+        );
+      } catch (error) {
+        lastError = error.toString();
       }
       if (attempt + 1 < attempts) {
         await Future<void>.delayed(retryDelay);
