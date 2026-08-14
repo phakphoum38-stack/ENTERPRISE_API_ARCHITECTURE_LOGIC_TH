@@ -3,32 +3,43 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
+from .agents import UnifiedAgentRegistry
 from .brain import BrainCore
 from .execution import FactoryExecutionEngine, FactoryExecutionResult, StageHandler
 from .factory import SoftwareFactory, SoftwareFactoryPlan
 from .models import OrchestrationDecision, Workload
 from .providers import CompletionRequest, CompletionResponse, ProviderRegistry
+from .skill_runtime import NativeSkillRuntime, SkillRuntimeContext
+from .skills import UnifiedSkillRegistry
+from .tools import UnifiedToolRegistry
 
 
 class UnifiedMasterOrchestrator:
-    """Single coordination authority for Research OS V3.
+    """Single coordination authority for Research OS V3.2 Full 10x10.
 
-    Scale selection is logical and lazy; real execution remains bounded by the
-    execution engine. Provider-backed answers flow through this master so chat,
-    local memory context, and provider selection keep one coordination path.
+    The 10^10 tier is logical planning capacity only. Scale is selected lazily,
+    while real execution remains bounded by the execution engine and explicit
+    tool/skill governance.
     """
 
-    contract = "unified-master-orchestrator-v3-clean"
+    contract = "unified-master-orchestrator-v3.2-full-10x10"
 
     def __init__(
         self,
         brain: BrainCore | None = None,
         providers: ProviderRegistry | None = None,
         factory: SoftwareFactory | None = None,
+        skills: UnifiedSkillRegistry | None = None,
+        tools: UnifiedToolRegistry | None = None,
+        agents: UnifiedAgentRegistry | None = None,
     ) -> None:
         self.brain = brain or BrainCore()
         self.providers = providers or ProviderRegistry()
         self.factory = factory or SoftwareFactory()
+        self.skills = skills or UnifiedSkillRegistry()
+        self.tools = tools or UnifiedToolRegistry()
+        self.skill_runtime = NativeSkillRuntime(self.skills)
+        self.agents = agents or UnifiedAgentRegistry(skills=self.skills, tools=self.tools)
 
     def decide(self, workload: Workload) -> OrchestrationDecision:
         profile, demand, reason = self.brain.select_profile(workload)
@@ -50,16 +61,27 @@ class UnifiedMasterOrchestrator:
         *,
         memory_context: str | None = None,
         preferred_provider: str | None = None,
+        agent_name: str | None = None,
         system_prompt: str | None = None,
     ) -> CompletionResponse:
         cleaned = prompt.strip()
         if not cleaned:
             raise ValueError("prompt must not be empty")
 
+        if agent_name:
+            return self.agents.run(
+                agent_name,
+                cleaned,
+                providers=self.providers,
+                preferred_provider=preferred_provider,
+                context_text=memory_context,
+            )
+
         governed_system = (
-            "You are Research OS V3. The Unified Master is the single coordination authority. "
-            "Use provided local memory only as relevant context, keep user/profile isolation, "
-            "never expose secrets, and never claim an action ran unless an execution result is supplied."
+            "You are Research OS V3.2. The Unified Master is the single coordination authority. "
+            "Follow governed execution boundaries, use provided local memory only as context, "
+            "never expose secrets, and never claim a tool/action ran unless its result is supplied."
+            f"\n\n{self.skills.conversation_context()}"
         )
         if system_prompt:
             governed_system += f"\n\nRequested conversation guidance:\n{system_prompt.strip()}"
@@ -70,6 +92,25 @@ class UnifiedMasterOrchestrator:
             CompletionRequest(prompt=cleaned, system_prompt=governed_system),
             preferred=preferred_provider,
         )
+
+    def execute_tool(
+        self,
+        name: str,
+        arguments: dict[str, object] | None = None,
+        *,
+        approved: bool = False,
+    ) -> dict[str, object]:
+        return self.tools.execute(name, arguments, approved=approved)
+
+    def execute_skill(
+        self,
+        name: str,
+        text: str = "",
+        *,
+        arguments: dict[str, object] | None = None,
+        context: SkillRuntimeContext,
+    ) -> dict[str, object]:
+        return self.skill_runtime.execute(name, text, arguments=arguments, context=context)
 
     def execute_factory(
         self,
