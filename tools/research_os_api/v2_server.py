@@ -9,6 +9,7 @@ business logic remain single-source.
 from __future__ import annotations
 
 import base64
+import importlib
 import os
 import sys
 from http import HTTPStatus
@@ -47,6 +48,10 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
             )
             return
 
+        if parsed.path == "/v2/master":
+            self._send_v2_master()
+            return
+
         if parsed.path == "/v2/orchestrations":
             self._send_v2_orchestration_page(parsed.query)
             return
@@ -56,7 +61,9 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
             return
 
         if parsed.path.startswith("/v2/workspaces/") and parsed.path.endswith("/knowledge"):
-            workspace_id = unquote(parsed.path[len("/v2/workspaces/") : -len("/knowledge")]).strip("/")
+            workspace_id = unquote(
+                parsed.path[len("/v2/workspaces/") : -len("/knowledge")]
+            ).strip("/")
             self._send_v2_workspace_knowledge(workspace_id, parsed.query)
             return
 
@@ -70,8 +77,79 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
         super().do_POST()
 
     def _workspace_engine(self) -> WorkspaceKnowledgeEngine:
-        data_dir = os.environ.get("RESEARCH_OS_DATA_DIR") or str(Path.home() / "ResearchOSData")
+        data_dir = os.environ.get("RESEARCH_OS_DATA_DIR") or str(
+            Path.home() / "ResearchOSData"
+        )
         return WorkspaceKnowledgeEngine(data_dir)
+
+    def _send_v2_master(self) -> None:
+        """Expose the owned V3 Unified Master capacities through the V2 facade.
+
+        The values are read from ``research_os_v3.models.SCALE_PROFILES`` so the
+        compatibility endpoint cannot silently drift from the actual V3 core.
+        """
+        repo_root = Path(__file__).resolve().parents[2]
+        v3_root = repo_root / "v3"
+        if not v3_root.is_dir():
+            self._send(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "error": "unified_master_unavailable",
+                    "detail": f"V3 core not found: {v3_root}",
+                },
+            )
+            return
+
+        path_value = str(v3_root)
+        inserted = False
+        if path_value not in sys.path:
+            sys.path.insert(0, path_value)
+            inserted = True
+        try:
+            module = importlib.import_module("research_os_v3")
+            models = importlib.import_module("research_os_v3.models")
+            profiles = {
+                item.tier.value: int(item.capacity)
+                for item in models.SCALE_PROFILES
+            }
+            master = module.UnifiedMasterOrchestrator()
+            six_cubed = profiles.get("6^3")
+            six_to_six = profiles.get("6^6")
+            if six_cubed is None or six_to_six is None:
+                raise RuntimeError("V3 scale profiles are missing 6^3 or 6^6")
+
+            self._send(
+                HTTPStatus.OK,
+                {
+                    "master": {
+                        "authority": "v3-owned-core",
+                        "contract": getattr(
+                            master,
+                            "contract",
+                            "UnifiedMasterOrchestrator",
+                        ),
+                        "capacity": {
+                            "assistant_6x3_capacity": six_cubed,
+                            "max_leaf_capacity": six_to_six,
+                            "profiles": profiles,
+                        },
+                    }
+                },
+            )
+        except (AttributeError, ImportError, RuntimeError, TypeError, ValueError) as exc:
+            self._send(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "error": "unified_master_unavailable",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                },
+            )
+        finally:
+            if inserted:
+                try:
+                    sys.path.remove(path_value)
+                except ValueError:
+                    pass
 
     def _send_v2_workspaces(self) -> None:
         try:
@@ -111,7 +189,9 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
             )
             items = records[offset : offset + page_size]
             next_offset = offset + len(items)
-            next_cursor = self._encode_cursor(next_offset) if next_offset < len(records) else None
+            next_cursor = (
+                self._encode_cursor(next_offset) if next_offset < len(records) else None
+            )
             self._send(
                 HTTPStatus.OK,
                 {
@@ -127,8 +207,16 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
             )
         except ValueError as exc:
             message = str(exc)
-            status = HTTPStatus.NOT_FOUND if message.startswith("unknown workspace:") else HTTPStatus.BAD_REQUEST
-            code = "workspace_not_found" if status == HTTPStatus.NOT_FOUND else "invalid_workspace_query"
+            status = (
+                HTTPStatus.NOT_FOUND
+                if message.startswith("unknown workspace:")
+                else HTTPStatus.BAD_REQUEST
+            )
+            code = (
+                "workspace_not_found"
+                if status == HTTPStatus.NOT_FOUND
+                else "invalid_workspace_query"
+            )
             self._send(status, {"error": code, "detail": message})
         except (OSError, RuntimeError) as exc:
             self._send(
@@ -181,8 +269,12 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
         if self._v2_request:
             if status_code >= 400:
                 raw_code = payload.get("error")
-                code = raw_code if isinstance(raw_code, str) else f"http_{status_code}"
-                message = str(payload.get("detail") or payload.get("message") or code)
+                code = (
+                    raw_code if isinstance(raw_code, str) else f"http_{status_code}"
+                )
+                message = str(
+                    payload.get("detail") or payload.get("message") or code
+                )
                 payload = {
                     "api_version": "v2",
                     "error": {
@@ -218,7 +310,11 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
 
     @staticmethod
     def _encode_cursor(offset: int) -> str:
-        return base64.urlsafe_b64encode(str(offset).encode("ascii")).decode("ascii").rstrip("=")
+        return (
+            base64.urlsafe_b64encode(str(offset).encode("ascii"))
+            .decode("ascii")
+            .rstrip("=")
+        )
 
     @staticmethod
     def _decode_cursor(value: str | None) -> int:
