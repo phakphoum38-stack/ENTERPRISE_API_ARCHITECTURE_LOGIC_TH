@@ -22,6 +22,57 @@ function Show-OwnerServiceDiagnostics {
         Write-Host "--- $path ---"
         if (Test-Path $path) { Get-Content $path -Tail 120 | Out-Host } else { Write-Host '<missing>' }
     }
+    $pythonPath = [IO.Path]::GetFullPath((Join-Path $Root 'runtime\python\python.exe'))
+    try {
+        Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
+            $_.Name -ieq 'python.exe' -and $_.ExecutablePath -and
+            ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $pythonPath)
+        } | Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
+    } catch {
+        Write-Host "Bundled Python diagnostics failed: $($_.Exception.Message)"
+    }
+}
+
+function Get-OwnerBundledPythonProcesses {
+    $pythonPath = [IO.Path]::GetFullPath((Join-Path $Root 'runtime\python\python.exe'))
+    return @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
+        $_.Name -ieq 'python.exe' -and $_.ExecutablePath -and
+        ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $pythonPath)
+    })
+}
+
+function Get-OwnerListeners {
+    return @(Get-NetTCPConnection -ErrorAction Stop | Where-Object {
+        $_.LocalPort -eq $Port -and $_.State -eq 'Listen'
+    })
+}
+
+function Stop-OwnerBundledPythonFallback {
+    $running = @()
+    for ($i = 0; $i -lt 20; $i++) {
+        $running = @(Get-OwnerBundledPythonProcesses)
+        if ($running.Count -eq 0) { return }
+        Start-Sleep -Milliseconds 250
+    }
+
+    Write-Host "Bundled Python remained after service shutdown; forcing exact packaged runtime process(es)."
+    foreach ($process in $running) {
+        Write-Host "Stopping bundled Python PID $($process.ProcessId): $($process.ExecutablePath)"
+        try {
+            Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+        } catch {
+            if (Get-Process -Id $process.ProcessId -ErrorAction SilentlyContinue) { throw }
+        }
+    }
+
+    for ($i = 0; $i -lt 20; $i++) {
+        $running = @(Get-OwnerBundledPythonProcesses)
+        if ($running.Count -eq 0) { return }
+        Start-Sleep -Milliseconds 250
+    }
+
+    Show-OwnerServiceDiagnostics
+    throw "Bundled runtime\python\python.exe remained alive after forced shutdown"
 }
 
 function Remove-OwnerService {
@@ -55,15 +106,22 @@ function Remove-OwnerService {
         }
     }
 
+    Stop-OwnerBundledPythonFallback
+    if (@(Get-OwnerBundledPythonProcesses).Count -ne 0) {
+        Show-OwnerServiceDiagnostics
+        throw 'Bundled Python verification failed after service removal'
+    }
+
     $listeners = @()
     for ($i = 0; $i -lt 40; $i++) {
-        $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+        $listeners = @(Get-OwnerListeners)
         if ($listeners.Count -eq 0) { break }
         Start-Sleep -Milliseconds 250
     }
     if ($listeners.Count -gt 0) {
         Show-OwnerServiceDiagnostics
-        throw "Owner Friend listener on port $Port remained after service stop/delete"
+        $pids = ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique) -join ','
+        throw "Owner Friend listener on port $Port remained after runtime shutdown. PID(s): $pids"
     }
 }
 
@@ -99,7 +157,7 @@ if (-not $ready) {
     throw 'Owner Friend Windows Service did not become HTTP-ready after installation'
 }
 
-$listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop)
+$listeners = @(Get-OwnerListeners)
 if ($listeners.Count -lt 1) { throw 'Owner Friend service has no listening socket after installation' }
 if ($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1','::1') }) { throw 'Owner Friend service is not loopback-only' }
 Write-Host "Owner Friend service installed and ready on 127.0.0.1:$Port"

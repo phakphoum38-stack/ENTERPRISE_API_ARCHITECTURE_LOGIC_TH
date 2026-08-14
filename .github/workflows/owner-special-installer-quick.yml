@@ -1,0 +1,117 @@
+name: Owner Special Installer Quick Check
+
+on:
+  pull_request:
+    paths:
+      - 'owner_special/**'
+      - 'v3/research_os_v3/**'
+      - '.github/workflows/owner-special-installer-quick.yml'
+  push:
+    branches: ['main', 'debug/owner-installer-guard']
+    paths:
+      - 'owner_special/**'
+      - 'v3/research_os_v3/**'
+      - '.github/workflows/owner-special-installer-quick.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-installer-upgrade-check:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build Owner desktop from current revision
+        working-directory: owner_special/flutter_app
+        shell: pwsh
+        run: |
+          flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+          if ($LASTEXITCODE -ne 0) { throw 'flutter create windows failed' }
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Owner desktop Windows build failed' }
+          $exe = Get-ChildItem 'build\windows\x64\runner\Release' -Filter 'research_os_owner_special.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw 'Owner Desktop EXE missing after Flutter build' }
+
+      - name: Publish Owner ServiceHost from current revision
+        shell: pwsh
+        run: |
+          dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish
+          if ($LASTEXITCODE -ne 0) { throw 'Owner ServiceHost publish failed' }
+
+      - name: Stage Owner installer inputs from current revision
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\stage-owner-installer.ps1 `
+            -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\flutter_app\build\windows\x64\runner\Release" `
+            -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Owner Setup.exe
+        working-directory: owner_special/installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc '.\owner-special.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'owner-special.iss compilation failed' }
+          if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe')) { throw 'Setup.exe missing' }
+
+      - name: Establish clean installed baseline
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 `
+            -Phase clean `
+            -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+
+      - name: Validate live in-place upgrade through Setup.exe
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 `
+            -Phase upgrade `
+            -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+
+      - name: Validate uninstall and Owner data preservation
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 `
+            -Phase uninstall `
+            -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+
+      - name: Show Owner installer diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($name in @('owner-special-clean.log','owner-special-upgrade.log')) {
+            $log = Join-Path $env:RUNNER_TEMP $name
+            if (Test-Path $log) {
+              Write-Host "--- $log ---"
+              Get-Content $log -Tail 300 | Out-Host
+            }
+          }
+          & sc.exe queryex ResearchOSOwnerFriendService 2>&1 | Out-Host
+          $global:LASTEXITCODE = 0
+          $python = [IO.Path]::GetFullPath('C:\Program Files\Research OS Owner Special\runtime\python\python.exe')
+          Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $python)
+          } | Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
+          Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction SilentlyContinue | Format-List | Out-Host

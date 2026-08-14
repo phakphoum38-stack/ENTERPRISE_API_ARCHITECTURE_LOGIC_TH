@@ -46,21 +46,15 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
         request.headers.set('X-Research-OS-Session', sessionId);
       }
       if (body != null) {
-        final payload = utf8.encode(jsonEncode(body));
         request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
-        request.contentLength = payload.length;
-        request.add(payload);
+        request.write(jsonEncode(body));
       }
       final response = await request.close().timeout(timeout);
       final responseBody = await utf8.decoder.bind(response).join().timeout(timeout);
       final decoded = jsonDecode(responseBody);
       if (decoded is! Map) throw const FormatException('Owner Friend response must be a JSON object');
       final result = Map<String, dynamic>.from(decoded);
-      if (response.statusCode != HttpStatus.ok) {
-        final message = result['message']?.toString();
-        final suffix = message == null || message.isEmpty ? '' : ': $message';
-        throw HttpException('Owner Friend returned HTTP ${response.statusCode}: ${result['error']}$suffix', uri: uri);
-      }
+      if (response.statusCode != HttpStatus.ok) throw HttpException('Owner Friend returned HTTP ${response.statusCode}: ${result['error']}', uri: uri);
       return result;
     } finally {
       client.close(force: true);

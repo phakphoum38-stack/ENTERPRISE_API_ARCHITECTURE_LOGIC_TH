@@ -1,0 +1,66 @@
+name: Research OS CI Lite
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Commit SHA to validate
+        required: false
+        type: string
+      include_flutter:
+        description: Also run Flutter analyze and tests
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-ci-lite-${{ inputs.target_sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  ci-lite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+      RESEARCH_OS_PROVIDER: mock
+      RESEARCH_OS_SYNC_KEY: ci-lite-test-key
+      RESEARCH_OS_ALLOW_LEGACY_IDENTITY_HEADERS: "1"
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile API modules
+        run: |
+          python -m compileall -q tools/research_os_api tools/research_curator
+
+      - name: Run API unit tests
+        run: |
+          export RESEARCH_OS_DATA_DIR="$RUNNER_TEMP/ResearchOSData"
+          export RESEARCH_OS_CONVERSATION_STORE="$RUNNER_TEMP/ResearchOSData/sessions/conversations.json"
+          python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+
+      - name: Set up Flutter
+        if: ${{ inputs.include_flutter == true }}
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter analyze and tests
+        if: ${{ inputs.include_flutter == true }}
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test

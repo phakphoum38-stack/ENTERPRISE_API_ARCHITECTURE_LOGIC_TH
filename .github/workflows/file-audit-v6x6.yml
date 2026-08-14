@@ -1,0 +1,48 @@
+name: Research OS 6^6 Full Repository Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to audit
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-file-audit-v6x6-${{ inputs.target_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  full-repository-audit:
+    name: Adaptive 6^6 full repository file audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+    steps:
+      - name: Checkout exact audit target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run adaptive 6^6 full repository audit
+        run: python -m unittest discover -s tools/research_os_api -p "test_file_audit_v6x6_gate.py" -v
+
+      - name: Write 6^6 audit summary
+        if: always()
+        run: |
+          {
+            echo "# Research OS 6^6 Full Repository Audit"
+            echo "- Logical capacity: 46,656"
+            echo "- Scope: complete checked-out repository"
+            echo "- Target SHA: $TARGET_SHA"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
