@@ -3,6 +3,9 @@ import 'package:research_os_v3_flutter/src/api/v3_api.dart';
 import 'package:research_os_v3_flutter/src/startup_probe.dart';
 
 class FakeApi implements V3Api {
+  FakeApi({this.invalidProvidersContract = false});
+
+  final bool invalidProvidersContract;
   int healthCalls = 0;
   int providerCalls = 0;
   int userCalls = 0;
@@ -40,6 +43,9 @@ class FakeApi implements V3Api {
   @override
   Future<Map<String, dynamic>> providers() async {
     providerCalls++;
+    if (invalidProvidersContract) {
+      return {'providers': 'invalid'};
+    }
     return {
       'providers': [
         {
@@ -170,5 +176,25 @@ void main() {
     expect(api.lastChatSessionId, 'installed-app-e2e');
     expect(api.lastChatProvider, 'auto');
     expect(api.lastChatMode, 'answer');
+    expect(connected, isTrue);
+  });
+
+  test('installed proof reaches chat before reporting semantic mismatch', () async {
+    final api = FakeApi(invalidProvidersContract: true);
+    final probe = StartupProbe(
+      api,
+      attempts: 1,
+      retryDelay: Duration.zero,
+      chatProbeMessage: 'installed-exe-e2e',
+    );
+
+    final connected = await probe.run();
+
+    expect(connected, isFalse);
+    expect(api.healthCalls, 1);
+    expect(api.userCalls, 1);
+    expect(api.providerCalls, 1);
+    expect(api.chatCalls, 1);
+    expect(probe.lastError, contains('providers.providers'));
   });
 }
