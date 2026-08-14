@@ -88,6 +88,15 @@ jobs:
             -ServiceHostDir 'v3/windows_service/publish' `
             -FlutterIconPath 'v3/flutter_app/windows/runner/resources/app_icon.ico'
 
+          $builtApp = 'v3/flutter_app/build/windows/x64/runner/Release/research_os_v3_flutter.exe'
+          $stagedApp = 'v3/installer/package/app/research_os_v3_flutter.exe'
+          $builtHash = (Get-FileHash $builtApp -Algorithm SHA256).Hash
+          $stagedHash = (Get-FileHash $stagedApp -Algorithm SHA256).Hash
+          if ($builtHash -ne $stagedHash) {
+            throw "Staged Flutter EXE does not match the release build: build=$builtHash staged=$stagedHash"
+          }
+          Write-Host "Verified staged Flutter EXE identity: $builtHash"
+
       - name: Compile Inno Setup installer
         shell: pwsh
         run: |
@@ -160,15 +169,36 @@ jobs:
           $app = Join-Path $installRoot 'app\research_os_v3_flutter.exe'
           if (-not (Test-Path $app)) { throw "Installed Flutter EXE missing: $app" }
 
+          $builtApp = (Resolve-Path 'v3/flutter_app/build/windows/x64/runner/Release/research_os_v3_flutter.exe').Path
+          $builtHash = (Get-FileHash $builtApp -Algorithm SHA256).Hash
+          $installedHash = (Get-FileHash $app -Algorithm SHA256).Hash
+          if ($builtHash -ne $installedHash) {
+            throw "Installed Flutter EXE does not match the release build: build=$builtHash installed=$installedHash"
+          }
+          Write-Host "Verified installed Flutter EXE identity: $installedHash"
+
           $audit = Join-Path $env:ProgramData 'ResearchOSV3\logs\http-audit.jsonl'
           if (Test-Path $audit) { [IO.File]::WriteAllText($audit, '') }
 
+          $appOut = Join-Path $env:RUNNER_TEMP 'research-os-v3-installed-app.out.log'
+          $appErr = Join-Path $env:RUNNER_TEMP 'research-os-v3-installed-app.err.log'
+          Remove-Item $appOut,$appErr -Force -ErrorAction SilentlyContinue
+
           $env:RESEARCH_OS_V3_E2E_CHAT = '1'
+          $env:RESEARCH_OS_V3_BASE_URL = 'http://127.0.0.1:8788'
+          $env:RESEARCH_OS_V3_USER = 'installed-app-ci'
           $env:RESEARCH_OS_V3_USER_ID = 'installed-app-ci'
-          $appProcess = Start-Process -FilePath $app -WorkingDirectory (Split-Path $app) -PassThru
+          $env:RESEARCH_OS_V3_PROFILE = 'default'
+          $env:RESEARCH_OS_V3_PROFILE_ID = 'default'
+          $appProcess = Start-Process `
+            -FilePath $app `
+            -WorkingDirectory (Split-Path $app) `
+            -RedirectStandardOutput $appOut `
+            -RedirectStandardError $appErr `
+            -PassThru
           try {
             $proved = $false
-            for ($attempt = 0; $attempt -lt 80; $attempt++) {
+            for ($attempt = 0; $attempt -lt 120; $attempt++) {
               if (Test-Path $audit) {
                 $records = @()
                 foreach ($line in [IO.File]::ReadAllLines($audit)) {
@@ -185,14 +215,35 @@ jobs:
                   break
                 }
               }
+              if ($appProcess.HasExited) {
+                Write-Host "Installed Flutter EXE exited before proof with code $($appProcess.ExitCode)"
+                break
+              }
               Start-Sleep -Milliseconds 250
             }
             if (-not $proved) {
-              if (Test-Path $audit) { Get-Content $audit }
+              if (Test-Path $audit) {
+                Write-Host '--- HTTP audit ---'
+                Get-Content $audit
+              }
+              if (Test-Path $appOut) {
+                Write-Host '--- Installed app stdout ---'
+                Get-Content $appOut -Tail 100
+              }
+              if (Test-Path $appErr) {
+                Write-Host '--- Installed app stderr ---'
+                Get-Content $appErr -Tail 100
+              }
               $serviceOut = Join-Path $env:ProgramData 'ResearchOSV3\logs\service.out.log'
               $serviceErr = Join-Path $env:ProgramData 'ResearchOSV3\logs\service.err.log'
-              if (Test-Path $serviceOut) { Get-Content $serviceOut -Tail 100 }
-              if (Test-Path $serviceErr) { Get-Content $serviceErr -Tail 100 }
+              if (Test-Path $serviceOut) {
+                Write-Host '--- Service stdout ---'
+                Get-Content $serviceOut -Tail 100
+              }
+              if (Test-Path $serviceErr) {
+                Write-Host '--- Service stderr ---'
+                Get-Content $serviceErr -Tail 100
+              }
               throw 'Installed Flutter app did not prove /health, /v3/user, /v3/providers, and /v3/chat'
             }
           }
@@ -203,6 +254,7 @@ jobs:
           }
 
       - name: Validate silent uninstall preserves data
+        if: always()
         shell: pwsh
         run: |
           $installRoot = Join-Path $env:ProgramFiles 'Research OS 3.2 Unified'
@@ -226,6 +278,7 @@ jobs:
           }
 
       - name: Package installer evidence
+        if: success()
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
@@ -237,6 +290,7 @@ jobs:
           if (Test-Path $setupLog) { Copy-Item $setupLog 'dist/setup-validation.log' -Force }
 
       - name: Upload Windows unified installer
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: research-os-3.2-unified-windows-${{ github.sha }}
