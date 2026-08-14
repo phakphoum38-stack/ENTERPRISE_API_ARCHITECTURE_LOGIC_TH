@@ -1,3 +1,4 @@
-Owner command: run Research OS Candidate for the current integration SHA.
+Owner command: run Research OS Candidate for the current new GUI modular SHA.
 Requested by owner via ChatGPT on 2026-08-14.
-Reason: rerun after fixing isolated E2E provider routing and static credential-like test fixture.
+Reason: validate the completed modular GUI target on Windows after Installer, Backup, Restore, Shell, Skills, Tools, Chat and live runtime wiring passed modular CI.
+Expected gate: full Python + Flutter regression, Windows release build, ServiceHost, runtime/service smoke, one-click Setup.exe build, install/upgrade/uninstall validation, checksum and artifact upload.
