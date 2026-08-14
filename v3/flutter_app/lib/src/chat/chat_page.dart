@@ -45,9 +45,7 @@ class _V3ChatPageState extends State<V3ChatPage> {
 
   Future<void> _send() async {
     final message = _controller.text.trim();
-    if (message.isEmpty || _sending) {
-      return;
-    }
+    if (message.isEmpty || _sending) return;
 
     _controller.clear();
     setState(() {
@@ -63,9 +61,7 @@ class _V3ChatPageState extends State<V3ChatPage> {
         sessionId: _sessionId,
         provider: _provider,
       );
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       final text = (response['text'] ?? response['answer'] ?? '').toString();
       final provider = response['provider']?.toString() ?? 'unknown';
       final model = response['model']?.toString() ?? '';
@@ -85,10 +81,7 @@ class _V3ChatPageState extends State<V3ChatPage> {
         );
       });
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _error = error.toString());
+      if (mounted) setState(() => _error = error.toString());
     } finally {
       if (mounted) {
         setState(() => _sending = false);
@@ -99,9 +92,7 @@ class _V3ChatPageState extends State<V3ChatPage> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) {
-        return;
-      }
+      if (!_scrollController.hasClients) return;
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 180),
@@ -124,7 +115,7 @@ class _V3ChatPageState extends State<V3ChatPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Chat',
+                      'AI Chat',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
@@ -142,9 +133,7 @@ class _V3ChatPageState extends State<V3ChatPage> {
                       onChanged: _sending
                           ? null
                           : (value) {
-                              if (value != null) {
-                                setState(() => _provider = value);
-                              }
+                              if (value != null) setState(() => _provider = value);
                             },
                     ),
                   ),
@@ -180,10 +169,8 @@ class _V3ChatPageState extends State<V3ChatPage> {
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
+                  Icon(Icons.error_outline,
+                      color: Theme.of(context).colorScheme.onErrorContainer),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -213,7 +200,7 @@ class _V3ChatPageState extends State<V3ChatPage> {
                   textInputAction: TextInputAction.newline,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
-                    hintText: 'Message Research OS V3',
+                    hintText: 'Message Research OS V3.2',
                   ),
                   onSubmitted: (_) => _send(),
                 ),
@@ -228,7 +215,7 @@ class _V3ChatPageState extends State<V3ChatPage> {
                         dimension: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.send),
+                    : const Icon(Icons.arrow_upward),
               ),
             ],
           ),
@@ -251,11 +238,8 @@ class _EmptyChat extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.auto_awesome,
-                size: 44,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+              Icon(Icons.auto_awesome,
+                  size: 44, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 16),
               Text(
                 'Unified Research OS Chat',
@@ -264,7 +248,7 @@ class _EmptyChat extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Messages go through the local V3 service, Unified Master, '
+                'Messages go through the local V3.2 service, Unified Master, '
                 'user-scoped memory, and the selected provider. Provider keys '
                 'remain outside the Flutter app.',
                 textAlign: TextAlign.center,
@@ -279,7 +263,6 @@ class _EmptyChat extends StatelessWidget {
 
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message});
-
   final _ChatMessage message;
 
   @override
@@ -308,8 +291,7 @@ class _MessageBubble extends StatelessWidget {
                   message.provider!,
                   if (message.model != null && message.model!.isNotEmpty)
                     message.model!,
-                  if (message.memoryCount > 0)
-                    'memory ${message.memoryCount}',
+                  if (message.memoryCount > 0) 'memory ${message.memoryCount}',
                 ].join(' · '),
                 key: const Key('chat-response-metadata'),
                 style: Theme.of(context).textTheme.labelSmall,
