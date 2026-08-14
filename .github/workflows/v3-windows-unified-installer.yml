@@ -3,7 +3,7 @@ name: Research OS 3.2 Unified Windows Installer
 on:
   push:
     branches:
-      - agent/fix-v3-chat-contract
+      - agent/research-os-v3.2-unified-10x10-full
     paths:
       - 'v3/**'
       - 'owner_special/OWNER_MANIFEST.json'
