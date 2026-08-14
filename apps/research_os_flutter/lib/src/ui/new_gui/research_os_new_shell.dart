@@ -330,8 +330,11 @@ class _ModuleNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final grouped = <ResearchOSModuleSection, List<ResearchOSModuleDefinition>>{};
     for (final module in researchOSNewGuiModules) {
-      grouped.putIfAbsent(module.section, () => <ResearchOSModuleDefinition>[])
-        ..add(module);
+      final entries = grouped.putIfAbsent(
+        module.section,
+        () => <ResearchOSModuleDefinition>[],
+      );
+      entries.add(module);
     }
 
     return AnimatedContainer(
