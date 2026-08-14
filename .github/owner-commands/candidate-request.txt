@@ -1,4 +1,5 @@
-Owner command: run Research OS Candidate for the current new GUI modular SHA.
+Owner command: run the final Research OS Candidate for the current new GUI modular SHA.
 Requested by owner via ChatGPT on 2026-08-14.
-Reason: validate the completed modular GUI target on Windows after Installer, Backup, Restore, Shell, Skills, Tools, Chat and live runtime wiring passed modular CI.
-Expected gate: full Python + Flutter regression, Windows release build, ServiceHost, runtime/service smoke, one-click Setup.exe build, install/upgrade/uninstall validation, checksum and artifact upload.
+Reason: Windows HTTP chat roundtrip is now proven, service/local API default to loopback-only direct-provider routing, and Installer/Backup/Restore/Shell/Skills/Tools/Chat GUI wiring is complete for the release gate.
+Expected gate: full Python + Flutter regression, Windows release build, ServiceHost, runtime/service smoke, one-click Setup.exe build, clean install, upgrade, uninstall/data preservation, SHA256 evidence and verified artifact upload.
+Do not integrate to main until this exact candidate passes.
