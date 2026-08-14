@@ -1,7 +1,7 @@
 name: research_os_v3_flutter
-description: Clean V3 desktop shell for Research OS.
+description: Research OS V3.2 Unified Full System workspace with governed adaptive 10^10 logical capacity.
 publish_to: "none"
-version: 3.0.0-dev.1+1
+version: 3.2.0+1
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
