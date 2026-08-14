@@ -57,5 +57,6 @@ jobs:
           flutter test test/new_gui_shell_test.dart
           flutter test test/registry_module_page_test.dart
           flutter test test/backup_module_page_test.dart
+          flutter test test/system_action_module_pages_test.dart
           flutter test test/chat_flow_test.dart
           flutter test test/desktop_shell_test.dart
