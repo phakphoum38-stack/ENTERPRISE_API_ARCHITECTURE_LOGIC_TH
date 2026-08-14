@@ -1,0 +1,27 @@
+name: Research OS Candidate Trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to validate
+        required: true
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Research OS Candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          gh workflow run candidate.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f target_sha="$TARGET_SHA"
