@@ -83,10 +83,12 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
         return WorkspaceKnowledgeEngine(data_dir)
 
     def _send_v2_master(self) -> None:
-        """Expose the owned V3 Unified Master capacities through the V2 facade.
+        """Expose the owned V3 Unified Master through a stable V2 contract.
 
-        The values are read from ``research_os_v3.models.SCALE_PROFILES`` so the
-        compatibility endpoint cannot silently drift from the actual V3 core.
+        Capacity values and the source contract are read from the owned V3 core.
+        The V2 compatibility contract remains stable for installed-service and
+        release-gate consumers while ``source_contract`` records the exact V3
+        implementation contract currently backing it.
         """
         repo_root = Path(__file__).resolve().parents[2]
         v3_root = repo_root / "v3"
@@ -113,6 +115,9 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
                 for item in models.SCALE_PROFILES
             }
             master = module.UnifiedMasterOrchestrator()
+            source_contract = str(
+                getattr(master, "contract", "UnifiedMasterOrchestrator")
+            )
             six_cubed = profiles.get("6^3")
             six_to_six = profiles.get("6^6")
             if six_cubed is None or six_to_six is None:
@@ -123,11 +128,8 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
                 {
                     "master": {
                         "authority": "v3-owned-core",
-                        "contract": getattr(
-                            master,
-                            "contract",
-                            "UnifiedMasterOrchestrator",
-                        ),
+                        "contract": "unified-master-orchestrator-v3",
+                        "source_contract": source_contract,
                         "capacity": {
                             "assistant_6x3_capacity": six_cubed,
                             "max_leaf_capacity": six_to_six,
