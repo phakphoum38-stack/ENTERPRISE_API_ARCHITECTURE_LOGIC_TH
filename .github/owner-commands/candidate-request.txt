@@ -1,0 +1,2 @@
+Owner command: run Research OS Candidate for the current integration SHA.
+Requested by owner via ChatGPT on 2026-08-14.
