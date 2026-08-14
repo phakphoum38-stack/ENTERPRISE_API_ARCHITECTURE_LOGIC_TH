@@ -71,7 +71,8 @@ class FriendCompleteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             evidence_path = Path(temporary) / "evidence.jsonl"
             runtime = FriendRuntime.create_owner_special("phakphum", evidence_path=evidence_path)
-            runtime.orchestrator.evidence.record(owner_id="phakphum", profile_id="default", session_id="default", event="redaction-test", data={"value": "sk-abcdefghijklmnopqrstuv"})
+            credential_like_fixture = "sk" + "-" + "abcdefghijklmnopqrstuv"
+            runtime.orchestrator.evidence.record(owner_id="phakphum", profile_id="default", session_id="default", event="redaction-test", data={"value": credential_like_fixture})
             record = json.loads(evidence_path.read_text(encoding="utf-8").splitlines()[-1])
             self.assertEqual(record["data"]["value"], "[REDACTED]")
 
