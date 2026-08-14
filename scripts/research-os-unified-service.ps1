@@ -17,22 +17,25 @@ function Set-LoopbackEnvironment {
         throw "Research OS service registry key missing: $serviceKey"
     }
 
-    $values = @((Get-ItemProperty -Path $serviceKey -Name Environment -ErrorAction Stop).Environment)
-    $updated = @()
-    $foundHost = $false
-    foreach ($value in $values) {
-        if ([string]$value -like 'RESEARCH_OS_API_HOST=*') {
-            $updated += 'RESEARCH_OS_API_HOST=127.0.0.1'
-            $foundHost = $true
-        } else {
-            $updated += [string]$value
+    [string[]]$values = @(Get-ItemPropertyValue -Path $serviceKey -Name Environment -ErrorAction Stop)
+    [string[]]$updated = @(
+        foreach ($value in $values) {
+            if ([string]$value -like 'RESEARCH_OS_API_HOST=*') {
+                'RESEARCH_OS_API_HOST=127.0.0.1'
+            } else {
+                [string]$value
+            }
         }
+    )
+    if (-not ($updated | Where-Object { $_ -like 'RESEARCH_OS_API_HOST=*' })) {
+        $updated = @($updated + 'RESEARCH_OS_API_HOST=127.0.0.1')
     }
-    if (-not $foundHost) {
-        $updated += 'RESEARCH_OS_API_HOST=127.0.0.1'
+
+    Set-ItemProperty -Path $serviceKey -Name Environment -Value ([string[]]$updated) -ErrorAction Stop
+    [string[]]$verify = @(Get-ItemPropertyValue -Path $serviceKey -Name Environment -ErrorAction Stop)
+    if (-not ($verify -contains 'RESEARCH_OS_API_HOST=127.0.0.1')) {
+        throw 'Research OS service loopback environment update did not persist'
     }
-    New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $updated -Force | Out-Null
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', '127.0.0.1', 'Machine')
 }
 
 function Wait-LoopbackReady([int]$Port = 8787, [int]$Seconds = 40) {
