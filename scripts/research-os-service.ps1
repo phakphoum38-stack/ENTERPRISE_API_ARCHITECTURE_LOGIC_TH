@@ -11,7 +11,12 @@ $Project = Join-Path $RepoRoot 'tools\research_os_service\ResearchOS.ServiceHost
 $PublishDir = Join-Path $RepoRoot 'tools\research_os_service\publish'
 $ServiceExe = Join-Path $PublishDir 'ResearchOS.ServiceHost.exe'
 $BundledPython = Join-Path $RepoRoot 'runtime\python\python.exe'
+$ApiHost = '127.0.0.1'
 $ApiPort = 8787
+$AiRoute = 'direct-provider'
+if ($env:RESEARCH_OS_AI_ROUTE -and $env:RESEARCH_OS_AI_ROUTE.Trim()) {
+  $AiRoute = $env:RESEARCH_OS_AI_ROUTE.Trim()
+}
 
 function Test-Admin {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -145,8 +150,9 @@ function Set-ServiceEnvironment([string]$PythonPath) {
     "RESEARCH_OS_REPO_ROOT=$RepoRoot",
     "RESEARCH_OS_DATA_DIR=$DataDir",
     "RESEARCH_OS_PYTHON_EXE=$PythonPath",
-    'RESEARCH_OS_API_HOST=0.0.0.0',
-    "RESEARCH_OS_API_PORT=$ApiPort"
+    "RESEARCH_OS_API_HOST=$ApiHost",
+    "RESEARCH_OS_API_PORT=$ApiPort",
+    "RESEARCH_OS_AI_ROUTE=$AiRoute"
   )
 
   New-ItemProperty -Path $serviceKey -Name Environment -PropertyType MultiString -Value $values -Force | Out-Null
@@ -164,6 +170,7 @@ switch ($Action) {
     Write-Host "Service name       : $ServiceName"
     Write-Host "Startup            : $startMode"
     Write-Host "Local API          : http://127.0.0.1:$ApiPort"
+    Write-Host "AI route           : $AiRoute"
     exit 0
   }
 
@@ -208,8 +215,9 @@ switch ($Action) {
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_REPO_ROOT', $RepoRoot, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_DATA_DIR', $DataDir, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_PYTHON_EXE', $python, 'Machine')
-    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', '0.0.0.0', 'Machine')
+    [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_HOST', $ApiHost, 'Machine')
     [Environment]::SetEnvironmentVariable('RESEARCH_OS_API_PORT', "$ApiPort", 'Machine')
+    [Environment]::SetEnvironmentVariable('RESEARCH_OS_AI_ROUTE', $AiRoute, 'Machine')
 
     $existing = Get-ServiceSafe
     if ($existing) {
@@ -234,6 +242,7 @@ switch ($Action) {
     Write-Host 'Research OS Service installed and started.'
     Write-Host "Service : $ServiceName"
     Write-Host "API     : http://127.0.0.1:$ApiPort"
+    Write-Host "AI route: $AiRoute"
     Write-Host "Data    : $DataDir"
     Write-Host "Runtime : $python"
     Write-Host 'Recovery: restart after 5s, 10s, then 30s'
