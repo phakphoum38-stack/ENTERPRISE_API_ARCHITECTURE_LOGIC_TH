@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'owner_api.dart';
+import 'update_center.dart';
 
 class OwnerFriendApp extends StatefulWidget {
   const OwnerFriendApp({required this.api, this.startup, this.startupError, super.key});
@@ -14,6 +15,13 @@ class OwnerFriendApp extends StatefulWidget {
 
 class _OwnerFriendAppState extends State<OwnerFriendApp> {
   int _index = 0;
+  final _updates = ResearchOsUpdateController.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _updates.configureFromEnvironment();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,22 +32,66 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Research OS • Owner Special • Friend Complete V1.3'),
-          actions: <Widget>[Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Center(child: Text(widget.startupError == null ? 'Friend Service: connected' : 'Friend Service: offline')))],
+          actions: <Widget>[
+            AnimatedBuilder(
+              animation: _updates,
+              builder: (context, _) => IconButton(
+                key: const Key('notification-center-button'),
+                tooltip: 'Notifications & Updates',
+                onPressed: () {
+                  _updates.markRead();
+                  setState(() => _index = 4);
+                },
+                icon: Badge(
+                  isLabelVisible: _updates.unread,
+                  label: const Text('1'),
+                  child: const Icon(Icons.notifications_outlined),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Center(child: Text(widget.startupError == null ? 'Friend Service: connected' : 'Friend Service: offline')),
+            ),
+          ],
         ),
         body: Row(children: <Widget>[
           NavigationRail(
             selectedIndex: _index,
-            onDestinationSelected: (value) => setState(() => _index = value),
+            onDestinationSelected: (value) {
+              if (value == 4) _updates.markRead();
+              setState(() => _index = value);
+            },
             labelType: NavigationRailLabelType.all,
-            destinations: const <NavigationRailDestination>[
-              NavigationRailDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: Text('Friend')),
-              NavigationRailDestination(icon: Icon(Icons.psychology_outlined), selectedIcon: Icon(Icons.psychology), label: Text('Capabilities')),
-              NavigationRailDestination(icon: Icon(Icons.memory_outlined), selectedIcon: Icon(Icons.memory), label: Text('Memory')),
-              NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('Provider')),
+            destinations: <NavigationRailDestination>[
+              const NavigationRailDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: Text('Friend')),
+              const NavigationRailDestination(icon: Icon(Icons.psychology_outlined), selectedIcon: Icon(Icons.psychology), label: Text('Capabilities')),
+              const NavigationRailDestination(icon: Icon(Icons.memory_outlined), selectedIcon: Icon(Icons.memory), label: Text('Memory')),
+              const NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('Provider')),
+              NavigationRailDestination(
+                icon: AnimatedBuilder(
+                  animation: _updates,
+                  builder: (context, _) => Badge(
+                    isLabelVisible: _updates.unread,
+                    smallSize: 8,
+                    child: const Icon(Icons.system_update_outlined),
+                  ),
+                ),
+                selectedIcon: const Icon(Icons.system_update),
+                label: const Text('Updates'),
+              ),
             ],
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: <Widget>[_FriendChatPage(api: widget.api), _CapabilitiesPage(api: widget.api, startup: widget.startup), _MemoryPage(api: widget.api), _ProviderPage(api: widget.api)][_index]),
+          Expanded(
+            child: <Widget>[
+              _FriendChatPage(api: widget.api),
+              _CapabilitiesPage(api: widget.api, startup: widget.startup),
+              _MemoryPage(api: widget.api),
+              _ProviderPage(api: widget.api),
+              const UpdateCenterPage(),
+            ][_index],
+          ),
         ]),
       ),
     );
