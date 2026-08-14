@@ -12,13 +12,27 @@ class ResearchOSApiException implements Exception {
 }
 
 class ResearchOSApiClient {
-  ResearchOSApiClient({required this.baseUrl, http.Client? client})
-      : _client = client ?? http.Client();
+  ResearchOSApiClient({
+    required this.baseUrl,
+    String? v3BaseUrl,
+    this.userId = 'local-user',
+    this.profileId = 'default',
+    http.Client? client,
+  })  : v3BaseUrl = v3BaseUrl ??
+            const String.fromEnvironment(
+              'RESEARCH_OS_V3_BASE_URL',
+              defaultValue: 'http://127.0.0.1:8788',
+            ),
+        _client = client ?? http.Client();
 
   final String baseUrl;
+  final String v3BaseUrl;
+  final String userId;
+  final String profileId;
   final http.Client _client;
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
+  Uri _v3Uri(String path) => Uri.parse('$v3BaseUrl$path');
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
@@ -167,17 +181,30 @@ class ResearchOSApiClient {
   }
 
   Future<Map<String, dynamic>> generateText(String prompt) {
-    return _postJson('/v1/ai/generate', <String, Object?>{
-      'provider': 'gemini',
-      'prompt': prompt,
-    });
+    return _postV3Chat(prompt, memoryLimit: 0);
   }
 
   Future<Map<String, dynamic>> answerWithMemory(String question) {
-    return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
-      'provider': 'gemini',
-      'question': question,
-    });
+    return _postV3Chat(question, memoryLimit: 8);
+  }
+
+  Future<Map<String, dynamic>> _postV3Chat(
+    String prompt, {
+    required int memoryLimit,
+  }) async {
+    final response = await _client.post(
+      _v3Uri('/v3/chat'),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'X-Research-OS-User': userId,
+        'X-Research-OS-Profile': profileId,
+      },
+      body: jsonEncode(<String, Object?>{
+        'prompt': prompt,
+        'memory_limit': memoryLimit,
+      }),
+    );
+    return _decode(response);
   }
 
   Future<Map<String, dynamic>> commitMemory(
