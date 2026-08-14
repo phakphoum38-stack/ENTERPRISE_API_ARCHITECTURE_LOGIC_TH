@@ -205,7 +205,7 @@ class _ResearchOSNewShellState extends State<ResearchOSNewShell> {
             kind: ResearchRegistryKind.tools,
           ),
         ResearchOSModuleId.factory =>
-          ResearchFactoryModulePage(apiClient: widget.apiClient),
+          AgentCenterPage(apiClient: widget.apiClient),
         ResearchOSModuleId.providers =>
           ResearchProvidersModulePage(apiClient: widget.apiClient),
         ResearchOSModuleId.files => LibraryPage(apiClient: widget.apiClient),
