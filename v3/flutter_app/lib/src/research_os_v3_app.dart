@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api/v3_api.dart';
+import 'chat/chat_page.dart';
 
 class ResearchOSV3App extends StatelessWidget {
   const ResearchOSV3App({super.key, required this.api});
@@ -108,7 +109,7 @@ class _V3AppShellState extends State<V3AppShell> {
             Expanded(
               child: switch (_selectedIndex) {
                 0 => _HomePage(snapshot: _snapshot, onRefresh: _refresh),
-                1 => const _ChatShell(),
+                1 => V3ChatPage(api: widget.api),
                 2 => const _FactoryPage(),
                 _ => _ProvidersPage(snapshot: _snapshot, onRefresh: _refresh),
               },
@@ -188,7 +189,7 @@ class _HomePage extends StatelessWidget {
                   padding: EdgeInsets.all(20),
                   child: Text(
                     'Unified Master → Factory → Team → Tests → Release\n'
-                    'Adaptive profiles: 1³ → 3³ → 6³ → 6⁶. '
+                    'Adaptive profiles scale from 1³ through 10¹⁰. '
                     'Maximum capacity is logical and never pre-spawned.',
                   ),
                 ),
@@ -196,85 +197,6 @@ class _HomePage extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _ChatShell extends StatefulWidget {
-  const _ChatShell();
-
-  @override
-  State<_ChatShell> createState() => _ChatShellState();
-}
-
-class _ChatShellState extends State<_ChatShell> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _PageFrame(
-      title: 'Chat',
-      child: Row(
-        children: [
-          SizedBox(
-            width: 220,
-            child: ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-                FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.add),
-                  label: const Text('New chat'),
-                ),
-                const SizedBox(height: 16),
-                const ListTile(
-                  selected: true,
-                  leading: Icon(Icons.chat_outlined),
-                  title: Text('V3 conversation'),
-                  subtitle: Text('Local-first shell'),
-                ),
-              ],
-            ),
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: Column(
-              children: [
-                const Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Text(
-                        'Conversation execution will use the governed V3 '
-                        'orchestrator and provider adapters. The desktop shell '
-                        'never stores provider API keys.',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    controller: _controller,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: 'Message Research OS V3',
-                      suffixIcon: Icon(Icons.send),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
