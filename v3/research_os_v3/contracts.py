@@ -13,13 +13,15 @@ def health_contract() -> dict[str, object]:
         "maximum_scale": maximum.tier.value,
         "maximum_logical_capacity": maximum.capacity,
         "capacity_policy": "lazy-bounded-execution",
+        "authority_contract": UnifiedMasterOrchestrator.contract,
     }
 
 
 def master_contract(decision: OrchestrationDecision) -> dict[str, object]:
     maximum = SCALE_PROFILES[-1]
     return {
-        "contract": UnifiedMasterOrchestrator.contract,
+        "contract": "unified-master-orchestrator-v3-clean",
+        "authority_contract": UnifiedMasterOrchestrator.contract,
         "scale": decision.profile.tier.value,
         "fanout": decision.profile.fanout,
         "depth": decision.profile.depth,
