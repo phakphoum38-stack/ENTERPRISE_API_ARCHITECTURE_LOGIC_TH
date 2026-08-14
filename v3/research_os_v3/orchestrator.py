@@ -11,9 +11,9 @@ from .providers import ProviderRegistry
 
 
 class UnifiedMasterOrchestrator:
-    """Single coordination authority for V3 Clean."""
+    """Single coordination authority for V3 Full 10x10."""
 
-    contract = "unified-master-orchestrator-v3-clean"
+    contract = "unified-master-orchestrator-v3-full"
 
     def __init__(
         self,

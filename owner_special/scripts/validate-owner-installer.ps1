@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][string]$SetupPath,
     [ValidateSet('full','clean','upgrade','uninstall')][string]$Phase = 'full'
 )
@@ -87,7 +87,9 @@ function Invoke-CleanValidation {
         if ($unsafe) { throw 'Owner Friend Service must be loopback-only' }
 
         $status = Invoke-RestMethod -Uri 'http://127.0.0.1:8790/owner/status' -Headers $headers -TimeoutSec 5
-        if ([int]$status.brain_profiles.'fast-1m' -ne 1000000) { throw 'fast-1m capacity missing after install' }
+        if ([long]$status.brain_profiles.'10^10' -ne 10000000000) { throw '10^10 capacity missing after install' }
+        if ($status.scale_authority -ne 'v3-unified-master-orchestrator') { throw 'V3 UnifiedMaster is not the scale authority after install' }
+        if ([long]$status.helper_scheduler.max_logical_helpers -ne 10000000000) { throw '10^10 helper logical capacity missing after install' }
         if ([int]$status.helper_scheduler.max_active_workers -gt 128) { throw 'active worker cap is unsafe' }
 
         $providerBody = @{base_url='http://127.0.0.1:18991/v1'; model='mock-model'; api_key='ci-owner-provider-key'; enabled=$true} | ConvertTo-Json
@@ -100,8 +102,9 @@ function Invoke-CleanValidation {
 
         $chatBody = @{text='installer turbo test'; complexity=9; risk=7; parallelism=128; helper_budget=1000000; requested_skills=@('analysis','planning','quality')} | ConvertTo-Json
         $chat = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8790/owner/chat' -Headers $headers -ContentType 'application/json' -Body $chatBody -TimeoutSec 20
-        if ($chat.decision.scale -ne 'fast-1m' -or [int]$chat.decision.capacity -ne 1000000) { throw 'Turbo 1M decision failed' }
-        if ([int]$chat.helpers.active_workers -gt 128 -or [int]$chat.helpers.planned_helpers -ne 1000000) { throw 'Bounded helper scheduler failed' }
+        if ($chat.decision.scale -ne '10^10' -or [long]$chat.decision.capacity -ne 10000000000) { throw 'Unified 10^10 decision failed' }
+        if ([long]$chat.helpers.logical_capacity -ne 10000000000 -or [int]$chat.helpers.active_workers -gt 128 -or [int]$chat.helpers.planned_helpers -ne 1000000) { throw 'Bounded 10^10 helper scheduler failed' }
+        if ($chat.factory.scale -ne '10^10' -or $chat.factory.requested_scale -ne '10^10') { throw 'V3 factory did not preserve requested 10^10 scale' }
         if ($chat.provider -ne 'openai-compatible' -or $chat.text -notmatch '^mock-provider:') { throw 'Real provider routing path failed' }
 
         $memoryPath = Get-MemoryPath
@@ -136,7 +139,7 @@ function Invoke-CleanValidation {
             setup_sha256 = $setupHash
             memory_sha256_before_upgrade = $beforeUpgrade
             provider_connected = $true
-            helper_logical_capacity = 1000000
+            helper_logical_capacity = 10000000000
             max_active_workers = 128
         }
         Write-Host 'CLEAN INSTALL VALIDATION PASSED'
@@ -176,7 +179,7 @@ function Invoke-UpgradeValidation {
             memory_sha256_before_upgrade = [string]$state.memory_sha256_before_upgrade
             memory_sha256_after_upgrade = $afterUpgrade
             provider_connected = [bool]$state.provider_connected
-            helper_logical_capacity = [int]$state.helper_logical_capacity
+            helper_logical_capacity = [long]$state.helper_logical_capacity
             max_active_workers = [int]$state.max_active_workers
         }
         Write-Host 'IN-PLACE UPGRADE VALIDATION PASSED'
@@ -213,7 +216,7 @@ function Invoke-UninstallValidation {
             upgrade = 'passed'
             uninstall = 'passed'
             setup_sha256 = [string]$state.setup_sha256
-            helper_logical_capacity = [int]$state.helper_logical_capacity
+            helper_logical_capacity = [long]$state.helper_logical_capacity
             max_active_workers = [int]$state.max_active_workers
             provider = 'openai-compatible'
             provider_connected = [bool]$state.provider_connected
@@ -237,3 +240,5 @@ switch ($Phase) {
         Invoke-UninstallValidation
     }
 }
+
+

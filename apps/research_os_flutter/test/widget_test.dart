@@ -21,6 +21,14 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
+  Future<Map<String, dynamic>> getGoogleIdentityStatus() async =>
+      <String, dynamic>{
+        'oauth_configured': false,
+        'connected': false,
+        'account': <String, dynamic>{},
+      };
+
+  @override
   Future<Map<String, dynamic>> getKnowledgeArtifacts() async => <String, dynamic>{
         'artifacts': <Map<String, dynamic>>[
           <String, dynamic>{
@@ -159,7 +167,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.text('คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
-    expect(find.text('Memory 1 รายการ'), findsOneWidget);
+    expect(find.text('ใช้ Memory 1 รายการ'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('research_os_chat_sessions_v1'), isNotNull);
     expect(tester.takeException(), isNull);

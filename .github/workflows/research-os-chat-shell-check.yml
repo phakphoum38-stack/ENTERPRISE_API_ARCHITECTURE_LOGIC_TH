@@ -1,0 +1,35 @@
+name: Research OS Chat Shell Check
+
+on:
+  push:
+    branches:
+      - 'feat/chatgpt-style-desktop-shell'
+    paths:
+      - 'apps/research_os_flutter/**'
+      - '.github/workflows/research-os-chat-shell-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-shell-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate desktop shell and chat flow
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test test/desktop_shell_test.dart
+          flutter test test/chat_flow_test.dart

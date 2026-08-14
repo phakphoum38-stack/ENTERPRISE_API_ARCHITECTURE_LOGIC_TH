@@ -1,4 +1,5 @@
 import json
+import os
 import threading
 import unittest
 import urllib.request
@@ -10,6 +11,8 @@ from server import ResearchOSHandler
 class ResearchOSEndToEndTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.previous_ai_route = os.environ.get("RESEARCH_OS_AI_ROUTE")
+        os.environ["RESEARCH_OS_AI_ROUTE"] = "direct-provider"
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), ResearchOSHandler)
         cls.base_url = f"http://127.0.0.1:{cls.server.server_address[1]}"
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -20,6 +23,10 @@ class ResearchOSEndToEndTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=2)
+        if cls.previous_ai_route is None:
+            os.environ.pop("RESEARCH_OS_AI_ROUTE", None)
+        else:
+            os.environ["RESEARCH_OS_AI_ROUTE"] = cls.previous_ai_route
 
     def request_json(self, path, payload=None):
         data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")

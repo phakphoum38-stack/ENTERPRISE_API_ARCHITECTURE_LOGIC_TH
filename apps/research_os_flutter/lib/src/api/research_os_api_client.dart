@@ -12,10 +12,14 @@ class ResearchOSApiException implements Exception {
 }
 
 class ResearchOSApiClient {
-  ResearchOSApiClient({required this.baseUrl, http.Client? client})
-      : _client = client ?? http.Client();
+  ResearchOSApiClient({
+    required this.baseUrl,
+    http.Client? client,
+    this.preferredProvider,
+  }) : _client = client ?? http.Client();
 
   final String baseUrl;
+  final String? preferredProvider;
   final http.Client _client;
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
@@ -26,6 +30,14 @@ class ResearchOSApiClient {
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
       _getJson('/v1/knowledge/graph');
+
+  Future<Map<String, dynamic>> getGoogleIdentityStatus() =>
+      _getJson('/v1/auth/google/status');
+  Future<Map<String, dynamic>> startGoogleIdentitySignIn() =>
+      _postJson('/v1/auth/google/start', const <String, Object?>{});
+  Future<Map<String, dynamic>> signOutGoogleIdentity() =>
+      _postJson('/v1/auth/google/signout', const <String, Object?>{});
+
   Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() =>
       _getJson('/v1/google-workspace/dashboard');
   Future<Map<String, dynamic>> getGoogleWorkspaceOAuthStatus() =>
@@ -55,8 +67,7 @@ class ResearchOSApiClient {
     return _decode(response);
   }
 
-  Future<Map<String, dynamic>> getV2Workspaces() =>
-      _getJson('/v2/workspaces');
+  Future<Map<String, dynamic>> getV2Workspaces() => _getJson('/v2/workspaces');
 
   Future<Map<String, dynamic>> searchWorkspaceKnowledge(
     String workspaceId, {
@@ -166,18 +177,23 @@ class ResearchOSApiClient {
     return _decode(response);
   }
 
+  Map<String, Object?> _aiPayload(String field, String value) {
+    final provider = preferredProvider?.trim();
+    return <String, Object?>{
+      field: value,
+      if (provider != null && provider.isNotEmpty) 'provider': provider,
+    };
+  }
+
   Future<Map<String, dynamic>> generateText(String prompt) {
-    return _postJson('/v1/ai/generate', <String, Object?>{
-      'provider': 'gemini',
-      'prompt': prompt,
-    });
+    return _postJson('/v1/ai/generate', _aiPayload('prompt', prompt));
   }
 
   Future<Map<String, dynamic>> answerWithMemory(String question) {
-    return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
-      'provider': 'gemini',
-      'question': question,
-    });
+    return _postJson(
+      '/v1/ai/answer-with-memory',
+      _aiPayload('question', question),
+    );
   }
 
   Future<Map<String, dynamic>> commitMemory(

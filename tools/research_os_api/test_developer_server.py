@@ -5,9 +5,12 @@ import json
 import os
 import tempfile
 import threading
+import time
 import unittest
+import uuid
 from http.server import ThreadingHTTPServer
 
+from developer_identity import IdentityAssertionVerifier
 from developer_server import DeveloperPlatformHandler
 
 
@@ -39,12 +42,36 @@ class DeveloperPlatformApiTests(unittest.TestCase):
                 os.environ[name] = old
         self.temp.cleanup()
 
-    def raw_request(self, method: str, path: str, principal: str | None = None, body: dict | None = None, secret: str = "test-gateway-secret"):
-        conn = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=5)
+    def raw_request(
+        self,
+        method: str,
+        path: str,
+        principal: str | None = None,
+        body: dict | None = None,
+        secret: str = "test-gateway-secret",
+    ):
+        conn = http.client.HTTPConnection(
+            "127.0.0.1",
+            self.server.server_address[1],
+            timeout=5,
+        )
         headers = {"Content-Type": "application/json"}
         if principal is not None:
-            headers["X-ResearchOS-Principal"] = principal
-            headers["X-ResearchOS-Identity-Secret"] = secret
+            issued_at = int(time.time())
+            nonce = uuid.uuid4().hex
+            signature = IdentityAssertionVerifier(secret).signature_for(
+                principal,
+                issued_at,
+                nonce,
+            )
+            headers.update(
+                {
+                    "X-ResearchOS-Principal": principal,
+                    "X-ResearchOS-Identity-Timestamp": str(issued_at),
+                    "X-ResearchOS-Identity-Nonce": nonce,
+                    "X-ResearchOS-Identity-Signature": signature,
+                }
+            )
         payload = json.dumps(body or {}) if body is not None else None
         conn.request(method, path, body=payload, headers=headers)
         response = conn.getresponse()
@@ -54,7 +81,14 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         conn.close()
         return status, content_type, data
 
-    def request(self, method: str, path: str, principal: str | None, body: dict | None = None, secret: str = "test-gateway-secret"):
+    def request(
+        self,
+        method: str,
+        path: str,
+        principal: str | None,
+        body: dict | None = None,
+        secret: str = "test-gateway-secret",
+    ):
         status, _, raw = self.raw_request(method, path, principal, body, secret)
         return status, json.loads(raw.decode("utf-8"))
 
@@ -140,7 +174,7 @@ class DeveloperPlatformApiTests(unittest.TestCase):
         self.assertFalse(os.path.exists(developer_dir))
 
     def test_untrusted_identity_is_rejected(self) -> None:
-        status, payload = self.request("GET", "/v2/developer/grants", "dev:alice", secret="wrong")
+        status, payload = self.request("GET", "/v2/developer/grants", "dev:alice", secret="wrong-but-long-enough")
         self.assertEqual(status, 401)
         self.assertEqual(payload["error"]["code"], "identity_required")
 

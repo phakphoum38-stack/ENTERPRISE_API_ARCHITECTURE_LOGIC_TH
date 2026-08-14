@@ -11,6 +11,7 @@ class ScaleProfile(str, Enum):
     SIX_CUBED = "6^3"
     SIX_TO_SIX = "6^6"
     FAST_MILLION = "fast-1m"
+    TEN_TO_TEN = "10^10"
 
     @property
     def logical_capacity(self) -> int:
@@ -20,6 +21,7 @@ class ScaleProfile(str, Enum):
             ScaleProfile.SIX_CUBED: 216,
             ScaleProfile.SIX_TO_SIX: 46656,
             ScaleProfile.FAST_MILLION: 1_000_000,
+            ScaleProfile.TEN_TO_TEN: 10_000_000_000,
         }[self]
 
 

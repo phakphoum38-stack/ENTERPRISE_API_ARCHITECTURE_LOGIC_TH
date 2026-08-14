@@ -1,0 +1,105 @@
+name: Research OS Windows Source Bundle
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/chatgpt-style-desktop-shell
+    paths:
+      - ".github/workflows/research-os-windows-source-bundle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-bundle:
+    name: Package exact Windows build source
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact verified Windows build commit
+        uses: actions/checkout@v4
+        with:
+          ref: f1ef9671e5b76dac0fc5df62f64fe31f54845072
+
+      - name: Setup exact Flutter toolchain
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+
+      - name: Prepare reproducible Windows source tree
+        shell: pwsh
+        run: |
+          $root = $env:GITHUB_WORKSPACE
+          $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows-Source"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory -Path $stage | Out-Null
+
+          New-Item -ItemType Directory -Path (Join-Path $stage "apps") | Out-Null
+          Copy-Item -Path (Join-Path $root "apps\research_os_flutter") -Destination (Join-Path $stage "apps\research_os_flutter") -Recurse -Force
+
+          New-Item -ItemType Directory -Path (Join-Path $stage "tools") | Out-Null
+          Copy-Item -Path (Join-Path $root "tools\research_os_api") -Destination (Join-Path $stage "tools\research_os_api") -Recurse -Force
+
+          New-Item -ItemType Directory -Path (Join-Path $stage ".github\workflows") -Force | Out-Null
+          Copy-Item -Path (Join-Path $root ".github\workflows\research-os-windows-artifact.yml") -Destination (Join-Path $stage ".github\workflows\research-os-windows-artifact.yml") -Force
+
+          Push-Location (Join-Path $stage "apps\research_os_flutter")
+          flutter pub get
+          flutter config --enable-windows-desktop
+          if (-not (Test-Path "windows")) {
+            flutter create --platforms=windows --project-name research_os_flutter .
+          }
+          Pop-Location
+
+          @'
+          # Research OS Windows source bundle
+          SOURCE_COMMIT=f1ef9671e5b76dac0fc5df62f64fe31f54845072
+          VERIFIED_WINDOWS_RUN=31485474577
+          FLUTTER_VERSION=3.44.9
+          APP_SOURCE=apps/research_os_flutter
+          LOCAL_API_SOURCE=tools/research_os_api
+          WINDOWS_WORKFLOW=.github/workflows/research-os-windows-artifact.yml
+
+          The windows/ scaffold is included in this bundle. It was generated with
+          Flutter 3.44.9 using the same command used by the verified Windows CI:
+            flutter create --platforms=windows --project-name research_os_flutter .
+
+          Build from apps/research_os_flutter with:
+            flutter pub get
+            flutter config --enable-windows-desktop
+            flutter build windows --release
+          '@ | Set-Content -Path (Join-Path $stage "SOURCE_MANIFEST.txt") -Encoding utf8
+
+          @'
+          $ErrorActionPreference = "Stop"
+          Set-Location "$PSScriptRoot\apps\research_os_flutter"
+          flutter pub get
+          flutter config --enable-windows-desktop
+          if (-not (Test-Path "windows")) {
+            flutter create --platforms=windows --project-name research_os_flutter .
+          }
+          flutter build windows --release
+          Write-Host "Built: build\windows\x64\runner\Release\research_os_flutter.exe"
+          '@ | Set-Content -Path (Join-Path $stage "BUILD_WINDOWS.ps1") -Encoding utf8
+
+          $zip = Join-Path $env:RUNNER_TEMP "Research-OS-Windows-Source-f1ef9671.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Research-OS-Windows-Source-f1ef9671.zip" | Set-Content -Path "$zip.sha256" -Encoding ascii
+          Write-Host "SOURCE_ZIP=$zip"
+          Write-Host "SOURCE_SHA256=$hash"
+
+      - name: Upload exact Windows source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Research-OS-Windows-Source-f1ef9671
+          path: |
+            ${{ runner.temp }}/Research-OS-Windows-Source-f1ef9671.zip
+            ${{ runner.temp }}/Research-OS-Windows-Source-f1ef9671.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

@@ -115,9 +115,10 @@ class GoogleOAuthBroker:
             token["refresh_token"] = existing["refresh_token"]
         token["obtained_at"] = int(time.time())
         token["redirect_uri"] = self.redirect_uri()
+        account = self._fetch_userinfo(str(token["access_token"]))
+        token["account"] = account
         self._write_token(token)
         self.state_path.unlink(missing_ok=True)
-        account = self._fetch_userinfo(str(token["access_token"]))
         return {"connected": True, "account": account, "has_refresh_token": bool(token.get("refresh_token"))}
 
     def _write_token(self, payload: dict[str, Any]) -> None:
@@ -156,12 +157,19 @@ class GoogleOAuthBroker:
     def status(self) -> dict[str, Any]:
         token = self._read_token(silent=True)
         connected = bool(token.get("access_token") or token.get("refresh_token"))
+        account = token.get("account") if isinstance(token.get("account"), dict) else {}
+        if connected and not account and token.get("access_token"):
+            account = self._fetch_userinfo(str(token["access_token"]))
+            if account:
+                token["account"] = account
+                self._write_token(token)
         return {
             "oauth_configured": self.config.oauth_configured,
             "connected": connected,
             "has_refresh_token": bool(token.get("refresh_token")),
             "redirect_uri": self.redirect_uri(),
             "token_storage": "backend_only",
+            "account": account,
         }
 
     def disconnect(self) -> dict[str, Any]:
