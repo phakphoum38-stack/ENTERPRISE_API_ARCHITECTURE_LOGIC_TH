@@ -38,12 +38,12 @@ class ResearchOSModuleDefinition {
   final String label;
   final IconData icon;
 
-  /// `existing` means the current Flutter shell already has a feature page.
-  /// `adapter` means the capability exists but needs a new dedicated surface.
+  /// `existing` means a real feature/runtime path is wired to the GUI.
+  /// `adapter` means the capability exists but still needs a dedicated surface.
   /// `planned` means implementation evidence still needs to be established.
   final String availability;
 
-  /// Existing page index from the current ResearchOSAppShell when available.
+  /// Existing page index from the classic ResearchOSAppShell when available.
   final int? legacyPageIndex;
 
   /// Human-readable source of truth used while wiring the new shell.
@@ -91,16 +91,16 @@ const researchOSNewGuiModules = <ResearchOSModuleDefinition>[
     section: ResearchOSModuleSection.main,
     label: 'Skills',
     icon: Icons.psychology_alt_outlined,
-    availability: 'adapter',
-    backendSource: 'skill registry/runtime',
+    availability: 'existing',
+    backendSource: '/v1/skills -> Owner/Friend SkillRegistry',
   ),
   ResearchOSModuleDefinition(
     id: ResearchOSModuleId.tools,
     section: ResearchOSModuleSection.main,
     label: 'Tools',
     icon: Icons.build_circle_outlined,
-    availability: 'adapter',
-    backendSource: 'tool registry/runtime',
+    availability: 'existing',
+    backendSource: '/v1/tools -> Owner/Friend ToolRegistry',
   ),
   ResearchOSModuleDefinition(
     id: ResearchOSModuleId.factory,
@@ -174,8 +174,8 @@ const researchOSNewGuiModules = <ResearchOSModuleDefinition>[
     section: ResearchOSModuleSection.system,
     label: 'Backup',
     icon: Icons.backup_outlined,
-    availability: 'planned',
-    backendSource: 'backup service/scripts',
+    availability: 'existing',
+    backendSource: 'LocalApiManager -> scripts/backup-research-os.ps1',
   ),
   ResearchOSModuleDefinition(
     id: ResearchOSModuleId.restore,
@@ -183,7 +183,7 @@ const researchOSNewGuiModules = <ResearchOSModuleDefinition>[
     label: 'Restore',
     icon: Icons.restore_outlined,
     availability: 'planned',
-    backendSource: 'restore service/scripts',
+    backendSource: 'scripts/restore-research-os.ps1',
   ),
   ResearchOSModuleDefinition(
     id: ResearchOSModuleId.shell,
