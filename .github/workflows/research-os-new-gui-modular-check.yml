@@ -6,6 +6,7 @@ on:
       - 'work/research-os-new-gui-modular'
     paths:
       - 'apps/research_os_flutter/**'
+      - 'tools/research_os_api/**'
       - '.github/workflows/research-os-new-gui-modular-check.yml'
   workflow_dispatch:
 
@@ -17,12 +18,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  flutter-new-gui:
+  modular-integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate registry API facade
+        working-directory: tools/research_os_api
+        run: |
+          python -m compileall -q .
+          python -m unittest test_agent_server.py -v
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -43,5 +55,6 @@ jobs:
         run: |
           flutter test test/research_os_module_catalog_test.dart
           flutter test test/new_gui_shell_test.dart
+          flutter test test/registry_module_page_test.dart
           flutter test test/chat_flow_test.dart
           flutter test test/desktop_shell_test.dart
