@@ -62,7 +62,10 @@ void main() {
     const wiredIds = <ResearchOSModuleId>{
       ResearchOSModuleId.skills,
       ResearchOSModuleId.tools,
+      ResearchOSModuleId.installer,
       ResearchOSModuleId.backup,
+      ResearchOSModuleId.restore,
+      ResearchOSModuleId.shell,
     };
 
     for (final id in wiredIds) {
