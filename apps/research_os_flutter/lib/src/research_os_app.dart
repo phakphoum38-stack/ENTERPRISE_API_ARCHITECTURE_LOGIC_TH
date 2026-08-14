@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
-import 'app_shell.dart';
+import 'ui/new_gui/research_os_new_shell.dart';
 
 class ResearchOSApp extends StatefulWidget {
   const ResearchOSApp({super.key});
@@ -46,9 +46,9 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   ThemeData _buildTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
     final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF1976D2),
+      seedColor: const Color(0xFF5B7CFF),
       brightness: brightness,
-      surface: dark ? const Color(0xFF101419) : const Color(0xFFF7F9FC),
+      surface: dark ? const Color(0xFF11192B) : const Color(0xFFF7F9FC),
     );
 
     final borderColor = dark
@@ -60,7 +60,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: dark
-          ? const Color(0xFF0C1015)
+          ? const Color(0xFF090E1A)
           : const Color(0xFFF3F6FA),
       dividerColor: borderColor,
       appBarTheme: AppBarTheme(
@@ -68,7 +68,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
         scrolledUnderElevation: 0,
         centerTitle: false,
         backgroundColor: dark
-            ? const Color(0xFF101419)
+            ? const Color(0xFF0D1424)
             : const Color(0xFFFDFEFF),
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
@@ -80,7 +80,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
       cardTheme: CardThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
-        color: dark ? const Color(0xFF151A21) : Colors.white,
+        color: dark ? const Color(0xFF11192B) : Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -89,7 +89,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: dark ? const Color(0xFF151A21) : Colors.white,
+        fillColor: dark ? const Color(0xFF11192B) : Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -148,7 +148,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
           ? const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             )
-          : ResearchOSAppShell(
+          : ResearchOSNewShell(
               key: ValueKey(_apiBaseUrl),
               apiClient: apiClient,
               themeMode: _themeMode,
