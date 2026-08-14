@@ -7,6 +7,11 @@ on:
         description: Exact commit SHA to validate
         required: true
         type: string
+  push:
+    branches:
+      - integrate/research-os-3.2-unified-10x10
+    paths:
+      - '.github/owner-commands/candidate-request.txt'
 
 permissions:
   actions: write
@@ -19,7 +24,7 @@ jobs:
       - name: Dispatch Research OS Candidate
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_SHA: ${{ inputs.target_sha }}
+          TARGET_SHA: ${{ inputs.target_sha || github.sha }}
         run: |
           gh workflow run candidate.yml \
             --repo "${{ github.repository }}" \
