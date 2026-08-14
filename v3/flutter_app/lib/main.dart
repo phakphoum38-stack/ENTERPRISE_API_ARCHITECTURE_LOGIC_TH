@@ -35,13 +35,15 @@ Future<void> main() async {
   if (proveInstalledChat) {
     // CI-only installed-binary proof. Run it before creating the window so the
     // HTTP evidence is deterministic even on a non-interactive Windows runner.
-    final connected = await StartupProbe(
+    final probe = StartupProbe(
       api,
       chatProbeMessage: 'installed-exe-e2e',
-    ).run();
+    );
+    final connected = await probe.run();
     if (!connected) {
       stderr.writeln(
-        'Research OS V3 installed executable failed its end-to-end startup probe.',
+        'Research OS V3 installed executable failed its end-to-end startup probe: '
+        '${probe.lastError ?? 'unknown error'}',
       );
       exitCode = 2;
       return;
