@@ -344,7 +344,7 @@ class _EmptyChat extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'มีอะไรให้ช่วย?',
+              'สวัสดีเริ่มทำอะไรดี',
               key: const Key('minimal-chat-empty-title'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
