@@ -55,6 +55,7 @@ void main() {
 
     expect(find.byKey(const Key('new-gui-shell')), findsOneWidget);
     expect(find.byKey(const Key('new-gui-sidebar')), findsOneWidget);
+    expect(find.byKey(const Key('new-gui-navigation-list')), findsOneWidget);
     expect(find.byKey(const Key('new-gui-top-bar')), findsOneWidget);
     expect(find.byKey(const Key('new-gui-main-pane')), findsOneWidget);
     expect(find.byKey(const Key('new-gui-conversation-rail')), findsOneWidget);
@@ -64,13 +65,11 @@ void main() {
     expect(find.text('สวัสดีเริ่มทำอะไรดี'), findsOneWidget);
     expect(find.text('MAIN'), findsOneWidget);
     expect(find.text('WORKSPACE'), findsOneWidget);
-    expect(find.text('SYSTEM'), findsOneWidget);
     expect(find.text('Factory'), findsOneWidget);
     expect(find.text('Providers'), findsOneWidget);
-    expect(find.text('Installer'), findsOneWidget);
-    expect(find.text('Backup'), findsOneWidget);
-    expect(find.text('Restore'), findsOneWidget);
-    expect(find.text('Shell'), findsOneWidget);
+    expect(find.text('6^6 ORCHESTRATOR'), findsOneWidget);
+    expect(find.text('AMR bounded'), findsOneWidget);
+    expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const Key('new-gui-nav-providers')));
     await tester.pump();
