@@ -6,6 +6,11 @@ class FakeApi implements V3Api {
   int healthCalls = 0;
   int providerCalls = 0;
   int userCalls = 0;
+  int chatCalls = 0;
+  String? lastChatMessage;
+  String? lastChatSessionId;
+  String? lastChatProvider;
+  String? lastChatMode;
 
   @override
   Future<Map<String, dynamic>> health() async {
@@ -54,12 +59,19 @@ class FakeApi implements V3Api {
     String sessionId = 'default',
     String provider = 'auto',
     String mode = 'answer',
-  }) async => {
-        'contract': 'research-os-v3-chat-v1',
-        'text': 'mock:$message',
-        'provider': 'mock',
-        'session_id': sessionId,
-      };
+  }) async {
+    chatCalls++;
+    lastChatMessage = message;
+    lastChatSessionId = sessionId;
+    lastChatProvider = provider;
+    lastChatMode = mode;
+    return {
+      'contract': 'research-os-v3-chat-v1',
+      'text': 'mock:$message',
+      'provider': 'mock',
+      'session_id': sessionId,
+    };
+  }
 }
 
 void main() {
@@ -76,5 +88,27 @@ void main() {
     expect(api.healthCalls, 1);
     expect(api.userCalls, 1);
     expect(api.providerCalls, 1);
+    expect(api.chatCalls, 0);
+  });
+
+  test('startup probe sends the installed executable chat proof', () async {
+    final api = FakeApi();
+
+    final connected = await StartupProbe(
+      api,
+      attempts: 1,
+      retryDelay: Duration.zero,
+      chatProbeMessage: 'installed-exe-e2e',
+    ).run();
+
+    expect(connected, isTrue);
+    expect(api.healthCalls, 1);
+    expect(api.userCalls, 1);
+    expect(api.providerCalls, 1);
+    expect(api.chatCalls, 1);
+    expect(api.lastChatMessage, 'installed-exe-e2e');
+    expect(api.lastChatSessionId, 'installed-app-e2e');
+    expect(api.lastChatProvider, 'auto');
+    expect(api.lastChatMode, 'answer');
   });
 }
