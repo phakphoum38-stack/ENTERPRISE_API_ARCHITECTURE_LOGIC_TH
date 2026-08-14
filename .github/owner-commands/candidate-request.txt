@@ -1,2 +1,3 @@
 Owner command: run Research OS Candidate for the current integration SHA.
 Requested by owner via ChatGPT on 2026-08-14.
+Reason: rerun after fixing isolated E2E provider routing and static credential-like test fixture.
