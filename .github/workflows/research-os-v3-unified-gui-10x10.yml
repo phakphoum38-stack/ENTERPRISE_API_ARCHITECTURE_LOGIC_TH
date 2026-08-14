@@ -62,8 +62,17 @@ jobs:
           $env:PYTHONPATH = Join-Path $PWD "owner_special"
           python -m unittest discover -s owner_special\tests -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Owner Friend tests failed" }
-          python -m unittest discover -s v3\tests -p "test_*.py" -v
-          if ($LASTEXITCODE -ne 0) { throw "V3 10x10 tests failed" }
+
+          Push-Location v3
+          try {
+            $env:PYTHONPATH = $PWD.Path
+            python -m unittest discover -s tests -p "test_*.py" -v
+            if ($LASTEXITCODE -ne 0) { throw "V3 10x10 tests failed" }
+          } finally {
+            Pop-Location
+          }
+
+          $env:PYTHONPATH = Join-Path $PWD "owner_special"
           python owner_special\scripts\smoke.py
           if ($LASTEXITCODE -ne 0) { throw "Owner Friend smoke failed" }
 
