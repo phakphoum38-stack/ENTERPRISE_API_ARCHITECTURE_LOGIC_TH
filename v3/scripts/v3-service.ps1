@@ -15,6 +15,26 @@ $v3Root = Join-Path $appRoot 'v3'
 $pythonExe = Join-Path $v3Root 'runtime\python\python.exe'
 $dataDir = Join-Path $env:ProgramData 'ResearchOSV3'
 
+function Get-NormalizedPath([string]$Path) {
+    if (-not $Path) { return $null }
+    try { return [IO.Path]::GetFullPath($Path).TrimEnd('\') }
+    catch { return $null }
+}
+
+function Clear-OwnedV3Listener {
+    $expectedPython = Get-NormalizedPath $pythonExe
+    $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    foreach ($listener in $listeners) {
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" -ErrorAction SilentlyContinue
+        $actualPath = Get-NormalizedPath $process.ExecutablePath
+        if ($actualPath -and $expectedPython -and $actualPath -ieq $expectedPython) {
+            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction Stop
+            continue
+        }
+        throw "Port $Port is still occupied by an unrelated process (PID $($listener.OwningProcess), path '$actualPath'). Refusing to terminate it."
+    }
+}
+
 function Remove-V3Service {
     $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
     if ($service -and $service.Status -ne 'Stopped') {
@@ -35,10 +55,22 @@ function Remove-V3Service {
         }
     }
 
-    $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
-    foreach ($listener in $listeners) {
-        Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+    for ($attempt = 0; $attempt -lt 20; $attempt++) {
+        $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+        if ($listeners.Count -eq 0) { return }
+        Start-Sleep -Milliseconds 250
     }
+
+    Clear-OwnedV3Listener
+
+    for ($attempt = 0; $attempt -lt 20; $attempt++) {
+        if (-not (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)) {
+            return
+        }
+        Start-Sleep -Milliseconds 250
+    }
+
+    throw "Port $Port remained in LISTEN state after Research OS V3 cleanup."
 }
 
 if ($Action -eq 'uninstall') {
@@ -61,7 +93,7 @@ New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
 Remove-V3Service
 
 $binaryPath = "`"$serviceExe`" --root `"$v3Root`" --python `"$pythonExe`" --port $Port --data-dir `"$dataDir`" --service-name `"$ServiceName`""
-New-Service -Name $ServiceName -BinaryPathName $binaryPath -StartupType Automatic -DisplayName 'Research OS V3 Local Service' | Out-Null
+New-Service -Name $ServiceName -BinaryPathName $binaryPath -StartupType Automatic -DisplayName 'Research OS V3 Unified Local Service' | Out-Null
 Start-Service -Name $ServiceName
 
 $ready = $false
