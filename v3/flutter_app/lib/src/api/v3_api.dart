@@ -180,6 +180,9 @@ final class HttpV3Api implements V3Api {
   }) async {
     final operationTimeout = requestTimeout ?? timeout;
     final client = HttpClient();
+    // Research OS V3 is a loopback-only service. Bypass environment/system
+    // proxies so a local request cannot be redirected away from 127.0.0.1.
+    client.findProxy = null;
     final uri = Uri.parse('$baseUrl$path');
     try {
       final request = method == 'POST'
@@ -192,8 +195,16 @@ final class HttpV3Api implements V3Api {
         request.headers.set('X-Research-OS-Approval', 'granted');
       }
       if (payload != null) {
-        request.headers.contentType = ContentType.json;
-        request.write(jsonEncode(payload));
+        final bodyBytes = utf8.encode(jsonEncode(payload));
+        request.headers.contentType = ContentType(
+          'application',
+          'json',
+          charset: 'utf-8',
+        );
+        // The local V3 service deliberately requires a bounded Content-Length.
+        // Set the byte length explicitly instead of relying on chunked transfer.
+        request.contentLength = bodyBytes.length;
+        request.add(bodyBytes);
       }
       final response = await request.close().timeout(operationTimeout);
       final body = await utf8.decoder
