@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import urllib.error
+import urllib.request
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
@@ -12,6 +15,44 @@ from urllib.parse import parse_qs, urlsplit
 from agent_orchestrator import ORCHESTRATOR
 from agent_platform import REGISTRY
 from server import ResearchOSHandler
+
+FRIEND_BASE_URL = os.getenv(
+    "RESEARCH_OS_FRIEND_URL",
+    "http://127.0.0.1:8790",
+).rstrip("/")
+FRIEND_OWNER_ID = os.getenv("RESEARCH_OS_FRIEND_OWNER", "owner")
+
+
+def _friend_status() -> dict[str, object]:
+    """Read the credential-redacted Owner/Friend architecture snapshot.
+
+    The Friend service remains the source of truth for its skill/tool registries;
+    this API only exposes a read-only facade for the Flutter control center.
+    """
+
+    request = urllib.request.Request(
+        f"{FRIEND_BASE_URL}/owner/status",
+        headers={
+            "X-Research-OS-Owner": FRIEND_OWNER_ID,
+            "X-Research-OS-Profile": "default",
+            "X-Research-OS-Session": "main-api-registry",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Friend service HTTP {exc.code}: {detail}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(
+            f"Friend service unavailable at {FRIEND_BASE_URL}: {exc.reason}"
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeError("Friend service returned an invalid status response")
+    return payload
 
 
 class AgentResearchOSHandler(ResearchOSHandler):
@@ -24,6 +65,39 @@ class AgentResearchOSHandler(ResearchOSHandler):
         parsed = urlsplit(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+
+        if path in {"/v1/friend/status", "/v1/skills", "/v1/tools", "/v1/capabilities"}:
+            try:
+                status = _friend_status()
+            except RuntimeError as exc:
+                self._send(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": "friend_service_unavailable", "detail": str(exc)},
+                )
+                return
+
+            if path == "/v1/friend/status":
+                self._send(HTTPStatus.OK, status)
+                return
+
+            key = {
+                "/v1/skills": "skills",
+                "/v1/tools": "tools",
+                "/v1/capabilities": "capabilities",
+            }[path]
+            raw = status.get(key, [])
+            items = [str(item) for item in raw] if isinstance(raw, list) else []
+            payload: dict[str, object] = {
+                key: items,
+                "count": len(items),
+                "source": "owner-friend",
+            }
+            if path == "/v1/capabilities":
+                manifest = status.get("capability_manifest")
+                if isinstance(manifest, dict):
+                    payload["manifest"] = manifest
+            self._send(HTTPStatus.OK, payload)
+            return
 
         if path == self._agents_prefix:
             agents = REGISTRY.list()
@@ -80,7 +154,10 @@ class AgentResearchOSHandler(ResearchOSHandler):
                     },
                 )
             except (TypeError, ValueError) as exc:
-                self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+                self._send(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "bad_request", "detail": str(exc)},
+                )
             return
 
         if path.startswith(self._prefix + "/"):
@@ -90,9 +167,15 @@ class AgentResearchOSHandler(ResearchOSHandler):
                 run_id = parts[0]
                 try:
                     events = ORCHESTRATOR.timeline(run_id)
-                    self._send(HTTPStatus.OK, {"run_id": run_id, "events": events, "count": len(events)})
+                    self._send(
+                        HTTPStatus.OK,
+                        {"run_id": run_id, "events": events, "count": len(events)},
+                    )
                 except ValueError as exc:
-                    self._send(HTTPStatus.NOT_FOUND, {"error": "orchestration_not_found", "detail": str(exc)})
+                    self._send(
+                        HTTPStatus.NOT_FOUND,
+                        {"error": "orchestration_not_found", "detail": str(exc)},
+                    )
                 return
 
             if len(parts) != 1 or not parts[0]:
@@ -102,7 +185,10 @@ class AgentResearchOSHandler(ResearchOSHandler):
             try:
                 self._send(HTTPStatus.OK, {"run": ORCHESTRATOR.get(run_id)})
             except ValueError as exc:
-                self._send(HTTPStatus.NOT_FOUND, {"error": "orchestration_not_found", "detail": str(exc)})
+                self._send(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": "orchestration_not_found", "detail": str(exc)},
+                )
             return
 
         super().do_GET()
@@ -123,38 +209,62 @@ class AgentResearchOSHandler(ResearchOSHandler):
                     raise ValueError("every step must be an object")
                 self._send(HTTPStatus.CREATED, {"run": run})
             except (TypeError, ValueError) as exc:
-                self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+                self._send(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "bad_request", "detail": str(exc)},
+                )
             return
 
         if path.startswith(self._prefix + "/"):
             relative = path[len(self._prefix) + 1 :].strip("/")
             parts = relative.split("/") if relative else []
-            if len(parts) != 2 or parts[1] not in {"execute", "confirm", "retry", "cancel"}:
+            if len(parts) != 2 or parts[1] not in {
+                "execute",
+                "confirm",
+                "retry",
+                "cancel",
+            }:
                 self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
                 return
             run_id, action = parts
             try:
                 body = self._read_json()
                 if action == "execute":
-                    run = ORCHESTRATOR.execute(run_id, confirmed=bool(body.get("confirmed", False)))
+                    run = ORCHESTRATOR.execute(
+                        run_id,
+                        confirmed=bool(body.get("confirmed", False)),
+                    )
                 elif action == "confirm":
                     run = ORCHESTRATOR.confirm(run_id)
                 elif action == "retry":
                     step_id = body.get("step_id")
-                    run = ORCHESTRATOR.retry(run_id, step_id=str(step_id).strip() if step_id else None)
+                    run = ORCHESTRATOR.retry(
+                        run_id,
+                        step_id=str(step_id).strip() if step_id else None,
+                    )
                 else:
                     run = ORCHESTRATOR.cancel(run_id)
                 self._send(HTTPStatus.OK, {"run": run})
             except ValueError as exc:
                 message = str(exc)
-                status = HTTPStatus.NOT_FOUND if message.startswith("unknown orchestration run:") else HTTPStatus.BAD_REQUEST
-                self._send(status, {"error": "orchestration_error", "detail": message})
+                status = (
+                    HTTPStatus.NOT_FOUND
+                    if message.startswith("unknown orchestration run:")
+                    else HTTPStatus.BAD_REQUEST
+                )
+                self._send(
+                    status,
+                    {"error": "orchestration_error", "detail": message},
+                )
             return
 
         super().do_POST()
 
     @staticmethod
-    def _first_query_value(query: dict[str, list[str]], key: str) -> str | None:
+    def _first_query_value(
+        query: dict[str, list[str]],
+        key: str,
+    ) -> str | None:
         values = query.get(key)
         if not values:
             return None
@@ -163,9 +273,18 @@ class AgentResearchOSHandler(ResearchOSHandler):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Research OS API with Multi-Agent Orchestrator")
-    parser.add_argument("--host", default=os.getenv("RESEARCH_OS_API_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("RESEARCH_OS_API_PORT", "8787")))
+    parser = argparse.ArgumentParser(
+        description="Research OS API with Multi-Agent Orchestrator"
+    )
+    parser.add_argument(
+        "--host",
+        default=os.getenv("RESEARCH_OS_API_HOST", "127.0.0.1"),
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("RESEARCH_OS_API_PORT", "8787")),
+    )
     args = parser.parse_args()
     server = ThreadingHTTPServer((args.host, args.port), AgentResearchOSHandler)
     print(f"Research OS Agent API listening on http://{args.host}:{args.port}")
