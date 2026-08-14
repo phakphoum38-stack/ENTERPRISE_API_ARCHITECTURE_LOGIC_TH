@@ -1,0 +1,283 @@
+name: Research OS V3 Unified GUI 10x10
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/research-os-v3-gui-10x10-installer
+    paths:
+      - "apps/research_os_flutter/**"
+      - "owner_special/**"
+      - "v3/**"
+      - "tools/research_os_api/**"
+      - "tools/research_os_service/**"
+      - "tools/research_curator/**"
+      - "scripts/**"
+      - "installer/research-os-v3-unified.iss"
+      - ".github/workflows/research-os-v3-unified-gui-10x10.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-v3-unified-gui-10x10-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-unified-installer:
+    runs-on: windows-latest
+    timeout-minutes: 80
+    env:
+      RESEARCH_OS_PROVIDER: mock
+      RESEARCH_OS_SYNC_KEY: unified-installer-test-key
+    steps:
+      - name: Checkout unified source
+        uses: actions/checkout@v4
+
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Prove Friend and V3 10x10 source
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = Join-Path $PWD "owner_special"
+          python -m unittest discover -s owner_special\tests -p "test_*.py" -v
+          if ($LASTEXITCODE -ne 0) { throw "Owner Friend tests failed" }
+          python -m unittest discover -s v3\tests -p "test_*.py" -v
+          if ($LASTEXITCODE -ne 0) { throw "V3 10x10 tests failed" }
+          python owner_special\scripts\smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Owner Friend smoke failed" }
+
+      - name: Prove Main API source
+        working-directory: tools/research_os_api
+        shell: pwsh
+        run: |
+          python -m unittest test_api.py -v
+          if ($LASTEXITCODE -ne 0) { throw "Research OS Main API tests failed" }
+
+      - name: Build new Research OS GUI UX
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE "apps\research_os_flutter"
+          $short = "D:\researchos-gui"
+          if (Test-Path $short) { Remove-Item $short -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $short | Out-Null
+          Copy-Item (Join-Path $source "*") $short -Recurse -Force
+          Set-Location $short
+          flutter create --platforms=windows --project-name=research_os_flutter .
+          if ($LASTEXITCODE -ne 0) { throw "Flutter Windows scaffold failed" }
+          python "$env:GITHUB_WORKSPACE\scripts\apply-research-os-branding.py" --app-root $short --platform windows
+          if ($LASTEXITCODE -ne 0) { throw "Research OS branding failed" }
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed" }
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw "New GUI analyze failed" }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw "New GUI tests failed" }
+          flutter test test\desktop_shell_test.dart --reporter expanded
+          if ($LASTEXITCODE -ne 0) { throw "Desktop shell GUI UX test failed" }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw "New GUI Windows build failed" }
+          $exe = "D:\researchos-gui\build\windows\x64\runner\Release\research_os_flutter.exe"
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "New Research OS GUI executable missing" }
+
+      - name: Publish Main API ServiceHost
+        shell: pwsh
+        run: |
+          dotnet publish tools\research_os_service\ResearchOS.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o tools\research_os_service\publish
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path "tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) { throw "Main ServiceHost publish failed" }
+
+      - name: Publish Owner Friend ServiceHost
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "owner-friend-service-host"
+          if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+          dotnet publish owner_special\windows_service\ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o $out
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path "$out\ResearchOS.Owner.ServiceHost.exe")) { throw "Owner Friend ServiceHost publish failed" }
+          "OWNER_SERVICE_HOST=$out" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Stage unified package
+        shell: pwsh
+        run: |
+          $package = Join-Path $PWD "installer\package"
+          if (Test-Path $package) { Remove-Item $package -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+
+          New-Item -ItemType Directory -Force -Path "$package\app" | Out-Null
+          Copy-Item "D:\researchos-gui\build\windows\x64\runner\Release\*" "$package\app" -Recurse -Force
+
+          New-Item -ItemType Directory -Force -Path "$package\tools\research_os_service\publish" | Out-Null
+          Copy-Item "tools\research_os_service\publish\*" "$package\tools\research_os_service\publish" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "$package\tools" | Out-Null
+          Copy-Item "tools\research_os_api" "$package\tools\research_os_api" -Recurse -Force
+          Copy-Item "tools\research_curator" "$package\tools\research_curator" -Recurse -Force
+          if (Test-Path "apps\research_os_web") {
+            New-Item -ItemType Directory -Force -Path "$package\apps" | Out-Null
+            Copy-Item "apps\research_os_web" "$package\apps\research_os_web" -Recurse -Force
+          }
+
+          Copy-Item "owner_special" "$package\owner_special" -Recurse -Force
+          Copy-Item "v3" "$package\v3" -Recurse -Force
+          foreach ($path in @(
+            "$package\owner_special\flutter_app\build",
+            "$package\owner_special\flutter_app\.dart_tool",
+            "$package\owner_special\installer\package",
+            "$package\owner_special\installer\output",
+            "$package\v3\flutter_app\build",
+            "$package\v3\flutter_app\.dart_tool",
+            "$package\v3\installer\package",
+            "$package\v3\installer\output"
+          )) {
+            if (Test-Path $path) { Remove-Item $path -Recurse -Force }
+          }
+
+          New-Item -ItemType Directory -Force -Path "$package\service_host" | Out-Null
+          Copy-Item "$env:OWNER_SERVICE_HOST\*" "$package\service_host" -Recurse -Force
+
+          New-Item -ItemType Directory -Force -Path "$package\scripts" | Out-Null
+          Copy-Item "scripts\*research-os*.ps1" "$package\scripts" -Force
+          Copy-Item "scripts\v2-data-preservation.ps1" "$package\scripts" -Force -ErrorAction SilentlyContinue
+
+          $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim()
+          New-Item -ItemType Directory -Force -Path "$package\runtime\python" | Out-Null
+          Copy-Item "$pythonRoot\*" "$package\runtime\python" -Recurse -Force
+          if (-not (Test-Path "$package\runtime\python\python.exe")) { throw "Bundled Python runtime missing" }
+
+          foreach ($required in @(
+            "$package\app\research_os_flutter.exe",
+            "$package\tools\research_os_service\publish\ResearchOS.ServiceHost.exe",
+            "$package\service_host\ResearchOS.Owner.ServiceHost.exe",
+            "$package\owner_special\scripts\run_friend_service.py",
+            "$package\owner_special\scripts\install-owner-service.ps1",
+            "$package\v3\research_os_v3\orchestrator.py",
+            "$package\runtime\python\python.exe"
+          )) {
+            if (-not (Test-Path $required -PathType Leaf)) { throw "Unified package missing: $required" }
+          }
+
+      - name: Generate installer branding
+        shell: pwsh
+        run: |
+          python scripts\apply-research-os-branding.py --app-root apps\research_os_flutter --platform windows
+          if ($LASTEXITCODE -ne 0) { throw "Installer branding failed" }
+          if (-not (Test-Path "apps\research_os_flutter\assets\branding\research_os.ico")) { throw "Installer icon missing" }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Research OS 3.0 unified Setup
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler missing" }
+          & $iscc "installer\research-os-v3-unified.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Unified Setup compilation failed" }
+          $setup = Get-ChildItem "installer\output\Research-OS-Setup-3.0.0-10x10-x64.exe" -File | Select-Object -First 1
+          if (-not $setup) { throw "Research OS 3.0 10x10 Setup was not produced" }
+          "UNIFIED_SETUP=$($setup.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Clean install and validate unified stack
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "research-os-v3-unified-install.log"
+          $p = Start-Process -FilePath $env:UNIFIED_SETUP -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 160 | Out-Host }
+            throw "Unified installer failed with exit code $($p.ExitCode)"
+          }
+
+          $friendReady = $false
+          $mainReady = $false
+          for ($i = 0; $i -lt 80; $i++) {
+            try {
+              $friend = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 2
+              if ($friend.status -eq 'ok') { $friendReady = $true }
+            } catch {}
+            try {
+              $main = Invoke-RestMethod "http://127.0.0.1:8787/health" -TimeoutSec 2
+              if ($main.status -eq 'ok') { $mainReady = $true }
+            } catch {}
+            if ($friendReady -and $mainReady) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $friendReady) { throw "Installed Friend service on 8790 did not become ready" }
+          if (-not $mainReady) { throw "Installed Main API on 8787 did not become ready" }
+
+          $status = Invoke-RestMethod "http://127.0.0.1:8790/owner/status" -TimeoutSec 5
+          if ([long]$status.brain_profiles.'10^10' -ne 10000000000) { throw "Installed Friend does not expose 10^10 capacity" }
+          if ($status.scale_authority -ne 'v3-unified-master-orchestrator') { throw "Installed Friend is not governed by V3 unified master" }
+          if ([long]$status.helper_scheduler.max_logical_helpers -ne 10000000000) { throw "Installed helper logical capacity is not 10^10" }
+
+          $mainListeners = @(Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction Stop)
+          if ($mainListeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1','::1') }) { throw "Main API is not loopback-only" }
+          $friendListeners = @(Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction Stop)
+          if ($friendListeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1','::1') }) { throw "Friend API is not loopback-only" }
+
+          $installedGui = Join-Path $env:ProgramFiles "Research OS\app\research_os_flutter.exe"
+          if (-not (Test-Path $installedGui -PathType Leaf)) { throw "Installed new GUI executable missing" }
+          $gui = Start-Process -FilePath $installedGui -PassThru
+          Start-Sleep -Seconds 5
+          if ($gui.HasExited) { throw "Installed new GUI exited during launch smoke" }
+          Stop-Process -Id $gui.Id -Force
+
+      - name: Validate in-place upgrade
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "research-os-v3-unified-upgrade.log"
+          $p = Start-Process -FilePath $env:UNIFIED_SETUP -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$log") -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 160 | Out-Host }
+            throw "Unified in-place upgrade failed with exit code $($p.ExitCode)"
+          }
+          $friend = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 5
+          $main = Invoke-RestMethod "http://127.0.0.1:8787/health" -TimeoutSec 5
+          if ($friend.status -ne 'ok' -or $main.status -ne 'ok') { throw "Services were not healthy after unified upgrade" }
+
+      - name: Create SHA256 and verified artifact
+        shell: pwsh
+        run: |
+          $out = "verified-unified"
+          if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item $env:UNIFIED_SETUP "$out\Research-OS-Setup-3.0.0-10x10-x64.exe" -Force
+          $hash = (Get-FileHash "$out\Research-OS-Setup-3.0.0-10x10-x64.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Research-OS-Setup-3.0.0-10x10-x64.exe" | Set-Content "$out\SHA256SUMS.txt" -Encoding ascii
+          @{
+            product = 'Research OS'
+            version = '3.0.0-10x10'
+            gui = 'apps/research_os_flutter'
+            main_api = '127.0.0.1:8787'
+            friend_api = '127.0.0.1:8790'
+            scale_authority = 'v3-unified-master-orchestrator'
+            logical_capacity = 10000000000
+            commit = '${{ github.sha }}'
+            sha256 = $hash
+          } | ConvertTo-Json -Depth 8 | Set-Content "$out\manifest.json" -Encoding utf8
+
+      - name: Upload Research OS 3.0 GUI 10x10 Setup
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-3.0-gui-10x10-${{ github.sha }}
+          path: verified-unified/**
+          if-no-files-found: error
+          retention-days: 30
