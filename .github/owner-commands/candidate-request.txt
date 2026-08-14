@@ -1,5 +1,5 @@
 Owner command: rerun the final Research OS Candidate for the current new GUI modular SHA.
 Requested by owner via ChatGPT on 2026-08-14.
-Reason: the prior exact-SHA candidate exposed one Windows-only regression-test assumption in Backup; that test is now platform-aware. The current target also includes the full Factory controls and expanded live System/Skills/Tools/Memory/Unified Master inspector.
+Reason: the prior exact-SHA candidate passed all 106 API tests, all 32 Flutter tests and the Windows release build, then exposed a missing /v2/master runtime compatibility facade. That facade is now restored from the owned V3 UnifiedMasterOrchestrator and SCALE_PROFILES source, with regression coverage. Modular CI and Windows chat roundtrip both pass.
 Expected gate: all Python tests, all Flutter tests on Windows, Windows release build, ServiceHost, runtime/service smoke, Setup.exe build, clean install, upgrade, uninstall/data preservation, loopback validation, SHA256 evidence and verified artifact upload.
 Do not integrate to main until this exact candidate passes.
