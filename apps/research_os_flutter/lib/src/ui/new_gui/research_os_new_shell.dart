@@ -14,6 +14,7 @@ import '../../features/graph/knowledge_graph_page.dart';
 import '../../features/home/home_page.dart';
 import '../../features/library/library_page.dart';
 import '../../features/settings/settings_page.dart';
+import 'backup_module_page.dart';
 import 'control_center_chrome.dart';
 import 'module_adapter_pages.dart';
 import 'registry_module_page.dart';
@@ -213,8 +214,8 @@ class _ResearchOSNewShellState extends State<ResearchOSNewShell> {
           GoogleWorkspacePage(apiClient: widget.apiClient),
         ResearchOSModuleId.runtime =>
           ResearchRuntimeHub(apiClient: widget.apiClient),
+        ResearchOSModuleId.backup => const ResearchBackupModulePage(),
         ResearchOSModuleId.installer ||
-        ResearchOSModuleId.backup ||
         ResearchOSModuleId.restore ||
         ResearchOSModuleId.shell =>
           ResearchModuleAdapterPage(module: _currentModule),
