@@ -84,6 +84,17 @@ class V2CompatibilityTests(unittest.TestCase):
             {item["agent_id"] for item in v2["agents"]},
         )
 
+    def test_v2_master_uses_owned_v3_scale_profiles(self) -> None:
+        status, payload = self.request("/v2/master")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["api_version"], "v2")
+        self.assertEqual(payload["master"]["authority"], "v3-owned-core")
+        capacity = payload["master"]["capacity"]
+        self.assertEqual(capacity["assistant_6x3_capacity"], 216)
+        self.assertEqual(capacity["max_leaf_capacity"], 46656)
+        self.assertEqual(capacity["profiles"]["6^3"], 216)
+        self.assertEqual(capacity["profiles"]["6^6"], 46656)
+
     def test_v2_orchestration_is_visible_through_v1(self) -> None:
         run_id = self.create_run(1)
 
@@ -154,7 +165,10 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(first["workspace_id"], "research")
         self.assertEqual(len(first["items"]), 1)
-        self.assertEqual(first["items"][0]["provenance"]["source_type"], "research_artifact")
+        self.assertEqual(
+            first["items"][0]["provenance"]["source_type"],
+            "research_artifact",
+        )
         cursor = first["page"]["next_cursor"]
         self.assertIsInstance(cursor, str)
 
