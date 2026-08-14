@@ -1,9 +1,9 @@
-name: Research OS V3 Unified Validation
+name: Research OS V3.2 Unified 10x10 Validation
 
 on:
   push:
     branches:
-      - agent/fix-v3-chat-contract
+      - agent/research-os-v3.2-unified-10x10-full
     paths:
       - "v3/**"
       - ".github/workflows/v3-unified-validation.yml"
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: research-os-v3-unified-${{ github.ref }}
+  group: research-os-v3.2-unified-10x10-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate V3 Python core
+      - name: Validate V3 Python core and full system
         working-directory: v3
         run: |
           python -m compileall -q research_os_v3 scripts
@@ -43,7 +43,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Validate V3 Flutter shell
+      - name: Validate V3.2 Full 10x10 Flutter shell
         working-directory: v3/flutter_app
         run: |
           flutter pub get
