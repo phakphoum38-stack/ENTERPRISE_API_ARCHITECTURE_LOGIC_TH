@@ -37,24 +37,47 @@ void main() {
     );
   });
 
-  test('existing destinations retain their legacy page adapters', () {
-    final existing = researchOSNewGuiModules
-        .where((module) => module.availability == 'existing')
-        .toList();
+  test('classic destinations retain their legacy page adapters', () {
+    const classicIds = <ResearchOSModuleId>{
+      ResearchOSModuleId.home,
+      ResearchOSModuleId.chat,
+      ResearchOSModuleId.agents,
+      ResearchOSModuleId.github,
+      ResearchOSModuleId.drive,
+      ResearchOSModuleId.runtime,
+    };
 
-    expect(existing, isNotEmpty);
-    for (final module in existing) {
+    for (final id in classicIds) {
+      final module = researchOSNewGuiModules.firstWhere((item) => item.id == id);
+      expect(module.availability, 'existing');
       expect(
         module.legacyPageIndex,
         isNotNull,
-        reason: '${module.label} must keep its current page adapter',
+        reason: '${module.label} must keep its classic page adapter',
       );
     }
   });
 
+  test('newly wired modules have a real backend source without fake legacy index', () {
+    const wiredIds = <ResearchOSModuleId>{
+      ResearchOSModuleId.skills,
+      ResearchOSModuleId.tools,
+      ResearchOSModuleId.backup,
+    };
+
+    for (final id in wiredIds) {
+      final module = researchOSNewGuiModules.firstWhere((item) => item.id == id);
+      expect(module.availability, 'existing');
+      expect(module.legacyPageIndex, isNull);
+      expect(module.backendSource, isNotNull);
+      expect(module.backendSource, isNotEmpty);
+    }
+  });
+
   test('planned modules never pretend to have a current page index', () {
-    for (final module
-        in researchOSNewGuiModules.where((module) => module.availability == 'planned')) {
+    for (final module in researchOSNewGuiModules.where(
+      (module) => module.availability == 'planned',
+    )) {
       expect(module.legacyPageIndex, isNull);
       expect(module.backendSource, isNotNull);
     }
