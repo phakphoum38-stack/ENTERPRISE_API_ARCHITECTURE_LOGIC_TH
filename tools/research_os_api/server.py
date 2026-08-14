@@ -9,6 +9,8 @@ import json
 import mimetypes
 import os
 import sys
+import urllib.error
+import urllib.request
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -46,6 +48,66 @@ def _load_module(name: str, path: Path):
     sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
+
+
+
+FRIEND_BASE_URL = os.getenv(
+    "RESEARCH_OS_FRIEND_URL",
+    "http://127.0.0.1:8790",
+).rstrip("/")
+
+FRIEND_OWNER_ID = os.getenv(
+    "RESEARCH_OS_FRIEND_OWNER",
+    "owner",
+)
+
+
+def _friend_chat(
+    text: str,
+    *,
+    session_id: str | None = None,
+    complexity: int = 3,
+    risk: int = 1,
+    parallelism: int = 2,
+    helper_budget: int = 0,
+) -> dict[str, Any]:
+    payload = {
+        "text": text,
+        "complexity": max(1, int(complexity)),
+        "risk": max(1, int(risk)),
+        "parallelism": max(1, int(parallelism)),
+        "helper_budget": max(0, int(helper_budget)),
+    }
+
+    request = urllib.request.Request(
+        f"{FRIEND_BASE_URL}/owner/chat",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "X-Research-OS-Owner": FRIEND_OWNER_ID,
+            "X-Research-OS-Profile": "default",
+            "X-Research-OS-Session": session_id or "main-api",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            value = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Friend service HTTP {exc.code}: {detail}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(
+            f"Friend service unavailable at {FRIEND_BASE_URL}: {exc.reason}"
+        ) from exc
+
+    if not isinstance(value, dict):
+        raise RuntimeError("Friend service returned an invalid response")
+
+    return value
 
 
 def _json_bytes(payload: Any) -> bytes:
@@ -316,18 +378,53 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 prompt = str(body.get("prompt", "")).strip()
                 if not prompt:
                     raise ValueError("prompt is required")
-                result = build_provider(body.get("provider")).generate(
+
+                route = os.getenv(
+                    "RESEARCH_OS_AI_ROUTE",
+                    "friend",
+                ).strip().lower()
+
+                if route == "direct-provider":
+                    result = build_provider(body.get("provider")).generate(
+                        prompt,
+                        system=str(body.get("system", "")),
+                        model=body.get("model"),
+                    )
+                    self._send(
+                        HTTPStatus.OK,
+                        {
+                            "provider": result.provider,
+                            "model": result.model,
+                            "text": result.text,
+                            "session_id": body.get("session_id"),
+                            "route": "direct-provider",
+                        },
+                    )
+                    return
+
+                friend = _friend_chat(
                     prompt,
-                    system=str(body.get("system", "")),
-                    model=body.get("model"),
+                    session_id=str(
+                        body.get("session_id") or "main-api"
+                    ),
+                    complexity=int(body.get("complexity", 3)),
+                    risk=int(body.get("risk", 1)),
+                    parallelism=int(body.get("parallelism", 2)),
+                    helper_budget=int(body.get("helper_budget", 0)),
                 )
+
                 self._send(
                     HTTPStatus.OK,
                     {
-                        "provider": result.provider,
-                        "model": result.model,
-                        "text": result.text,
+                        "provider": friend.get("provider"),
+                        "model": "friend-unified-master",
+                        "text": friend.get("text", ""),
                         "session_id": body.get("session_id"),
+                        "route": "friend",
+                        "decision": friend.get("decision"),
+                        "factory": friend.get("factory"),
+                        "helpers": friend.get("helpers"),
+                        "metadata": friend.get("metadata"),
                     },
                 )
                 return
@@ -343,20 +440,55 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     "When memory is insufficient, say so. Do not invent artifact contents."
                 )
                 prompt = f"Memory:\n{context or '(no matching memory)'}\n\nQuestion:\n{question}"
-                result = build_provider(body.get("provider")).generate(
-                    prompt,
-                    system=system,
-                    model=body.get("model"),
+                route = os.getenv(
+                    "RESEARCH_OS_AI_ROUTE",
+                    "friend",
+                ).strip().lower()
+
+                if route == "direct-provider":
+                    result = build_provider(body.get("provider")).generate(
+                        prompt,
+                        system=system,
+                        model=body.get("model"),
+                    )
+                    self._send(
+                        HTTPStatus.OK,
+                        {
+                            "provider": result.provider,
+                            "model": result.model,
+                            "text": result.text,
+                            "memory_hits": hits,
+                            "memory_count": len(hits),
+                            "session_id": body.get("session_id"),
+                            "route": "direct-provider",
+                        },
+                    )
+                    return
+
+                friend = _friend_chat(
+                    f"{system}\n\n{prompt}",
+                    session_id=str(
+                        body.get("session_id") or "main-api-memory"
+                    ),
+                    complexity=int(body.get("complexity", 3)),
+                    risk=int(body.get("risk", 1)),
+                    parallelism=int(body.get("parallelism", 2)),
+                    helper_budget=int(body.get("helper_budget", 0)),
                 )
+
                 self._send(
                     HTTPStatus.OK,
                     {
-                        "provider": result.provider,
-                        "model": result.model,
-                        "text": result.text,
+                        "provider": friend.get("provider"),
+                        "model": "friend-unified-master",
+                        "text": friend.get("text", ""),
                         "memory_hits": hits,
                         "memory_count": len(hits),
                         "session_id": body.get("session_id"),
+                        "route": "friend",
+                        "decision": friend.get("decision"),
+                        "factory": friend.get("factory"),
+                        "helpers": friend.get("helpers"),
                     },
                 )
                 return

@@ -46,6 +46,11 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertEqual("ok", payload["status"])
         self.assertTrue(payload["memory"])
 
+    @patch.dict(
+        os.environ,
+        {"RESEARCH_OS_AI_ROUTE": "direct-provider"},
+        clear=False,
+    )
     def test_mock_provider_generation(self):
         status, payload = self.request("POST", "/v1/ai/generate", {
             "provider": "mock",
@@ -55,6 +60,55 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertEqual("mock", payload["provider"])
         self.assertIn("วิเคราะห์", payload["text"])
 
+    @patch("server._friend_chat")
+    def test_generate_routes_through_friend_by_default(self, friend_chat):
+        friend_chat.return_value = {
+            "provider": "owner-mock",
+            "text": "friend-ok",
+            "decision": {
+                "scale": "10^10",
+                "capacity": 10_000_000_000,
+            },
+            "factory": {
+                "available": True,
+                "scale": "10^10",
+                "capacity": 10_000_000_000,
+            },
+            "helpers": {
+                "bounded": True,
+                "active_workers": 128,
+                "logical_capacity": 10_000_000_000,
+            },
+            "metadata": {
+                "capabilities": ["v3-unified-master"],
+            },
+        }
+
+        with patch.dict(
+            os.environ,
+            {"RESEARCH_OS_AI_ROUTE": "friend"},
+            clear=False,
+        ):
+            status, payload = self.request(
+                "POST",
+                "/v1/ai/generate",
+                {
+                    "prompt": "mega project",
+                    "session_id": "api-friend-test",
+                    "complexity": 9,
+                    "risk": 7,
+                    "parallelism": 128,
+                    "helper_budget": 1_000_000,
+                },
+            )
+
+        self.assertEqual(200, status)
+        self.assertEqual("friend", payload["route"])
+        self.assertEqual("friend-ok", payload["text"])
+        self.assertEqual("10^10", payload["decision"]["scale"])
+        self.assertEqual("10^10", payload["factory"]["scale"])
+        self.assertTrue(payload["helpers"]["bounded"])
+
     def test_memory_search(self):
         query = urllib.parse.quote("conversation knowledge")
         status, payload = self.request("GET", f"/v1/memory/search?q={query}&limit=3")
@@ -63,6 +117,11 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertIn("artifact_id", payload["hits"][0])
         self.assertIn("score", payload["hits"][0])
 
+    @patch.dict(
+        os.environ,
+        {"RESEARCH_OS_AI_ROUTE": "direct-provider"},
+        clear=False,
+    )
     def test_answer_with_memory_uses_mock_provider(self):
         status, payload = self.request("POST", "/v1/ai/answer-with-memory", {
             "provider": "mock",
