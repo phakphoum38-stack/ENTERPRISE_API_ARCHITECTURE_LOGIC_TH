@@ -1,0 +1,245 @@
+name: Research OS 3.2 Unified Windows Installer
+
+on:
+  push:
+    branches:
+      - agent/fix-v3-chat-contract
+    paths:
+      - 'v3/**'
+      - 'owner_special/OWNER_MANIFEST.json'
+      - 'owner_special/research_os_friend/**'
+      - '.github/workflows/v3-windows-unified-installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-v3-windows-unified-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-unified:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    env:
+      RESEARCH_OS_PROVIDER: mock
+    steps:
+      - name: Checkout exact branch revision
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate V3 Python runtime
+        working-directory: v3
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'V3 Python tests failed' }
+
+      - name: Generate and validate Windows Flutter project
+        working-directory: v3/flutter_app
+        shell: pwsh
+        run: |
+          flutter create --platforms=windows --project-name=research_os_v3_flutter .
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows project generation failed' }
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw 'flutter analyze failed' }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw 'flutter test failed' }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows release build failed' }
+
+      - name: Publish self-contained V3 Windows ServiceHost
+        shell: pwsh
+        run: |
+          dotnet publish v3/windows_service/ResearchOS.V3.ServiceHost.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -o v3/windows_service/publish
+          if ($LASTEXITCODE -ne 0) { throw 'V3 ServiceHost publish failed' }
+          if (-not (Test-Path 'v3/windows_service/publish/ResearchOS.V3.ServiceHost.exe')) {
+            throw 'V3 ServiceHost executable missing after publish'
+          }
+
+      - name: Stage Research OS 3.2 Unified package
+        shell: pwsh
+        run: |
+          & ./v3/scripts/stage_candidate.ps1 `
+            -FlutterReleaseDir 'v3/flutter_app/build/windows/x64/runner/Release' `
+            -ServiceHostDir 'v3/windows_service/publish' `
+            -FlutterIconPath 'v3/flutter_app/windows/runner/resources/app_icon.ico'
+
+      - name: Compile Inno Setup installer
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          & $iscc 'v3/installer/research-os-v3.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
+          $setup = 'v3/installer/output/Research-OS-3.2-Unified-Setup-x64.exe'
+          if (-not (Test-Path $setup)) { throw "Installer missing: $setup" }
+
+      - name: Install candidate silently
+        shell: pwsh
+        run: |
+          $setup = (Resolve-Path 'v3/installer/output/Research-OS-3.2-Unified-Setup-x64.exe').Path
+          $log = Join-Path $env:RUNNER_TEMP 'research-os-3.2-unified-setup.log'
+          $process = Start-Process -FilePath $setup -ArgumentList @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            '/TASKS=""',
+            "/LOG=`"$log`""
+          ) -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 200 }
+            throw "Installer failed with exit code $($process.ExitCode)"
+          }
+
+      - name: Validate installed service and chat contract
+        shell: pwsh
+        run: |
+          $service = Get-Service -Name 'ResearchOSV3Service' -ErrorAction Stop
+          $service.WaitForStatus('Running', [TimeSpan]::FromSeconds(20))
+          $listener = Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction Stop
+          if ($listener.LocalAddress -ne '127.0.0.1') {
+            throw "V3 listener is not loopback-only: $($listener.LocalAddress)"
+          }
+
+          $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8788/health' -TimeoutSec 5
+          if ($health.status -ne 'ok') { throw 'Installed V3 health contract failed' }
+
+          $headers = @{
+            'X-Research-OS-User' = 'windows-ci-user'
+            'X-Research-OS-Profile' = 'default'
+          }
+          $body = @{
+            message = 'Research OS 3.2 Unified Windows installer e2e'
+            provider = 'auto'
+            session_id = 'windows-installer-e2e'
+            mode = 'answer'
+          } | ConvertTo-Json
+          $chat = Invoke-RestMethod `
+            -Uri 'http://127.0.0.1:8788/v3/chat' `
+            -Method POST `
+            -Headers $headers `
+            -ContentType 'application/json; charset=utf-8' `
+            -Body $body `
+            -TimeoutSec 15
+          if ($chat.contract -ne 'research-os-v3-chat-v1') { throw 'Installed V3 chat contract mismatch' }
+          if ($chat.provider -ne 'mock') { throw "CI expected mock provider, got $($chat.provider)" }
+          if (-not $chat.text) { throw 'Installed V3 chat response was empty' }
+
+      - name: Prove installed Flutter EXE calls service and chat
+        shell: pwsh
+        run: |
+          $installRoot = Join-Path $env:ProgramFiles 'Research OS 3.2 Unified'
+          $app = Join-Path $installRoot 'app\research_os_v3_flutter.exe'
+          if (-not (Test-Path $app)) { throw "Installed Flutter EXE missing: $app" }
+
+          $audit = Join-Path $env:ProgramData 'ResearchOSV3\logs\http-audit.jsonl'
+          if (Test-Path $audit) { [IO.File]::WriteAllText($audit, '') }
+
+          $env:RESEARCH_OS_V3_E2E_CHAT = '1'
+          $env:RESEARCH_OS_V3_USER_ID = 'installed-app-ci'
+          $appProcess = Start-Process -FilePath $app -WorkingDirectory (Split-Path $app) -PassThru
+          try {
+            $proved = $false
+            for ($attempt = 0; $attempt -lt 80; $attempt++) {
+              if (Test-Path $audit) {
+                $records = @()
+                foreach ($line in [IO.File]::ReadAllLines($audit)) {
+                  if ($line.Trim()) {
+                    try { $records += ($line | ConvertFrom-Json) } catch { }
+                  }
+                }
+                $health = @($records | Where-Object { $_.method -eq 'GET' -and $_.path -eq '/health' -and $_.status -eq 200 }).Count -gt 0
+                $user = @($records | Where-Object { $_.method -eq 'GET' -and $_.path -eq '/v3/user' -and $_.status -eq 200 }).Count -gt 0
+                $providers = @($records | Where-Object { $_.method -eq 'GET' -and $_.path -eq '/v3/providers' -and $_.status -eq 200 }).Count -gt 0
+                $chat = @($records | Where-Object { $_.method -eq 'POST' -and $_.path -eq '/v3/chat' -and $_.status -eq 200 }).Count -gt 0
+                if ($health -and $user -and $providers -and $chat) {
+                  $proved = $true
+                  break
+                }
+              }
+              Start-Sleep -Milliseconds 250
+            }
+            if (-not $proved) {
+              if (Test-Path $audit) { Get-Content $audit }
+              $serviceOut = Join-Path $env:ProgramData 'ResearchOSV3\logs\service.out.log'
+              $serviceErr = Join-Path $env:ProgramData 'ResearchOSV3\logs\service.err.log'
+              if (Test-Path $serviceOut) { Get-Content $serviceOut -Tail 100 }
+              if (Test-Path $serviceErr) { Get-Content $serviceErr -Tail 100 }
+              throw 'Installed Flutter app did not prove /health, /v3/user, /v3/providers, and /v3/chat'
+            }
+          }
+          finally {
+            if ($appProcess -and -not $appProcess.HasExited) {
+              Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+      - name: Validate silent uninstall preserves data
+        shell: pwsh
+        run: |
+          $installRoot = Join-Path $env:ProgramFiles 'Research OS 3.2 Unified'
+          $uninstaller = Join-Path $installRoot 'unins000.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'Uninstaller is missing' }
+          $process = Start-Process -FilePath $uninstaller -ArgumentList @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART'
+          ) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Uninstall failed with exit code $($process.ExitCode)" }
+          for ($attempt = 0; $attempt -lt 40; $attempt++) {
+            if (-not (Get-Service -Name 'ResearchOSV3Service' -ErrorAction SilentlyContinue)) { break }
+            Start-Sleep -Milliseconds 250
+          }
+          if (Get-Service -Name 'ResearchOSV3Service' -ErrorAction SilentlyContinue) {
+            throw 'ResearchOSV3Service remained registered after uninstall'
+          }
+          if (-not (Test-Path (Join-Path $env:ProgramData 'ResearchOSV3'))) {
+            throw 'ProgramData ResearchOSV3 should be preserved after uninstall'
+          }
+
+      - name: Package installer evidence
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $setup = 'v3/installer/output/Research-OS-3.2-Unified-Setup-x64.exe'
+          Copy-Item $setup 'dist/Research-OS-3.2-Unified-Setup-x64.exe' -Force
+          $hash = Get-FileHash 'dist/Research-OS-3.2-Unified-Setup-x64.exe' -Algorithm SHA256
+          "$($hash.Hash.ToLower())  Research-OS-3.2-Unified-Setup-x64.exe" | Set-Content 'dist/Research-OS-3.2-Unified-Setup-x64.exe.sha256' -Encoding ascii
+          $setupLog = Join-Path $env:RUNNER_TEMP 'research-os-3.2-unified-setup.log'
+          if (Test-Path $setupLog) { Copy-Item $setupLog 'dist/setup-validation.log' -Force }
+
+      - name: Upload Windows unified installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-3.2-unified-windows-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
