@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - integrate/research-os-3.2-unified-10x10
+      - work/research-os-new-gui-modular
     paths:
       - '.github/owner-commands/candidate-request.txt'
 
