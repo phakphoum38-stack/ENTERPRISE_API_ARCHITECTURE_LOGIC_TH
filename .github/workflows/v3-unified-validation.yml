@@ -1,0 +1,51 @@
+name: Research OS V3 Unified Validation
+
+on:
+  push:
+    branches:
+      - agent/fix-v3-chat-contract
+    paths:
+      - "v3/**"
+      - ".github/workflows/v3-unified-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-v3-unified-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      RESEARCH_OS_PROVIDER: mock
+    steps:
+      - name: Checkout branch revision
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate V3 Python core
+        working-directory: v3
+        run: |
+          python -m compileall -q research_os_v3 scripts
+          python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate V3 Flutter shell
+        working-directory: v3/flutter_app
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
