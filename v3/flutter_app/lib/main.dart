@@ -29,8 +29,16 @@ void main() {
 
   runApp(ResearchOSV3App(api: api));
 
-  // Paint first, then prove loopback connectivity and user isolation context.
-  unawaited(StartupProbe(api).run());
+  final proveInstalledChat =
+      Platform.environment['RESEARCH_OS_V3_E2E_CHAT'] == '1';
+  unawaited(
+    StartupProbe(
+      api,
+      chatProbeMessage: proveInstalledChat
+          ? 'Research OS V3 installed app end-to-end probe'
+          : null,
+    ).run(),
+  );
 }
 
 String _safeIdentifier(String raw, {required String fallbackPrefix}) {
