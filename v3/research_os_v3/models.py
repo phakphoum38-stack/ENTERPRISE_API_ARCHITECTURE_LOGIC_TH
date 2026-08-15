@@ -10,6 +10,7 @@ class ScaleTier(str, Enum):
     TIER_6_3 = "6^3"
     TIER_6_6 = "6^6"
     TIER_10_10 = "10^10"
+    TIER_20_20 = "20^20"
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,8 @@ SCALE_PROFILES: tuple[ScaleProfile, ...] = (
     ScaleProfile(ScaleTier.TIER_6_3, fanout=6, depth=3),
     ScaleProfile(ScaleTier.TIER_6_6, fanout=6, depth=6),
     ScaleProfile(ScaleTier.TIER_10_10, fanout=10, depth=10),
+    # Logical capacity only. Physical execution remains bounded by FactoryExecutionEngine.
+    ScaleProfile(ScaleTier.TIER_20_20, fanout=20, depth=20),
 )
 
 
