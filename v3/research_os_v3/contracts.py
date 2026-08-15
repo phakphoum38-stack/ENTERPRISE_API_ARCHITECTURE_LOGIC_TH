@@ -9,10 +9,11 @@ def health_contract() -> dict[str, object]:
     maximum = SCALE_PROFILES[-1]
     return {
         "status": "ok",
-        "version": "v3-full-10x10",
+        "version": "v3-full-20x20",
         "maximum_scale": maximum.tier.value,
         "maximum_logical_capacity": maximum.capacity,
         "capacity_policy": "lazy-bounded-execution",
+        "physical_execution_policy": "queue-backpressure-hard-concurrency-limit",
     }
 
 
@@ -28,6 +29,8 @@ def master_contract(decision: OrchestrationDecision) -> dict[str, object]:
         "system_maximum_logical_capacity": maximum.capacity,
         "demand": decision.demand,
         "provider": decision.provider,
+        "capacity_policy": "lazy-bounded-execution",
+        "physical_execution_policy": "queue-backpressure-hard-concurrency-limit",
         "reason": decision.reason,
     }
 
