@@ -1,3 +1,0 @@
-Owner command: run Research OS Candidate for the current integration SHA.
-Requested by owner via ChatGPT on 2026-08-15.
-Reason: rerun after fixing the isolated Windows installer V3 core packaging failure from candidate run 31820428322.
