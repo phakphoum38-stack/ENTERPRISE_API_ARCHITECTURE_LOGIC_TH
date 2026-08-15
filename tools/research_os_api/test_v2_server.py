@@ -73,7 +73,7 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(created["api_version"], "v2")
         return created["run"]["run_id"]
 
-    def test_v2_master_delegates_to_v3_core(self) -> None:
+    def test_v2_master_delegates_to_v3_full_core(self) -> None:
         status, payload = self.request("/v2/master")
         self.assertEqual(status, 200)
         self.assertEqual(payload["api_version"], "v2")
