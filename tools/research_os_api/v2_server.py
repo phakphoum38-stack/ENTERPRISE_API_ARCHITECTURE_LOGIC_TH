@@ -12,6 +12,7 @@ import base64
 import os
 import sys
 from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit, urlunsplit
@@ -47,6 +48,10 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
             )
             return
 
+        if parsed.path == "/v2/master":
+            self._send_v2_master()
+            return
+
         if parsed.path == "/v2/orchestrations":
             self._send_v2_orchestration_page(parsed.query)
             return
@@ -68,6 +73,75 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
         self._v2_request = parsed.path.startswith("/v2/")
         self._rewrite_v2_path()
         super().do_POST()
+
+    def _send_v2_master(self) -> None:
+        """Expose the V3 UnifiedMaster contract through the V2 transport.
+
+        The V3 core remains the single source of truth for scale profiles and
+        orchestration decisions. If it is absent or cannot be imported, fail
+        explicitly instead of silently falling back to a V1 implementation.
+        """
+        repo_root = Path(__file__).resolve().parents[2]
+        v3_root = repo_root / "v3"
+        if not v3_root.is_dir():
+            self._send(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "error": "unified_master_unavailable",
+                    "detail": f"V3 core not found: {v3_root}",
+                },
+            )
+            return
+
+        v3_path = str(v3_root)
+        inserted = False
+        if v3_path not in sys.path:
+            sys.path.insert(0, v3_path)
+            inserted = True
+        try:
+            from research_os_v3 import UnifiedMasterOrchestrator, Workload
+            from research_os_v3.models import SCALE_PROFILES
+
+            master = UnifiedMasterOrchestrator()
+            decision = master.decide(
+                Workload(estimated_leaf_tasks=1, risk=1, parallelism=1)
+            )
+            profile_6x3 = next(item for item in SCALE_PROFILES if item.tier.value == "6^3")
+            profile_6x6 = next(item for item in SCALE_PROFILES if item.tier.value == "6^6")
+            maximum = SCALE_PROFILES[-1]
+            self._send(
+                HTTPStatus.OK,
+                {
+                    "master": {
+                        "contract": master.contract,
+                        "scale": decision.profile.tier.value,
+                        "fanout": decision.profile.fanout,
+                        "depth": decision.profile.depth,
+                        "capacity": {
+                            "assistant_6x3_capacity": profile_6x3.capacity,
+                            "max_leaf_capacity": profile_6x6.capacity,
+                            "system_maximum_logical_capacity": maximum.capacity,
+                        },
+                        "demand": decision.demand,
+                        "provider": decision.provider,
+                        "reason": decision.reason,
+                    }
+                },
+            )
+        except Exception as exc:
+            self._send(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "error": "unified_master_unavailable",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                },
+            )
+        finally:
+            if inserted:
+                try:
+                    sys.path.remove(v3_path)
+                except ValueError:
+                    pass
 
     def _workspace_engine(self) -> WorkspaceKnowledgeEngine:
         data_dir = os.environ.get("RESEARCH_OS_DATA_DIR") or str(Path.home() / "ResearchOSData")
@@ -181,16 +255,19 @@ class V2ResearchOSHandler(AgentResearchOSHandler):
         if self._v2_request:
             if status_code >= 400:
                 raw_code = payload.get("error")
-                code = raw_code if isinstance(raw_code, str) else f"http_{status_code}"
-                message = str(payload.get("detail") or payload.get("message") or code)
-                payload = {
-                    "api_version": "v2",
-                    "error": {
-                        "code": code,
-                        "message": message,
-                        "status": status_code,
-                    },
-                }
+                if isinstance(raw_code, dict):
+                    payload = payload
+                else:
+                    code = raw_code if isinstance(raw_code, str) else f"http_{status_code}"
+                    message = str(payload.get("detail") or payload.get("message") or code)
+                    payload = {
+                        "api_version": "v2",
+                        "error": {
+                            "code": code,
+                            "message": message,
+                            "status": status_code,
+                        },
+                    }
             else:
                 payload = {"api_version": "v2", **payload}
         super()._send(status, payload)
