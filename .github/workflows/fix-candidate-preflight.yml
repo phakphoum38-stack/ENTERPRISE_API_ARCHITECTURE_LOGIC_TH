@@ -1,0 +1,55 @@
+name: Fix Research OS Candidate Preflight
+
+on:
+  push:
+    branches:
+      - compat/pr41-pr47-8790
+    paths:
+      - '.github/workflows/fix-candidate-preflight.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  fix-and-dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout compatibility branch
+        uses: actions/checkout@v4
+        with:
+          ref: compat/pr41-pr47-8790
+          fetch-depth: 0
+
+      - name: Fix stale installer preflight expectation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/candidate.yml')
+          s = p.read_text(encoding='utf-8')
+          old = "if ($iss -notmatch 'Source:\\s*\"\\.\\.\\\\v3\\\\\\*\"') { throw 'Installer is not configured to package V3 core.' }"
+          new = "if ($iss -notmatch 'Source:\\s*\"package\\\\\\*\"') { throw 'Installer is not configured to package the staged Research OS package.' }"
+          if old not in s:
+              raise SystemExit('EXPECTED_PREFLIGHT_LINE_NOT_FOUND')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Commit preflight fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/candidate.yml
+          git commit -m "ci: align candidate installer preflight with package layout"
+          git push origin HEAD:compat/pr41-pr47-8790
+
+      - name: Dispatch candidate for exact fixed SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="$(git rev-parse HEAD)"
+          echo "TARGET_SHA=$SHA"
+          gh workflow run candidate.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f target_sha="$SHA"
