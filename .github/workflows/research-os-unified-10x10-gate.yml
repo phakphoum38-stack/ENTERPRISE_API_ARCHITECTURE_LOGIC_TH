@@ -1,0 +1,85 @@
+name: Research OS Unified 10x10 Exact SHA Gate
+
+on:
+  push:
+    branches:
+      - compat/pr41-pr47-8790
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  unified-gate:
+    name: V3 Master 8788 + 10x10 exact runtime evidence
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+      - name: Verify exact SHA
+        shell: pwsh
+        run: |
+          $actual=(git rev-parse HEAD).Trim()
+          if($actual -ne $env:TARGET_SHA){throw "Exact SHA mismatch: expected $env:TARGET_SHA got $actual"}
+          Write-Host "EXACT_SHA=$actual"
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Start Main API 8787
+        shell: pwsh
+        run: |
+          $data="$env:RUNNER_TEMP\ResearchOSData"
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          .\scripts\start-research-os-local.ps1 -DataDir $data -Provider mock -Port 8787 -Background
+          for($i=0;$i-lt 40;$i++){try{$h=Invoke-RestMethod 'http://127.0.0.1:8787/health' -TimeoutSec 2;if($h.status -eq 'ok'){Write-Host 'PORT_8787=PASS';exit 0}}catch{};Start-Sleep -Milliseconds 500}
+          throw '8787 did not become ready'
+      - name: Start actual V3 Master 8788
+        shell: pwsh
+        run: |
+          $data="$env:RUNNER_TEMP\ResearchOSV3"
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          $env:RESEARCH_OS_DATA_DIR=$data
+          $out="$data\v3.out.log";$err="$data\v3.err.log"
+          $p=Start-Process python -ArgumentList @('-c',"from v3.research_os_v3.service import V3LocalService; V3LocalService(host='127.0.0.1',port=8788).serve_forever()") -WorkingDirectory $PWD -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          $p.Id | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
+          for($i=0;$i-lt 40;$i++){try{$h=Invoke-RestMethod 'http://127.0.0.1:8788/health' -TimeoutSec 2;if($h.status -eq 'ok'){Write-Host 'PORT_8788_V3_MASTER=PASS';exit 0}}catch{};Start-Sleep -Milliseconds 500}
+          Get-Content $out -ErrorAction SilentlyContinue;Get-Content $err -ErrorAction SilentlyContinue;throw '8788 V3 Master did not become ready'
+      - name: Execute actual V3 Unified Master 10x10
+        shell: pwsh
+        run: |
+          $master=Invoke-RestMethod 'http://127.0.0.1:8788/v3/master?tasks=10000000000&risk=1&parallelism=1' -TimeoutSec 10
+          if($master.contract -ne 'unified-master-orchestrator-v3-full'){throw "Unexpected contract: $($master.contract)"}
+          if($master.system_maximum_scale -ne '10^10'){throw "Unexpected scale: $($master.system_maximum_scale)"}
+          if([int64]$master.system_maximum_logical_capacity -ne 10000000000){throw "Unexpected logical capacity: $($master.system_maximum_logical_capacity)"}
+          if($master.capacity_policy -ne 'lazy-bounded-execution'){throw "Unexpected policy: $($master.capacity_policy)"}
+          if(-not $master.scale){throw 'Missing scale decision'}
+          $out="$env:RUNNER_TEMP\v3-evidence";New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $master | ConvertTo-Json -Depth 30 | Set-Content "$out\MASTER_V3_EVIDENCE.json" -Encoding utf8
+          @{target_sha=$env:TARGET_SHA;endpoint='127.0.0.1:8788/v3/master';contract=$master.contract;scale=$master.scale;system_maximum_scale=$master.system_maximum_scale;system_maximum_logical_capacity=[int64]$master.system_maximum_logical_capacity;capacity_policy=$master.capacity_policy} | ConvertTo-Json | Set-Content "$out\UNIFIED_GATE.json" -Encoding utf8
+          Get-FileHash "$out\MASTER_V3_EVIDENCE.json" -Algorithm SHA256 | Format-List | Out-File "$out\MASTER_V3_EVIDENCE.sha256.txt"
+          Get-FileHash "$out\UNIFIED_GATE.json" -Algorithm SHA256 | Format-List | Out-File "$out\UNIFIED_GATE.sha256.txt"
+          Write-Host 'V3_MASTER_CONTRACT=PASS';Write-Host "V3_MASTER_SCALE=$($master.scale)";Write-Host 'V3_MASTER_10X10=PASS';Write-Host "V3_MASTER_LOGICAL_CAPACITY=$($master.system_maximum_logical_capacity)"
+      - name: Upload V3 Master evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-master-exact-evidence-${{ env.TARGET_SHA }}
+          path: ${{ runner.temp }}\v3-evidence\*
+          if-no-files-found: error
+      - name: Cleanup services
+        if: always()
+        shell: pwsh
+        run: |
+          .\scripts\stop-research-os-local.ps1 -Port 8787 -ErrorAction SilentlyContinue
+          if(Test-Path "$env:RUNNER_TEMP\v3.pid"){$p=(Get-Content "$env:RUNNER_TEMP\v3.pid" -ErrorAction SilentlyContinue);if($p){Stop-Process -Id ([int]$p) -Force -ErrorAction SilentlyContinue}}
