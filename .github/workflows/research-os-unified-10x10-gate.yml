@@ -1,0 +1,164 @@
+name: Research OS Unified 10x10 Exact SHA Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-unified-10x10-${{ inputs.target_sha }}
+  cancel-in-progress: false
+
+jobs:
+  unified-gate:
+    name: Unified 8787 + 8790 + 10x10 gate
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      TARGET_SHA: ${{ inputs.target_sha }}
+      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\ResearchOSData
+      FRIEND_DATA_DIR: ${{ runner.temp }}\ResearchOSFriend
+
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Verify checked out SHA
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne $env:TARGET_SHA) {
+            throw "Exact SHA mismatch: expected $env:TARGET_SHA, got $actual"
+          }
+          Write-Host "EXACT_SHA=$actual"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Run Research OS API tests
+        shell: pwsh
+        run: |
+          python -m compileall -q tools/research_os_api tools/research_curator
+          if ($LASTEXITCODE -ne 0) { throw "Python compile failed" }
+          python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+          if ($LASTEXITCODE -ne 0) { throw "Research OS API tests failed" }
+
+      - name: Run Flutter checks
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          flutter pub get
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw "Flutter analyze failed" }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw "Flutter tests failed" }
+          flutter config --enable-windows-desktop
+          if (-not (Test-Path windows)) { flutter create --platforms=windows --project-name research_os_flutter . }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw "Flutter Windows build failed" }
+
+      - name: Start Main API on 8787
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:RESEARCH_OS_DATA_DIR | Out-Null
+          .\scripts\start-research-os-local.ps1 -DataDir $env:RESEARCH_OS_DATA_DIR -Provider mock -Port 8787 -Background
+          $ready = $false
+          for ($i=0; $i -lt 40; $i++) {
+            try {
+              $h = Invoke-RestMethod "http://127.0.0.1:8787/health" -TimeoutSec 2
+              if ($h.status -eq "ok") { $ready = $true; break }
+            } catch {}
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ready) { throw "8787 did not become ready" }
+
+      - name: Validate Unified Master and 10x10 contract
+        shell: pwsh
+        run: |
+          $master = Invoke-RestMethod "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
+          if ($master.master.contract -ne "unified-master-orchestrator-v3") {
+            throw "Unified Master contract missing"
+          }
+          $json = $master | ConvertTo-Json -Depth 20 -Compress
+          if ($json -notmatch '10\^10|10000000000|10x10|10×10') {
+            throw "10x10/10^10 logical-capacity contract is not exposed by /v2/master"
+          }
+          Write-Host "UNIFIED_MASTER_10X10_CONTRACT=PASS"
+
+      - name: Start Owner Friend on 8790
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:FRIEND_DATA_DIR | Out-Null
+          $env:PYTHONPATH = (Resolve-Path "owner_special").Path
+          $audit = Join-Path $env:FRIEND_DATA_DIR "friend-audit.jsonl"
+          $p = Start-Process python -ArgumentList @("owner_special\scripts\run_friend_service.py","--owner-id","owner","--host","127.0.0.1","--port","8790","--data-root",$env:FRIEND_DATA_DIR,"--audit-path",$audit,"--repository-root",$PWD) -PassThru
+          $ready = $false
+          for ($i=0; $i -lt 40; $i++) {
+            try {
+              $h = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 2
+              if ($h.status -eq "ok") { $ready = $true; break }
+            } catch {}
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ready) { throw "8790 Owner Friend service did not become ready" }
+          "FRIEND_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\friend.pid" -Encoding ascii
+
+      - name: Validate loopback and 8790
+        shell: pwsh
+        run: |
+          $h = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 5
+          if ($h.status -ne "ok") { throw "8790 health failed" }
+          $listeners = @()
+          $listeners += Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction SilentlyContinue
+          $listeners += Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
+          $unsafe = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1','::1') })
+          if ($unsafe) { throw "8787/8790 must listen on loopback only" }
+          Write-Host "PORT_8787=PASS"
+          Write-Host "PORT_8790=PASS"
+
+      - name: Produce gate evidence
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\unified-gate"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          @{
+            target_sha = $env:TARGET_SHA
+            main_api = '127.0.0.1:8787'
+            owner_friend_v3 = '127.0.0.1:8790'
+            legacy_8788 = 'isolated / not production'
+            unified_master = 'unified-master-orchestrator-v3'
+            ten_x_ten = 'required contract checked at /v2/master'
+          } | ConvertTo-Json | Set-Content "$out\UNIFIED_GATE.json" -Encoding utf8
+          Get-FileHash "$out\UNIFIED_GATE.json" -Algorithm SHA256 | Format-List | Out-File "$out\UNIFIED_GATE.sha256.txt"
+
+      - name: Upload unified gate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-unified-10x10-gate-${{ env.TARGET_SHA }}
+          path: ${{ runner.temp }}\unified-gate\*
+
+      - name: Cleanup services
+        if: always()
+        shell: pwsh
+        run: |
+          .\scripts\stop-research-os-local.ps1 -Port 8787 -ErrorAction SilentlyContinue
+          if (Test-Path "$env:RUNNER_TEMP\friend.pid") {
+            $pid = (Get-Content "$env:RUNNER_TEMP\friend.pid" -ErrorAction SilentlyContinue)
+            if ($pid) { Stop-Process -Id ([int]$pid) -Force -ErrorAction SilentlyContinue }
+          }
