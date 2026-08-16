@@ -53,7 +53,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path $data | Out-Null
           $env:RESEARCH_OS_DATA_DIR=$data
           $out="$data\v3.out.log";$err="$data\v3.err.log"
-          $p=Start-Process python -ArgumentList @('-c',"from v3.research_os_v3.service import V3LocalService; V3LocalService(host='127.0.0.1',port=8788).serve_forever()") -WorkingDirectory $PWD -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          $launcher="$data\start-v3-master.py"
+          @'
+          from v3.research_os_v3.service import V3LocalService
+          V3LocalService(host="127.0.0.1", port=8788).serve_forever()
+          '@ | Set-Content $launcher -Encoding utf8
+          $p=Start-Process python -ArgumentList @($launcher) -WorkingDirectory $PWD -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
           $p.Id | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
           for($i=0;$i-lt 40;$i++){try{$h=Invoke-RestMethod 'http://127.0.0.1:8788/health' -TimeoutSec 2;if($h.status -eq 'ok'){Write-Host 'PORT_8788_V3_MASTER=PASS';exit 0}}catch{};Start-Sleep -Milliseconds 500}
           Get-Content $out -ErrorAction SilentlyContinue;Get-Content $err -ErrorAction SilentlyContinue;throw '8788 V3 Master did not become ready'
