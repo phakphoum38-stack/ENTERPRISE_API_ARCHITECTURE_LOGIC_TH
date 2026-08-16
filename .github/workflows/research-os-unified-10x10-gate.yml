@@ -1,6 +1,9 @@
 name: Research OS Unified 10x10 Exact SHA Gate
 
 on:
+  push:
+    branches:
+      - compat/pr41-pr47-8790
   workflow_dispatch:
     inputs:
       target_sha:
@@ -12,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: research-os-unified-10x10-${{ inputs.target_sha }}
+  group: research-os-unified-10x10-${{ inputs.target_sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -21,7 +24,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     env:
-      TARGET_SHA: ${{ inputs.target_sha }}
+      TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\ResearchOSData
       FRIEND_DATA_DIR: ${{ runner.temp }}\ResearchOSFriend
 
