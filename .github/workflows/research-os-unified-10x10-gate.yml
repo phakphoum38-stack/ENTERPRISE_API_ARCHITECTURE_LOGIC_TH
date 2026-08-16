@@ -66,7 +66,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $data | Out-Null
           $env:RESEARCH_OS_DATA_DIR=$data
           $env:PYTHONPATH=$PWD
-          python -c "import v3.research_os_v3.service as svc; print('V3_IMPORT=' + [string]$svc.__file__)"
+          python -c 'import v3.research_os_v3.service as svc; print("V3_IMPORT=PASS"); print("V3_SERVICE=" + str(svc.__file__))'
           if($LASTEXITCODE -ne 0){throw 'V3 service import failed'}
           $out="$data\v3.out.log";$err="$data\v3.err.log"
           $launcher="$data\start-v3-master.py"
