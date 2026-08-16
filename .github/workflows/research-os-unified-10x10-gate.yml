@@ -1,6 +1,7 @@
 name: Research OS Unified 10x10 Exact SHA Gate
 
 # Runtime verification gate: 8787 + actual V3 Master 8788 + Owner Friend 8790 + 10x10.
+# Trigger repair marker: force execution on the exact compat branch.
 
 on:
   push:
