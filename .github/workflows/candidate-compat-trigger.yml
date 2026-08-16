@@ -32,7 +32,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.sha }}
         run: |
+          # Dispatch the canonical workflow definition from main; validate the
+          # exact compatibility-branch commit via target_sha inside that workflow.
           gh workflow run research-os-unified-10x10-gate.yml \
             --repo "${{ github.repository }}" \
-            --ref "compat/pr41-pr47-8790" \
+            --ref main \
             -f target_sha="$TARGET_SHA"
