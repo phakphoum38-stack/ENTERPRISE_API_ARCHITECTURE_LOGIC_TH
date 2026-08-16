@@ -24,15 +24,15 @@ concurrency:
 
 jobs:
   dispatch-candidate:
-    name: Dispatch exact-SHA Research OS Candidate
+    name: Dispatch exact-SHA Research OS V3 Unified 10x10 Gate
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch candidate validation from compatibility branch
+      - name: Dispatch V3 unified candidate validation from compatibility branch
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.sha }}
         run: |
-          gh workflow run candidate.yml \
+          gh workflow run research-os-unified-10x10-gate.yml \
             --repo "${{ github.repository }}" \
             --ref "compat/pr41-pr47-8790" \
             -f target_sha="$TARGET_SHA"
