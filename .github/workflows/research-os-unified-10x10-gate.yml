@@ -51,6 +51,16 @@ jobs:
           }
           Write-Host "EXACT_SHA=$actual"
 
+      - name: Verify V3 Master source exists
+        shell: pwsh
+        run: |
+          $service = Join-Path $PWD "v3\research_os_v3\service.py"
+          if (-not (Test-Path $service)) {
+            throw "V3 Master source missing: $service"
+          }
+          Write-Host "V3_MASTER_SOURCE=PASS"
+          Write-Host "V3_MASTER_SOURCE_PATH=$service"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -98,6 +108,7 @@ jobs:
             Start-Sleep -Milliseconds 500
           }
           if (-not $ready) { throw "8787 did not become ready" }
+          Write-Host "PORT_8787_MAIN_API=PASS"
 
       - name: Start actual V3 Master Local Service on 8788
         shell: pwsh
@@ -106,9 +117,17 @@ jobs:
           $env:RESEARCH_OS_DATA_DIR = $env:V3_DATA_DIR
           $v3Log = Join-Path $env:V3_DATA_DIR "v3-service.log"
           $v3Err = Join-Path $env:V3_DATA_DIR "v3-service.err.log"
-          $p = Start-Process python -ArgumentList @("-c", "from v3.research_os_v3.service import V3LocalService; V3LocalService(host='127.0.0.1', port=8788).serve_forever()") -WorkingDirectory $PWD -RedirectStandardOutput $v3Log -RedirectStandardError $v3Err -PassThru
+          $launcher = Join-Path $env:V3_DATA_DIR "start-v3-master.py"
+          @'
+from v3.research_os_v3.service import V3LocalService
+
+V3LocalService(host="127.0.0.1", port=8788).serve_forever()
+'@ | Set-Content -Path $launcher -Encoding utf8
+          $p = Start-Process python -ArgumentList @($launcher) -WorkingDirectory $PWD -RedirectStandardOutput $v3Log -RedirectStandardError $v3Err -PassThru
+          "V3_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
           $ready = $false
           for ($i=0; $i -lt 40; $i++) {
+            if ($p.HasExited) { break }
             try {
               $h = Invoke-RestMethod "http://127.0.0.1:8788/health" -TimeoutSec 2
               if ($h.status -eq "ok") { $ready = $true; break }
@@ -116,11 +135,12 @@ jobs:
             Start-Sleep -Milliseconds 500
           }
           if (-not $ready) {
+            Write-Host "V3 process exited=$($p.HasExited)"
             Get-Content $v3Log -ErrorAction SilentlyContinue
             Get-Content $v3Err -ErrorAction SilentlyContinue
             throw "V3 Master service on 8788 did not become ready"
           }
-          "V3_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
+          Write-Host "PORT_8788_V3_MASTER=PASS"
 
       - name: Validate actual V3 Unified Master and 10x10 contract
         shell: pwsh
