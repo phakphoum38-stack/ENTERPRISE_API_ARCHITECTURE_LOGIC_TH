@@ -1,7 +1,7 @@
 name: research_os_flutter
 description: Cross-platform Flutter home for Research OS.
 publish_to: "none"
-version: 3.0.0+300
+version: 2.0.0-rc.1+1
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
