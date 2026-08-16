@@ -1,0 +1,38 @@
+name: Research OS Candidate Compat Trigger
+
+on:
+  push:
+    branches:
+      - compat/pr41-pr47-8790
+    paths:
+      - '.github/workflows/**'
+      - 'apps/**'
+      - 'installer/**'
+      - 'scripts/**'
+      - 'tools/**'
+      - 'research/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: research-os-candidate-compat-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch-candidate:
+    name: Dispatch exact-SHA Research OS Candidate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch candidate validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          gh workflow run candidate.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f target_sha="$TARGET_SHA"
