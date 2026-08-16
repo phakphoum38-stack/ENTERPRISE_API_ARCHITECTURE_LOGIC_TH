@@ -1,6 +1,9 @@
 name: Research OS CI Lite
 
 on:
+  push:
+    branches:
+      - compat/pr41-pr47-8790
   workflow_dispatch:
     inputs:
       target_sha:
@@ -14,6 +17,7 @@ on:
         type: boolean
 
 permissions:
+  actions: write
   contents: read
 
 concurrency:
@@ -49,6 +53,16 @@ jobs:
           export RESEARCH_OS_DATA_DIR="$RUNNER_TEMP/ResearchOSData"
           export RESEARCH_OS_CONVERSATION_STORE="$RUNNER_TEMP/ResearchOSData/sessions/conversations.json"
           python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+
+      - name: Dispatch exact-SHA V3 Unified 10x10 gate
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run research-os-unified-10x10-gate.yml \
+            --repo "${{ github.repository }}" \
+            --ref "compat/pr41-pr47-8790" \
+            -f target_sha="$TARGET_SHA"
 
       - name: Set up Flutter
         if: ${{ inputs.include_flutter == true }}

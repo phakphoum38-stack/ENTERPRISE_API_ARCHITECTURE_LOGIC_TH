@@ -1,0 +1,218 @@
+name: Research OS Unified 10x10 Exact SHA Gate
+
+# Runtime verification gate: 8787 + actual V3 Master 8788 + Owner Friend 8790 + 10x10.
+# Trigger repair marker: force execution on the exact compat branch.
+
+on:
+  push:
+    branches:
+      - compat/pr41-pr47-8790
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-unified-10x10-${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  unified-gate:
+    name: Unified 8787 + V3 Master 8788 + 8790 + 10x10 gate
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
+      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\ResearchOSData
+      V3_DATA_DIR: ${{ runner.temp }}\ResearchOSV3
+      FRIEND_DATA_DIR: ${{ runner.temp }}\ResearchOSFriend
+
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Verify checked out SHA
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne $env:TARGET_SHA) {
+            throw "Exact SHA mismatch: expected $env:TARGET_SHA, got $actual"
+          }
+          Write-Host "EXACT_SHA=$actual"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Run Research OS API tests
+        shell: pwsh
+        run: |
+          python -m compileall -q tools/research_os_api tools/research_curator v3 owner_special
+          if ($LASTEXITCODE -ne 0) { throw "Python compile failed" }
+          python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
+          if ($LASTEXITCODE -ne 0) { throw "Research OS API tests failed" }
+
+      - name: Run Flutter checks
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          flutter pub get
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw "Flutter analyze failed" }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw "Flutter tests failed" }
+          flutter config --enable-windows-desktop
+          if (-not (Test-Path windows)) { flutter create --platforms=windows --project-name research_os_flutter . }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw "Flutter Windows build failed" }
+
+      - name: Start Main API on 8787
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:RESEARCH_OS_DATA_DIR | Out-Null
+          .\scripts\start-research-os-local.ps1 -DataDir $env:RESEARCH_OS_DATA_DIR -Provider mock -Port 8787 -Background
+          $ready = $false
+          for ($i=0; $i -lt 40; $i++) {
+            try {
+              $h = Invoke-RestMethod "http://127.0.0.1:8787/health" -TimeoutSec 2
+              if ($h.status -eq "ok") { $ready = $true; break }
+            } catch {}
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ready) { throw "8787 did not become ready" }
+
+      - name: Start actual V3 Master Local Service on 8788
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:V3_DATA_DIR | Out-Null
+          $env:RESEARCH_OS_DATA_DIR = $env:V3_DATA_DIR
+          $v3Log = Join-Path $env:V3_DATA_DIR "v3-service.log"
+          $v3Err = Join-Path $env:V3_DATA_DIR "v3-service.err.log"
+          $p = Start-Process python -ArgumentList @("-c", "from v3.research_os_v3.service import V3LocalService; V3LocalService(host='127.0.0.1', port=8788).serve_forever()") -WorkingDirectory $PWD -RedirectStandardOutput $v3Log -RedirectStandardError $v3Err -PassThru
+          $ready = $false
+          for ($i=0; $i -lt 40; $i++) {
+            try {
+              $h = Invoke-RestMethod "http://127.0.0.1:8788/health" -TimeoutSec 2
+              if ($h.status -eq "ok") { $ready = $true; break }
+            } catch {}
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ready) {
+            Get-Content $v3Log -ErrorAction SilentlyContinue
+            Get-Content $v3Err -ErrorAction SilentlyContinue
+            throw "V3 Master service on 8788 did not become ready"
+          }
+          "V3_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
+
+      - name: Validate actual V3 Unified Master and 10x10 contract
+        shell: pwsh
+        run: |
+          $master = Invoke-RestMethod "http://127.0.0.1:8788/v3/master?tasks=10000000000&risk=1&parallelism=1" -TimeoutSec 10
+          if ($master.contract -ne "unified-master-orchestrator-v3-full") {
+            throw "Unexpected V3 Master contract: $($master.contract)"
+          }
+          if ($master.system_maximum_scale -ne "10^10") {
+            throw "Unexpected V3 Master maximum scale: $($master.system_maximum_scale)"
+          }
+          if ([int64]$master.system_maximum_logical_capacity -ne 10000000000) {
+            throw "Unexpected V3 Master logical capacity: $($master.system_maximum_logical_capacity)"
+          }
+          if ($master.capacity_policy -ne "lazy-bounded-execution") {
+            throw "Unexpected V3 Master capacity policy: $($master.capacity_policy)"
+          }
+          if (-not $master.scale) { throw "V3 Master scale decision missing" }
+          $master | ConvertTo-Json -Depth 30 -Compress | Set-Content "$env:V3_DATA_DIR\master-evidence.json" -Encoding utf8
+          Write-Host "V3_MASTER_CONTRACT=PASS"
+          Write-Host "V3_MASTER_SCALE=$($master.scale)"
+          Write-Host "V3_MASTER_10X10=PASS"
+          Write-Host "V3_MASTER_LOGICAL_CAPACITY=$($master.system_maximum_logical_capacity)"
+
+      - name: Start Owner Friend on 8790
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:FRIEND_DATA_DIR | Out-Null
+          $env:PYTHONPATH = (Resolve-Path "owner_special").Path
+          $audit = Join-Path $env:FRIEND_DATA_DIR "friend-audit.jsonl"
+          $p = Start-Process python -ArgumentList @("owner_special\scripts\run_friend_service.py","--owner-id","owner","--host","127.0.0.1","--port","8790","--data-root",$env:FRIEND_DATA_DIR,"--audit-path",$audit,"--repository-root",$PWD) -PassThru
+          $ready = $false
+          for ($i=0; $i -lt 40; $i++) {
+            try {
+              $h = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 2
+              if ($h.status -eq "ok") { $ready = $true; break }
+            } catch {}
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ready) { throw "8790 Owner Friend service did not become ready" }
+          "FRIEND_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\friend.pid" -Encoding ascii
+
+      - name: Validate loopback and service topology
+        shell: pwsh
+        run: |
+          $h = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 5
+          if ($h.status -ne "ok") { throw "8790 health failed" }
+          $listeners = @()
+          $listeners += Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction SilentlyContinue
+          $listeners += Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
+          $listeners += Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue
+          $unsafe = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1','::1') })
+          if ($unsafe) { throw "8787/8788/8790 must listen on loopback only" }
+          Write-Host "PORT_8787=PASS"
+          Write-Host "PORT_8788_V3_MASTER=PASS"
+          Write-Host "PORT_8790=PASS"
+
+      - name: Produce gate evidence
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\unified-gate"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item "$env:V3_DATA_DIR\master-evidence.json" "$out\MASTER_V3_EVIDENCE.json" -Force
+          @{
+            target_sha = $env:TARGET_SHA
+            main_api = '127.0.0.1:8787'
+            unified_master_v3 = '127.0.0.1:8788/v3/master'
+            owner_friend_v3 = '127.0.0.1:8790'
+            unified_master_contract = 'unified-master-orchestrator-v3-full'
+            ten_x_ten = '10^10 / 10000000000'
+            capacity_policy = 'lazy-bounded-execution'
+            legacy_v2_master = 'not used by this V3 gate'
+          } | ConvertTo-Json | Set-Content "$out\UNIFIED_GATE.json" -Encoding utf8
+          Get-FileHash "$out\UNIFIED_GATE.json" -Algorithm SHA256 | Format-List | Out-File "$out\UNIFIED_GATE.sha256.txt"
+          Get-FileHash "$out\MASTER_V3_EVIDENCE.json" -Algorithm SHA256 | Format-List | Out-File "$out\MASTER_V3_EVIDENCE.sha256.txt"
+
+      - name: Upload unified gate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-unified-10x10-gate-${{ env.TARGET_SHA }}
+          path: ${{ runner.temp }}\unified-gate\*
+
+      - name: Cleanup services
+        if: always()
+        shell: pwsh
+        run: |
+          .\scripts\stop-research-os-local.ps1 -Port 8787 -ErrorAction SilentlyContinue
+          if (Test-Path "$env:RUNNER_TEMP\friend.pid") {
+            $friendPid = (Get-Content "$env:RUNNER_TEMP\friend.pid" -ErrorAction SilentlyContinue)
+            if ($friendPid) { Stop-Process -Id ([int]$friendPid) -Force -ErrorAction SilentlyContinue }
+          }
+          if (Test-Path "$env:RUNNER_TEMP\v3.pid") {
+            $v3Pid = (Get-Content "$env:RUNNER_TEMP\v3.pid" -ErrorAction SilentlyContinue)
+            if ($v3Pid) { Stop-Process -Id ([int]$v3Pid) -Force -ErrorAction SilentlyContinue }
+          }
