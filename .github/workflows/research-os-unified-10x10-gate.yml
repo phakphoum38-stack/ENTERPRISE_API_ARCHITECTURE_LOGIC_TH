@@ -65,16 +65,20 @@ jobs:
           $data="$env:RUNNER_TEMP\ResearchOSV3"
           New-Item -ItemType Directory -Force -Path $data | Out-Null
           $env:RESEARCH_OS_DATA_DIR=$data
-          $env:PYTHONPATH=$PWD
-          python -c 'import v3.research_os_v3.service as svc; print("V3_IMPORT=PASS"); print("V3_SERVICE=" + str(svc.__file__))'
+          $env:RESEARCH_OS_V3_HOST='127.0.0.1'
+          $env:RESEARCH_OS_V3_PORT='8788'
+          $env:PYTHONPATH="$PWD\v3"
+          python -c 'import research_os_v3.service as svc; print("V3_IMPORT=PASS"); print("V3_SERVICE=" + str(svc.__file__))'
           if($LASTEXITCODE -ne 0){throw 'V3 service import failed'}
           $out="$data\v3.out.log";$err="$data\v3.err.log"
           $launcher="$data\start-v3-master.py"
           @'
-          from v3.research_os_v3.service import V3LocalService
-          V3LocalService(host="127.0.0.1", port=8788).serve_forever()
+          import os
+          from pathlib import Path
+          from v3.scripts.run_service import main
+          raise SystemExit(main())
           '@ | Set-Content $launcher -Encoding utf8
-          $p=Start-Process python -ArgumentList @($launcher) -WorkingDirectory $PWD -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          $p=Start-Process python -ArgumentList @('v3/scripts/run_service.py') -WorkingDirectory $PWD -Environment @{PYTHONPATH="$PWD\v3";RESEARCH_OS_DATA_DIR=$data;RESEARCH_OS_V3_HOST='127.0.0.1';RESEARCH_OS_V3_PORT='8788'} -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
           $p.Id | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
           $ready=$false
           for($i=0;$i-lt 40;$i++){
