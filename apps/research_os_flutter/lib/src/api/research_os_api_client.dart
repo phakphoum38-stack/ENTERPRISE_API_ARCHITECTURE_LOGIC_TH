@@ -196,6 +196,20 @@ class ResearchOSApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> generateWithChatGPT(String prompt) {
+    return _postJson('/v1/ai/generate', <String, Object?>{
+      'prompt': prompt,
+      'provider': 'openai',
+    });
+  }
+
+  Future<Map<String, dynamic>> answerWithChatGPTMemory(String question) {
+    return _postJson('/v1/ai/answer-with-memory', <String, Object?>{
+      'question': question,
+      'provider': 'openai',
+    });
+  }
+
   Future<Map<String, dynamic>> commitMemory(
     String syncKey, {
     required String title,
