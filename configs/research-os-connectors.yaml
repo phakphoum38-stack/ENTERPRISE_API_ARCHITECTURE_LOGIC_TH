@@ -1,0 +1,33 @@
+version: 1
+research_os:
+  name: Research OS
+  branch: Google-Drive-Connector
+
+connectors:
+  google_drive:
+    role: workspace_storage
+    enabled: true
+    provider: google_drive
+    root: Research OS
+    folders:
+      - source code
+      - Project Modules
+      - builds
+      - releases
+      - evidence
+    credentials: backend_only
+
+  chatgpt:
+    role: ai_control_layer
+    enabled: true
+    implementation: tools/research_os_api/chatgpt_connector.py
+    credentials: backend_only
+    api_key_env: OPENAI_API_KEY
+    model_env: OPENAI_MODEL
+
+orchestration:
+  flow:
+    - research_os
+    - chatgpt
+    - google_drive_connector
+  secrets_never_committed: true
