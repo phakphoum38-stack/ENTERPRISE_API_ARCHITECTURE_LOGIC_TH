@@ -1,0 +1,58 @@
+name: Research OS Drive Sync
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - Google-Drive-Connector
+
+env:
+  ROOT_NAME: "Research OS"
+  DRIVE_ROOT: "Research OS"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate structure
+        shell: bash
+        run: |
+          set -e
+          test -d connectors
+          test -d virtual-root/Research-OS
+          test -d virtual-root/Research-OS/source-code
+          echo "Structure validation: PASS"
+
+  prepare:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare Drive manifest
+        shell: bash
+        run: |
+          set -e
+          mkdir -p artifact
+          cat > artifact/drive-manifest.yaml <<'EOF'
+          root: Research OS
+          folders:
+            - source code
+            - Project Modules
+            - builds
+            - releases
+            - evidence
+          source:
+            github_branch: Google-Drive-Connector
+            path: virtual-root/Research-OS
+          EOF
+
+      - name: Upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-drive-manifest
+          path: artifact/drive-manifest.yaml
