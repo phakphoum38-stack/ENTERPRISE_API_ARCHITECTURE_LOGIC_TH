@@ -1,5 +1,6 @@
 name: Research OS CI Lite
 
+# Active compat-branch trigger for exact-SHA V3 verification.
 on:
   push:
     branches:
