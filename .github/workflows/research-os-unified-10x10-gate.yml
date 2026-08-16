@@ -26,16 +26,29 @@ jobs:
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Checkout exact target SHA
+      - name: Checkout workflow definition
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.TARGET_SHA }}
+          ref: main
+          fetch-depth: 1
+
+      - name: Checkout exact target SHA
+        shell: pwsh
+        run: |
+          $sha=$env:TARGET_SHA.Trim()
+          if($sha -notmatch '^[0-9a-fA-F]{40}$'){throw "Invalid TARGET_SHA: $sha"}
+          git fetch --no-tags --depth=1 origin $sha
+          if($LASTEXITCODE -ne 0){throw "Failed to fetch TARGET_SHA $sha"}
+          git checkout --detach FETCH_HEAD
+          if($LASTEXITCODE -ne 0){throw "Failed to checkout TARGET_SHA $sha"}
+
       - name: Verify exact SHA
         shell: pwsh
         run: |
           $actual=(git rev-parse HEAD).Trim()
           if($actual -ne $env:TARGET_SHA){throw "Exact SHA mismatch: expected $env:TARGET_SHA got $actual"}
           Write-Host "EXACT_SHA=$actual"
+
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - name: Start Main API 8787
