@@ -27,12 +27,12 @@ jobs:
     name: Dispatch exact-SHA Research OS Candidate
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch candidate validation
+      - name: Dispatch candidate validation from compatibility branch
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.sha }}
         run: |
           gh workflow run candidate.yml \
             --repo "${{ github.repository }}" \
-            --ref main \
+            --ref "compat/pr41-pr47-8790" \
             -f target_sha="$TARGET_SHA"
