@@ -3,6 +3,7 @@ name: Research OS Unified 10x10 Exact SHA Gate
 on:
   push:
     branches:
+      - main
       - compat/pr41-pr47-8790
   pull_request:
     types: [opened, synchronize, reopened]
