@@ -1,0 +1,28 @@
+version: 1
+name: generate-tool-registry
+purpose: Registry-driven tools available to the Generate AI repair loop.
+entries:
+  - id: github-actions
+    capability: inspect-dispatch-rerun-workflow
+    source: GitHub Actions API
+    safe_boundary: repair-branch-or-readonly
+  - id: github-repository
+    capability: read-source-readme-workflows
+    source: GitHub repository
+    safe_boundary: repair-branch-or-readonly
+  - id: yaml-validator
+    capability: validate-workflow-yaml
+    source: local-runtime
+    safe_boundary: repair-branch
+  - id: python-validator
+    capability: validate-registry-evidence-memory
+    source: local-runtime
+    safe_boundary: repair-branch
+  - id: git-branch
+    capability: create-repair-branch
+    source: Git
+    safe_boundary: never-main
+  - id: pr-gate
+    capability: propose-change-for-review
+    source: GitHub Pull Request
+    safe_boundary: never-main
