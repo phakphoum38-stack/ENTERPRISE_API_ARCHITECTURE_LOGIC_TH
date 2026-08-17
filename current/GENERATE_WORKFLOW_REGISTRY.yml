@@ -1,0 +1,69 @@
+version: 1
+purpose: >-
+  Single source of truth for Generate Orchestrator ordering. Existing workflows are
+  preserved; this registry describes how they may be connected without deleting or
+  forcing non-dispatchable workflows into execution.
+
+stages:
+  - stage: 10
+    file: owner-special-friend.yml
+    dispatchable: true
+    role: canonical-control
+
+  - stage: 20
+    file: research-os-build-ready-source.yml
+    dispatchable: true
+    role: build-ready-source
+
+  - stage: 30
+    file: artifacts-build.yml
+    dispatchable: true
+    role: artifact-build
+
+  - stage: 40
+    file: owner-special-ios-ipa.yml
+    dispatchable: true
+    role: ios-artifact
+
+  - stage: 50
+    file: file-audit-v6x6.yml
+    dispatchable: true
+    role: evidence-audit
+
+  - stage: 60
+    file: browser-use-cloud-smoke.yml
+    dispatchable: true
+    role: smoke-test
+
+  - stage: 70
+    file: ci-lite.yml
+    dispatchable: true
+    role: ci-gate
+
+  - stage: 80
+    file: release.yml
+    dispatchable: true
+    role: release-gate
+
+  - stage: 90
+    file: candidate-trigger.yml
+    dispatchable: false
+    role: trigger-only
+
+  - stage: 91
+    file: candidate.yml
+    dispatchable: true
+    role: candidate-build
+
+  - stage: 100
+    file: generate-orchestrator.yml
+    dispatchable: true
+    role: orchestrator
+
+rules:
+  - preserve_existing_workflows: true
+  - delete_only_after_dependency_verification: true
+  - generate_only_after_all_prebuild_gates: true
+  - one_canonical_final_artifact_per_target: true
+  - do_not_force_non_dispatchable_workflows: true
+  - re-audit_when_new_workflow_appears: true
