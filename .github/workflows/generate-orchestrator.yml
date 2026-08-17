@@ -69,13 +69,32 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import pathlib,re
-          registry=pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()
-          names=re.findall(r'^\s*- file:\s*([^\s#]+)',registry,re.M)
-          missing=[n for n in names if not pathlib.Path('.github/workflows',n).is_file()]
+          import pathlib
+          try:
+              import yaml
+          except ImportError:
+              raise SystemExit('PyYAML is required for registry validation.')
+          data=yaml.safe_load(pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()) or {}
+          stages=data.get('stages') or []
+          if not isinstance(stages,list):
+              raise SystemExit('Registry stages must be a list.')
+          missing=[]
+          dispatchable=0
+          for entry in stages:
+              if not isinstance(entry,dict):
+                  raise SystemExit(f'Invalid registry stage entry: {entry!r}')
+              wf=entry.get('file')
+              if not wf:
+                  raise SystemExit(f'Registry stage missing file: {entry!r}')
+              if not pathlib.Path('.github/workflows',wf).is_file():
+                  missing.append(wf)
+              if entry.get('dispatchable') is True and wf != 'generate-orchestrator.yml':
+                  dispatchable += 1
           if missing:
               print('\n'.join(missing)); raise SystemExit(1)
-          print(f'Registry validation passed: {len(names)} workflow entries found.')
+          if dispatchable == 0:
+              raise SystemExit('Registry contains no dispatchable downstream workflows.')
+          print(f'Registry validation passed: {len(stages)} stages; {dispatchable} downstream dispatchable workflows.')
           PY
 
       - name: Validate YAML syntax
@@ -106,26 +125,24 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, pathlib, re, subprocess, time, urllib.parse
+          import json, pathlib, subprocess, time, urllib.parse
           from datetime import datetime
+          import yaml
 
-          registry=pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()
+          registry=pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml')
+          data=yaml.safe_load(registry.read_text()) or {}
+          stages=data.get('stages') or []
           entries=[]
-          current=None
-          for line in registry.splitlines():
-              m=re.match(r'\s*- stage:\s*(\d+)',line)
-              if m:
-                  current={'stage':int(m.group(1))}
-                  entries.append(current)
-                  continue
-              if current is not None:
-                  m=re.match(r'\s*file:\s*([^\s#]+)',line)
-                  if m: current['file']=m.group(1)
-                  m=re.match(r'\s*dispatchable:\s*(true|false)',line)
-                  if m: current['dispatchable']=m.group(1)=='true'
-
-          entries=[e for e in entries if e.get('dispatchable') and e.get('file')]
+          for e in stages:
+              if not isinstance(e,dict):
+                  raise SystemExit(f'Invalid stage entry: {e!r}')
+              wf=e.get('file')
+              if e.get('dispatchable') is True and wf and wf != 'generate-orchestrator.yml':
+                  entries.append({'stage':int(e.get('stage',0)),'file':wf})
           entries.sort(key=lambda e:e['stage'])
+          if not entries:
+              raise SystemExit('No downstream dispatchable stages found; refusing to run.')
+
           print('Sequential dispatch plan:')
           for e in entries:
               print(f"  stage {e['stage']}: {e['file']}")
@@ -148,7 +165,7 @@ jobs:
               deadline=time.time()+3600
               run=None
               while time.time()<deadline:
-                  raw=api(f'repos/{repo}/actions/workflows/{encoded}/runs?event=workflow_dispatch&per_page=10')
+                  raw=api(f'repos/{repo}/actions/workflows/{encoded}/runs?event=workflow_dispatch&per_page=20')
                   data=json.loads(raw)
                   candidates=[]
                   for r in data.get('workflow_runs',[]):
@@ -174,12 +191,13 @@ jobs:
                   if status=='completed':
                       if conclusion!='success':
                           raise SystemExit(f"Stage {e['stage']} {wf} failed: {conclusion}")
+                      print(f"Stage {e['stage']} completed successfully.")
                       break
                   time.sleep(10)
               else:
                   raise SystemExit(f"Stage {e['stage']} {wf} timed out")
 
-          print('\nAll dispatchable registry stages completed successfully.')
+          print('\nAll downstream dispatchable registry stages completed successfully.')
           PY
 
       - name: Emit safe result
@@ -187,4 +205,5 @@ jobs:
         run: |
           echo 'Generate Orchestrator connected to registry, timeline, docs validation, and optional issue references.'
           echo 'Existing workflows remain preserved.'
+          echo 'The orchestrator itself is never recursively dispatched.'
           echo 'No cleanup occurs here.'
