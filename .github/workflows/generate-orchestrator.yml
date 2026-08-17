@@ -4,18 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'inventory validates the chain; dispatch runs only the explicitly registered dispatchable stages'
+        description: 'inventory, validate, issue-read, or dispatch'
         required: false
         default: inventory
         type: choice
-        options:
-          - inventory
-          - validate
-          - dispatch
+        options: [inventory, validate, issue-read, dispatch]
 
 permissions:
   contents: read
   actions: write
+  issues: read
 
 concurrency:
   group: generate-orchestrator-main
@@ -23,6 +21,7 @@ concurrency:
 
 env:
   REGISTRY: current/GENERATE_WORKFLOW_REGISTRY.yml
+  WATCH_ISSUES: "32 52"
 
 jobs:
   inventory-and-validate:
@@ -35,32 +34,50 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== EXISTING WORKFLOWS ==='
           find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sort
-          echo
-          echo '=== GENERATE REGISTRY ==='
           test -f "$REGISTRY"
-          cat "$REGISTRY"
-          echo
-          echo '=== CANONICAL CONTROL FILES ==='
           test -f current/GENERATE_TIMELINE.md
           test -f current/tools/generate-timeline-tool.md
           test -f current/tools/docs-validation-generate.md
-          echo 'Timeline + Generate Tool + Docs Validation Tool: present'
+
+      - name: Read watched issues #32 and #52
+        if: ${{ inputs.mode == 'issue-read' || inputs.mode == 'validate' || inputs.mode == 'dispatch' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/generate
+          status=0
+          for issue in $WATCH_ISSUES; do
+            echo "=== ISSUE #$issue ==="
+            if gh api "repos/${GITHUB_REPOSITORY}/issues/$issue" > "evidence/generate/issue-$issue.json" 2>/dev/null; then
+              python - "$issue" "evidence/generate/issue-$issue.json" <<'PY'
+          import json,sys
+          issue=sys.argv[1]; path=sys.argv[2]
+          data=json.load(open(path))
+          print(f"#{issue}: {data.get('state')} | {data.get('title')}")
+          PY
+            else
+              echo "#${issue}: NOT_FOUND_OR_NOT_ACCESSIBLE"
+              status=1
+            fi
+          done
+          echo "Issue reader completed."
+          echo "Non-readable issue data is a gate failure; no destructive action is allowed."
+          exit "$status"
 
       - name: Validate registry against repository
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import pathlib, re, sys
-          registry = pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()
-          names = re.findall(r'^\s*- file:\s*([^\s#]+)', registry, re.M)
-          missing = [n for n in names if not pathlib.Path('.github/workflows', n).is_file()]
+          import pathlib,re
+          registry=pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()
+          names=re.findall(r'^\s*- file:\s*([^\s#]+)',registry,re.M)
+          missing=[n for n in names if not pathlib.Path('.github/workflows',n).is_file()]
           if missing:
-              print('Missing registered workflows:')
-              print('\n'.join(missing))
-              raise SystemExit(1)
+              print('\n'.join(missing)); raise SystemExit(1)
           print(f'Registry validation passed: {len(names)} workflow entries found.')
           PY
 
@@ -77,40 +94,25 @@ jobs:
               raise SystemExit(0)
           errors=[]
           for p in sorted(pathlib.Path('.github/workflows').glob('*.*ml')):
-              try:
-                  yaml.safe_load(p.read_text())
-              except Exception as e:
-                  errors.append(f'{p}: {e}')
+              try: yaml.safe_load(p.read_text())
+              except Exception as e: errors.append(f'{p}: {e}')
           if errors:
-              print('\n'.join(errors))
-              raise SystemExit(1)
+              print('\n'.join(errors)); raise SystemExit(1)
           print('Workflow YAML validation passed.')
           PY
 
       - name: Dispatch registered stages sequentially
         if: ${{ inputs.mode == 'dispatch' }}
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          echo 'Dispatch mode is intentionally gated by the registry.'
-          echo 'Only entries marked dispatchable=true are eligible.'
+          echo 'Dispatch remains explicitly gated by the registry and issue reader.'
           echo 'No workflow is deleted or modified by this step.'
-          echo 'Runtime dispatch requires the registered workflow to expose workflow_dispatch.'
-          echo 'The registry is the single source of orchestration order.'
-          python - <<'PY'
-          import pathlib, re
-          text = pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()
-          for line in text.splitlines():
-              if 'dispatchable:' in line or 'file:' in line or 'stage:' in line:
-                  print(line)
-          PY
+          echo 'Runtime dispatch requires workflow_dispatch on the target workflow.'
 
       - name: Emit safe result
         shell: bash
         run: |
-          echo 'Generate Orchestrator connected to the workflow registry.'
+          echo 'Generate Orchestrator connected to registry, timeline, docs validation, and watched-issue reader.'
           echo 'Existing workflows remain preserved.'
           echo 'No cleanup occurs here.'
-          echo 'Artifacts are generated only by explicitly registered build stages.'
