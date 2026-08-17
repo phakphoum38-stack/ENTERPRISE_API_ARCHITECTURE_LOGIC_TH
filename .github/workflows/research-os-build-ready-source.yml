@@ -1,0 +1,223 @@
+name: Research OS Build Ready Source
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/chatgpt-style-desktop-shell
+    paths:
+      - 'apps/research_os_flutter/**'
+      - 'tools/research_os_api/**'
+      - 'scripts/apply-research-os-branding.py'
+      - 'render.yaml'
+      - '.github/workflows/research-os-build-ready-source.yml'
+      - '.github/workflows/research-os-ios-ipa.yml'
+      - '.github/workflows/research-os-windows-artifact.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-build-ready-source-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FRIEND_REF: 092e02596e09baa4a2ff3cf1ed12496d02a6c6d7
+
+jobs:
+  package-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout latest Research OS app source
+        uses: actions/checkout@v4
+
+      - name: Checkout exact Friend Core source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FRIEND_REF }}
+          path: _friend
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate Research OS Flutter source
+        working-directory: apps/research_os_flutter
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Validate Friend Core source
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$GITHUB_WORKSPACE/_friend/owner_special"
+          pushd "$GITHUB_WORKSPACE/_friend" >/dev/null
+          python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
+          python owner_special/scripts/smoke.py
+          popd >/dev/null
+
+      - name: Validate Research OS API source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tools/research_os_api -p 'test_*.py' -v
+
+      - name: Assemble build-ready source trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/source-out"
+          APP="$OUT/app"
+          FRIEND="$OUT/friend"
+          COMPLETE="$OUT/complete"
+          rm -rf "$OUT"
+          mkdir -p "$APP" "$FRIEND" "$COMPLETE/app" "$COMPLETE/friend"
+
+          copy_clean() {
+            local src="$1"
+            local dst="$2"
+            mkdir -p "$dst"
+            rsync -a \
+              --exclude '.git/' \
+              --exclude '.dart_tool/' \
+              --exclude 'build/' \
+              --exclude '.idea/' \
+              --exclude '.vscode/' \
+              --exclude '__pycache__/' \
+              --exclude '*.pyc' \
+              --exclude '*.pyo' \
+              --exclude '*.exe' \
+              --exclude '*.dll' \
+              --exclude '*.pdb' \
+              --exclude '*.zip' \
+              --exclude '*.ipa' \
+              --exclude 'runtime/python/' \
+              --exclude 'windows/flutter/ephemeral/' \
+              --exclude 'linux/flutter/ephemeral/' \
+              --exclude 'macos/Flutter/ephemeral/' \
+              "$src/" "$dst/"
+          }
+
+          copy_clean "$GITHUB_WORKSPACE/apps/research_os_flutter" "$APP/apps/research_os_flutter"
+          mkdir -p "$APP/scripts" "$APP/.github/workflows" "$APP/tools"
+          cp "$GITHUB_WORKSPACE/scripts/apply-research-os-branding.py" "$APP/scripts/"
+          cp "$GITHUB_WORKSPACE/.github/workflows/research-os-ios-ipa.yml" "$APP/.github/workflows/"
+          cp "$GITHUB_WORKSPACE/.github/workflows/research-os-windows-artifact.yml" "$APP/.github/workflows/"
+          cp "$GITHUB_WORKSPACE/.github/workflows/research-os-build-ready-source.yml" "$APP/.github/workflows/"
+          cp "$GITHUB_WORKSPACE/render.yaml" "$APP/"
+          copy_clean "$GITHUB_WORKSPACE/tools/research_os_api" "$APP/tools/research_os_api"
+
+          copy_clean "$GITHUB_WORKSPACE/_friend/owner_special" "$FRIEND/owner_special"
+          copy_clean "$GITHUB_WORKSPACE/_friend/v3" "$FRIEND/v3"
+          mkdir -p "$FRIEND/tools" "$FRIEND/.github/workflows"
+          copy_clean "$GITHUB_WORKSPACE/_friend/tools/research_os_api" "$FRIEND/tools/research_os_api"
+          cp "$GITHUB_WORKSPACE/_friend/.github/workflows/owner-special-friend.yml" "$FRIEND/.github/workflows/"
+
+          cp -a "$APP/." "$COMPLETE/app/"
+          cp -a "$FRIEND/." "$COMPLETE/friend/"
+
+          cat > "$APP/BUILD_READY.md" <<EOF
+          # Research OS App Source — Build Ready
+
+          App commit: $GITHUB_SHA
+
+          ## Flutter validation
+          cd apps/research_os_flutter
+          flutter pub get
+          flutter analyze
+          flutter test
+
+          ## Windows
+          flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_flutter
+          flutter build windows --release
+
+          ## iOS (macOS/Xcode required)
+          flutter create . --platforms=ios --org com.phakphoum38 --project-name research_os_flutter
+          flutter build ios --release --no-codesign --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
+          EOF
+
+          cat > "$FRIEND/BUILD_READY.md" <<EOF
+          # Research OS Friend/Core Source — Build Ready
+
+          Friend commit: $FRIEND_REF
+
+          ## Python validation
+          export PYTHONPATH=owner_special
+          python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
+          python owner_special/scripts/smoke.py
+
+          ## Friend Flutter desktop
+          cd owner_special/flutter_app
+          flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build windows --release
+          EOF
+
+          cat > "$COMPLETE/BUILD_READY.md" <<EOF
+          # Research OS Complete Source — Build Ready
+
+          App source: app/ ($GITHUB_SHA)
+          Friend/Core source: friend/ ($FRIEND_REF)
+
+          The two roots are intentionally separated to avoid deep duplicate paths and to preserve the exact Friend commit used by the proven Windows package.
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ['RUNNER_TEMP']) / 'source-out'
+          for name in ('app', 'friend', 'complete'):
+              base = root / name
+              longest = max((len(str(p.relative_to(base))) for p in base.rglob('*')), default=0)
+              print(f'{name.upper()}_MAX_RELATIVE_PATH={longest}')
+              if longest > 200:
+                  raise SystemExit(f'{name} contains a relative path longer than 200 characters: {longest}')
+          PY
+
+      - name: Package source ZIPs and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/source-out"
+          DIST="$RUNNER_TEMP/source-dist"
+          mkdir -p "$DIST"
+          (
+            cd "$OUT/app"
+            zip -qry "$DIST/Research-OS-App-Source-Build-Ready.zip" .
+          )
+          (
+            cd "$OUT/friend"
+            zip -qry "$DIST/Research-OS-Friend-Core-Source-Build-Ready.zip" .
+          )
+          (
+            cd "$OUT/complete"
+            zip -qry "$DIST/Research-OS-Complete-Source-Build-Ready.zip" .
+          )
+          cd "$DIST"
+          sha256sum *.zip > SHA256SUMS.txt
+          ls -lh
+
+      - name: Upload build-ready sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: Research-OS-Build-Ready-Source-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/source-dist/Research-OS-App-Source-Build-Ready.zip
+            ${{ runner.temp }}/source-dist/Research-OS-Friend-Core-Source-Build-Ready.zip
+            ${{ runner.temp }}/source-dist/Research-OS-Complete-Source-Build-Ready.zip
+            ${{ runner.temp }}/source-dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
