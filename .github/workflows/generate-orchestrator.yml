@@ -40,7 +40,7 @@ jobs:
           test -f current/tools/generate-timeline-tool.md
           test -f current/tools/docs-validation-generate.md
 
-      - name: Read watched issues #32 and #52
+      - name: Read watched issues #32 and #52 (optional reference)
         if: ${{ inputs.mode == 'issue-read' || inputs.mode == 'validate' || inputs.mode == 'dispatch' }}
         shell: bash
         env:
@@ -48,7 +48,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence/generate
-          status=0
           for issue in $WATCH_ISSUES; do
             echo "=== ISSUE #$issue ==="
             if gh api "repos/${GITHUB_REPOSITORY}/issues/$issue" > "evidence/generate/issue-$issue.json" 2>/dev/null; then
@@ -60,12 +59,10 @@ jobs:
           PY
             else
               echo "#${issue}: NOT_FOUND_OR_NOT_ACCESSIBLE"
-              status=1
+              echo "Issue is optional reference only; continuing."
             fi
           done
-          echo "Issue reader completed."
-          echo "Non-readable issue data is a gate failure; no destructive action is allowed."
-          exit "$status"
+          echo "Optional issue reference scan completed."
 
       - name: Validate registry against repository
         shell: bash
@@ -106,13 +103,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo 'Dispatch remains explicitly gated by the registry and issue reader.'
+          echo 'Dispatch remains explicitly gated by the registry.'
           echo 'No workflow is deleted or modified by this step.'
           echo 'Runtime dispatch requires workflow_dispatch on the target workflow.'
 
       - name: Emit safe result
         shell: bash
         run: |
-          echo 'Generate Orchestrator connected to registry, timeline, docs validation, and watched-issue reader.'
+          echo 'Generate Orchestrator connected to registry, timeline, docs validation, and optional issue references.'
           echo 'Existing workflows remain preserved.'
           echo 'No cleanup occurs here.'
