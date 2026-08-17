@@ -101,11 +101,86 @@ jobs:
       - name: Dispatch registered stages sequentially
         if: ${{ inputs.mode == 'dispatch' }}
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          echo 'Dispatch remains explicitly gated by the registry.'
-          echo 'No workflow is deleted or modified by this step.'
-          echo 'Runtime dispatch requires workflow_dispatch on the target workflow.'
+          python - <<'PY'
+          import json, pathlib, re, subprocess, time, urllib.parse
+          from datetime import datetime
+
+          registry=pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()
+          entries=[]
+          current=None
+          for line in registry.splitlines():
+              m=re.match(r'\s*- stage:\s*(\d+)',line)
+              if m:
+                  current={'stage':int(m.group(1))}
+                  entries.append(current)
+                  continue
+              if current is not None:
+                  m=re.match(r'\s*file:\s*([^\s#]+)',line)
+                  if m: current['file']=m.group(1)
+                  m=re.match(r'\s*dispatchable:\s*(true|false)',line)
+                  if m: current['dispatchable']=m.group(1)=='true'
+
+          entries=[e for e in entries if e.get('dispatchable') and e.get('file')]
+          entries.sort(key=lambda e:e['stage'])
+          print('Sequential dispatch plan:')
+          for e in entries:
+              print(f"  stage {e['stage']}: {e['file']}")
+
+          def api(path, method='GET', payload=None):
+              cmd=['gh','api',path,'--method',method]
+              if payload is not None:
+                  cmd += ['--input','-']
+                  return subprocess.run(cmd,input=json.dumps(payload).encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
+              return subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
+
+          repo='${{ github.repository }}'
+          for e in entries:
+              wf=e['file']
+              encoded=urllib.parse.quote(wf,safe='')
+              started=time.time()
+              print(f"\n=== DISPATCH stage {e['stage']}: {wf} ===")
+              api(f'repos/{repo}/actions/workflows/{encoded}/dispatches','POST',{'ref':'main'})
+
+              deadline=time.time()+3600
+              run=None
+              while time.time()<deadline:
+                  raw=api(f'repos/{repo}/actions/workflows/{encoded}/runs?event=workflow_dispatch&per_page=10')
+                  data=json.loads(raw)
+                  candidates=[]
+                  for r in data.get('workflow_runs',[]):
+                      created=r.get('created_at')
+                      if not created: continue
+                      ts=datetime.fromisoformat(created.replace('Z','+00:00')).timestamp()
+                      if ts >= started-5: candidates.append(r)
+                  if candidates:
+                      run=max(candidates,key=lambda r:r['id'])
+                      break
+                  time.sleep(3)
+
+              if not run:
+                  raise SystemExit(f"Could not identify dispatched run for {wf}")
+
+              run_id=run['id']
+              print(f"Dispatched run {run_id}: {run.get('html_url','')}")
+              while time.time()<deadline:
+                  current=json.loads(api(f'repos/{repo}/actions/runs/{run_id}'))
+                  status=current.get('status')
+                  conclusion=current.get('conclusion')
+                  print(f"run {run_id}: status={status} conclusion={conclusion}")
+                  if status=='completed':
+                      if conclusion!='success':
+                          raise SystemExit(f"Stage {e['stage']} {wf} failed: {conclusion}")
+                      break
+                  time.sleep(10)
+              else:
+                  raise SystemExit(f"Stage {e['stage']} {wf} timed out")
+
+          print('\nAll dispatchable registry stages completed successfully.')
+          PY
 
       - name: Emit safe result
         shell: bash
