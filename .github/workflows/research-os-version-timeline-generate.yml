@@ -1,0 +1,135 @@
+name: Research OS Version Timeline Generate
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: 'Ref to inspect (branch, tag, or SHA)'
+        required: false
+        default: ''
+      write_artifact:
+        description: 'Write generated timeline files into the workspace'
+        required: false
+        default: 'true'
+  schedule:
+    - cron: '17 2 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  generate-timeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Generate version timeline
+        shell: python
+        env:
+          TARGET_REF: ${{ inputs.target_ref }}
+          WRITE_ARTIFACT: ${{ inputs.write_artifact || 'true' }}
+        run: |
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+
+          target = os.environ.get('TARGET_REF', '').strip()
+          if target:
+              target_sha = git('rev-parse', target)
+          else:
+              target_sha = git('rev-parse', 'HEAD')
+
+          tags = git('tag', '--sort=-creatordate').splitlines()
+          branches = git('for-each-ref', '--sort=-committerdate', '--format=%(refname:short)\t%(objectname)\t%(committerdate:iso-strict)', 'refs/remotes/origin').splitlines()
+
+          version_re = re.compile(r'(?i)(?:^|[/_-])(?:v)?(\d+(?:\.\d+){0,3})(?:$|[/_-])')
+          version_tags = []
+          for tag in tags:
+              m = version_re.search(tag)
+              if m:
+                  version_tags.append({'version': m.group(1), 'tag': tag, 'sha': git('rev-list', '-n', '1', tag)})
+
+          version_branches = []
+          for line in branches:
+              parts = line.split('\t')
+              if len(parts) != 3:
+                  continue
+              name, sha, date = parts
+              m = version_re.search(name)
+              if m:
+                  version_branches.append({'version': m.group(1), 'branch': name.removeprefix('origin/'), 'sha': sha, 'committed_at': date})
+
+          commits = []
+          for line in git('log', '--all', '--date=iso-strict', '--format=%H\t%ad\t%s', '-n', '500').splitlines():
+              sha, date, subject = line.split('\t', 2)
+              low = subject.lower()
+              if any(k in low for k in ('v1', 'v2', 'v3', '10x10', 'unified', 'research os', 'release', 'candidate', 'installer')):
+                  commits.append({'sha': sha, 'date': date, 'subject': subject})
+
+          payload = {
+              'schema': 'research-os.version-timeline.v1',
+              'generated_at': git('show', '-s', '--format=%cI', target_sha),
+              'target_ref': target or 'HEAD',
+              'target_sha': target_sha,
+              'version_tags': version_tags,
+              'version_branches': version_branches,
+              'milestone_commits': commits,
+          }
+
+          out = Path('research/generated/timeline')
+          out.mkdir(parents=True, exist_ok=True)
+          (out / 'version-timeline.json').write_text(json.dumps(payload, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          lines = [
+              '# Research OS Version Timeline',
+              '',
+              f'- Generated from: `{target or "HEAD"}`',
+              f'- Target SHA: `{target_sha}`',
+              f'- Generated commit date: `{payload["generated_at"]}`',
+              '',
+              '## Version tags',
+              '',
+              '| Version | Tag | SHA |',
+              '|---|---|---|',
+          ]
+          for item in version_tags:
+              lines.append(f'| {item["version"]} | `{item["tag"]}` | `{item["sha"]}` |')
+          if not version_tags:
+              lines.append('| — | No version-like tags found | — |')
+
+          lines += ['', '## Version branches', '', '| Version | Branch | SHA |', '|---|---|---|']
+          for item in version_branches:
+              lines.append(f'| {item["version"]} | `{item["branch"]}` | `{item["sha"]}` |')
+          if not version_branches:
+              lines.append('| — | No version-like branches found | — |')
+
+          lines += ['', '## Milestone commits', '', '| Date | SHA | Subject |', '|---|---|---|']
+          for item in commits:
+              subject = item['subject'].replace('|', '\\|')
+              lines.append(f'| {item["date"]} | `{item["sha"]}` | {subject} |')
+          (out / 'version-timeline.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+      - name: Upload timeline artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-version-timeline
+          path: research/generated/timeline/
+          if-no-files-found: error
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo '## Research OS Version Timeline' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Generated files:' >> "$GITHUB_STEP_SUMMARY"
+          echo '- research/generated/timeline/version-timeline.md' >> "$GITHUB_STEP_SUMMARY"
+          echo '- research/generated/timeline/version-timeline.json' >> "$GITHUB_STEP_SUMMARY"
