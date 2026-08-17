@@ -1,8 +1,59 @@
-version: 1
+version: 2
 purpose: >-
-  Single source of truth for Generate Orchestrator ordering. Existing workflows are
-  preserved; this registry describes how they may be connected without deleting or
-  forcing non-dispatchable workflows into execution.
+  Single source of truth for Generate Orchestrator ordering and multi-stack routing.
+  Existing workflows are preserved; this registry describes how they may be connected
+  without deleting or forcing non-dispatchable workflows into execution.
+
+stacks:
+  - id: flutter-dart
+    name: Flutter / Dart
+    platforms: [android, ios, macos, windows, linux, web]
+    detection: [pubspec.yaml, flutter.yaml]
+  - id: python
+    name: Python
+    platforms: [linux, windows, macos, web]
+    detection: [pyproject.toml, requirements.txt, setup.py]
+  - id: nodejs
+    name: Node.js
+    platforms: [windows, linux, macos, web, android, ios]
+    detection: [package.json]
+  - id: dotnet
+    name: .NET
+    platforms: [windows, linux, macos, web, android, ios]
+    detection: ["*.sln", "*.csproj", "*.fsproj"]
+  - id: rust
+    name: Rust
+    platforms: [windows, linux, macos, web, android, ios]
+    detection: [Cargo.toml]
+  - id: go
+    name: Go
+    platforms: [windows, linux, macos, web, android, ios]
+    detection: [go.mod]
+  - id: native-apple
+    name: Native iOS/macOS
+    platforms: [ios, macos]
+    detection: ["*.xcodeproj", "*.xcworkspace", Package.swift]
+  - id: windows
+    name: Windows
+    platforms: [windows]
+    detection: ["*.sln", "*.vcxproj", "*.csproj"]
+  - id: web
+    name: Web
+    platforms: [web]
+    detection: [package.json, index.html, vite.config.*, next.config.*]
+  - id: android
+    name: Android
+    platforms: [android]
+    detection: ["build.gradle", "build.gradle.kts", settings.gradle, settings.gradle.kts]
+  - id: linux
+    name: Linux
+    platforms: [linux]
+    detection: [CMakeLists.txt, Makefile, meson.build]
+  - id: custom
+    name: Custom
+    platforms: [custom]
+    detection: []
+    policy: require_explicit_workflow_and_gate
 
 stages:
   - stage: 10
@@ -67,3 +118,6 @@ rules:
   - one_canonical_final_artifact_per_target: true
   - do_not_force_non_dispatchable_workflows: true
   - re-audit_when_new_workflow_appears: true
+  - detect_stack_before_selecting_build_workflow: true
+  - support_multiple_stacks_per_repository: true
+  - custom_stack_requires_explicit_workflow_and_gate: true
