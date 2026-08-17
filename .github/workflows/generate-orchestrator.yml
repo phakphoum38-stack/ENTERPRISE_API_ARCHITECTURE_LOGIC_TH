@@ -4,23 +4,28 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'inventory, validate, issue-read, or dispatch'
+        description: 'inventory, validate, issue-read, dispatch, or repair'
         required: false
         default: inventory
         type: choice
-        options: [inventory, validate, issue-read, dispatch]
+        options: [inventory, validate, issue-read, dispatch, repair]
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write
   actions: write
   issues: read
+  pull-requests: write
 
 concurrency:
-  group: generate-orchestrator-main
+  group: generate-orchestrator-${{ github.ref }}
   cancel-in-progress: false
 
 env:
   REGISTRY: current/GENERATE_WORKFLOW_REGISTRY.yml
+  TOOL_REGISTRY: current/tools/generate-tool-registry.yml
+  SKILL_MEMORY: current/GENERATE_SKILL_MEMORY.md
   WATCH_ISSUES: "32 52"
 
 jobs:
@@ -29,6 +34,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Inventory existing workflows
         shell: bash
@@ -36,12 +43,15 @@ jobs:
           set -euo pipefail
           find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sort
           test -f "$REGISTRY"
+          test -f "$TOOL_REGISTRY"
+          test -f "$SKILL_MEMORY"
           test -f current/GENERATE_TIMELINE.md
           test -f current/tools/generate-timeline-tool.md
           test -f current/tools/docs-validation-generate.md
+          test -f current/tools/generate-ai-repair-contract.md
 
       - name: Read watched issues #32 and #52 (optional reference)
-        if: ${{ inputs.mode == 'issue-read' || inputs.mode == 'validate' || inputs.mode == 'dispatch' }}
+        if: ${{ inputs.mode == 'issue-read' || inputs.mode == 'validate' || inputs.mode == 'dispatch' || inputs.mode == 'repair' || github.event_name == 'pull_request' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -97,6 +107,27 @@ jobs:
           print(f'Registry validation passed: {len(stages)} stages; {dispatchable} downstream dispatchable workflows.')
           PY
 
+      - name: Validate AI tool registry and skill memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib,yaml
+          tools=yaml.safe_load(pathlib.Path('current/tools/generate-tool-registry.yml').read_text()) or {}
+          entries=tools.get('entries') or []
+          if not entries:
+              raise SystemExit('Generate tool registry is empty.')
+          for e in entries:
+              if not e.get('id') or not e.get('capability') or not e.get('safe_boundary'):
+                  raise SystemExit(f'Invalid tool registry entry: {e!r}')
+          memory=pathlib.Path('current/GENERATE_SKILL_MEMORY.md').read_text()
+          for required in ('candidate', 'validated', 'reusable', 'Evidence'):
+              if required not in memory:
+                  raise SystemExit(f'Skill memory contract missing: {required}')
+          print(f'AI tool registry validated: {len(entries)} tools.')
+          print('Skill Memory contract validated.')
+          PY
+
       - name: Validate YAML syntax
         shell: bash
         run: |
@@ -116,6 +147,49 @@ jobs:
               print('\n'.join(errors)); raise SystemExit(1)
           print('Workflow YAML validation passed.')
           PY
+
+      - name: Prepare AI repair evidence
+        if: ${{ inputs.mode == 'repair' || github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/generate
+          cat > evidence/generate/repair-context.md <<EOF
+          # Generate AI Repair Context
+
+          - Repository: ${GITHUB_REPOSITORY}
+          - Event: ${GITHUB_EVENT_NAME}
+          - Ref: ${GITHUB_REF}
+          - Source SHA: ${GITHUB_SHA}
+          - Source run: ${GITHUB_RUN_ID}
+          - Tool registry: ${TOOL_REGISTRY}
+          - Skill memory: ${SKILL_MEMORY}
+          - Repair boundary: branch-only
+          - Main mutation: forbidden
+          EOF
+          git status --short
+
+      - name: Create repair branch and preserve evidence
+        if: ${{ inputs.mode == 'repair' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            branch="fix/generate-repair-${GITHUB_RUN_ID}"
+          else
+            branch="fix/generate-repair-${GITHUB_RUN_ID}"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add evidence/generate/repair-context.md
+          git commit -m "generate: record AI repair context" || true
+          git push --set-upstream origin "$branch"
+          echo "REPAIR_BRANCH=$branch" >> "$GITHUB_ENV"
+          echo "Repair branch created: $branch"
+          echo "No changes are permitted directly on main."
 
       - name: Dispatch registered stages sequentially
         if: ${{ inputs.mode == 'dispatch' }}
@@ -195,7 +269,7 @@ jobs:
                       break
                   time.sleep(10)
               else:
-                  raise SystemExit(f"Stage {e['stage']} {wf} timed out")
+                  raise SystemExit(f"Stage {e['stage']} timed out")
 
           print('\nAll downstream dispatchable registry stages completed successfully.')
           PY
@@ -203,7 +277,7 @@ jobs:
       - name: Emit safe result
         shell: bash
         run: |
-          echo 'Generate Orchestrator connected to registry, timeline, docs validation, and optional issue references.'
+          echo 'Generate Orchestrator connected to Brain/AI repair contracts, Tool Registry, Skill Memory, registry, timeline, docs validation, and optional issue references.'
+          echo 'Repair mutations are branch-only; main is never mutated by the repair path.'
           echo 'Existing workflows remain preserved.'
           echo 'The orchestrator itself is never recursively dispatched.'
-          echo 'No cleanup occurs here.'
