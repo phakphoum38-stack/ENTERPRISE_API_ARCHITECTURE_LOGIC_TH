@@ -1,8 +1,5 @@
 name: Research OS Unified 10x10 Exact SHA Gate
 
-# Runtime verification gate: 8787 + actual V3 Master 8788 + Owner Friend 8790 + 10x10.
-# Trigger repair marker: force execution on the exact compat branch.
-
 on:
   push:
     branches:
@@ -32,9 +29,9 @@ jobs:
     timeout-minutes: 45
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
-      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\ResearchOSData
-      V3_DATA_DIR: ${{ runner.temp }}\ResearchOSV3
-      FRIEND_DATA_DIR: ${{ runner.temp }}\ResearchOSFriend
+      RESEARCH_OS_DATA_DIR: ${{ runner.temp }}\\ResearchOSData
+      V3_DATA_DIR: ${{ runner.temp }}\\ResearchOSV3
+      FRIEND_DATA_DIR: ${{ runner.temp }}\\ResearchOSFriend
 
     steps:
       - name: Checkout exact target SHA
@@ -46,20 +43,16 @@ jobs:
         shell: pwsh
         run: |
           $actual = (git rev-parse HEAD).Trim()
-          if ($actual -ne $env:TARGET_SHA) {
-            throw "Exact SHA mismatch: expected $env:TARGET_SHA, got $actual"
-          }
+          if ($actual -ne $env:TARGET_SHA) { throw "Exact SHA mismatch: expected $env:TARGET_SHA, got $actual" }
           Write-Host "EXACT_SHA=$actual"
 
-      - name: Verify V3 Master source exists
+      - name: Verify required sources
         shell: pwsh
         run: |
-          $service = Join-Path $PWD "v3\research_os_v3\service.py"
-          if (-not (Test-Path $service)) {
-            throw "V3 Master source missing: $service"
+          foreach ($path in @("v3\\research_os_v3\\service.py","owner_special\\scripts\\run_friend_service.py","scripts\\start-research-os-local.ps1")) {
+            if (-not (Test-Path $path)) { throw "Required source missing: $path" }
           }
-          Write-Host "V3_MASTER_SOURCE=PASS"
-          Write-Host "V3_MASTER_SOURCE_PATH=$service"
+          Write-Host "REQUIRED_SOURCES=PASS"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -72,7 +65,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Run Research OS API tests
+      - name: Run Research OS Python tests
         shell: pwsh
         run: |
           python -m compileall -q tools/research_os_api tools/research_curator v3 owner_special
@@ -80,7 +73,7 @@ jobs:
           python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Research OS API tests failed" }
 
-      - name: Run Flutter checks
+      - name: Run Flutter checks and Windows build
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: |
@@ -98,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:RESEARCH_OS_DATA_DIR | Out-Null
-          .\scripts\start-research-os-local.ps1 -DataDir $env:RESEARCH_OS_DATA_DIR -Provider mock -Port 8787 -Background
+          .\\scripts\\start-research-os-local.ps1 -DataDir $env:RESEARCH_OS_DATA_DIR -Provider mock -Port 8787 -Background
           $ready = $false
           for ($i=0; $i -lt 40; $i++) {
             try {
@@ -117,14 +110,9 @@ jobs:
           $env:RESEARCH_OS_DATA_DIR = $env:V3_DATA_DIR
           $v3Log = Join-Path $env:V3_DATA_DIR "v3-service.log"
           $v3Err = Join-Path $env:V3_DATA_DIR "v3-service.err.log"
-          $launcher = Join-Path $env:V3_DATA_DIR "start-v3-master.py"
-          @'
-from v3.research_os_v3.service import V3LocalService
-
-V3LocalService(host="127.0.0.1", port=8788).serve_forever()
-'@ | Set-Content -Path $launcher -Encoding utf8
-          $p = Start-Process python -ArgumentList @($launcher) -WorkingDirectory $PWD -RedirectStandardOutput $v3Log -RedirectStandardError $v3Err -PassThru
-          "V3_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
+          $code = 'from v3.research_os_v3.service import V3LocalService; V3LocalService(host="127.0.0.1", port=8788).serve_forever()'
+          $p = Start-Process python -ArgumentList @("-c",$code) -WorkingDirectory $PWD -RedirectStandardOutput $v3Log -RedirectStandardError $v3Err -PassThru
+          "V3_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\\v3.pid" -Encoding ascii
           $ready = $false
           for ($i=0; $i -lt 40; $i++) {
             if ($p.HasExited) { break }
@@ -135,7 +123,6 @@ V3LocalService(host="127.0.0.1", port=8788).serve_forever()
             Start-Sleep -Milliseconds 500
           }
           if (-not $ready) {
-            Write-Host "V3 process exited=$($p.HasExited)"
             Get-Content $v3Log -ErrorAction SilentlyContinue
             Get-Content $v3Err -ErrorAction SilentlyContinue
             throw "V3 Master service on 8788 did not become ready"
@@ -146,24 +133,16 @@ V3LocalService(host="127.0.0.1", port=8788).serve_forever()
         shell: pwsh
         run: |
           $master = Invoke-RestMethod "http://127.0.0.1:8788/v3/master?tasks=10000000000&risk=1&parallelism=1" -TimeoutSec 10
-          if ($master.contract -ne "unified-master-orchestrator-v3-full") {
-            throw "Unexpected V3 Master contract: $($master.contract)"
-          }
-          if ($master.system_maximum_scale -ne "10^10") {
-            throw "Unexpected V3 Master maximum scale: $($master.system_maximum_scale)"
-          }
-          if ([int64]$master.system_maximum_logical_capacity -ne 10000000000) {
-            throw "Unexpected V3 Master logical capacity: $($master.system_maximum_logical_capacity)"
-          }
-          if ($master.capacity_policy -ne "lazy-bounded-execution") {
-            throw "Unexpected V3 Master capacity policy: $($master.capacity_policy)"
-          }
+          if ($master.contract -ne "unified-master-orchestrator-v3-full") { throw "Unexpected V3 Master contract: $($master.contract)" }
+          if ($master.system_maximum_scale -ne "10^10") { throw "Unexpected V3 Master maximum scale: $($master.system_maximum_scale)" }
+          if ([int64]$master.system_maximum_logical_capacity -ne 10000000000) { throw "Unexpected V3 Master logical capacity: $($master.system_maximum_logical_capacity)" }
+          if ($master.capacity_policy -ne "lazy-bounded-execution") { throw "Unexpected V3 Master capacity policy: $($master.capacity_policy)" }
           if (-not $master.scale) { throw "V3 Master scale decision missing" }
-          $master | ConvertTo-Json -Depth 30 -Compress | Set-Content "$env:V3_DATA_DIR\master-evidence.json" -Encoding utf8
+          New-Item -ItemType Directory -Force -Path $env:V3_DATA_DIR | Out-Null
+          $master | ConvertTo-Json -Depth 30 | Set-Content "$env:V3_DATA_DIR\\master-evidence.json" -Encoding utf8
           Write-Host "V3_MASTER_CONTRACT=PASS"
           Write-Host "V3_MASTER_SCALE=$($master.scale)"
           Write-Host "V3_MASTER_10X10=PASS"
-          Write-Host "V3_MASTER_LOGICAL_CAPACITY=$($master.system_maximum_logical_capacity)"
 
       - name: Start Owner Friend on 8790
         shell: pwsh
@@ -171,7 +150,8 @@ V3LocalService(host="127.0.0.1", port=8788).serve_forever()
           New-Item -ItemType Directory -Force -Path $env:FRIEND_DATA_DIR | Out-Null
           $env:PYTHONPATH = (Resolve-Path "owner_special").Path
           $audit = Join-Path $env:FRIEND_DATA_DIR "friend-audit.jsonl"
-          $p = Start-Process python -ArgumentList @("owner_special\scripts\run_friend_service.py","--owner-id","owner","--host","127.0.0.1","--port","8790","--data-root",$env:FRIEND_DATA_DIR,"--audit-path",$audit,"--repository-root",$PWD) -PassThru
+          $p = Start-Process python -ArgumentList @("owner_special\\scripts\\run_friend_service.py","--owner-id","owner","--host","127.0.0.1","--port","8790","--data-root",$env:FRIEND_DATA_DIR,"--audit-path",$audit,"--repository-root",$PWD) -PassThru
+          "FRIEND_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\\friend.pid" -Encoding ascii
           $ready = $false
           for ($i=0; $i -lt 40; $i++) {
             try {
@@ -181,58 +161,65 @@ V3LocalService(host="127.0.0.1", port=8788).serve_forever()
             Start-Sleep -Milliseconds 500
           }
           if (-not $ready) { throw "8790 Owner Friend service did not become ready" }
-          "FRIEND_PID=$($p.Id)" | Out-File "$env:RUNNER_TEMP\friend.pid" -Encoding ascii
+          Write-Host "PORT_8790_OWNER=PASS"
 
-      - name: Validate loopback and service topology
+      - name: Validate Owner identity and service topology
         shell: pwsh
         run: |
-          $h = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 5
-          if ($h.status -ne "ok") { throw "8790 health failed" }
+          $headers = @{
+            "X-Research-OS-Owner" = "owner"
+            "X-Research-OS-Profile" = "default"
+            "X-Research-OS-Session" = "default"
+          }
+          $status = Invoke-RestMethod "http://127.0.0.1:8790/owner/status" -Method Get -Headers $headers -TimeoutSec 10
+          if ($status.owner_id -ne "owner") { throw "Owner identity rejected or mismatched" }
+          if ($status.profile_id -ne "default") { throw "Owner profile mismatch" }
+          if ($status.session_id -ne "default") { throw "Owner session mismatch" }
+          if (-not $status.v3_bridge.available) { throw "V3 bridge unavailable" }
           $listeners = @()
-          $listeners += Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction SilentlyContinue
           $listeners += Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
           $listeners += Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue
+          $listeners += Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction SilentlyContinue
           $unsafe = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1','::1') })
           if ($unsafe) { throw "8787/8788/8790 must listen on loopback only" }
-          Write-Host "PORT_8787=PASS"
-          Write-Host "PORT_8788_V3_MASTER=PASS"
-          Write-Host "PORT_8790=PASS"
+          Write-Host "OWNER_IDENTITY=PASS"
+          Write-Host "V3_BRIDGE=PASS"
+          Write-Host "LOOPBACK_TOPOLOGY=PASS"
 
-      - name: Produce gate evidence
+      - name: Produce and upload gate evidence
         shell: pwsh
         run: |
-          $out = "$env:RUNNER_TEMP\unified-gate"
+          $out = "$env:RUNNER_TEMP\\unified-gate"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          Copy-Item "$env:V3_DATA_DIR\master-evidence.json" "$out\MASTER_V3_EVIDENCE.json" -Force
+          Copy-Item "$env:V3_DATA_DIR\\master-evidence.json" "$out\\MASTER_V3_EVIDENCE.json" -Force
           @{
             target_sha = $env:TARGET_SHA
             main_api = '127.0.0.1:8787'
             unified_master_v3 = '127.0.0.1:8788/v3/master'
             owner_friend_v3 = '127.0.0.1:8790'
-            unified_master_contract = 'unified-master-orchestrator-v3-full'
+            owner_id = 'owner'
+            profile_id = 'default'
+            session_id = 'default'
             ten_x_ten = '10^10 / 10000000000'
             capacity_policy = 'lazy-bounded-execution'
-            legacy_v2_master = 'not used by this V3 gate'
-          } | ConvertTo-Json | Set-Content "$out\UNIFIED_GATE.json" -Encoding utf8
-          Get-FileHash "$out\UNIFIED_GATE.json" -Algorithm SHA256 | Format-List | Out-File "$out\UNIFIED_GATE.sha256.txt"
-          Get-FileHash "$out\MASTER_V3_EVIDENCE.json" -Algorithm SHA256 | Format-List | Out-File "$out\MASTER_V3_EVIDENCE.sha256.txt"
+          } | ConvertTo-Json | Set-Content "$out\\UNIFIED_GATE.json" -Encoding utf8
+          Get-FileHash "$out\\UNIFIED_GATE.json" -Algorithm SHA256 | Format-List | Out-File "$out\\UNIFIED_GATE.sha256.txt"
+          Get-FileHash "$out\\MASTER_V3_EVIDENCE.json" -Algorithm SHA256 | Format-List | Out-File "$out\\MASTER_V3_EVIDENCE.sha256.txt"
 
       - name: Upload unified gate evidence
         uses: actions/upload-artifact@v4
         with:
           name: research-os-unified-10x10-gate-${{ env.TARGET_SHA }}
-          path: ${{ runner.temp }}\unified-gate\*
+          path: ${{ runner.temp }}\\unified-gate\\*
 
       - name: Cleanup services
         if: always()
         shell: pwsh
         run: |
-          .\scripts\stop-research-os-local.ps1 -Port 8787 -ErrorAction SilentlyContinue
-          if (Test-Path "$env:RUNNER_TEMP\friend.pid") {
-            $friendPid = (Get-Content "$env:RUNNER_TEMP\friend.pid" -ErrorAction SilentlyContinue)
-            if ($friendPid) { Stop-Process -Id ([int]$friendPid) -Force -ErrorAction SilentlyContinue }
-          }
-          if (Test-Path "$env:RUNNER_TEMP\v3.pid") {
-            $v3Pid = (Get-Content "$env:RUNNER_TEMP\v3.pid" -ErrorAction SilentlyContinue)
-            if ($v3Pid) { Stop-Process -Id ([int]$v3Pid) -Force -ErrorAction SilentlyContinue }
+          .\\scripts\\stop-research-os-local.ps1 -Port 8787 -ErrorAction SilentlyContinue
+          foreach ($file in @("$env:RUNNER_TEMP\\friend.pid","$env:RUNNER_TEMP\\v3.pid")) {
+            if (Test-Path $file) {
+              $pid = Get-Content $file -ErrorAction SilentlyContinue
+              if ($pid) { Stop-Process -Id ([int]$pid) -Force -ErrorAction SilentlyContinue }
+            }
           }
