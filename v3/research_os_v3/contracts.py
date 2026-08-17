@@ -26,6 +26,7 @@ def master_contract(decision: OrchestrationDecision) -> dict[str, object]:
         "maximum_leaf_capacity": decision.profile.capacity,
         "system_maximum_scale": maximum.tier.value,
         "system_maximum_logical_capacity": maximum.capacity,
+        "capacity_policy": "lazy-bounded-execution",
         "demand": decision.demand,
         "provider": decision.provider,
         "reason": decision.reason,
