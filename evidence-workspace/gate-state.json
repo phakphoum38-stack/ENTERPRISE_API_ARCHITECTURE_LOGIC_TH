@@ -1,0 +1,22 @@
+{
+  "repository": "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH",
+  "pr": 49,
+  "target_sha": "3dc73c6c87565b2cc1e3b241ddac9b6efc9ebe19",
+  "source": "github-structure",
+  "generated_at": "2026-08-17",
+  "stages": {
+    "yaml": {"status": "pending", "evidence": null},
+    "exact-sha": {"status": "pending", "evidence": null},
+    "flutter": {"status": "pending", "evidence": null},
+    "8787": {"status": "pending", "evidence": null},
+    "8788": {"status": "pending", "evidence": null},
+    "10x10": {"status": "pending", "evidence": null},
+    "8790": {"status": "pending", "evidence": null},
+    "evidence-sha256": {"status": "pending", "evidence": null}
+  },
+  "policy": {
+    "capacity_policy": "lazy-bounded-execution",
+    "physical_workers_follow_logical_capacity": false,
+    "results_may_be_marked_passed_without_runtime_evidence": false
+  }
+}
