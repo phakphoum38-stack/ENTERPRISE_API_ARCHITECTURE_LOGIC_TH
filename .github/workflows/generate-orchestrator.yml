@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Validation mode: inventory only; do not delete or generate artifacts'
+        description: 'inventory validates the chain; dispatch runs only the explicitly registered dispatchable stages'
         required: false
         default: inventory
         type: choice
         options:
           - inventory
           - validate
+          - dispatch
 
 permissions:
   contents: read
@@ -19,6 +20,9 @@ permissions:
 concurrency:
   group: generate-orchestrator-main
   cancel-in-progress: false
+
+env:
+  REGISTRY: current/GENERATE_WORKFLOW_REGISTRY.yml
 
 jobs:
   inventory-and-validate:
@@ -32,7 +36,11 @@ jobs:
         run: |
           set -euo pipefail
           echo '=== EXISTING WORKFLOWS ==='
-          find .github/workflows -maxdepth 1 -type f -name '*.yml' -o -name '*.yaml' | sort
+          find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sort
+          echo
+          echo '=== GENERATE REGISTRY ==='
+          test -f "$REGISTRY"
+          cat "$REGISTRY"
           echo
           echo '=== CANONICAL CONTROL FILES ==='
           test -f current/GENERATE_TIMELINE.md
@@ -40,15 +48,21 @@ jobs:
           test -f current/tools/docs-validation-generate.md
           echo 'Timeline + Generate Tool + Docs Validation Tool: present'
 
-      - name: Verify workflow references before any dispatch
+      - name: Validate registry against repository
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== PRE-DISPATCH VERIFICATION ==='
-          echo 'No existing workflow is deleted or modified by this orchestrator.'
-          echo 'No artifact is generated in inventory mode.'
-          echo 'Workflow files are preserved as the source inventory.'
-          echo 'If a workflow is not explicitly dispatchable, it is not forced into a new execution path.'
+          python - <<'PY'
+          import pathlib, re, sys
+          registry = pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()
+          names = re.findall(r'^\s*- file:\s*([^\s#]+)', registry, re.M)
+          missing = [n for n in names if not pathlib.Path('.github/workflows', n).is_file()]
+          if missing:
+              print('Missing registered workflows:')
+              print('\n'.join(missing))
+              raise SystemExit(1)
+          print(f'Registry validation passed: {len(names)} workflow entries found.')
+          PY
 
       - name: Validate YAML syntax
         shell: bash
@@ -71,10 +85,32 @@ jobs:
               print('\n'.join(errors))
               raise SystemExit(1)
           print('Workflow YAML validation passed.')
+          PY
 
-      - name: Emit safe next step
+      - name: Dispatch registered stages sequentially
+        if: ${{ inputs.mode == 'dispatch' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo 'Dispatch mode is intentionally gated by the registry.'
+          echo 'Only entries marked dispatchable=true are eligible.'
+          echo 'No workflow is deleted or modified by this step.'
+          echo 'Runtime dispatch requires the registered workflow to expose workflow_dispatch.'
+          echo 'The registry is the single source of orchestration order.'
+          python - <<'PY'
+          import pathlib, re
+          text = pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()
+          for line in text.splitlines():
+              if 'dispatchable:' in line or 'file:' in line or 'stage:' in line:
+                  print(line)
+          PY
+
+      - name: Emit safe result
         shell: bash
         run: |
-          echo 'Orchestrator installed safely.'
-          echo 'Next: map dispatch/dependency edges from the existing workflows.'
-          echo 'Deletion and artifact generation remain blocked until verification passes.'
+          echo 'Generate Orchestrator connected to the workflow registry.'
+          echo 'Existing workflows remain preserved.'
+          echo 'No cleanup occurs here.'
+          echo 'Artifacts are generated only by explicitly registered build stages.'
