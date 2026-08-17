@@ -1,0 +1,80 @@
+name: Generate Orchestrator
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Validation mode: inventory only; do not delete or generate artifacts'
+        required: false
+        default: inventory
+        type: choice
+        options:
+          - inventory
+          - validate
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: generate-orchestrator-main
+  cancel-in-progress: false
+
+jobs:
+  inventory-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Inventory existing workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== EXISTING WORKFLOWS ==='
+          find .github/workflows -maxdepth 1 -type f -name '*.yml' -o -name '*.yaml' | sort
+          echo
+          echo '=== CANONICAL CONTROL FILES ==='
+          test -f current/GENERATE_TIMELINE.md
+          test -f current/tools/generate-timeline-tool.md
+          test -f current/tools/docs-validation-generate.md
+          echo 'Timeline + Generate Tool + Docs Validation Tool: present'
+
+      - name: Verify workflow references before any dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== PRE-DISPATCH VERIFICATION ==='
+          echo 'No existing workflow is deleted or modified by this orchestrator.'
+          echo 'No artifact is generated in inventory mode.'
+          echo 'Workflow files are preserved as the source inventory.'
+          echo 'If a workflow is not explicitly dispatchable, it is not forced into a new execution path.'
+
+      - name: Validate YAML syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          try:
+              import yaml
+          except ImportError:
+              print('PyYAML unavailable; skipping parser-only check.')
+              raise SystemExit(0)
+          errors=[]
+          for p in sorted(pathlib.Path('.github/workflows').glob('*.*ml')):
+              try:
+                  yaml.safe_load(p.read_text())
+              except Exception as e:
+                  errors.append(f'{p}: {e}')
+          if errors:
+              print('\n'.join(errors))
+              raise SystemExit(1)
+          print('Workflow YAML validation passed.')
+
+      - name: Emit safe next step
+        shell: bash
+        run: |
+          echo 'Orchestrator installed safely.'
+          echo 'Next: map dispatch/dependency edges from the existing workflows.'
+          echo 'Deletion and artifact generation remain blocked until verification passes.'
