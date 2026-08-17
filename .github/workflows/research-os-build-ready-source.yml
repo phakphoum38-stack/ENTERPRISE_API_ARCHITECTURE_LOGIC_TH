@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FRIEND_REF: 092e02596e09baa4a2ff3cf1ed12496d02a6c6d7
+  FRIEND_REF: 63b2a39f4dcb1aef76e34daa2c3be7f6351554ff
 
 jobs:
   package-source:
