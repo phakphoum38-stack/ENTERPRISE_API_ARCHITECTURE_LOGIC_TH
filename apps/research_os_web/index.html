@@ -3,42 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Research OS</title>
+  <meta name="theme-color" content="#0b0d0f">
+  <title>Research OS 3.2 — Wide Research</title>
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-  <main class="shell">
-    <section class="hero">
-      <div class="mark">🏡</div>
-      <p class="eyebrow">Research OS v0.1</p>
-      <h1>ยินดีต้อนรับกลับครับเพื่อน</h1>
-      <p class="motto">บ้านของเรา…ดีขึ้นกว่าเมื่อวาน</p>
-      <button id="startButton">เริ่มงาน</button>
-    </section>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">R</div><div><strong>Research OS</strong><span>3.2 Unified</span></div></div>
+      <button class="new-research" id="newResearch">＋ New research</button>
+      <nav class="nav" aria-label="Workspace">
+        <a class="active" href="#research">⌕ <span>Research</span></a>
+        <a href="#evidence">◈ <span>Evidence</span></a>
+        <a href="#memory">◌ <span>Memory</span></a>
+        <a href="#workspace">▦ <span>Workspace</span></a>
+      </nav>
+      <div class="nav-section"><span>UNIFIED SYSTEM</span><a href="#master">◉ <span>Unified Master</span><em>ON</em></a><a href="#bridge">◇ <span>V3 Bridge</span><em>ON</em></a><a href="#providers">⌘ <span>Providers</span></a></div>
+      <div class="sidebar-bottom"><div class="status-dot"></div><div><b>System online</b><small>Evidence pipeline ready</small></div></div>
+    </aside>
 
-    <section id="workspace" class="workspace" hidden>
-      <header>
-        <div>
-          <h2>ห้องทำงาน</h2>
-          <p id="health">กำลังตรวจสอบบ้าน…</p>
-        </div>
-        <span id="sessionLabel" class="badge"></span>
-      </header>
+    <main class="main" id="research">
+      <header class="topbar"><div class="crumb">Research / <b>New investigation</b></div><div class="top-actions"><button class="icon-btn">⌘ K</button><button class="avatar">P</button></div></header>
 
-      <div id="messages" class="messages" aria-live="polite"></div>
+      <section class="research-home">
+        <div class="welcome"><span class="live-pill"><i></i> RESEARCH OS 3.2</span><h1>What do you want to<br><span>research today?</span></h1><p>Ask a question, define a goal, and let the Unified Master coordinate research, evidence, memory, and tools.</p></div>
 
-      <form id="chatForm">
-        <label for="prompt">คุยกับเพื่อน</label>
-        <div class="composer">
-          <textarea id="prompt" rows="3" required placeholder="วันนี้เราจะสร้างอะไรด้วยกัน?"></textarea>
-          <button type="submit">ส่ง</button>
-        </div>
-      </form>
+        <form id="researchForm" class="research-composer">
+          <div class="composer-top"><span class="spark">✦</span><textarea id="prompt" rows="4" required placeholder="Describe the research you want to investigate..."></textarea></div>
+          <div class="composer-bottom"><div class="composer-tools"><button type="button" class="tool-chip" id="deepMode">◉ Deep Research <span>ON</span></button><button type="button" class="tool-chip">＋ Sources</button><button type="button" class="tool-chip">◫ Evidence</button></div><button class="run-btn" type="submit" id="runButton">Start research <span>→</span></button></div>
+        </form>
 
-      <button id="captureButton" class="secondary" disabled>เก็บความรู้จาก Session</button>
-      <pre id="captureResult" class="result" hidden></pre>
-    </section>
-  </main>
+        <div class="suggestions"><span>Try a research task</span><button data-prompt="Compare the strongest evidence and explain the key findings">Compare evidence and explain the key findings</button><button data-prompt="Build a structured research brief with sources and open questions">Build a structured research brief</button><button data-prompt="Find gaps, contradictions, and unresolved questions">Find gaps and contradictions</button></div>
+
+        <section class="workspace-grid" id="workspace">
+          <div class="research-card output-card">
+            <div class="card-head"><div><span class="eyebrow">CURRENT RESEARCH</span><h2 id="researchTitle">Ready for your investigation</h2></div><span class="state" id="researchState">IDLE</span></div>
+            <div id="messages" class="messages"><div class="empty-state"><div class="empty-icon">✦</div><b>Your research workspace is ready.</b><span>Results, reasoning notes, and evidence will appear here.</span></div></div>
+          </div>
+          <aside class="research-card activity-card" id="evidence">
+            <div class="card-head"><div><span class="eyebrow">RESEARCH FLOW</span><h3>Evidence pipeline</h3></div></div>
+            <div class="flow"><div class="flow-item active"><b>01</b><div><strong>Plan</strong><small>Unified Master</small></div><i>✓</i></div><div class="flow-line"></div><div class="flow-item"><b>02</b><div><strong>Research</strong><small>V3 Bridge · Providers</small></div><i>○</i></div><div class="flow-line"></div><div class="flow-item"><b>03</b><div><strong>Verify</strong><small>Evidence Workspace</small></div><i>○</i></div><div class="flow-line"></div><div class="flow-item"><b>04</b><div><strong>Remember</strong><small>Memory / Knowledge</small></div><i>○</i></div></div>
+            <div class="system-mini"><div><span>API</span><b id="health">checking…</b></div><div><span>Memory</span><b>READY</b></div><div><span>Bridge</span><b>ONLINE</b></div></div>
+          </aside>
+        </section>
+
+        <section class="platform-strip" id="providers"><div><span class="eyebrow">UNIFIED PLATFORM</span><h3>One research system across every surface.</h3></div><div class="platforms"><span>Windows <b>READY</b></span><span>iOS <b>READY</b></span><span>Web <b>ONLINE</b></span><span>API <b>8787</b></span></div></section>
+      </section>
+    </main>
+  </div>
   <script src="/app.js" defer></script>
 </body>
 </html>
