@@ -18,18 +18,18 @@ from .runner import RunnerResult, StatelessResearchRunner
 from .secrets import CompositeSecretSource, EnvironmentSecretSource, WindowsCredentialManagerSecretSource, default_secret_source
 from .service import PROFILE_HEADER, USER_HEADER, V3LocalService
 from .storage import DataLayout, UserDataLayout
+from .tool_evidence import EvidenceSink, InMemoryEvidenceSink, ToolEvidence, ToolEvidenceRecorder
 from .user_context import UserContext, safe_local_user_id
 
 __all__ = [
     "AtomicExecutionEvidenceStore", "AutonomousResearchLoop", "AutonomousResearchResult", "BrainCore", "BuiltinResearchTools",
     "CircuitBreakerPolicy", "CircuitOpenError", "CompletionRequest", "CompletionResponse", "CompositeSecretSource", "DataLayout",
-    "DurableTaskQueue", "EnvironmentSecretSource", "FactoryExecutionContext", "FactoryExecutionEngine", "FactoryExecutionResult",
-    "FileResearchTool", "GitHubResearchTool", "MockProvider", "OpenAICompatibleProvider", "OrchestrationDecision", "PROFILE_HEADER",
-    "ProviderRegistry", "ProviderStatus", "ProviderUnavailableError", "PythonResearchTool", "QueueTask", "ReportFinding",
-    "ResearchCheckpoint", "ResearchCheckpointStore", "ResearchExecutionCoordinator", "ResearchExecutionResult", "ResearchReport",
-    "ResearchReportBuilder", "ResearchTool", "ResearchToolError", "ResearchToolRegistry", "RetryPolicy", "RunnerResult",
-    "ScaleProfile", "ScaleTier", "ShellResearchTool", "SoftwareFactory", "StageEvidence", "StageHandler", "StatelessResearchRunner",
-    "ToolRequest", "ToolResult", "USER_HEADER", "UnifiedMasterOrchestrator", "UserContext", "UserDataLayout", "V3LocalService",
-    "WebResearchTool", "WindowsCredentialManagerSecretSource", "Workload", "default_secret_source", "health_contract", "master_contract",
-    "providers_contract", "safe_local_user_id",
+    "DurableTaskQueue", "EnvironmentSecretSource", "EvidenceSink", "FactoryExecutionContext", "FactoryExecutionEngine", "FactoryExecutionResult",
+    "FileResearchTool", "GitHubResearchTool", "InMemoryEvidenceSink", "MockProvider", "OpenAICompatibleProvider", "OrchestrationDecision", "PROFILE_HEADER",
+    "ProviderRegistry", "ProviderStatus", "ProviderUnavailableError", "PythonResearchTool", "QueueTask", "ReportFinding", "ResearchCheckpoint",
+    "ResearchCheckpointStore", "ResearchExecutionCoordinator", "ResearchExecutionResult", "ResearchReport", "ResearchReportBuilder", "ResearchTool",
+    "ResearchToolError", "ResearchToolRegistry", "RetryPolicy", "RunnerResult", "ScaleProfile", "ScaleTier", "ShellResearchTool", "SoftwareFactory",
+    "StageEvidence", "StageHandler", "StatelessResearchRunner", "ToolEvidence", "ToolEvidenceRecorder", "ToolRequest", "ToolResult", "USER_HEADER",
+    "UnifiedMasterOrchestrator", "UserContext", "UserDataLayout", "V3LocalService", "WebResearchTool", "WindowsCredentialManagerSecretSource", "Workload",
+    "default_secret_source", "health_contract", "master_contract", "providers_contract", "safe_local_user_id",
 ]
