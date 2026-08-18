@@ -1,6 +1,9 @@
 name: Browser Use Cloud Connect Smoke
 
 on:
+  push:
+    branches:
+      - agent/stage60-ai-chat-complete
   workflow_dispatch:
     inputs:
       target_sha:
@@ -32,7 +35,7 @@ jobs:
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       RESEARCH_OS_PROVIDER: mock
-      CONNECT_CLOUD: ${{ inputs.connect_cloud }}
+      CONNECT_CLOUD: ${{ inputs.connect_cloud || false }}
       PROXY_COUNTRY_CODE: ${{ inputs.proxy_country_code || 'us' }}
 
     steps:
@@ -89,10 +92,8 @@ jobs:
           python - <<'PY'
           import json
           import urllib.request
-
           with urllib.request.urlopen("http://127.0.0.1:8787/health", timeout=5) as response:
               health = json.loads(response.read().decode("utf-8"))
-
           assert health["status"] == "ok", health
           assert health["service"] == "research-os-api", health
           assert health["memory"] is True, health
@@ -128,7 +129,6 @@ jobs:
           python - <<'PY'
           import json
           import urllib.request
-
           def post(path, payload):
               request = urllib.request.Request(
                   f"http://127.0.0.1:8787{path}",
@@ -138,10 +138,8 @@ jobs:
               )
               with urllib.request.urlopen(request, timeout=15) as response:
                   return json.loads(response.read().decode())
-
           generated = post("/v1/ai/generate", {"prompt": "Reply with CHAT-DIRECT-READY"})
           assert str(generated.get("text", "")).strip(), generated
-
           answer = post(
               "/v1/ai/answer-with-memory",
               {"question": "User: marker DIRECT-KITE-731\nAssistant: acknowledged\nUser: return DIRECT-KITE-731"},
