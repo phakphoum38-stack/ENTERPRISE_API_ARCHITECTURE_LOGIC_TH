@@ -1,0 +1,58 @@
+name: Stage 60 Generate Brain
+
+on:
+  push:
+    branches:
+      - agent/stage60-build-plan-20e20
+  workflow_dispatch:
+    inputs:
+      workers:
+        description: Bounded real workers (20^20 remains logical capacity)
+        required: false
+        default: "4"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  generate-brain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate Brain plan
+        shell: bash
+        env:
+          WORKERS: ${{ inputs.workers || '4' }}
+        run: |
+          set -euo pipefail
+          python tools/stage60/generate_brain.py --workers "$WORKERS" --output stage60-generate-brain.json
+
+      - name: Upload Generate Brain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage60-generate-brain
+          path: stage60-generate-brain.json
+
+      - name: Block on missing real contracts
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          plan = json.loads(Path('stage60-generate-brain.json').read_text(encoding='utf-8'))
+          print('logical_capacity=', plan['logical_capacity'])
+          print('workers=', plan['workers'])
+          print('status=', plan['status'])
+          if plan['status'] != 'READY':
+              raise SystemExit('Generate Brain found missing real contracts: ' + ', '.join(plan['blocking_items']))
+          PY
