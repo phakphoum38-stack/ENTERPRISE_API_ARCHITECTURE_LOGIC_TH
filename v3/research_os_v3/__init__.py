@@ -18,6 +18,7 @@ from .research_tool_adapters import BuiltinResearchTools, FileResearchTool, Pyth
 from .runner import RunnerResult, StatelessResearchRunner
 from .secrets import CompositeSecretSource, EnvironmentSecretSource, WindowsCredentialManagerSecretSource, default_secret_source
 from .service import PROFILE_HEADER, USER_HEADER, V3LocalService
+from .storage import DataLayout, UserDataLayout
 from .tool_evidence import EvidenceSink, InMemoryEvidenceSink, ToolEvidence, ToolEvidenceRecorder
 from .user_context import UserContext, safe_local_user_id
 
