@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Mapping
+import hashlib
 
 from .queue import DurableTaskQueue, QueueTask
 from .research_planner import ResearchPlan, ResearchTask, ready_tasks
-from .runner import RunnerResult, StatelessResearchRunner
+from .runner import StatelessResearchRunner
 
-TaskHandler = callable
+TaskHandler = Callable[[ResearchTask, QueueTask], None]
 
 
 @dataclass(frozen=True)
@@ -19,11 +20,7 @@ class ResearchExecutionResult:
 
 
 class ResearchExecutionCoordinator:
-    """Binds the Research DAG to the existing durable queue/runner boundary.
-
-    It does not call providers and does not own execution state beyond the
-    current coordinator invocation. The queue and runner remain replaceable.
-    """
+    """Binds the Research DAG to the existing durable queue/runner boundary."""
 
     def __init__(self, queue: DurableTaskQueue, *, max_attempts: int = 3) -> None:
         self.queue = queue
@@ -55,14 +52,12 @@ class ResearchExecutionCoordinator:
 
     @staticmethod
     def research_id(plan: ResearchPlan) -> str:
-        # Stable enough for queue correlation while avoiding provider calls.
-        import hashlib
         return "research-" + hashlib.sha256(plan.question.encode("utf-8")).hexdigest()[:20]
 
     def run(
         self,
         plan: ResearchPlan,
-        handlers: Mapping[str, callable],
+        handlers: Mapping[str, TaskHandler],
     ) -> ResearchExecutionResult:
         task_map = {task.id: task for task in plan.tasks}
         completed: set[str] = set()
