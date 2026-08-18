@@ -1,0 +1,40 @@
+document:
+  id: ANEF-WR-004
+  version: v0.1.0-draft
+  status: draft
+  title: Workflow Retry Policy
+
+policy:
+  default:
+    max_attempts: 3
+    backoff: exponential
+    initial_delay_seconds: 5
+    max_delay_seconds: 300
+    jitter: true
+    retryable_errors:
+      - transient
+      - rate_limited
+      - dependency_unavailable
+      - runner_lost
+
+  non_retryable_errors:
+    - invalid_input
+    - contract_violation
+    - authorization_denied
+    - deterministic_failure
+    - cancelled
+
+  timeout:
+    default_seconds: 900
+    timeout_is_retryable: false
+
+  cancellation:
+    cooperative: true
+    runner_must_stop_new_side_effects: true
+    engine_must_record_cancel_event: true
+
+requirements:
+  policy_is_versioned: true
+  retry_count_is_persisted: true
+  attempt_id_is_unique: true
+  side_effects_require_idempotency_key: true

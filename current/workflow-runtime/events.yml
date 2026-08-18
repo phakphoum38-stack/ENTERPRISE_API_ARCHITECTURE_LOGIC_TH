@@ -1,0 +1,53 @@
+document:
+  id: ANEF-WR-003
+  version: v0.1.0-draft
+  status: draft
+  title: Workflow Runtime Events
+
+event_envelope:
+  required:
+    - event_id
+    - event_type
+    - occurred_at
+    - workflow_id
+    - task_id
+    - correlation_id
+    - causation_id
+    - sequence
+    - payload
+  fields:
+    event_id: string
+    event_type: string
+    occurred_at: datetime
+    workflow_id: string
+    task_id: string
+    correlation_id: string
+    causation_id: string
+    sequence: integer
+    producer: string
+    payload: object
+
+lifecycle_events:
+  - workflow.created
+  - workflow.started
+  - workflow.completed
+  - workflow.failed
+  - workflow.cancelled
+  - task.queued
+  - task.started
+  - task.succeeded
+  - task.failed
+  - task.retry_scheduled
+  - task.requeued
+  - task.timed_out
+  - task.cancelled
+  - task.cancel_requested
+  - runner.heartbeat
+  - runner.execution_rejected
+  - artifact.created
+
+semantics:
+  delivery: at-least-once
+  consumers_must_be_idempotent: true
+  event_log_is_append_only: true
+  ordering_scope: workflow-and-task
