@@ -5,7 +5,7 @@ on:
     inputs:
       expected_sha:
         description: "PR HEAD SHA to validate"
-        required: true
+        required: false
         type: string
   pull_request:
     branches:
@@ -28,14 +28,19 @@ jobs:
         env:
           EVENT_SHA: ${{ github.event.pull_request.head.sha }}
           INPUT_SHA: ${{ inputs.expected_sha }}
+          WORKFLOW_SHA: ${{ github.sha }}
         run: |
+          set -euo pipefail
           if [ -n "$INPUT_SHA" ]; then
             TARGET_SHA="$INPUT_SHA"
-          else
+          elif [ -n "$EVENT_SHA" ]; then
             TARGET_SHA="$EVENT_SHA"
+          else
+            TARGET_SHA="$WORKFLOW_SHA"
           fi
           test -n "$TARGET_SHA"
           echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+          echo "TARGET_SHA=$TARGET_SHA"
 
       - name: Checkout locked SHA
         uses: actions/checkout@v4
@@ -47,11 +52,14 @@ jobs:
         env:
           TARGET_SHA: ${{ steps.target.outputs.target_sha }}
         run: |
+          set -euo pipefail
           ACTUAL_SHA="$(git rev-parse HEAD)"
           test "$ACTUAL_SHA" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$ACTUAL_SHA"
 
       - name: Verify Worker Pool sources
         run: |
+          set -euo pipefail
           test -f v3/worker_pool.py
           test -f v3/tests/test_worker_pool.py
           test -f v3/tests/test_worker_pool_shutdown.py
@@ -68,4 +76,5 @@ jobs:
       - name: Emit validation SHA
         env:
           TARGET_SHA: ${{ steps.target.outputs.target_sha }}
-        run: echo "VALIDATED_SHA=$TARGET_SHA"
+        run: |
+          echo "VALIDATED_SHA=$TARGET_SHA"
