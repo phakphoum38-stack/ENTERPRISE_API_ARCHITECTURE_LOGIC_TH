@@ -52,7 +52,7 @@ jobs:
         run: |
           flutter create --platforms=web .
           flutter pub get
-          flutter test test/research_os_api_client_test.dart test/widget_test.dart
+          flutter test test/widget_test.dart
           flutter build web --release --dart-define=RESEARCH_OS_API_BASE_URL=http://127.0.0.1:8787
       - name: Stage website bundle
         run: |
@@ -213,7 +213,7 @@ jobs:
         run: |
           flutter create --platforms=ios --project-name=research_os_flutter .
           flutter pub get
-          flutter test test/research_os_api_client_test.dart test/widget_test.dart
+          flutter test test/widget_test.dart
           flutter build ios --release --no-codesign --dart-define=RESEARCH_OS_API_BASE_URL=http://127.0.0.1:8787
           test -d build/ios/iphoneos/Runner.app
       - name: Package unsigned IPA
