@@ -36,11 +36,10 @@ class ResearchE2ETests(unittest.TestCase):
             checkpoints = ResearchCheckpointStore(root / "checkpoint.sqlite")
             registry = ResearchToolRegistry()
             registry.register(DeterministicResearchTool())
-            recorder = ToolEvidenceRecorder(
-                registry,
-                PersistentToolEvidenceSink(evidence_store),
+            recorder = ToolEvidenceRecorder(registry, PersistentToolEvidenceSink(evidence_store))
+            plan = ResearchPlanner().plan(
+                "What is Research OS?", sub_questions=["What is the runtime?"]
             )
-            plan = ResearchPlanner().plan("What is Research OS?", sub_questions=["What is the runtime?"])
 
             def handler(task):
                 result = recorder.execute(
@@ -51,7 +50,7 @@ class ResearchE2ETests(unittest.TestCase):
                     )
                 )
                 self.assertTrue(result.success)
-                return (f"tool-{task.id}" if False else evidence_store.for_task(task.id)[0].id,)
+                return (evidence_store.for_task(task.id)[0].id,)
 
             result = AutonomousResearchLoop(checkpoints).run(
                 run_id="e2e-1",
