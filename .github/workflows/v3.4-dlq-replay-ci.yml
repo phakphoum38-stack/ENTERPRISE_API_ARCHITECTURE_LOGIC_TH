@@ -8,6 +8,7 @@ on:
       - 'v3/dlq/**'
       - 'v3/tests/test_dlq.py'
       - 'v3/tests/test_replay.py'
+      - 'v3/tests/test_queue_adapter.py'
       - '.github/workflows/v3.4-dlq-replay-ci.yml'
   pull_request:
     branches:
@@ -16,6 +17,7 @@ on:
       - 'v3/dlq/**'
       - 'v3/tests/test_dlq.py'
       - 'v3/tests/test_replay.py'
+      - 'v3/tests/test_queue_adapter.py'
       - '.github/workflows/v3.4-dlq-replay-ci.yml'
 
 permissions:
@@ -38,8 +40,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run DLQ and replay tests
-        run: python -m unittest v3.tests.test_dlq v3.tests.test_replay -v
+      - name: Run DLQ, replay and queue adapter tests
+        run: python -m unittest v3.tests.test_dlq v3.tests.test_replay v3.tests.test_queue_adapter -v
 
       - name: Compile DLQ implementation
-        run: python -m py_compile v3/dlq/models.py v3/dlq/store.py v3/dlq/service.py v3/dlq/idempotency.py v3/dlq/replay.py
+        run: python -m py_compile v3/dlq/models.py v3/dlq/store.py v3/dlq/service.py v3/dlq/idempotency.py v3/dlq/replay.py v3/dlq/queue_adapter.py
