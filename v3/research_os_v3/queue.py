@@ -24,11 +24,7 @@ class LeaseOwnershipError(RuntimeError):
 
 
 class DurableTaskQueue:
-    """Durable queue boundary with expiring worker leases.
-
-    SQLite is the portable reference adapter. Production deployments can
-    replace this implementation with RabbitMQ/Kafka without changing Runner.
-    """
+    """Durable queue boundary with expiring worker leases."""
 
     def __init__(self, path: Path, *, default_lease_seconds: int = 30) -> None:
         if default_lease_seconds < 1:
@@ -51,6 +47,14 @@ class DurableTaskQueue:
                     worker_id TEXT
                 )"""
             )
+            columns = {row[1] for row in db.execute("PRAGMA table_info(research_queue)")}
+            for name, definition in (
+                ("lease_id", "TEXT"),
+                ("lease_until", "TEXT"),
+                ("worker_id", "TEXT"),
+            ):
+                if name not in columns:
+                    db.execute(f"ALTER TABLE research_queue ADD COLUMN {name} {definition}")
             db.execute("CREATE INDEX IF NOT EXISTS idx_research_queue_ready ON research_queue(status, available_at)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_research_queue_lease ON research_queue(status, lease_until)")
 
@@ -100,11 +104,12 @@ class DurableTaskQueue:
                 "WHERE task_id=? AND status='running' AND lease_id=?",
                 (task_id, lease_id),
             ).fetchone()
-            if row is None:
-                raise LeaseOwnershipError("task is not owned by the supplied lease")
-            if row[4] is None or row[4] <= now_iso:
-                raise LeaseOwnershipError("lease has expired")
-            db.execute("UPDATE research_queue SET lease_until=?, updated_at=? WHERE task_id=? AND lease_id=?", (new_until, now_iso, task_id, lease_id))
+            if row is None or row[4] is None or row[4] <= now_iso:
+                raise LeaseOwnershipError("task is not owned by the supplied active lease")
+            db.execute(
+                "UPDATE research_queue SET lease_until=?, updated_at=? WHERE task_id=? AND lease_id=?",
+                (new_until, now_iso, task_id, lease_id),
+            )
         return QueueTask(row[0], row[1], json.loads(row[2]), row[3], lease_id, new_until)
 
     def ack(self, task_id: str, lease_id: str) -> None:
@@ -116,8 +121,7 @@ class DurableTaskQueue:
         available_at = (now + timedelta(seconds=max(0, delay_seconds))).isoformat()
         with sqlite3.connect(self.path) as db:
             db.execute(
-                "UPDATE research_queue SET status='queued', attempts=attempts+1, available_at=?, updated_at=?, lease_id=NULL, lease_until=NULL, worker_id=NULL "
-                "WHERE task_id=? AND lease_id=?",
+                "UPDATE research_queue SET status='queued', attempts=attempts+1, available_at=?, updated_at=?, lease_id=NULL, lease_until=NULL, worker_id=NULL WHERE task_id=? AND lease_id=?",
                 (available_at, now.isoformat(), task_id, lease_id),
             )
 
@@ -128,19 +132,19 @@ class DurableTaskQueue:
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.path) as db:
             cursor = db.execute(
-                "UPDATE research_queue SET status='queued', available_at=?, updated_at=?, lease_id=NULL, lease_until=NULL, worker_id=NULL "
-                "WHERE status='running' AND lease_until IS NOT NULL AND lease_until<=?",
+                "UPDATE research_queue SET status='queued', available_at=?, updated_at=?, lease_id=NULL, lease_until=NULL, worker_id=NULL WHERE status='running' AND lease_until IS NOT NULL AND lease_until<=?",
                 (now, now, now),
             )
             return cursor.rowcount
 
     def _assert_lease(self, task_id: str, lease_id: str, now: datetime) -> None:
         with sqlite3.connect(self.path) as db:
-            row = db.execute("SELECT lease_until FROM research_queue WHERE task_id=? AND status='running' AND lease_id=?", (task_id, lease_id)).fetchone()
-        if row is None:
-            raise LeaseOwnershipError("task is not owned by the supplied lease")
-        if row[0] is None or row[0] <= now.isoformat():
-            raise LeaseOwnershipError("lease has expired")
+            row = db.execute(
+                "SELECT lease_until FROM research_queue WHERE task_id=? AND status='running' AND lease_id=?",
+                (task_id, lease_id),
+            ).fetchone()
+        if row is None or row[0] is None or row[0] <= now.isoformat():
+            raise LeaseOwnershipError("task is not owned by the supplied active lease")
 
     def _set_status(self, task_id: str, status: str, lease_id: str) -> None:
         now = datetime.now(timezone.utc)
