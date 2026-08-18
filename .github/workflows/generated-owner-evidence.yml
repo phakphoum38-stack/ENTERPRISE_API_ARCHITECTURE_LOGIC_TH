@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_sha:
-        description: 'Exact commit SHA to validate'
+        description: Exact commit SHA to validate
         required: false
         default: ''
         type: string
@@ -17,7 +17,7 @@ jobs:
   generated-owner-evidence:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact target SHA
+      - name: Checkout target
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.target_sha || github.sha }}
@@ -28,28 +28,50 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          try:
-              import yaml
-          except ImportError:
-              raise SystemExit('PyYAML is required for workflow validation')
-          path = Path('.github/workflows/generated-owner-evidence.yml')
-          yaml.safe_load(path.read_text(encoding='utf-8'))
-          print(f'YAML OK: {path}')
+          import yaml
+          for path in sorted(Path('.github/workflows').glob('*.yml')):
+              yaml.safe_load(path.read_text(encoding='utf-8'))
+              print(f'YAML OK: {path}')
+          for path in sorted(Path('.github/workflows').glob('*.yaml')):
+              yaml.safe_load(path.read_text(encoding='utf-8'))
+              print(f'YAML OK: {path}')
           PY
 
-      - name: Emit evidence gate result
+      - name: Check Owner Friend source contract
         shell: bash
         run: |
           set -euo pipefail
+          test -f owner_special/scripts/run_friend_service.py
+          test -f owner_special/research_os_friend/service.py
+          grep -q 'default=8790' owner_special/scripts/run_friend_service.py
+          grep -q 'path == "/owner/health"' owner_special/research_os_friend/service.py
+          echo 'OWNER FRIEND SOURCE CONTRACT: PASS'
+
+      - name: Write generated evidence
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+        run: |
+          set -euo pipefail
           mkdir -p evidence/generated-owner
-          printf '%s\n' \
-            '{' \
-            '  "gate": "generated-owner-evidence",' \
-            "  \"sha\": \"$GITHUB_SHA\",", \
-            '  "status": "PASS",' \
-            '  "note": "Workflow YAML validated; owner runtime evidence gate is ready for the exact target SHA."' \
-            '}' > evidence/generated-owner/generated-owner-evidence.json
-          echo "GENERATED OWNER EVIDENCE GATE PASSED: $GITHUB_SHA"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          payload = {
+              'gate': 'generated-owner-evidence',
+              'workflow_sha': os.environ['GITHUB_SHA'],
+              'target_sha': os.environ['TARGET_SHA'],
+              'status': 'PASS',
+              'owner_friend_port': 8790,
+              'health_endpoint': '/owner/health',
+              'source_contract': 'PASS',
+              'runtime_health': 'NOT_RUN_IN_GITHUB_RUNNER',
+          }
+          Path('evidence/generated-owner/generated-owner-evidence.json').write_text(
+              json.dumps(payload, indent=2) + '\n', encoding='utf-8'
+          )
+          print(f"GENERATED OWNER EVIDENCE GATE PASSED: {os.environ['TARGET_SHA']}")
+          PY
 
       - name: Upload generated evidence
         uses: actions/upload-artifact@v4
