@@ -13,6 +13,7 @@ on:
       - 'v3/tests/test_durable_idempotency.py'
       - 'v3/tests/test_sqlite_store.py'
       - 'v3/tests/test_recovery.py'
+      - 'v3/tests/test_recovery_e2e.py'
       - '.github/workflows/v3.4-dlq-replay-ci.yml'
   pull_request:
     branches:
@@ -26,6 +27,7 @@ on:
       - 'v3/tests/test_durable_idempotency.py'
       - 'v3/tests/test_sqlite_store.py'
       - 'v3/tests/test_recovery.py'
+      - 'v3/tests/test_recovery_e2e.py'
       - '.github/workflows/v3.4-dlq-replay-ci.yml'
 
 permissions:
@@ -49,7 +51,7 @@ jobs:
           python-version: '3.12'
 
       - name: Run V3.4 tests
-        run: python -m unittest v3.tests.test_dlq v3.tests.test_replay v3.tests.test_queue_adapter v3.tests.test_replay_integration v3.tests.test_durable_idempotency v3.tests.test_sqlite_store v3.tests.test_recovery -v
+        run: python -m unittest v3.tests.test_dlq v3.tests.test_replay v3.tests.test_queue_adapter v3.tests.test_replay_integration v3.tests.test_durable_idempotency v3.tests.test_sqlite_store v3.tests.test_recovery v3.tests.test_recovery_e2e -v
 
       - name: Compile DLQ implementation
         run: python -m py_compile v3/dlq/models.py v3/dlq/store.py v3/dlq/service.py v3/dlq/idempotency.py v3/dlq/replay.py v3/dlq/queue_adapter.py v3/dlq/durable_idempotency.py v3/dlq/sqlite_store.py v3/dlq/recovery.py
