@@ -1,0 +1,46 @@
+name: V3.5 PR Integrity
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'v3/**'
+      - '.github/workflows/v3.5-*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify PR head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+
+      - name: Verify Worker Pool sources
+        run: |
+          test -f v3/worker_pool.py
+          test -f v3/tests/test_worker_pool.py
+          test -f v3/tests/test_worker_pool_shutdown.py
+          test -f v3/tests/test_worker_pool_timeout.py
+          python -m py_compile v3/worker_pool.py
+
+      - name: Run Worker Pool test suite
+        run: |
+          python -m unittest \
+            v3.tests.test_worker_pool \
+            v3.tests.test_worker_pool_shutdown \
+            v3.tests.test_worker_pool_timeout -v
