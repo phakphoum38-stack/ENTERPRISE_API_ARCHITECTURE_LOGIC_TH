@@ -118,7 +118,7 @@ stages:
 
   - stage: 100
     file: generate-orchestrator.yml
-    dispatchable: true
+    dispatchable: false
     role: orchestrator
 
 rules:
