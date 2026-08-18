@@ -3,6 +3,7 @@ from .brain import BrainCore
 from .contracts import health_contract, master_contract, providers_contract
 from .execution import AtomicExecutionEvidenceStore, FactoryExecutionContext, FactoryExecutionEngine, FactoryExecutionResult, StageEvidence, StageHandler
 from .factory import SoftwareFactory
+from .final_integration import FinalIntegrationGate, GateResult
 from .models import OrchestrationDecision, ScaleProfile, ScaleTier, Workload
 from .network_research_tools import GitHubResearchTool, WebResearchTool
 from .orchestrator import UnifiedMasterOrchestrator
@@ -21,16 +22,17 @@ from .service import PROFILE_HEADER, USER_HEADER, V3LocalService
 from .storage import DataLayout, UserDataLayout
 from .tool_evidence import EvidenceSink, InMemoryEvidenceSink, ToolEvidence, ToolEvidenceRecorder
 from .user_context import UserContext, safe_local_user_id
+from .work_tracker import WorkItem, WorkState, WorkTracker
 
 __all__ = [
     "AtomicExecutionEvidenceStore", "AutonomousResearchLoop", "AutonomousResearchResult", "BrainCore", "BuiltinResearchTools",
     "CircuitBreakerPolicy", "CircuitOpenError", "CompletionRequest", "CompletionResponse", "CompositeSecretSource", "DataLayout",
     "DurableTaskQueue", "EnvironmentSecretSource", "EvidenceSink", "FactoryExecutionContext", "FactoryExecutionEngine", "FactoryExecutionResult",
-    "FileResearchTool", "GitHubResearchTool", "InMemoryEvidenceSink", "MockProvider", "OpenAICompatibleProvider", "OrchestrationDecision", "PROFILE_HEADER",
+    "FileResearchTool", "FinalIntegrationGate", "GateResult", "GitHubResearchTool", "InMemoryEvidenceSink", "MockProvider", "OpenAICompatibleProvider", "OrchestrationDecision", "PROFILE_HEADER",
     "PersistentToolEvidenceSink", "ProviderRegistry", "ProviderStatus", "ProviderUnavailableError", "PythonResearchTool", "QueueTask", "ReportFinding",
     "ResearchCheckpoint", "ResearchCheckpointStore", "ResearchExecutionCoordinator", "ResearchExecutionResult", "ResearchReport", "ResearchReportBuilder",
     "ResearchTool", "ResearchToolError", "ResearchToolRegistry", "RetryPolicy", "RunnerResult", "ScaleProfile", "ScaleTier", "ShellResearchTool",
     "SoftwareFactory", "StageEvidence", "StageHandler", "StatelessResearchRunner", "ToolEvidence", "ToolEvidenceRecorder", "ToolRequest", "ToolResult",
     "USER_HEADER", "UnifiedMasterOrchestrator", "UserContext", "UserDataLayout", "V3LocalService", "WebResearchTool", "WindowsCredentialManagerSecretSource",
-    "Workload", "default_secret_source", "health_contract", "master_contract", "providers_contract", "safe_local_user_id",
+    "WorkItem", "WorkState", "WorkTracker", "Workload", "default_secret_source", "health_contract", "master_contract", "providers_contract", "safe_local_user_id",
 ]
