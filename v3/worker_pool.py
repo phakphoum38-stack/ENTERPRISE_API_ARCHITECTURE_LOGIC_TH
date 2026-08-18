@@ -29,13 +29,15 @@ class WorkerPoolStats:
 class BoundedWorkerPool(Generic[T, R]):
     """Worker pool with bounded total in-flight work and explicit backpressure.
 
-    `max_queue` is the total in-flight capacity: running + executor-pending
-    tasks. This makes saturation deterministic and prevents hidden backlog.
+    ``max_queue`` is the total in-flight capacity: running + executor-pending
+    tasks. The bookkeeping queue is deliberately separate from the executor so
+    ThreadPoolExecutor's unbounded internal queue cannot create hidden backlog.
     """
 
     def __init__(self, max_workers: int, max_queue: int) -> None:
         if max_workers < 1 or max_queue < 1:
             raise ValueError("max_workers and max_queue must be >= 1")
+
         self._capacity = max_queue
         self._queue: Queue[object] = Queue(maxsize=max_queue)
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -43,7 +45,14 @@ class BoundedWorkerPool(Generic[T, R]):
         self._active = 0
         self._closed = False
 
+    def __enter__(self) -> "BoundedWorkerPool[T, R]":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.shutdown()
+
     def submit(self, task: T, fn: Callable[[T], R]) -> Future[R]:
+        """Submit one task without allowing the in-flight limit to be exceeded."""
         with self._lock:
             if self._closed:
                 raise WorkerPoolClosedError("worker pool is shut down")
@@ -56,34 +65,43 @@ class BoundedWorkerPool(Generic[T, R]):
         try:
             future = self._executor.submit(self._run, task, fn)
         except BaseException:
-            self._release(task)
+            # Keep capacity accounting correct even if the executor rejects
+            # submission during a concurrent shutdown.
+            self._release()
             raise
-        future.add_done_callback(lambda _: self._release(task))
+
+        future.add_done_callback(lambda _: self._release())
         return future
 
     @staticmethod
     def _run(task: T, fn: Callable[[T], R]) -> R:
         return fn(task)
 
-    def _release(self, task: T) -> None:
+    def _release(self) -> None:
         with self._lock:
-            try:
-                self._queue.get_nowait()
-                self._queue.task_done()
-            finally:
-                self._active -= 1
+            # The queue is used as a bounded permit ledger, not as a work
+            # dispatch queue. Removing any one permit is sufficient because
+            # each accepted submission owns exactly one permit.
+            self._queue.get_nowait()
+            self._queue.task_done()
+            self._active -= 1
 
     def stats(self) -> WorkerPoolStats:
         with self._lock:
+            queued = self._queue.qsize()
             return WorkerPoolStats(
                 capacity=self._capacity,
-                queued=self._queue.qsize(),
+                queued=queued,
                 active=self._active,
                 closed=self._closed,
             )
 
     def shutdown(self, wait: bool = True, cancel_pending: bool = False) -> None:
-        """Stop accepting work and optionally cancel executor-pending tasks."""
+        """Stop accepting work and optionally cancel executor-pending tasks.
+
+        Shutdown is idempotent. Pending futures cancelled by the executor still
+        invoke their completion callbacks, releasing their capacity permits.
+        """
         with self._lock:
             self._closed = True
         self._executor.shutdown(wait=wait, cancel_futures=cancel_pending)
