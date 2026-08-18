@@ -1,0 +1,37 @@
+name: V3.3 Worker Pool CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'v3/**'
+      - '.github/workflows/v3-worker-pool-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-worker-pool-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Run Worker Pool tests
+        working-directory: v3
+        run: python -m unittest tests.test_worker_pool -v
+
+      - name: Compile Worker Pool
+        run: python -m py_compile v3/research_os_v3/worker_pool.py
