@@ -180,7 +180,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, pathlib, subprocess, time, urllib.parse
+          import json, os, pathlib, subprocess, time, urllib.parse
           from datetime import datetime
           import yaml
 
@@ -199,6 +199,15 @@ jobs:
           print('Sequential dispatch plan:')
           for e in entries:
               print(f"  stage {e['stage']}: {e['file']}")
+
+          def set_recovery_env(**values):
+              env_file=os.environ.get('GITHUB_ENV')
+              if not env_file:
+                  return
+              with open(env_file,'a',encoding='utf-8') as f:
+                  for key,value in values.items():
+                      if value is not None:
+                          f.write(f"{key}={value}\n")
 
           def api(path, method='GET', payload=None):
               cmd=['gh','api',path,'--method',method]
@@ -231,7 +240,8 @@ jobs:
                   time.sleep(3)
 
               if not run:
-                  print(f"RECOVERY_STAGE={e['stage']}" )
+                  set_recovery_env(RECOVERY_STAGE=e['stage'],RECOVERY_WORKFLOW=wf,RECOVERY_RUN_ID='')
+                  print(f"RECOVERY_STAGE={e['stage']}")
                   print(f"RECOVERY_WORKFLOW={wf}")
                   raise RuntimeError(f"STAGE_DISCOVERY_FAILURE|stage={e['stage']}|workflow={wf}")
 
@@ -243,6 +253,7 @@ jobs:
                   print(f"run {run_id}: status={status} conclusion={conclusion}")
                   if status=='completed':
                       if conclusion!='success':
+                          set_recovery_env(RECOVERY_STAGE=e['stage'],RECOVERY_WORKFLOW=wf,RECOVERY_RUN_ID=run_id)
                           print(f"RECOVERY_STAGE={e['stage']}")
                           print(f"RECOVERY_WORKFLOW={wf}")
                           print(f"RECOVERY_RUN_ID={run_id}")
@@ -251,6 +262,7 @@ jobs:
                       break
                   time.sleep(10)
               else:
+                  set_recovery_env(RECOVERY_STAGE=e['stage'],RECOVERY_WORKFLOW=wf,RECOVERY_RUN_ID=run_id)
                   print(f"RECOVERY_STAGE={e['stage']}")
                   print(f"RECOVERY_WORKFLOW={wf}")
                   print(f"RECOVERY_RUN_ID={run_id}")
@@ -304,7 +316,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch --detach "${GITHUB_SHA}"
-          git add evidence/generate/repair-manifest.md
+          git add evidence/generate/repair-manifest.md evidence/generate/repair-context.md 2>/dev/null || true
           git commit -m "chore(generate): record recovery manifest" || true
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"refs/heads/${branch}" || true
 
