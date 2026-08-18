@@ -1,0 +1,103 @@
+name: V3.5 PR Integrity
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "PR HEAD SHA to validate"
+        required: false
+        type: string
+      delay_seconds:
+        description: "Generated delay value to reuse"
+        required: true
+        type: string
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'v3/**'
+      - '.github/workflows/v3.5-*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve target SHA
+        id: target
+        env:
+          EVENT_SHA: ${{ github.event.pull_request.head.sha }}
+          INPUT_SHA: ${{ inputs.expected_sha }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_SHA" ]; then
+            TARGET_SHA="$INPUT_SHA"
+          elif [ -n "$EVENT_SHA" ]; then
+            TARGET_SHA="$EVENT_SHA"
+          else
+            TARGET_SHA="$WORKFLOW_SHA"
+          fi
+          test -n "$TARGET_SHA"
+          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+          echo "TARGET_SHA=$TARGET_SHA"
+
+      - name: Checkout locked SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.target_sha }}
+          fetch-depth: 1
+
+      - name: Verify checked-out SHA
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$ACTUAL_SHA"
+
+      - name: Verify Worker Pool sources
+        run: |
+          set -euo pipefail
+          test -f v3/worker_pool.py
+          test -f v3/tests/test_worker_pool.py
+          test -f v3/tests/test_worker_pool_shutdown.py
+          test -f v3/tests/test_worker_pool_timeout.py
+          test -f v3/research_os_v3/delay.py
+          python -m py_compile v3/worker_pool.py v3/research_os_v3/delay.py
+
+      - name: Run Worker Pool test suite
+        run: |
+          python -m unittest \
+            v3.tests.test_worker_pool \
+            v3.tests.test_worker_pool_shutdown \
+            v3.tests.test_worker_pool_timeout \
+            v3.tests.test_delay -v
+
+      - name: Validate and reuse generated delay
+        env:
+          DELAY_SECONDS: ${{ inputs.delay_seconds }}
+        run: |
+          set -euo pipefail
+          test -n "$DELAY_SECONDS"
+          python - <<PY
+          import time
+          value = float("$DELAY_SECONDS")
+          assert value >= 0, "delay must be non-negative"
+          print(f"RECEIVED_DELAY_SECONDS={value:.3f}")
+          time.sleep(value)
+          print(f"REUSED_DELAY_SECONDS={value:.3f}")
+          PY
+
+      - name: Emit validation contract
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
+          DELAY_SECONDS: ${{ inputs.delay_seconds }}
+        run: |
+          echo "VALIDATED_SHA=$TARGET_SHA"
+          echo "VALIDATED_DELAY_SECONDS=$DELAY_SECONDS"
