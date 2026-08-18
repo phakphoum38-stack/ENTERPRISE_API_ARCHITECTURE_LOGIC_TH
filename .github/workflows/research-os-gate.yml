@@ -1,0 +1,129 @@
+name: Research OS Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  python-quality:
+    name: Python Build Test Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Compile Research OS
+        run: python -m compileall -q v3/research_os_v3
+
+      - name: Unit tests
+        run: |
+          python -m unittest discover -s v3/tests -p 'test_*.py' -v
+
+      - name: Import smoke
+        run: |
+          PYTHONPATH=v3 python -c "import research_os_v3; print('research_os_v3 import: OK')"
+
+      - name: Static analysis
+        run: |
+          PYTHONPATH=v3 python - <<'PY'
+          import ast
+          from pathlib import Path
+          root = Path('v3/research_os_v3')
+          files = sorted(root.glob('*.py'))
+          assert files, 'no Research OS Python sources found'
+          for path in files:
+              ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+          print(f'AST analysis passed: {len(files)} files')
+          PY
+
+  research-e2e:
+    name: Research E2E
+    needs: python-quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run Research OS E2E tests
+        run: |
+          python -m unittest discover -s v3/tests -p 'test_*e2e*.py' -v
+
+      - name: Run autonomous/evidence integration tests
+        run: |
+          python -m unittest \
+            v3.tests.test_autonomous_research \
+            v3.tests.test_tool_evidence \
+            v3.tests.test_research_tool_adapters \
+            -v
+
+  flutter-quality:
+    name: Flutter Analyze Test Build
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('flutter_app/pubspec.yaml') != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.3'
+          channel: stable
+          cache: true
+
+      - name: Flutter dependencies
+        working-directory: flutter_app
+        run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: flutter_app
+        run: flutter analyze
+
+      - name: Flutter tests
+        working-directory: flutter_app
+        run: flutter test
+
+      - name: Flutter debug APK build
+        working-directory: flutter_app
+        run: flutter build apk --debug
+
+  gate:
+    name: Research OS Final Gate
+    needs: [python-quality, research-e2e, flutter-quality]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        run: |
+          echo "python-quality=${{ needs.python-quality.result }}"
+          echo "research-e2e=${{ needs.research-e2e.result }}"
+          echo "flutter-quality=${{ needs.flutter-quality.result }}"
+          test "${{ needs.python-quality.result }}" = success
+          test "${{ needs.research-e2e.result }}" = success
+          test "${{ needs.flutter-quality.result }}" = success
+          echo "RESEARCH_OS_GATE=PASS"
