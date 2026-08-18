@@ -1,7 +1,7 @@
 document:
   id: ANEF-WR-004
-  version: v0.1.0-draft
-  status: draft
+  version: v3.2.0
+  status: active
   title: Workflow Retry Policy
 
 policy:
