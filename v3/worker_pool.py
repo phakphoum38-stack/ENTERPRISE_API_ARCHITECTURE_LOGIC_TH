@@ -14,19 +14,20 @@ class QueueSaturatedError(RuntimeError):
     """Raised when the bounded worker queue cannot accept another task."""
 
 
+class WorkerPoolClosedError(RuntimeError):
+    """Raised when work is submitted after shutdown begins."""
+
+
 @dataclass(frozen=True)
 class WorkerPoolStats:
     capacity: int
     queued: int
     active: int
+    closed: bool
 
 
 class BoundedWorkerPool(Generic[T, R]):
-    """Bounded, backpressure-aware worker pool.
-
-    The queue bound includes both queued and currently executing work, so the
-    pool cannot silently grow an unbounded backlog in memory.
-    """
+    """Bounded, backpressure-aware, gracefully-shutting-down worker pool."""
 
     def __init__(self, max_workers: int, max_queue: int) -> None:
         if max_workers < 1 or max_queue < 1:
@@ -41,18 +42,23 @@ class BoundedWorkerPool(Generic[T, R]):
     def submit(self, task: T, fn: Callable[[T], R]) -> Future[R]:
         with self._lock:
             if self._closed:
-                raise RuntimeError("worker pool is shut down")
+                raise WorkerPoolClosedError("worker pool is shut down")
             try:
                 self._queue.put_nowait(task)
             except Full as exc:
                 raise QueueSaturatedError("worker pool queue is full") from exc
             self._active += 1
 
-        future = self._executor.submit(self._run, task, fn)
+        try:
+            future = self._executor.submit(self._run, task, fn)
+        except BaseException:
+            self._release(task)
+            raise
         future.add_done_callback(lambda _: self._release(task))
         return future
 
-    def _run(self, task: T, fn: Callable[[T], R]) -> R:
+    @staticmethod
+    def _run(task: T, fn: Callable[[T], R]) -> R:
         return fn(task)
 
     def _release(self, task: T) -> None:
@@ -69,9 +75,11 @@ class BoundedWorkerPool(Generic[T, R]):
                 capacity=self._capacity,
                 queued=self._queue.qsize(),
                 active=self._active,
+                closed=self._closed,
             )
 
-    def shutdown(self, wait: bool = True) -> None:
+    def shutdown(self, wait: bool = True, cancel_pending: bool = False) -> None:
+        """Stop accepting work and optionally cancel executor-pending tasks."""
         with self._lock:
             self._closed = True
-        self._executor.shutdown(wait=wait)
+        self._executor.shutdown(wait=wait, cancel_futures=cancel_pending)
