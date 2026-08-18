@@ -1,0 +1,43 @@
+name: V3.4 DLQ Replay CI
+
+on:
+  push:
+    branches:
+      - agent/v3.4-dlq-replay
+    paths:
+      - 'v3/dlq/**'
+      - 'v3/tests/test_dlq.py'
+      - '.github/workflows/v3.4-dlq-replay-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'v3/dlq/**'
+      - 'v3/tests/test_dlq.py'
+      - '.github/workflows/v3.4-dlq-replay-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3.4-dlq-replay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run DLQ tests
+        run: python -m unittest v3.tests.test_dlq -v
+
+      - name: Compile DLQ implementation
+        run: python -m py_compile v3/dlq/models.py v3/dlq/store.py v3/dlq/service.py
