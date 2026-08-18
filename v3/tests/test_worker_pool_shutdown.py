@@ -25,8 +25,10 @@ class WorkerPoolShutdownTests(unittest.TestCase):
         release.set()
         self.assertEqual("task", future.result(timeout=2))
         pool.shutdown(wait=True)
+        self.assertEqual(0, pool.stats().active)
+        self.assertEqual(0, pool.stats().queued)
 
-    def test_cancel_pending_work(self):
+    def test_cancel_pending_work_releases_capacity(self):
         pool = BoundedWorkerPool(max_workers=1, max_queue=2)
         started = Event()
         release = Event()
@@ -47,6 +49,11 @@ class WorkerPoolShutdownTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertTrue(pending.cancelled())
         pool.shutdown(wait=True)
+        deadline = time.time() + 1
+        while pool.stats().active and time.time() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(0, pool.stats().active)
+        self.assertEqual(0, pool.stats().queued)
 
 
 if __name__ == "__main__":
