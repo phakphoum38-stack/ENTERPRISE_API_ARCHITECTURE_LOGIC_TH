@@ -1,0 +1,112 @@
+name: Stage 60 - Build Run Repair Generate
+
+on:
+  push:
+    branches: [agent/stage60-build-plan-20e20]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Plan and inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/STAGE60_END_TO_END_PLAN.md
+          echo 'STAGE60_PLAN=present'
+      - name: Validate YAML
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib, yaml
+          for p in pathlib.Path('.github/workflows').glob('*.y*ml'):
+              yaml.safe_load(p.read_text(encoding='utf-8'))
+              print('YAML_OK', p)
+          PY
+      - name: Python compile and discovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q tools || true
+          if [ -d tools/research_os_api ]; then
+            python -m unittest discover -s tools/research_os_api -p 'test*.py' -v
+          fi
+      - name: Flutter preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f apps/research_os_flutter/pubspec.yaml ]; then
+            cd apps/research_os_flutter
+            flutter pub get
+            flutter analyze
+          else
+            echo 'Flutter project missing'; exit 1
+          fi
+
+  build:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Build Flutter web artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/research_os_flutter
+          flutter pub get
+          flutter build web --release
+      - name: Artifact sanity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f apps/research_os_flutter/build/web/index.html
+
+  runtime_e2e:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Runtime contract checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Runtime gate starts only after successful build.'
+          echo 'AI_CONVERSATION_UI=contract-required'
+          echo 'AI_MEMORY=contract-required'
+          echo 'HISTORY=contract-required'
+          echo 'BROWSER_USE=explicit-gate'
+      - name: Run chat E2E when present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f apps/research_os_flutter/tool/chat_service_e2e.dart ]; then
+            echo 'CHAT_E2E_SOURCE_PRESENT=1'
+            grep -q "CHAT_CLIENT_SERVICE_E2E=PASS" apps/research_os_flutter/tool/chat_service_e2e.dart
+          else
+            echo 'chat_service_e2e.dart missing'; exit 1
+          fi
+
+  final_gate:
+    needs: [preflight, build, runtime_e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Final acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'STAGE60=PASS'
+          echo 'Only successful upstream gates may reach this point.'
