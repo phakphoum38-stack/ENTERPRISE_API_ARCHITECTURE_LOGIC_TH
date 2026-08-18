@@ -19,7 +19,6 @@ SolidCompression=yes
 WizardStyle=modern
 OutputDir=output
 OutputBaseFilename=Research-OS-Setup-{#MyAppVersion}-x64
-SetupIconFile=..\apps\research_os_flutter\assets\branding\research_os.ico
 UninstallDisplayName=Research OS
 UninstallDisplayIcon={app}\app\{#MyAppExeName}
 SetupLogging=yes
