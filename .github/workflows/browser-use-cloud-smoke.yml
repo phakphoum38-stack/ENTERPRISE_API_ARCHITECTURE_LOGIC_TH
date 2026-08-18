@@ -28,7 +28,7 @@ concurrency:
 jobs:
   connect-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       TARGET_SHA: ${{ inputs.target_sha || github.sha }}
       RESEARCH_OS_PROVIDER: mock
@@ -99,17 +99,56 @@ jobs:
           print(json.dumps(health, ensure_ascii=False))
           PY
 
+      - name: Run Python API tests
+        working-directory: tools/research_os_api
+        run: |
+          python -m unittest discover -p 'test_*.py' -v
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - name: Verify Flutter API client contract
+      - name: Verify Flutter API and AI conversation contract
         working-directory: apps/research_os_flutter
         run: |
           flutter pub get
-          flutter test test/research_os_api_client_test.dart test/widget_test.dart
+          flutter test test/research_os_api_client_test.dart test/widget_test.dart test/chat_flow_test.dart
+
+      - name: Run live AI chat client E2E
+        working-directory: apps/research_os_flutter
+        env:
+          RESEARCH_OS_API_BASE_URL: http://127.0.0.1:8787
+        run: |
+          dart run tool/chat_service_e2e.dart
+
+      - name: Verify AI chat endpoint directly
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          def post(path, payload):
+              request = urllib.request.Request(
+                  f"http://127.0.0.1:8787{path}",
+                  data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  return json.loads(response.read().decode())
+
+          generated = post("/v1/ai/generate", {"prompt": "Reply with CHAT-DIRECT-READY"})
+          assert str(generated.get("text", "")).strip(), generated
+
+          answer = post(
+              "/v1/ai/answer-with-memory",
+              {"question": "User: marker DIRECT-KITE-731\nAssistant: acknowledged\nUser: return DIRECT-KITE-731"},
+          )
+          assert "DIRECT-KITE-731" in str(answer.get("text", "")), answer
+          print("AI_CHAT_DIRECT_E2E=PASS")
+          PY
 
       - name: Stop Research OS API
         if: always()
