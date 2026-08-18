@@ -26,3 +26,14 @@ class IdempotencyRegistry:
     def release(self, key: str) -> None:
         with self._lock:
             self._claimed.discard(key)
+
+    def is_claimed(self, key: str) -> bool:
+        """Return whether a replay key is currently claimed.
+
+        This is an inspection-only API; callers cannot mutate registry state
+        through it. It also keeps tests independent from the private set.
+        """
+        if not key:
+            return False
+        with self._lock:
+            return key in self._claimed
