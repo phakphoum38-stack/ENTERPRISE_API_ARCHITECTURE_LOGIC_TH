@@ -1,7 +1,7 @@
 # Workflow Runtime Foundation
 
-สถานะ: `draft`
-Version: `v0.1.0-draft`
+สถานะ: `active`
+Version: `v3.2.0`
 
 เอกสารชุดนี้กำหนด **Architecture Contract** สำหรับ Workflow Runtime ของ Research OS โดยไม่ผูกกับภาษา, queue provider, database หรือ cloud provider ใดโดยเฉพาะ
 
@@ -39,3 +39,7 @@ GitHub Actions ยังคงทำหน้าที่ CI/CD และ reposi
 - `state-machine.yml` — lifecycle และ transition rules
 - `events.yml` — event envelope และ lifecycle events
 - `retry-policy.yml` — retry/timeout/cancellation policy
+
+## Release status
+
+This contract set is **active for v3.2.0**. Implementations must remain compatible with these contracts, and any breaking change requires a new versioned contract.
