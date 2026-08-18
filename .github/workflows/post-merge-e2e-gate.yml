@@ -3,7 +3,7 @@ name: Post-Merge E2E Gate
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, test/post-merge-e2e-gate]
     paths:
       - 'tools/research_os_api/**'
       - 'current/**'
