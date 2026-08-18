@@ -7,6 +7,10 @@ on:
         description: "PR HEAD SHA to validate"
         required: false
         type: string
+      delay_seconds:
+        description: "Generated delay value to reuse"
+        required: true
+        type: string
   pull_request:
     branches:
       - main
@@ -75,8 +79,28 @@ jobs:
             v3.tests.test_worker_pool_timeout \
             v3.tests.test_delay -v
 
-      - name: Emit validation SHA
+      - name: Validate and reuse generated delay
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          DELAY_SECONDS: ${{ inputs.delay_seconds }}
+        run: |
+          set -euo pipefail
+          test -n "$DELAY_SECONDS"
+          python - <<PY
+          import time
+          value = float("$DELAY_SECONDS")
+          assert value >= 0, "delay must be non-negative"
+          print(f"RECEIVED_DELAY_SECONDS={value:.3f}")
+          time.sleep(value)
+          print(f"REUSED_DELAY_SECONDS={value:.3f}")
+          PY
+
+      - name: Emit validation contract
         env:
           TARGET_SHA: ${{ steps.target.outputs.target_sha }}
+          DELAY_SECONDS: ${{ inputs.delay_seconds }}
         run: |
           echo "VALIDATED_SHA=$TARGET_SHA"
+          if [ -n "$DELAY_SECONDS" ]; then
+            echo "VALIDATED_DELAY_SECONDS=$DELAY_SECONDS"
+          fi
