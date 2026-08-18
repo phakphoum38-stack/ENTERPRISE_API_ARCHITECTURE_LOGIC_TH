@@ -95,9 +95,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _persistSessions() async {
     await _persistLocal();
-    if (_cloudEnabled) {
-      await _pushSession(_activeSession);
-    }
+    if (_cloudEnabled) await _pushSession(_activeSession);
   }
 
   Future<void> _pushSession(_ChatSession session) async {
@@ -108,14 +106,16 @@ class _ChatPageState extends State<ChatPage> {
         session.toCloudJson(),
       );
     } on Object {
-      // Cloud sync is optional and must never block the local chat flow.
+      // Cloud sync is optional; local conversation remains authoritative.
     }
   }
 
   String _conversationPrompt(String latestPrompt) {
-    final history = _messages
+    final recent = _messages
         .where((message) => message.text.trim().isNotEmpty)
-        .takeLast(10)
+        .toList(growable: false);
+    final history = recent
+        .skip(recent.length > 10 ? recent.length - 10 : 0)
         .map((message) {
           final role = message.role == 'user' ? 'User' : 'Assistant';
           return '$role: ${message.text}';
@@ -258,33 +258,35 @@ class _Composer extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Expanded(
-              child: TextField(
-                controller: controller,
-                minLines: 1,
-                maxLines: 6,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  hintText: 'ถามอะไรก็ได้…',
-                  border: InputBorder.none,
-                  filled: false,
-                ),
+            TextField(
+              controller: controller,
+              minLines: 2,
+              maxLines: 6,
+              textInputAction: TextInputAction.newline,
+              decoration: const InputDecoration(
+                hintText: 'เขียนข้อความที่ต้องการ...',
+                border: InputBorder.none,
+                filled: false,
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              tooltip: 'ส่ง',
-              onPressed: sending || loading ? null : onSend,
-              icon: sending
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.arrow_upward),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                key: const Key('ai-conversation-button'),
+                onPressed: sending || loading ? null : onSend,
+                icon: sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome),
+                label: Text(sending ? 'กำลังสนทนา...' : 'สนทนา AI'),
+              ),
             ),
           ],
         ),
@@ -350,7 +352,7 @@ class _EmptyChat extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'พิมพ์ข้อความด้านล่างเพื่อเริ่มสนทนา',
+              'เขียนข้อความ แล้วกด สนทนา AI เพื่อเริ่มคุย',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -481,24 +483,16 @@ class _ChatSession {
   factory _ChatSession.fromJson(Map<String, dynamic> json) {
     final rawMessages = json['messages'];
     final rawUpdatedAt = json['updated_at'];
-    DateTime updatedAt;
-    if (rawUpdatedAt is int) {
-      updatedAt = DateTime.fromMillisecondsSinceEpoch(rawUpdatedAt);
-    } else {
-      updatedAt = DateTime.tryParse((rawUpdatedAt ?? '').toString()) ??
-          DateTime.now();
-    }
+    final updatedAt = rawUpdatedAt is int
+        ? DateTime.fromMillisecondsSinceEpoch(rawUpdatedAt)
+        : DateTime.tryParse((rawUpdatedAt ?? '').toString()) ?? DateTime.now();
     return _ChatSession(
       id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? 'บทสนทนา').toString(),
       messages: rawMessages is List
           ? rawMessages
               .whereType<Map>()
-              .map(
-                (item) => _ChatMessage.fromJson(
-                  Map<String, dynamic>.from(item),
-                ),
-              )
+              .map((item) => _ChatMessage.fromJson(Map<String, dynamic>.from(item)))
               .toList()
           : <_ChatMessage>[],
       updatedAt: updatedAt,
@@ -510,7 +504,7 @@ class _ChatSession {
   final List<_ChatMessage> messages;
   DateTime updatedAt;
 
-  Map<String, Object?> toJson() => <String, Object?>{
+  Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'title': title,
         'updated_at': updatedAt.toIso8601String(),
@@ -520,40 +514,31 @@ class _ChatSession {
   Map<String, Object?> toCloudJson() => <String, Object?>{
         'id': id,
         'title': title,
-        'updated_at': updatedAt.millisecondsSinceEpoch,
+        'updated_at': updatedAt.toIso8601String(),
         'messages': messages.map((message) => message.toJson()).toList(),
       };
 }
 
 class _ChatMessage {
-  const _ChatMessage({
+  _ChatMessage({
     required this.role,
     required this.text,
     this.memoryCount,
   });
 
   factory _ChatMessage.fromJson(Map<String, dynamic> json) => _ChatMessage(
-        role: (json['role'] ?? '').toString(),
+        role: (json['role'] ?? 'user').toString(),
         text: (json['text'] ?? '').toString(),
-        memoryCount:
-            json['memory_count'] is int ? json['memory_count'] as int : null,
+        memoryCount: json['memory_count'] is int ? json['memory_count'] as int : null,
       );
 
   final String role;
   final String text;
   final int? memoryCount;
 
-  Map<String, Object?> toJson() => <String, Object?>{
+  Map<String, dynamic> toJson() => <String, dynamic>{
         'role': role,
         'text': text,
         if (memoryCount != null) 'memory_count': memoryCount,
       };
-}
-
-extension<T> on Iterable<T> {
-  Iterable<T> takeLast(int count) {
-    final values = toList(growable: false);
-    if (values.length <= count) return values;
-    return values.sublist(values.length - count);
-  }
 }
