@@ -1,0 +1,71 @@
+name: Research OS Completion Validation
+
+on:
+  push:
+    branches: [feature/research-os-completion]
+    paths:
+      - 'v3/**'
+      - '.github/workflows/research-os-completion-validation.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'v3/**'
+      - '.github/workflows/research-os-completion-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-completion-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  python-validation:
+    name: Python build + test + analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile Python package
+        run: |
+          python -m compileall -q v3/research_os_v3 v3/tests
+
+      - name: Run Research OS unit and E2E tests
+        env:
+          PYTHONPATH: v3
+        run: |
+          python -m unittest discover -s v3/tests -p 'test_*.py' -v
+
+      - name: Static AST analysis
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          root = Path('v3/research_os_v3')
+          files = sorted(root.glob('*.py'))
+          assert files, 'no Research OS Python files found'
+          for path in files:
+              ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+          print(f'AST_ANALYSIS=PASS files={len(files)}')
+          PY
+
+      - name: Service smoke test
+        env:
+          PYTHONPATH: v3
+        run: python v3/scripts/service_smoke.py
+
+      - name: Research E2E smoke
+        env:
+          PYTHONPATH: v3
+        run: python -m unittest v3.tests.test_research_e2e -v
