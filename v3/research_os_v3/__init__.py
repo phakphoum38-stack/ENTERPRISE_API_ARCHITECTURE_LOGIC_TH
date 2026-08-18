@@ -19,12 +19,14 @@ from .providers import (
     ProviderRegistry,
     ProviderStatus,
 )
+from .queue import DurableTaskQueue, QueueTask
 from .resilience import (
     CircuitBreakerPolicy,
     CircuitOpenError,
     ProviderUnavailableError,
     RetryPolicy,
 )
+from .runner import RunnerResult, StatelessResearchRunner
 from .secrets import (
     CompositeSecretSource,
     EnvironmentSecretSource,
@@ -44,6 +46,7 @@ __all__ = [
     "CompletionResponse",
     "CompositeSecretSource",
     "DataLayout",
+    "DurableTaskQueue",
     "EnvironmentSecretSource",
     "FactoryExecutionContext",
     "FactoryExecutionEngine",
@@ -55,12 +58,15 @@ __all__ = [
     "ProviderRegistry",
     "ProviderStatus",
     "ProviderUnavailableError",
+    "QueueTask",
     "RetryPolicy",
+    "RunnerResult",
     "ScaleProfile",
     "ScaleTier",
     "SoftwareFactory",
     "StageEvidence",
     "StageHandler",
+    "StatelessResearchRunner",
     "USER_HEADER",
     "UnifiedMasterOrchestrator",
     "UserContext",
