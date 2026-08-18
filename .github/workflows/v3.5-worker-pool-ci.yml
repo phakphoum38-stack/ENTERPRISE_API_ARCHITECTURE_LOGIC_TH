@@ -1,0 +1,45 @@
+name: V3.5 Worker Pool CI
+
+on:
+  push:
+    branches:
+      - agent/v3.5-worker-pool-hardening
+    paths:
+      - 'v3/worker_pool.py'
+      - 'v3/tests/test_worker_pool.py'
+      - 'v3/tests/test_worker_pool_shutdown.py'
+      - '.github/workflows/v3.5-worker-pool-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'v3/worker_pool.py'
+      - 'v3/tests/test_worker_pool.py'
+      - 'v3/tests/test_worker_pool_shutdown.py'
+      - '.github/workflows/v3.5-worker-pool-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3.5-worker-pool-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Worker Pool tests
+        run: python -m unittest v3.tests.test_worker_pool v3.tests.test_worker_pool_shutdown -v
+
+      - name: Compile Worker Pool
+        run: python -m py_compile v3/worker_pool.py
