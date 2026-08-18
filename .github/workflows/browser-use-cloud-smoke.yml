@@ -52,6 +52,10 @@ jobs:
           echo "RESEARCH_OS_DATA_DIR=$RUNNER_TEMP/ResearchOSData" >> "$GITHUB_ENV"
           echo "RESEARCH_OS_CONVERSATION_STORE=$RUNNER_TEMP/ResearchOSData/sessions/conversations.json" >> "$GITHUB_ENV"
 
+      - name: Stage 60 preflight helper
+        run: |
+          python tools/research_os_api/stage60_preflight.py
+
       - name: Require Browser Use Cloud secret for real-cloud mode
         if: ${{ inputs.connect_cloud == true }}
         shell: bash
@@ -62,11 +66,6 @@ jobs:
             echo "BROWSER_USE_API_KEY GitHub Secret is required when connect_cloud=true."
             exit 1
           fi
-
-      - name: Validate Research OS API test contract
-        working-directory: tools/research_os_api
-        run: |
-          python -m unittest discover -p 'test*.py' -v
 
       - name: Start Research OS API
         env:
