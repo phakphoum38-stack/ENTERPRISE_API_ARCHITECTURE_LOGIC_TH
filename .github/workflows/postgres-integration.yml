@@ -43,7 +43,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest psycopg[binary]
-      - name: Apply schema
+      - name: Apply base schema
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f adapters/postgres/schema.sql
+      - name: Apply v0.3.0 core model
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f adapters/postgres/core_model_v0_3.sql
       - name: Run PostgreSQL integration and concurrency gates
-        run: pytest -q tests/integration/test_postgres_fencing.py tests/integration/test_postgres_concurrency.py
+        run: pytest -q tests/integration/test_postgres_fencing.py tests/integration/test_postgres_concurrency.py tests/integration/test_core_model.py
