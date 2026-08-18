@@ -1,0 +1,97 @@
+name: Generated Owner Evidence Gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  generated-owner-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Owner Special Friend run for this exact SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/generated-owner
+          python - <<'PY'
+          import json, os, subprocess
+          repo=os.environ['GITHUB_REPOSITORY']
+          sha=os.environ['GITHUB_SHA']
+          workflow='.github/workflows/owner-special-friend.yml'
+          out=subprocess.check_output([
+              'gh','api',f'repos/{repo}/actions/workflows/{workflow}/runs',
+              '-f',f'event=workflow_dispatch', '-f','per_page=50'
+          ])
+          data=json.loads(out)
+          matches=[r for r in data.get('workflow_runs',[]) if r.get('head_sha')==sha]
+          if not matches:
+              raise SystemExit(f'No Owner Special Friend workflow_dispatch run found for SHA {sha}')
+          run=max(matches,key=lambda r:r['id'])
+          if run.get('status')!='completed' or run.get('conclusion')!='success':
+              raise SystemExit(f"Owner Special Friend run {run['id']} is not successful: {run.get('status')}/{run.get('conclusion')}")
+          json.dump(run,open('evidence/generated-owner/owner-run.json','w'),indent=2)
+          print(f"Owner Special Friend run: {run['id']} | SHA: {sha} | conclusion: {run['conclusion']}")
+          PY
+
+      - name: Verify 8790 validation job and generated evidence artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess
+          repo=os.environ['GITHUB_REPOSITORY']
+          run=json.load(open('evidence/generated-owner/owner-run.json'))
+          run_id=str(run['id'])
+          jobs=json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/actions/runs/{run_id}/jobs?per_page=100']))
+          jobmap={j.get('name'):j for j in jobs.get('jobs',[])}
+          required=['friend-complete','owner-desktop','owner-installer-build','owner-installer-validation','owner-bundle']
+          missing=[n for n in required if n not in jobmap]
+          failed=[f"{n}:{jobmap[n].get('conclusion')}" for n in required if n in jobmap and jobmap[n].get('conclusion')!='success']
+          if missing: raise SystemExit(f'Missing required Owner jobs: {missing}')
+          if failed: raise SystemExit(f'Owner jobs failed: {failed}')
+          artifacts=json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100']))
+          names={a.get('name'):a for a in artifacts.get('artifacts',[])}
+          sha=os.environ['GITHUB_SHA']
+          required_artifacts=[f'owner-special-setup-{sha}',f'owner-special-setup-build-{sha}',f'owner-special-desktop-{sha}']
+          missing_artifacts=[n for n in required_artifacts if n not in names or names[n].get('expired')]
+          if missing_artifacts: raise SystemExit(f'Missing/expired Owner artifacts: {missing_artifacts}')
+          evidence={
+              'generated':True,
+              'repository':repo,
+              'commit_sha':sha,
+              'owner_special_friend_run_id':run_id,
+              'owner_special_friend_run_url':run.get('html_url'),
+              'owner_8790_gate':'passed',
+              'required_jobs':{n:jobmap[n].get('conclusion') for n in required},
+              'required_artifacts':{n:{'id':names[n].get('id'),'digest':names[n].get('digest'),'expired':names[n].get('expired')} for n in required_artifacts},
+              'evidence_contract':[
+                  'Owner Friend 127.0.0.1:8790 health gate passed in owner-installer-validation',
+                  'Installed Owner /owner/chat path is covered by validate-owner-installer.ps1',
+                  'Validated installer artifact is tied to this exact commit SHA'
+              ]
+          }
+          json.dump(evidence,open('evidence/generated-owner/generated-owner-evidence.json','w'),indent=2)
+          print(json.dumps(evidence,indent=2))
+          PY
+
+      - name: Upload generated Owner evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-owner-evidence-${{ github.sha }}
+          path: evidence/generated-owner
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Emit hard gate result
+        shell: bash
+        run: echo "GENERATED OWNER EVIDENCE GATE PASSED: $GITHUB_SHA"
