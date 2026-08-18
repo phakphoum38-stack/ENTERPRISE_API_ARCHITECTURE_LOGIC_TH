@@ -1,0 +1,40 @@
+name: Generate Orchestrator Hardening
+
+on:
+  push:
+    branches: [agent/v3.5-worker-pool-hardening]
+    paths:
+      - '.github/workflows/generate-orchestrator.yml'
+      - 'current/GENERATE_WORKFLOW_REGISTRY.yml'
+      - 'tools/validate_generate_orchestrator.py'
+  pull_request:
+    paths:
+      - '.github/workflows/generate-orchestrator.yml'
+      - 'current/GENERATE_WORKFLOW_REGISTRY.yml'
+      - 'tools/validate_generate_orchestrator.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generate-orchestrator-hardening-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install validation dependency
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Validate orchestrator invariants
+        run: python tools/validate_generate_orchestrator.py
