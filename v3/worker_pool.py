@@ -27,7 +27,11 @@ class WorkerPoolStats:
 
 
 class BoundedWorkerPool(Generic[T, R]):
-    """Bounded, backpressure-aware, gracefully-shutting-down worker pool."""
+    """Worker pool with bounded total in-flight work and explicit backpressure.
+
+    `max_queue` is the total in-flight capacity: running + executor-pending
+    tasks. This makes saturation deterministic and prevents hidden backlog.
+    """
 
     def __init__(self, max_workers: int, max_queue: int) -> None:
         if max_workers < 1 or max_queue < 1:
@@ -46,7 +50,7 @@ class BoundedWorkerPool(Generic[T, R]):
             try:
                 self._queue.put_nowait(task)
             except Full as exc:
-                raise QueueSaturatedError("worker pool queue is full") from exc
+                raise QueueSaturatedError("worker pool in-flight capacity is full") from exc
             self._active += 1
 
         try:
