@@ -7,6 +7,7 @@ on:
     paths:
       - 'v3/dlq/**'
       - 'v3/tests/test_dlq.py'
+      - 'v3/tests/test_replay.py'
       - '.github/workflows/v3.4-dlq-replay-ci.yml'
   pull_request:
     branches:
@@ -14,6 +15,7 @@ on:
     paths:
       - 'v3/dlq/**'
       - 'v3/tests/test_dlq.py'
+      - 'v3/tests/test_replay.py'
       - '.github/workflows/v3.4-dlq-replay-ci.yml'
 
 permissions:
@@ -36,8 +38,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run DLQ tests
-        run: python -m unittest v3.tests.test_dlq -v
+      - name: Run DLQ and replay tests
+        run: python -m unittest v3.tests.test_dlq v3.tests.test_replay -v
 
       - name: Compile DLQ implementation
-        run: python -m py_compile v3/dlq/models.py v3/dlq/store.py v3/dlq/service.py
+        run: python -m py_compile v3/dlq/models.py v3/dlq/store.py v3/dlq/service.py v3/dlq/idempotency.py v3/dlq/replay.py
