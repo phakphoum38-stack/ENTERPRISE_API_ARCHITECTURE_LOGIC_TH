@@ -61,6 +61,11 @@ stages:
     dispatchable: true
     role: canonical-control
 
+  - stage: 15
+    file: generated-owner-evidence.yml
+    dispatchable: true
+    role: generated-8790-evidence-gate
+
   - stage: 20
     file: research-os-build-ready-source.yml
     dispatchable: true
@@ -121,3 +126,4 @@ rules:
   - detect_stack_before_selecting_build_workflow: true
   - support_multiple_stacks_per_repository: true
   - custom_stack_requires_explicit_workflow_and_gate: true
+  - generated_evidence_must_match_exact_commit_sha: true
