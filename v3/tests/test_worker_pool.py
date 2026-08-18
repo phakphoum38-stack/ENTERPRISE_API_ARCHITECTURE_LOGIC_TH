@@ -2,12 +2,12 @@ import time
 import unittest
 from threading import Event
 
-from v3.worker_pool import BoundedWorkerPool, QueueSaturatedError
+from v3.worker_pool import BoundedWorkerPool, QueueSaturatedError, WorkerPoolClosedError
 
 
 class WorkerPoolTests(unittest.TestCase):
     def test_queue_is_bounded_and_applies_backpressure(self):
-        pool = BoundedWorkerPool(max_workers=1, max_queue=1)
+        pool = BoundedWorkerPool(max_workers=1, max_queue=2)
         started = Event()
         release = Event()
 
@@ -41,7 +41,7 @@ class WorkerPoolTests(unittest.TestCase):
     def test_shutdown_rejects_new_work(self):
         pool = BoundedWorkerPool(max_workers=1, max_queue=1)
         pool.shutdown()
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(WorkerPoolClosedError):
             pool.submit("task", lambda value: value)
 
 
