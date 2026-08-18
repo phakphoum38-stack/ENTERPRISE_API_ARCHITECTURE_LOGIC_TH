@@ -16,6 +16,8 @@ def db():
     try:
         conn = psycopg.connect(DSN)
     except Exception as exc:
+        if os.getenv("CI") == "true":
+            raise RuntimeError(f"PostgreSQL integration database unavailable in CI: {exc}") from exc
         pytest.skip(f"PostgreSQL integration database unavailable: {exc}")
     conn.autocommit = True
     with conn.cursor() as cur:
