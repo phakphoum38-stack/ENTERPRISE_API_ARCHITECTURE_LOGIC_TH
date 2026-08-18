@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python tools/research_os_api/server.py --host 127.0.0.1 --port 8787 > /tmp/research-os-api.log 2>&1 &
+          RESEARCH_OS_AI_ROUTE=direct-provider python tools/research_os_api/server.py --host 127.0.0.1 --port 8787 > /tmp/research-os-api.log 2>&1 &
           echo $! > /tmp/research-os-api.pid
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8787/health > /tmp/health.json; then
@@ -104,6 +104,9 @@ jobs:
           import json
           data=json.load(open('/tmp/generate.json'))
           assert isinstance(data, dict), 'generate response must be an object'
+          assert data.get('provider') == 'mock', 'generate provider must be mock'
+          assert data.get('route') == 'direct-provider', 'generate must use direct-provider route in E2E'
+          assert data.get('text'), 'generate response text is empty'
           print('generate endpoint ok')
           PY
 
