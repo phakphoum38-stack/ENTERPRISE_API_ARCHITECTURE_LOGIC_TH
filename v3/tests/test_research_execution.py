@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from research_os_v3.evidence import Evidence
+from research_os_v3.persistent_evidence import SQLiteEvidenceStore
 from research_os_v3.queue import DurableTaskQueue
 from research_os_v3.research_execution import ResearchExecutionCoordinator
 from research_os_v3.research_planner import ResearchPlanner
@@ -40,6 +42,20 @@ class ResearchExecutionTests(unittest.TestCase):
             self.assertEqual(result.failed, (plan.tasks[0].id,))
             self.assertEqual(len(result.retried), 1)
             queue.close()
+
+    def test_evidence_survives_store_reopen(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "evidence.db"
+            item = Evidence(
+                id="e1", claim="queue is durable", source_uri="https://example.test",
+                task_id="t1", confidence=0.9,
+            )
+            store = SQLiteEvidenceStore(path)
+            store.add(item)
+            store.close()
+            reopened = SQLiteEvidenceStore(path)
+            self.assertEqual(reopened.get("e1"), item)
+            reopened.close()
 
 
 if __name__ == "__main__":
