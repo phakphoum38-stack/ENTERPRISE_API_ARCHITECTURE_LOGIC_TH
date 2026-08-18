@@ -48,7 +48,7 @@ class DurableResearchQueue:
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
         cur = self._db.execute(
-            "INSERT INTO research_queue(task_id,payload,max_attempts,state) VALUES(?,?,?,?,?)",
+            "INSERT INTO research_queue(task_id,payload,max_attempts,state) VALUES(?,?,?,?)",
             (task_id, json.dumps(payload, sort_keys=True), max_attempts, QueueState.QUEUED),
         )
         return int(cur.lastrowid)
@@ -63,9 +63,15 @@ class DurableResearchQueue:
             if row is None:
                 self._db.execute("COMMIT")
                 return None
-            self._db.execute("UPDATE research_queue SET state=?, attempts=attempts+1 WHERE id=?", (QueueState.RUNNING, row["id"]))
+            self._db.execute(
+                "UPDATE research_queue SET state=?, attempts=attempts+1 WHERE id=?",
+                (QueueState.RUNNING, row["id"]),
+            )
             self._db.execute("COMMIT")
-            return QueueItem(row["id"], row["task_id"], json.loads(row["payload"]), row["attempts"] + 1, row["max_attempts"], QueueState.RUNNING)
+            return QueueItem(
+                row["id"], row["task_id"], json.loads(row["payload"]),
+                row["attempts"] + 1, row["max_attempts"], QueueState.RUNNING,
+            )
         except Exception:
             self._db.execute("ROLLBACK")
             raise
@@ -74,11 +80,15 @@ class DurableResearchQueue:
         self._db.execute("UPDATE research_queue SET state=? WHERE id=?", (QueueState.SUCCEEDED, item_id))
 
     def fail(self, item_id: int, *, error: str) -> QueueState:
-        row = self._db.execute("SELECT attempts,max_attempts FROM research_queue WHERE id=?", (item_id,)).fetchone()
+        row = self._db.execute(
+            "SELECT attempts,max_attempts FROM research_queue WHERE id=?", (item_id,)
+        ).fetchone()
         if row is None:
             raise KeyError(item_id)
         state = QueueState.RETRY if row["attempts"] < row["max_attempts"] else QueueState.FAILED
-        self._db.execute("UPDATE research_queue SET state=?, error=? WHERE id=?", (state, error, item_id))
+        self._db.execute(
+            "UPDATE research_queue SET state=?, error=? WHERE id=?", (state, error, item_id)
+        )
         return state
 
     def close(self) -> None:
