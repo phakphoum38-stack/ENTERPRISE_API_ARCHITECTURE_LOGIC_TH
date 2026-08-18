@@ -76,7 +76,7 @@ class DurableTaskQueue:
 
     def retry(self, task_id: str, *, delay_seconds: int = 0) -> None:
         now = datetime.now(timezone.utc)
-        available = (now.timestamp() + max(0, delay_seconds))
+        available = now.timestamp() + max(0, delay_seconds)
         available_at = datetime.fromtimestamp(available, tz=timezone.utc).isoformat()
         with sqlite3.connect(self.path) as db:
             db.execute(
@@ -95,3 +95,7 @@ class DurableTaskQueue:
                 "UPDATE research_queue SET status=?, updated_at=? WHERE task_id=?",
                 (status, now, task_id),
             )
+
+    def close(self) -> None:
+        """Lifecycle hook for API compatibility with connection-backed adapters."""
+        return None
