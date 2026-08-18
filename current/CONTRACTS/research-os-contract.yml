@@ -1,0 +1,20 @@
+research_os_contract:
+  name: research-os-domain
+  version: 0.1.0
+  status: foundation
+  compatibility:
+    policy: semver
+    breaking_change_requires_major: true
+  boundaries:
+    brain_creates_intent: true
+    planner_creates_task_graph: true
+    orchestrator_owns_execution: true
+    evidence_requires_source: true
+    synthesis_must_not_invent_evidence: true
+  domains:
+    research_question: 1
+    research_plan: 1
+    research_task: 1
+    evidence: 1
+    finding: 1
+    synthesis_result: 1
