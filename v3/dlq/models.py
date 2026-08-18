@@ -26,6 +26,8 @@ class DLQRecord:
     payload_reference: str
     failed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     first_failed_at: datetime | None = None
+    last_failed_at: datetime | None = None
+    lease_id: str | None = None
     replay_count: int = 0
     status: DLQStatus = DLQStatus.AVAILABLE
     metadata: Mapping[str, Any] = field(default_factory=dict)
@@ -37,3 +39,5 @@ class DLQRecord:
             raise ValueError("max_attempts must be >= attempt")
         if not self.task_id or not self.event_id or not self.idempotency_key:
             raise ValueError("task_id, event_id and idempotency_key are required")
+        if self.first_failed_at and self.last_failed_at and self.last_failed_at < self.first_failed_at:
+            raise ValueError("last_failed_at must be >= first_failed_at")
