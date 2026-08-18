@@ -64,14 +64,16 @@ jobs:
           test -f v3/tests/test_worker_pool.py
           test -f v3/tests/test_worker_pool_shutdown.py
           test -f v3/tests/test_worker_pool_timeout.py
-          python -m py_compile v3/worker_pool.py
+          test -f v3/research_os_v3/delay.py
+          python -m py_compile v3/worker_pool.py v3/research_os_v3/delay.py
 
       - name: Run Worker Pool test suite
         run: |
           python -m unittest \
             v3.tests.test_worker_pool \
             v3.tests.test_worker_pool_shutdown \
-            v3.tests.test_worker_pool_timeout -v
+            v3.tests.test_worker_pool_timeout \
+            v3.tests.test_delay -v
 
       - name: Emit validation SHA
         env:
