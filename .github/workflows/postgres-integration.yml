@@ -31,6 +31,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://workflow:workflow@localhost:5432/workflow_test
+      TEST_POSTGRES_DSN: postgresql://workflow:workflow@localhost:5432/workflow_test
       PGPASSWORD: workflow
 
     steps:
@@ -43,6 +44,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest psycopg[binary]
       - name: Apply schema
-        run: psql "$DATABASE_URL" -f adapters/postgres/schema.sql
-      - name: Run PostgreSQL integration gate
-        run: pytest -q tests/integration/test_postgres_fencing.py
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f adapters/postgres/schema.sql
+      - name: Run PostgreSQL integration and concurrency gates
+        run: pytest -q tests/integration/test_postgres_fencing.py tests/integration/test_postgres_concurrency.py
