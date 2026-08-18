@@ -26,6 +26,7 @@ from .resilience import (
     ProviderUnavailableError,
     RetryPolicy,
 )
+from .research_checkpoint import ResearchCheckpoint, ResearchCheckpointStore
 from .research_execution import ResearchExecutionCoordinator, ResearchExecutionResult
 from .runner import RunnerResult, StatelessResearchRunner
 from .secrets import (
@@ -44,8 +45,8 @@ __all__ = [
     "DurableTaskQueue", "EnvironmentSecretSource", "FactoryExecutionContext", "FactoryExecutionEngine",
     "FactoryExecutionResult", "MockProvider", "OpenAICompatibleProvider", "OrchestrationDecision",
     "PROFILE_HEADER", "ProviderRegistry", "ProviderStatus", "ProviderUnavailableError", "QueueTask",
-    "ResearchExecutionCoordinator", "ResearchExecutionResult", "RetryPolicy", "RunnerResult",
-    "ScaleProfile", "ScaleTier", "SoftwareFactory", "StageEvidence", "StageHandler",
+    "ResearchCheckpoint", "ResearchCheckpointStore", "ResearchExecutionCoordinator", "ResearchExecutionResult",
+    "RetryPolicy", "RunnerResult", "ScaleProfile", "ScaleTier", "SoftwareFactory", "StageEvidence", "StageHandler",
     "StatelessResearchRunner", "USER_HEADER", "UnifiedMasterOrchestrator", "UserContext", "UserDataLayout",
     "V3LocalService", "WindowsCredentialManagerSecretSource", "Workload", "default_secret_source",
     "health_contract", "master_contract", "providers_contract", "safe_local_user_id",
