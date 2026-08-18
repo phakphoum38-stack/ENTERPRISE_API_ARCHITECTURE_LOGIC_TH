@@ -37,7 +37,7 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
-  testWidgets('chat sends replies keeps context and restores session', (tester) async {
+  testWidgets('AI conversation composer sends, keeps context and restores session', (tester) async {
     tester.view.physicalSize = const Size(1440, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -45,41 +45,33 @@ void main() {
 
     final apiClient = ChatFlowApiClient();
 
-    await tester.pumpWidget(
-      MaterialApp(home: ChatPage(apiClient: apiClient)),
-    );
+    await tester.pumpWidget(MaterialApp(home: ChatPage(apiClient: apiClient)));
     await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('ai-conversation-button')), findsOneWidget);
+    expect(find.text('สนทนา AI'), findsOneWidget);
 
     final composer = find.byType(TextField);
     expect(composer, findsOneWidget);
 
     await tester.enterText(composer, 'สวัสดีเพื่อน ทดสอบแชทตัวเอง');
-    await tester.tap(find.byTooltip('ส่ง'));
+    await tester.tap(find.byKey(const Key('ai-conversation-button')));
     await tester.pumpAndSettle();
 
     expect(find.text('สวัสดีเพื่อน ทดสอบแชทตัวเอง'), findsWidgets);
-    expect(
-      find.text('สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว'),
-      findsOneWidget,
-    );
+    expect(find.text('สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว'), findsOneWidget);
     expect(apiClient.questions, hasLength(1));
     expect(apiClient.questions.first, 'สวัสดีเพื่อน ทดสอบแชทตัวเอง');
 
     await tester.enterText(composer, 'จำคำตอบรอบแรกได้ไหม');
-    await tester.tap(find.byTooltip('ส่ง'));
+    await tester.tap(find.byKey(const Key('ai-conversation-button')));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('จำได้ครับ รอบแรกผมตอบว่าระบบแชทตอบกลับได้แล้ว'),
-      findsOneWidget,
-    );
+    expect(find.text('จำได้ครับ รอบแรกผมตอบว่าระบบแชทตอบกลับได้แล้ว'), findsOneWidget);
     expect(apiClient.questions, hasLength(2));
     final secondPrompt = apiClient.questions.last;
     expect(secondPrompt, contains('User: สวัสดีเพื่อน ทดสอบแชทตัวเอง'));
-    expect(
-      secondPrompt,
-      contains('Assistant: สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว'),
-    );
+    expect(secondPrompt, contains('Assistant: สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว'));
     expect(secondPrompt, contains('User: จำคำตอบรอบแรกได้ไหม'));
 
     final prefs = await SharedPreferences.getInstance();
@@ -91,35 +83,21 @@ void main() {
     final messages = session['messages'] as List<dynamic>;
     expect(messages, hasLength(4));
     expect((messages[0] as Map)['text'], 'สวัสดีเพื่อน ทดสอบแชทตัวเอง');
-    expect(
-      (messages[1] as Map)['text'],
-      'สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว',
-    );
+    expect((messages[1] as Map)['text'], 'สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว');
     expect((messages[2] as Map)['text'], 'จำคำตอบรอบแรกได้ไหม');
-    expect(
-      (messages[3] as Map)['text'],
-      'จำได้ครับ รอบแรกผมตอบว่าระบบแชทตอบกลับได้แล้ว',
-    );
+    expect((messages[3] as Map)['text'], 'จำได้ครับ รอบแรกผมตอบว่าระบบแชทตอบกลับได้แล้ว');
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
 
     final reopenedClient = ChatFlowApiClient();
-    await tester.pumpWidget(
-      MaterialApp(home: ChatPage(apiClient: reopenedClient)),
-    );
+    await tester.pumpWidget(MaterialApp(home: ChatPage(apiClient: reopenedClient)));
     await tester.pumpAndSettle();
 
     expect(find.text('สวัสดีเพื่อน ทดสอบแชทตัวเอง'), findsWidgets);
-    expect(
-      find.text('สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว'),
-      findsOneWidget,
-    );
+    expect(find.text('สวัสดีครับเพื่อน แชทของ Research OS ตอบกลับได้แล้ว'), findsOneWidget);
     expect(find.text('จำคำตอบรอบแรกได้ไหม'), findsOneWidget);
-    expect(
-      find.text('จำได้ครับ รอบแรกผมตอบว่าระบบแชทตอบกลับได้แล้ว'),
-      findsOneWidget,
-    );
+    expect(find.text('จำได้ครับ รอบแรกผมตอบว่าระบบแชทตอบกลับได้แล้ว'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
