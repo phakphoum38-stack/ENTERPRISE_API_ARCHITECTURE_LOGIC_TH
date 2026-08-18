@@ -1,0 +1,71 @@
+name: Research OS Final Gate
+
+on:
+  push:
+    branches:
+      - feature/research-os-completion
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-final-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-gate:
+    name: Python build test analyze e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Research OS
+        run: python -m compileall -q v3/research_os_v3 v3/tests
+
+      - name: Run Research OS test suite
+        env:
+          PYTHONPATH: v3
+        run: python -m unittest discover -s v3/tests -p 'test_*.py' -v
+
+      - name: Static import smoke
+        env:
+          PYTHONPATH: v3
+        run: python -c "import research_os_v3; print('research_os_v3 import: OK')"
+
+  flutter-gate:
+    name: Flutter build analyze test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter dependencies
+        working-directory: v3/flutter_app
+        run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: v3/flutter_app
+        run: flutter analyze
+
+      - name: Flutter tests
+        working-directory: v3/flutter_app
+        run: flutter test
+
+      - name: Flutter build smoke
+        working-directory: v3/flutter_app
+        run: flutter build apk --debug
