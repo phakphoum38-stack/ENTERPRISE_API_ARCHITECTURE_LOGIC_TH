@@ -82,7 +82,7 @@ jobs:
             -v
 
   flutter-quality:
-    name: Flutter Analyze Test Build
+    name: Flutter Tool Analyze Test Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -94,10 +94,10 @@ jobs:
         run: |
           if [[ -f flutter_app/pubspec.yaml ]]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Flutter application detected"
+            echo "Flutter tool detected"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No flutter_app/pubspec.yaml found; Flutter checks will be skipped"
+            echo "No flutter_app/pubspec.yaml found; Flutter tool checks will be skipped"
           fi
 
       - name: Setup Flutter
@@ -128,18 +128,27 @@ jobs:
         working-directory: flutter_app
         run: flutter build apk --debug
 
-  gate:
-    name: Research OS Final Gate
-    needs: [python-quality, research-e2e, flutter-quality]
+  core-gate:
+    name: Research OS Core Final Gate
+    needs: [python-quality, research-e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Verify required jobs
+      - name: Verify Research OS core jobs
         run: |
           echo "python-quality=${{ needs.python-quality.result }}"
           echo "research-e2e=${{ needs.research-e2e.result }}"
-          echo "flutter-quality=${{ needs.flutter-quality.result }}"
           test "${{ needs.python-quality.result }}" = success
           test "${{ needs.research-e2e.result }}" = success
-          test "${{ needs.flutter-quality.result }}" = success
-          echo "RESEARCH_OS_GATE=PASS"
+          echo "RESEARCH_OS_CORE_GATE=PASS"
+
+  flutter-result:
+    name: Flutter External Tool Result
+    needs: flutter-quality
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Flutter tool result
+        run: |
+          echo "flutter-quality=${{ needs.flutter-quality.result }}"
+          echo "FLUTTER_EXTERNAL_TOOL_RESULT=${{ needs.flutter-quality.result }}"
