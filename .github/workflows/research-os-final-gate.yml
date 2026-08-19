@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - feature/research-os-completion
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: research-os-final-gate-${{ github.ref }}
+  group: research-os-final-gate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
