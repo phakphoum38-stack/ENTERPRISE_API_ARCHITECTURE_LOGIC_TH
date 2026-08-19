@@ -17,6 +17,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'v3/**'
+      - 'current/GENERATE_WORKFLOW_REGISTRY.yml'
+      - 'tools/validate_v35_contract.py'
       - '.github/workflows/v3.5-*.yml'
 
 permissions:
@@ -60,6 +62,9 @@ jobs:
           ACTUAL_SHA="$(git rev-parse HEAD)"
           test "$ACTUAL_SHA" = "$TARGET_SHA"
           echo "CHECKED_OUT_SHA=$ACTUAL_SHA"
+
+      - name: Validate V3.5 contract guards
+        run: python tools/validate_v35_contract.py
 
       - name: Verify Worker Pool sources
         run: |
