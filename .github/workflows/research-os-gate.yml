@@ -16,6 +16,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11'
+  PYTHONPATH: ${{ github.workspace }}/v3
 
 jobs:
   python-quality:
@@ -41,11 +42,11 @@ jobs:
 
       - name: Import smoke
         run: |
-          PYTHONPATH=v3 python -c "import research_os_v3; print('research_os_v3 import: OK')"
+          python -c "import research_os_v3; print('research_os_v3 import: OK')"
 
       - name: Static analysis
         run: |
-          PYTHONPATH=v3 python - <<'PY'
+          python - <<'PY'
           import ast
           from pathlib import Path
           root = Path('v3/research_os_v3')
