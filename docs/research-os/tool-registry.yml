@@ -1,0 +1,81 @@
+version: 1
+program: research-os
+status: inventory-in-progress
+source_issue: 88
+
+lifecycle:
+  - KEEP
+  - PROMOTE
+  - COMPATIBILITY
+  - RETIRE
+  - VERIFY
+
+required_fields:
+  - id
+  - path
+  - owner
+  - lifecycle
+  - input_output_contract
+  - runtime_dependency
+  - auth_requirement
+  - evidence_test
+  - notes
+
+# Initial repository-grounded inventory. VERIFY entries require implementation/test evidence before promotion.
+tools:
+  - id: file-audit-v6x6
+    path: tools/file_audit_v6x6.py
+    owner: A04
+    lifecycle: VERIFY
+    input_output_contract: "CLI/script contract; exact arguments and output schema require audit"
+    runtime_dependency: python
+    auth_requirement: none-known
+    evidence_test: tools/test_file_audit_v6x6.py
+    notes: "Existing tool and dedicated test discovered on main."
+
+  - id: house-command
+    path: tools/house_command/
+    owner: A04
+    lifecycle: VERIFY
+    input_output_contract: "Directory inventory required"
+    runtime_dependency: VERIFY
+    auth_requirement: VERIFY
+    evidence_test: VERIFY
+    notes: "Directory exists; contents require recursive inventory."
+
+  - id: research-curator
+    path: tools/research_curator/
+    owner: A04
+    lifecycle: VERIFY
+    input_output_contract: "Directory inventory required"
+    runtime_dependency: VERIFY
+    auth_requirement: VERIFY
+    evidence_test: VERIFY
+    notes: "Directory exists; contents require recursive inventory."
+
+  - id: research-os-api
+    path: tools/research_os_api/
+    owner: A01
+    lifecycle: VERIFY
+    input_output_contract: "OpenAPI/runtime endpoint matrix required"
+    runtime_dependency: python
+    auth_requirement: VERIFY
+    evidence_test: VERIFY
+    notes: "Canonical API mapping must be reconciled with OpenAPI and V3 runtime."
+
+  - id: research-os-service
+    path: tools/research_os_service/
+    owner: A02
+    lifecycle: VERIFY
+    input_output_contract: "Service entrypoint contract requires audit"
+    runtime_dependency: VERIFY
+    auth_requirement: VERIFY
+    evidence_test: VERIFY
+    notes: "Directory exists; recursive inventory and runtime evidence required."
+
+completion_rules:
+  no_delete_without_replacement: true
+  no_promote_without_tests: true
+  no_promote_without_evidence: true
+  no_retire_without_migration: true
+  no_unverified_completion: true
