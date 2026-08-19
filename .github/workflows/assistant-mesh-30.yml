@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  FLUTTER_MESH_REF: continuation/30-assistant-mesh-main-flutter
+
 jobs:
   validate:
     name: Validate 10 Enterprise + 20 Flutter mesh contract
@@ -34,6 +37,7 @@ jobs:
           assert 'total_required: 30' in text
           assert 'bounded_execution: true' in text
           assert 'evidence_required: true' in text
+          assert 'fail_closed_on_contract_mismatch: true' in text
 
           print('Enterprise control-plane units: 10')
           print('Flutter downstream units: 20')
@@ -41,12 +45,13 @@ jobs:
           print('Contract: anef-core-contract:0.1.0')
           PY
 
-      - name: Verify downstream manifest is reachable
+      - name: Verify downstream manifest on coordinated ref
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/phakphoum38-stack/flutter/main/docs/assistant-mesh-30.yml \
-            -o /tmp/flutter-assistant-mesh-30.yml
+          url="https://raw.githubusercontent.com/phakphoum38-stack/flutter/${FLUTTER_MESH_REF}/docs/assistant-mesh-30.yml"
+          curl --fail --silent --show-error --location "$url" -o /tmp/flutter-assistant-mesh-30.yml
           grep -q 'mesh_id: enterprise-flutter-30' /tmp/flutter-assistant-mesh-30.yml
           grep -q 'upstream_contract_version: 0.1.0' /tmp/flutter-assistant-mesh-30.yml
+          grep -q 'total_units: 30' /tmp/flutter-assistant-mesh-30.yml
+          echo "Verified Flutter mesh ref: ${FLUTTER_MESH_REF}"
