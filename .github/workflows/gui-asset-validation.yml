@@ -1,0 +1,35 @@
+name: GUI Asset Validation
+
+on:
+  pull_request:
+    paths:
+      - 'design/**'
+      - '.github/workflows/gui-asset-validation.yml'
+  push:
+    branches:
+      - agent/v3.5-worker-pool-hardening
+    paths:
+      - 'design/**'
+      - '.github/workflows/gui-asset-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-gui-assets:
+    name: Validate GUI assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate asset manifest
+        run: python design/validate_assets.py
+
+      - name: Run asset validator tests
+        run: python -m pytest -q design/tests/test_validate_assets.py
