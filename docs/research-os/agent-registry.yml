@@ -1,0 +1,49 @@
+version: 1
+program: research-os
+lead: architect
+agents:
+  - id: A01
+    name: api
+    status: active
+    depends_on: []
+  - id: A02
+    name: core-runtime
+    status: active
+    depends_on: [A01]
+  - id: A03
+    name: queue-worker
+    status: active
+    depends_on: [A01, A02]
+  - id: A04
+    name: tools
+    status: active
+    depends_on: [A01, A02]
+  - id: A05
+    name: workflow
+    status: active
+    depends_on: [A01, A02, A03]
+  - id: A06
+    name: reliability
+    status: active
+    depends_on: [A02, A03]
+  - id: A07
+    name: security-observability
+    status: active
+    depends_on: [A01, A02]
+  - id: A08
+    name: gui-ux
+    status: active
+    depends_on: [A01]
+  - id: A09
+    name: app-packaging
+    status: active
+    depends_on: [A08]
+  - id: A10
+    name: integration-qa
+    status: active
+    depends_on: [A01, A02, A03, A04, A05, A06, A07, A08, A09]
+completion_gate:
+  require_tests: true
+  require_evidence: true
+  require_contract_mapping: true
+  allow_unverified_completion: false
