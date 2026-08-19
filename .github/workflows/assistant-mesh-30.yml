@@ -1,0 +1,52 @@
+name: Assistant Mesh 30 Gate
+
+on:
+  push:
+    branches: [main, continuation/30-assistant-mesh-main-flutter]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate 10 Enterprise + 20 Flutter mesh contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Enterprise source of truth
+        uses: actions/checkout@v4
+
+      - name: Validate Enterprise mesh
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('docs/assistant-mesh-30.yml')
+          text = p.read_text()
+
+          main_ids = re.findall(r'^\s+- id: (MAIN-\d{2})\s*$', text, re.M)
+          assert len(main_ids) == 10, main_ids
+          assert len(set(main_ids)) == 10
+          assert all(f'MAIN-{i:02d}' in main_ids for i in range(1, 11))
+          assert 'contract: anef-core-contract' in text
+          assert 'contract_version: 0.1.0' in text
+          assert 'total_required: 30' in text
+          assert 'bounded_execution: true' in text
+          assert 'evidence_required: true' in text
+
+          print('Enterprise control-plane units: 10')
+          print('Flutter downstream units: 20')
+          print('Total logical units: 30')
+          print('Contract: anef-core-contract:0.1.0')
+          PY
+
+      - name: Verify downstream manifest is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/phakphoum38-stack/flutter/main/docs/assistant-mesh-30.yml \
+            -o /tmp/flutter-assistant-mesh-30.yml
+          grep -q 'mesh_id: enterprise-flutter-30' /tmp/flutter-assistant-mesh-30.yml
+          grep -q 'upstream_contract_version: 0.1.0' /tmp/flutter-assistant-mesh-30.yml
