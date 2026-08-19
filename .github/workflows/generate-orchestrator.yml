@@ -177,6 +177,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          github_ref: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -270,8 +271,6 @@ jobs:
 
           print('\nAll downstream dispatchable registry stages completed successfully.')
           PY
-        env:
-          github_ref: ${{ github.ref_name }}
 
       - name: Create repair branch and recovery manifest
         if: ${{ failure() && (inputs.mode == 'dispatch' || inputs.mode == 'repair') }}
