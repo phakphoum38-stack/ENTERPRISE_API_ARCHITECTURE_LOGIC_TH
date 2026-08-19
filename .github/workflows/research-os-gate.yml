@@ -84,12 +84,24 @@ jobs:
   flutter-quality:
     name: Flutter Analyze Test Build
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('flutter_app/pubspec.yaml') != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect Flutter application
+        id: flutter-check
+        shell: bash
+        run: |
+          if [[ -f flutter_app/pubspec.yaml ]]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Flutter application detected"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No flutter_app/pubspec.yaml found; Flutter checks will be skipped"
+          fi
+
       - name: Setup Flutter
+        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
@@ -97,18 +109,22 @@ jobs:
           cache: true
 
       - name: Flutter dependencies
+        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         working-directory: flutter_app
         run: flutter pub get
 
       - name: Flutter analyze
+        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         working-directory: flutter_app
         run: flutter analyze
 
       - name: Flutter tests
+        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         working-directory: flutter_app
         run: flutter test
 
       - name: Flutter debug APK build
+        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         working-directory: flutter_app
         run: flutter build apk --debug
 
