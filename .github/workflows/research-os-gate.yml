@@ -84,7 +84,6 @@ jobs:
   flutter-quality:
     name: Flutter Analyze Test Build
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('flutter_app/pubspec.yaml') != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
