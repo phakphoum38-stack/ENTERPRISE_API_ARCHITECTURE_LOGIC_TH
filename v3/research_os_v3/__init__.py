@@ -1,3 +1,4 @@
+from .agent_matrix import LOGICAL_AGENT_MATRIX, LogicalAgent, select_logical_agents, validate_logical_agent_matrix
 from .autonomous_research import AutonomousResearchLoop, AutonomousResearchResult
 from .brain import BrainCore
 from .contracts import health_contract, master_contract, providers_contract
@@ -35,4 +36,5 @@ __all__ = [
     "SoftwareFactory", "StageEvidence", "StageHandler", "StatelessResearchRunner", "ToolEvidence", "ToolEvidenceRecorder", "ToolRequest", "ToolResult",
     "USER_HEADER", "UnifiedMasterOrchestrator", "UserContext", "UserDataLayout", "V3LocalService", "WebResearchTool", "WindowsCredentialManagerSecretSource",
     "WorkItem", "WorkState", "WorkTracker", "Workload", "default_secret_source", "health_contract", "master_contract", "providers_contract", "safe_local_user_id",
+    "LOGICAL_AGENT_MATRIX", "LogicalAgent", "select_logical_agents", "validate_logical_agent_matrix",
 ]
