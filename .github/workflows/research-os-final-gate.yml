@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/research-os-completion
+      - fix/living-house-e2e
   pull_request:
     branches:
       - main
