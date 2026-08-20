@@ -104,6 +104,10 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Generate Android platform
+        working-directory: v3/flutter_app
+        run: flutter create --platforms=android --project-name=research_os_v3_flutter .
+
       - name: Flutter dependencies
         working-directory: v3/flutter_app
         run: flutter pub get
