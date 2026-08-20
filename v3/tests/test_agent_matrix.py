@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import unittest
 
-from research_os_v3.agent_matrix import AGENT_MATRIX, GUARDIANS, validate_agent_matrix
+from research_os_v3.agent_matrix import (
+    AGENT_MATRIX,
+    GUARDIANS,
+    LOGICAL_AGENT_MATRIX,
+    validate_agent_matrix,
+    validate_logical_agent_matrix,
+    select_logical_agents,
+)
 
 
 class AgentMatrixTests(unittest.TestCase):
@@ -12,8 +19,16 @@ class AgentMatrixTests(unittest.TestCase):
         self.assertEqual(len(GUARDIANS), 3)
 
     def test_matrix_is_unique_and_valid(self) -> None:
-        errors = validate_agent_matrix(AGENT_MATRIX)
-        self.assertEqual(errors, [])
+        self.assertEqual(validate_agent_matrix(AGENT_MATRIX), [])
+
+    def test_runtime_profile_has_six_sets_and_eleven_agents(self) -> None:
+        self.assertEqual(len(LOGICAL_AGENT_MATRIX), 11)
+        self.assertEqual(len({agent.agent_set for agent in LOGICAL_AGENT_MATRIX}), 6)
+        self.assertEqual(validate_logical_agent_matrix(), [])
+
+    def test_dynamic_selection_is_bounded_and_deterministic(self) -> None:
+        selected = select_logical_agents(("research", "evidence_qa"), concurrency=3)
+        self.assertEqual([agent.agent_id for agent in selected], ["A2", "A3", "A8"])
 
 
 if __name__ == "__main__":
