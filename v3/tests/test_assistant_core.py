@@ -5,6 +5,7 @@ from assistant_core import (
     ConversationTurn,
     Evidence,
     MemoryStore,
+    NaturalConversationPolicy,
     PluginManifest,
 )
 
@@ -43,6 +44,11 @@ class AssistantCoreTests(unittest.TestCase):
         result = orchestrator.generate_python("generated.py", "x = 1\n", "no evidence")
         self.assertFalse(result.passed)
         self.assertIn("no trusted evidence", result.failures)
+
+    def test_natural_conversation_policy_removes_ai_boilerplate(self):
+        policy = NaturalConversationPolicy(max_context_turns=2)
+        self.assertEqual(policy.normalize("  As an AI,  hello   there. "), "hello there.")
+        self.assertEqual(len(policy.context((ConversationTurn("user", "1"), ConversationTurn("user", "2")))), 2)
 
 
 if __name__ == "__main__":
