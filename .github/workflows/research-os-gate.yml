@@ -36,16 +36,22 @@ jobs:
         run: python -m compileall -q v3/research_os_v3
 
       - name: Unit tests
+        env:
+          PYTHONPATH: v3
         run: |
           python -m unittest discover -s v3/tests -p 'test_*.py' -v
 
       - name: Import smoke
+        env:
+          PYTHONPATH: v3
         run: |
-          PYTHONPATH=v3 python -c "import research_os_v3; print('research_os_v3 import: OK')"
+          python -c "import research_os_v3; print('research_os_v3 import: OK')"
 
       - name: Static analysis
+        env:
+          PYTHONPATH: v3
         run: |
-          PYTHONPATH=v3 python - <<'PY'
+          python - <<'PY'
           import ast
           from pathlib import Path
           root = Path('v3/research_os_v3')
@@ -70,10 +76,14 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Run Research OS E2E tests
+        env:
+          PYTHONPATH: v3
         run: |
           python -m unittest discover -s v3/tests -p 'test_*e2e*.py' -v
 
       - name: Run autonomous/evidence integration tests
+        env:
+          PYTHONPATH: v3
         run: |
           python -m unittest \
             v3.tests.test_autonomous_research \
@@ -91,24 +101,23 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3'
           channel: stable
           cache: true
 
       - name: Flutter dependencies
-        working-directory: flutter_app
+        working-directory: v3/flutter_app
         run: flutter pub get
 
       - name: Flutter analyze
-        working-directory: flutter_app
+        working-directory: v3/flutter_app
         run: flutter analyze
 
       - name: Flutter tests
-        working-directory: flutter_app
+        working-directory: v3/flutter_app
         run: flutter test
 
       - name: Flutter debug APK build
-        working-directory: flutter_app
+        working-directory: v3/flutter_app
         run: flutter build apk --debug
 
   gate:
