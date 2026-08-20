@@ -42,7 +42,7 @@ jobs:
       - name: Static import smoke
         env:
           PYTHONPATH: v3
-        run: python -c 'import research_os_v3; print("research_os_v3 import: OK")'
+        run: python -c "import research_os_v3; print('research_os_v3 import: OK')"
 
   flutter-gate:
     name: Flutter build analyze test
