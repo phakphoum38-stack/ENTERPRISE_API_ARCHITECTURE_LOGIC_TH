@@ -1,0 +1,39 @@
+name: Assistant Core CI
+
+on:
+  push:
+    branches: [agent/v3.5-worker-pool-hardening]
+    paths:
+      - 'v3/assistant_core/**'
+      - 'v3/tests/test_assistant_core.py'
+      - '.github/workflows/assistant-core-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'v3/assistant_core/**'
+      - 'v3/tests/test_assistant_core.py'
+      - '.github/workflows/assistant-core-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  assistant-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile core
+        run: python -m compileall -q v3/assistant_core
+
+      - name: Run core tests
+        env:
+          PYTHONPATH: v3
+        run: python -m unittest v3.tests.test_assistant_core -v
