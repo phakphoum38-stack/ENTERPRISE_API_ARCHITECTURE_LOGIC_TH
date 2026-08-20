@@ -65,7 +65,7 @@ jobs:
               python - "$issue" "evidence/generate/issue-$issue.json" <<'PY'
           import json,sys
           issue=sys.argv[1]; path=sys.argv[2]
-          data=json.load(open(path))
+          data=json.load(open(path, encoding='utf-8'))
           print(f"#{issue}: {data.get('state')} | {data.get('title')}")
           PY
             else
@@ -81,10 +81,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import pathlib
-          try:
-              import yaml
-          except ImportError:
-              raise SystemExit('PyYAML is required for registry validation.')
+          import yaml
           data=yaml.safe_load(pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()) or {}
           stages=data.get('stages') or []
           if not isinstance(stages,list):
@@ -101,7 +98,8 @@ jobs:
               if entry.get('dispatchable') is True and wf != 'generate-orchestrator.yml':
                   dispatchable += 1
           if missing:
-              print('\n'.join(missing)); raise SystemExit(1)
+              print('\n'.join(missing))
+              raise SystemExit(1)
           if dispatchable == 0:
               raise SystemExit('Registry contains no dispatchable downstream workflows.')
           print(f'Registry validation passed: {len(stages)} stages; {dispatchable} downstream dispatchable workflows.')
@@ -135,11 +133,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import pathlib
-          try:
-              import yaml
-          except ImportError:
-              print('PyYAML unavailable; skipping parser-only check.')
-              raise SystemExit(0)
+          import yaml
           errors=[]
           for p in sorted(pathlib.Path('.github/workflows').glob('*.*ml')):
               try:
@@ -147,7 +141,8 @@ jobs:
               except Exception as e:
                   errors.append(f'{p}: {e}')
           if errors:
-              print('\n'.join(errors)); raise SystemExit(1)
+              print('\n'.join(errors))
+              raise SystemExit(1)
           print('Workflow YAML validation passed.')
           PY
 
@@ -177,6 +172,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -216,7 +212,8 @@ jobs:
                   return subprocess.run(cmd,input=json.dumps(payload).encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
               return subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
 
-          repo='${{ github.repository }}'
+          repo=os.environ['GITHUB_REPOSITORY']
+          github_ref=os.environ['GITHUB_REF_NAME']
           for e in entries:
               wf=e['file']
               encoded=urllib.parse.quote(wf,safe='')
@@ -231,9 +228,11 @@ jobs:
                   candidates=[]
                   for r in data.get('workflow_runs',[]):
                       created=r.get('created_at')
-                      if not created: continue
+                      if not created:
+                          continue
                       ts=datetime.fromisoformat(created.replace('Z','+00:00')).timestamp()
-                      if ts >= started-5: candidates.append(r)
+                      if ts >= started-5:
+                          candidates.append(r)
                   if candidates:
                       run=max(candidates,key=lambda r:r['id'])
                       break
@@ -241,8 +240,6 @@ jobs:
 
               if not run:
                   set_recovery_env(RECOVERY_STAGE=e['stage'],RECOVERY_WORKFLOW=wf,RECOVERY_RUN_ID='')
-                  print(f"RECOVERY_STAGE={e['stage']}")
-                  print(f"RECOVERY_WORKFLOW={wf}")
                   raise RuntimeError(f"STAGE_DISCOVERY_FAILURE|stage={e['stage']}|workflow={wf}")
 
               run_id=run['id']
@@ -254,24 +251,16 @@ jobs:
                   if status=='completed':
                       if conclusion!='success':
                           set_recovery_env(RECOVERY_STAGE=e['stage'],RECOVERY_WORKFLOW=wf,RECOVERY_RUN_ID=run_id)
-                          print(f"RECOVERY_STAGE={e['stage']}")
-                          print(f"RECOVERY_WORKFLOW={wf}")
-                          print(f"RECOVERY_RUN_ID={run_id}")
                           raise RuntimeError(f"STAGE_FAILURE|stage={e['stage']}|workflow={wf}|run_id={run_id}|conclusion={conclusion}")
                       print(f"Stage {e['stage']} completed successfully.")
                       break
                   time.sleep(10)
               else:
                   set_recovery_env(RECOVERY_STAGE=e['stage'],RECOVERY_WORKFLOW=wf,RECOVERY_RUN_ID=run_id)
-                  print(f"RECOVERY_STAGE={e['stage']}")
-                  print(f"RECOVERY_WORKFLOW={wf}")
-                  print(f"RECOVERY_RUN_ID={run_id}")
                   raise RuntimeError(f"STAGE_TIMEOUT|stage={e['stage']}|workflow={wf}|run_id={run_id}")
 
           print('\nAll downstream dispatchable registry stages completed successfully.')
           PY
-        env:
-          github_ref: ${{ github.ref_name }}
 
       - name: Create repair branch and recovery manifest
         if: ${{ failure() && (inputs.mode == 'dispatch' || inputs.mode == 'repair') }}
@@ -300,17 +289,7 @@ jobs:
           - Failed stage: ${RECOVERY_STAGE:-unknown}
           - Failed workflow: ${RECOVERY_WORKFLOW:-unknown}
           - Failed downstream run: ${RECOVERY_RUN_ID:-unknown}
-          - Reason: downstream dispatch, validation, or repair failure
           - Main branch is not modified by recovery.
-
-          ## Recovery contract
-
-          1. Diagnose the failed stage from run evidence.
-          2. Apply generated/source fixes on this repair branch only.
-          3. Run preflight validation on this branch.
-          4. Open a PR to main after validation passes.
-          5. Resume from the failed stage; do not restart already-passed stages unless required.
-          6. Promote a Skill Memory entry only after successful validation and merge.
           EOF
 
           git config user.name "github-actions[bot]"
@@ -319,7 +298,6 @@ jobs:
           git add evidence/generate/repair-manifest.md evidence/generate/repair-context.md 2>/dev/null || true
           git commit -m "chore(generate): record recovery manifest" || true
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"refs/heads/${branch}" || true
-
           echo "REPAIR_BRANCH=${branch}"
           echo "Repair branch created/preserved. Main remains untouched."
 
