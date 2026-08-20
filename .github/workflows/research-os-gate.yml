@@ -16,7 +16,6 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11'
-  PYTHONPATH: ${{ github.workspace }}/v3
 
 jobs:
   python-quality:
@@ -42,11 +41,11 @@ jobs:
 
       - name: Import smoke
         run: |
-          python -c "import research_os_v3; print('research_os_v3 import: OK')"
+          PYTHONPATH=v3 python -c "import research_os_v3; print('research_os_v3 import: OK')"
 
       - name: Static analysis
         run: |
-          python - <<'PY'
+          PYTHONPATH=v3 python - <<'PY'
           import ast
           from pathlib import Path
           root = Path('v3/research_os_v3')
@@ -89,20 +88,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Detect Flutter application
-        id: flutter-check
-        shell: bash
-        run: |
-          if [[ -f flutter_app/pubspec.yaml ]]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Flutter application detected"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No flutter_app/pubspec.yaml found; Flutter checks will be skipped"
-          fi
-
       - name: Setup Flutter
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
@@ -110,22 +96,18 @@ jobs:
           cache: true
 
       - name: Flutter dependencies
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         working-directory: flutter_app
         run: flutter pub get
 
       - name: Flutter analyze
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         working-directory: flutter_app
         run: flutter analyze
 
       - name: Flutter tests
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         working-directory: flutter_app
         run: flutter test
 
       - name: Flutter debug APK build
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         working-directory: flutter_app
         run: flutter build apk --debug
 

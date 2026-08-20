@@ -4,13 +4,18 @@ on:
   push:
     branches:
       - feature/research-os-completion
+      - feature/research-os-final-integration
+      - fix/living-house-e2e
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: research-os-final-gate-${{ github.ref }}
+  group: research-os-final-gate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,8 +47,8 @@ jobs:
           python -c "import research_os_v3; print('research_os_v3 import OK')"
 
   flutter-gate:
-    name: Flutter build analyze test
-    runs-on: ubuntu-latest
+    name: Flutter Windows build analyze test
+    runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - name: Checkout exact revision
@@ -55,6 +60,22 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Generate Windows platform
+        working-directory: v3/flutter_app
+        run: flutter create --platforms=windows --project-name=research_os_v3_flutter .
+
       - name: Flutter dependencies
         working-directory: v3/flutter_app
         run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: v3/flutter_app
+        run: flutter analyze
+
+      - name: Flutter tests
+        working-directory: v3/flutter_app
+        run: flutter test
+
+      - name: Flutter build smoke
+        working-directory: v3/flutter_app
+        run: flutter build windows --release

@@ -111,3 +111,7 @@ class PersistentWorkTracker:
     def items(self) -> Iterable[WorkItem]:
         with self._lock:
             return list(self._items.values())
+
+
+# Backward-compatible public API used by v3 consumers and tests.
+WorkTracker = PersistentWorkTracker
