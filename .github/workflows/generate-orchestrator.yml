@@ -1,6 +1,9 @@
 name: Generate Orchestrator
 
 on:
+  push:
+    branches:
+      - feature/research-os-final-integration
   workflow_dispatch:
     inputs:
       mode:
@@ -217,6 +220,7 @@ jobs:
               return subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
 
           repo='${{ github.repository }}'
+          github_ref=os.environ.get('GITHUB_REF_NAME') or os.environ.get('GITHUB_HEAD_REF') or '${{ github.ref_name }}'
           for e in entries:
               wf=e['file']
               encoded=urllib.parse.quote(wf,safe='')
@@ -270,8 +274,6 @@ jobs:
 
           print('\nAll downstream dispatchable registry stages completed successfully.')
           PY
-        env:
-          github_ref: ${{ github.ref_name }}
 
       - name: Create repair branch and recovery manifest
         if: ${{ failure() && (inputs.mode == 'dispatch' || inputs.mode == 'repair') }}
