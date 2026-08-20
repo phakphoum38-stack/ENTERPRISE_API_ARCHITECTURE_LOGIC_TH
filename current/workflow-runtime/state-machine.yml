@@ -1,0 +1,63 @@
+document:
+  id: ANEF-WR-002
+  version: v3.2.0
+  status: active
+  title: Workflow Task State Machine
+
+states:
+  - PENDING
+  - QUEUED
+  - RUNNING
+  - RETRY_WAIT
+  - SUCCEEDED
+  - FAILED
+  - CANCELLED
+  - TIMED_OUT
+
+initial_state: PENDING
+terminal_states:
+  - SUCCEEDED
+  - FAILED
+  - CANCELLED
+  - TIMED_OUT
+
+transitions:
+  - from: PENDING
+    to: QUEUED
+    event: task.queued
+  - from: QUEUED
+    to: RUNNING
+    event: task.started
+  - from: RUNNING
+    to: SUCCEEDED
+    event: task.succeeded
+  - from: RUNNING
+    to: RETRY_WAIT
+    event: task.retry_scheduled
+  - from: RETRY_WAIT
+    to: QUEUED
+    event: task.requeued
+  - from: RUNNING
+    to: FAILED
+    event: task.failed
+  - from: RUNNING
+    to: TIMED_OUT
+    event: task.timed_out
+  - from: PENDING
+    to: CANCELLED
+    event: task.cancelled
+  - from: QUEUED
+    to: CANCELLED
+    event: task.cancelled
+  - from: RETRY_WAIT
+    to: CANCELLED
+    event: task.cancelled
+  - from: RUNNING
+    to: CANCELLED
+    event: task.cancel_requested
+
+invariants:
+  state_owner: workflow-engine
+  every_transition_requires_event: true
+  terminal_states_are_immutable: true
+  stale_runner_updates_must_be_rejected: true

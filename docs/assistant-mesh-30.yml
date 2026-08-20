@@ -1,0 +1,73 @@
+schema: assistant-mesh/v1
+mesh_id: enterprise-flutter-30
+source_of_truth: ENTERPRISE_API_ARCHITECTURE_LOGIC_TH
+source_commit: 311ece33bf42ba709dfdba44afc063f361623ddd
+contract: anef-core-contract
+contract_version: 0.1.0
+
+purpose: >-
+  Continue the latest orchestration design as 30 coordinated work units:
+  10 control-plane units owned by the Enterprise repository and 20
+  execution/integration units owned by the Flutter repository.
+
+execution_model:
+  owner: MAIN-01
+  dispatcher: MAIN-02
+  evidence: MAIN-09
+  final_gate: MAIN-10
+  flutter_downstream: true
+
+main_units:
+  - id: MAIN-01
+    role: Owner Orchestrator
+    scope: control-plane ownership, task intent, lifecycle
+  - id: MAIN-02
+    role: Dispatch Coordinator
+    scope: stage selection, bounded dispatch, handoff
+  - id: MAIN-03
+    role: Contract Guardian
+    scope: contract version, schema and boundary compatibility
+  - id: MAIN-04
+    role: Research Planner
+    scope: research plan, DAG, checkpoints and resumability
+  - id: MAIN-05
+    role: Runtime Coordinator
+    scope: queue, lease, runner ownership and cancellation
+  - id: MAIN-06
+    role: Recovery Coordinator
+    scope: timeout, retry, DLQ, replay and recovery evidence
+  - id: MAIN-07
+    role: Evidence Coordinator
+    scope: provenance, artifacts, hashes and traceability
+  - id: MAIN-08
+    role: Security Boundary Guardian
+    scope: secrets, artifact boundaries and trust boundaries
+  - id: MAIN-09
+    role: Integration Reporter
+    scope: aggregate upstream/downstream evidence and status
+  - id: MAIN-10
+    role: Final Gate Coordinator
+    scope: deterministic acceptance and release decision
+
+handoff_rules:
+  - from: MAIN-03
+    to: FLUTTER-01
+    contract: anef-core-contract:0.1.0
+  - from: MAIN-02
+    to: FLUTTER-02
+    contract: execution-handoff:v1
+  - from: MAIN-07
+    to: FLUTTER-15
+    contract: evidence-bundle:v1
+  - from: MAIN-10
+    to: FLUTTER-20
+    contract: final-gate:v1
+
+acceptance:
+  main_required: 10
+  flutter_required: 20
+  total_required: 30
+  no_physical_worker_per_unit: true
+  bounded_execution: true
+  evidence_required: true
+  fail_closed_on_contract_mismatch: true

@@ -1,0 +1,44 @@
+document:
+  id: ANEF-WR-001
+  version: v3.2.0
+  status: active
+  title: Workflow Runtime Schema
+
+workflow:
+  required:
+    - workflow_id
+    - version
+    - tasks
+  fields:
+    workflow_id: string
+    version: string
+    correlation_id: string
+    idempotency_key: string
+    metadata: object
+    tasks:
+      type: array
+      item:
+        required:
+          - task_id
+          - type
+          - depends_on
+        fields:
+          task_id: string
+          type: string
+          version: string
+          depends_on: array[string]
+          input_ref: string
+          timeout_seconds: integer
+          retry_policy_ref: string
+          required_capabilities: array[string]
+          metadata: object
+
+execution:
+  delivery: at-least-once
+  idempotency: required
+  ordering: dependency-defined
+  state_authority: workflow-engine
+
+compatibility:
+  provider_neutral: true
+  runner_must_not_persist_business_state: true

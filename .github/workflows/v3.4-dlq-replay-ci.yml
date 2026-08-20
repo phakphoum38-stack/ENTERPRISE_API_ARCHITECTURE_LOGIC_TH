@@ -1,0 +1,59 @@
+name: V3.4 DLQ Replay CI
+
+on:
+  push:
+    branches:
+      - agent/v3.4-dlq-replay
+    paths:
+      - 'v3/dlq/**'
+      - 'v3/tests/test_dlq.py'
+      - 'v3/tests/test_replay.py'
+      - 'v3/tests/test_queue_adapter.py'
+      - 'v3/tests/test_replay_integration.py'
+      - 'v3/tests/test_durable_idempotency.py'
+      - 'v3/tests/test_sqlite_store.py'
+      - 'v3/tests/test_recovery.py'
+      - 'v3/tests/test_recovery_e2e.py'
+      - 'v3/tests/test_audit.py'
+      - '.github/workflows/v3.4-dlq-replay-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'v3/dlq/**'
+      - 'v3/tests/test_dlq.py'
+      - 'v3/tests/test_replay.py'
+      - 'v3/tests/test_queue_adapter.py'
+      - 'v3/tests/test_replay_integration.py'
+      - 'v3/tests/test_durable_idempotency.py'
+      - 'v3/tests/test_sqlite_store.py'
+      - 'v3/tests/test_recovery.py'
+      - 'v3/tests/test_recovery_e2e.py'
+      - 'v3/tests/test_audit.py'
+      - '.github/workflows/v3.4-dlq-replay-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3.4-dlq-replay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run V3.4 tests
+        run: python -m unittest v3.tests.test_dlq v3.tests.test_replay v3.tests.test_queue_adapter v3.tests.test_replay_integration v3.tests.test_durable_idempotency v3.tests.test_sqlite_store v3.tests.test_recovery v3.tests.test_recovery_e2e v3.tests.test_audit -v
+
+      - name: Compile DLQ implementation
+        run: python -m py_compile v3/dlq/models.py v3/dlq/store.py v3/dlq/service.py v3/dlq/idempotency.py v3/dlq/replay.py v3/dlq/queue_adapter.py v3/dlq/durable_idempotency.py v3/dlq/sqlite_store.py v3/dlq/recovery.py v3/dlq/audit.py
