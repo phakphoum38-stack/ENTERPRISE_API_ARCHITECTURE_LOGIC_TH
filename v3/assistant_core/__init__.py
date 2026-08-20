@@ -6,6 +6,7 @@ from .plugins import PluginRegistry
 from .research import ResearchIndex
 from .factory import CodeFactory
 from .verification import VerificationEngine
+from .conversation import NaturalConversationPolicy
 from .orchestrator import AssistantOrchestrator
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "ResearchIndex",
     "CodeFactory",
     "VerificationEngine",
+    "NaturalConversationPolicy",
     "AssistantOrchestrator",
 ]
