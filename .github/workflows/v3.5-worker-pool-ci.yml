@@ -8,6 +8,7 @@ on:
       - 'v3/worker_pool.py'
       - 'v3/tests/test_worker_pool.py'
       - 'v3/tests/test_worker_pool_shutdown.py'
+      - 'v3/tests/test_worker_pool_timeout.py'
       - '.github/workflows/v3.5-worker-pool-ci.yml'
   pull_request:
     branches:
@@ -16,6 +17,7 @@ on:
       - 'v3/worker_pool.py'
       - 'v3/tests/test_worker_pool.py'
       - 'v3/tests/test_worker_pool_shutdown.py'
+      - 'v3/tests/test_worker_pool_timeout.py'
       - '.github/workflows/v3.5-worker-pool-ci.yml'
 
 permissions:
@@ -39,7 +41,7 @@ jobs:
           python-version: '3.12'
 
       - name: Run Worker Pool tests
-        run: python -m unittest v3.tests.test_worker_pool v3.tests.test_worker_pool_shutdown -v
+        run: python -m unittest v3.tests.test_worker_pool v3.tests.test_worker_pool_shutdown v3.tests.test_worker_pool_timeout -v
 
       - name: Compile Worker Pool
         run: python -m py_compile v3/worker_pool.py
