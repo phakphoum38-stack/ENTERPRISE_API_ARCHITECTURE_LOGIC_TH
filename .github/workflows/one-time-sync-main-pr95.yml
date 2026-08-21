@@ -34,7 +34,7 @@ jobs:
             conflicts="$(git diff --name-only --diff-filter=U)"
             printf '%s\n' "$conflicts"
 
-            allowed='^.github/workflows/(generate-orchestrator|research-os-final-gate|research-os-gate)\.yml$|^v3/research_os_v3/queue\.py$|^v3/worker_pool\.py$'
+            allowed='^.github/workflows/(generate-orchestrator|research-os-final-gate|research-os-gate|one-time-sync-main-pr95)\.yml$|^v3/research_os_v3/queue\.py$|^v3/worker_pool\.py$'
             while IFS= read -r path; do
               [ -z "$path" ] && continue
               if ! printf '%s\n' "$path" | grep -Eq "$allowed"; then
@@ -54,6 +54,7 @@ jobs:
             done
 
             for path in \
+              .github/workflows/one-time-sync-main-pr95.yml \
               v3/research_os_v3/queue.py \
               v3/worker_pool.py; do
               if git ls-files -u -- "$path" | grep -q .; then
