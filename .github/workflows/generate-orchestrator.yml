@@ -82,6 +82,17 @@ jobs:
           done
           echo "Optional issue reference scan completed."
 
+      - name: Validate branch-isolated repair path
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          test -n "$branch"
+          repair_ref="refs/heads/${branch}"
+          echo "Repair branch: ${branch}"
+          echo "Repair ref: ${repair_ref}"
+          test "$repair_ref" = "refs/heads/${branch}"
+
       - name: Validate registry against repository
         shell: bash
         run: |
