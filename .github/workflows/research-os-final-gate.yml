@@ -6,6 +6,7 @@ on:
       - feature/research-os-completion
       - feature/research-os-final-integration
       - fix/living-house-e2e
+      - coord/v3.5-flex-final-gates
   pull_request:
     branches:
       - main
@@ -14,9 +15,10 @@ on:
 permissions:
   contents: read
 
+# Final evidence must be allowed to finish; do not cancel an in-flight gate.
 concurrency:
   group: research-os-final-gate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   python-gate:
@@ -25,10 +27,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout exact revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -40,11 +42,15 @@ jobs:
           PYTHONPATH: v3
         run: python -m unittest discover -s v3/tests -p 'test_*.py' -v
 
+      - name: Run V3.5 recovery evidence gate
+        env:
+          PYTHONPATH: v3
+        run: python -m unittest v3.tests.test_worker_recovery_evidence -v
+
       - name: Static import smoke
         env:
           PYTHONPATH: v3
-        run: |
-          python -c "import research_os_v3; print('research_os_v3 import OK')"
+        run: python -c "import research_os_v3; print('research_os_v3 import OK')"
 
   flutter-gate:
     name: Flutter Windows build analyze test
@@ -52,7 +58,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout exact revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
