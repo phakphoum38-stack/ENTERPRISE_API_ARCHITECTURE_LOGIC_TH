@@ -33,6 +33,8 @@ env:
   SKILL_MEMORY: current/GENERATE_SKILL_MEMORY.md
   WATCH_ISSUES: "32 52"
   REPAIR_BRANCH_PREFIX: fix/generate-stage
+  RECOVERY_STAGE: ${{ github.event_name == 'pull_request' && 'pr' || inputs.mode || 'inventory' }}
+  RECOVERY_RUN_ID: ${{ github.run_id }}
 
 jobs:
   inventory-and-validate:
@@ -83,3 +85,6 @@ jobs:
       - name: Validate registry against repository
         shell: bash
         run: |
+          set -euo pipefail
+          echo "Recovery correlation: stage=${RECOVERY_STAGE} run_id=${RECOVERY_RUN_ID}"
+          python tools/validate_generate_orchestrator.py
