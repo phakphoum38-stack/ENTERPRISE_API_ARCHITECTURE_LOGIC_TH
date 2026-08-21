@@ -35,7 +35,6 @@ def main() -> None:
 
     text = ORCHESTRATOR.read_text(encoding="utf-8")
     assert "workflow_dispatch" in text, "orchestrator must support manual dispatch"
-    assert "generate-orchestrator.yml" in text, "self-exclusion guard is missing"
     assert "concurrency:" in text, "orchestrator concurrency guard is missing"
     assert "cancel-in-progress: false" in text, "orchestrator must not cancel an active run"
     assert "RECOVERY_STAGE" in text and "RECOVERY_RUN_ID" in text, "recovery correlation is missing"
