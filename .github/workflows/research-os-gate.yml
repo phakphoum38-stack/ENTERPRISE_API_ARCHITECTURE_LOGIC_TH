@@ -6,15 +6,9 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      expected_sha:
-        description: "Exact SHA to validate and dispatch"
-        required: false
-        type: string
 
 permissions:
   contents: read
-  actions: write
 
 concurrency:
   group: research-os-${{ github.workflow }}-${{ github.ref }}
@@ -22,7 +16,6 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11'
-  PYTHONPATH: ${{ github.workspace }}/v3
 
 jobs:
   python-quality:
@@ -43,14 +36,20 @@ jobs:
         run: python -m compileall -q v3/research_os_v3
 
       - name: Unit tests
+        env:
+          PYTHONPATH: v3
         run: |
           python -m unittest discover -s v3/tests -p 'test_*.py' -v
 
       - name: Import smoke
+        env:
+          PYTHONPATH: v3
         run: |
           python -c "import research_os_v3; print('research_os_v3 import: OK')"
 
       - name: Static analysis
+        env:
+          PYTHONPATH: v3
         run: |
           python - <<'PY'
           import ast
@@ -77,10 +76,14 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Run Research OS E2E tests
+        env:
+          PYTHONPATH: v3
         run: |
           python -m unittest discover -s v3/tests -p 'test_*e2e*.py' -v
 
       - name: Run autonomous/evidence integration tests
+        env:
+          PYTHONPATH: v3
         run: |
           python -m unittest \
             v3.tests.test_autonomous_research \
@@ -95,44 +98,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Detect Flutter application
-        id: flutter-check
-        shell: bash
-        run: |
-          if [[ -f flutter_app/pubspec.yaml ]]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Flutter application detected"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No flutter_app/pubspec.yaml found; Flutter checks will be skipped"
-          fi
-
       - name: Setup Flutter
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3'
           channel: stable
           cache: true
 
+      - name: Generate Android platform
+        working-directory: v3/flutter_app
+        run: flutter create --platforms=android --project-name=research_os_v3_flutter .
+
       - name: Flutter dependencies
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
-        working-directory: flutter_app
+        working-directory: v3/flutter_app
         run: flutter pub get
 
       - name: Flutter analyze
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
-        working-directory: flutter_app
+        working-directory: v3/flutter_app
         run: flutter analyze
 
       - name: Flutter tests
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
-        working-directory: flutter_app
+        working-directory: v3/flutter_app
         run: flutter test
 
       - name: Flutter debug APK build
-        if: ${{ steps.flutter-check.outputs.exists == 'true' }}
-        working-directory: flutter_app
+        working-directory: v3/flutter_app
         run: flutter build apk --debug
 
   gate:
@@ -140,9 +129,6 @@ jobs:
     needs: [python-quality, research-e2e, flutter-quality]
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    outputs:
-      target_sha: ${{ steps.target.outputs.target_sha }}
-      delay_seconds: ${{ steps.delay.outputs.delay_seconds }}
     steps:
       - name: Verify required jobs
         run: |
@@ -153,72 +139,3 @@ jobs:
           test "${{ needs.research-e2e.result }}" = success
           test "${{ needs.flutter-quality.result }}" = success
           echo "RESEARCH_OS_GATE=PASS"
-
-      - name: Resolve target SHA
-        id: target
-        env:
-          INPUT_SHA: ${{ inputs.expected_sha }}
-          PR_SHA: ${{ github.event.pull_request.head.sha }}
-          WORKFLOW_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          if [ -n "$INPUT_SHA" ]; then
-            TARGET_SHA="$INPUT_SHA"
-          elif [ -n "$PR_SHA" ]; then
-            TARGET_SHA="$PR_SHA"
-          else
-            TARGET_SHA="$WORKFLOW_SHA"
-          fi
-          test -n "$TARGET_SHA"
-          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
-          echo "TARGET_SHA=$TARGET_SHA"
-
-      - name: Generate one delay value
-        id: delay
-        run: |
-          set -euo pipefail
-          DELAY_SECONDS="$(python - <<'PY'
-          import random
-          value = round(random.uniform(1.0, 3.0), 3)
-          print(f"{value:.3f}")
-          PY
-          )"
-          python - <<PY
-          value = float("$DELAY_SECONDS")
-          assert value >= 0
-          PY
-          echo "delay_seconds=$DELAY_SECONDS" >> "$GITHUB_OUTPUT"
-          echo "GENERATED_DELAY_SECONDS=$DELAY_SECONDS"
-
-      - name: Sleep using the generated value
-        env:
-          DELAY_SECONDS: ${{ steps.delay.outputs.delay_seconds }}
-        run: |
-          set -euo pipefail
-          python - <<PY
-          import time
-          value = float("$DELAY_SECONDS")
-          time.sleep(value)
-          print(f"REUSED_DELAY_SECONDS={value:.3f}")
-          PY
-
-      - name: Dispatch V3.5 PR Integrity with the same contract
-        uses: actions/github-script@v7
-        env:
-          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
-          DELAY_SECONDS: ${{ steps.delay.outputs.delay_seconds }}
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'v3.5-pr-integrity.yml',
-              ref: 'agent/v3.5-worker-pool-hardening',
-              inputs: {
-                expected_sha: process.env.TARGET_SHA,
-                delay_seconds: process.env.DELAY_SECONDS
-              }
-            });
-            core.info(`DISPATCHED_SHA=${process.env.TARGET_SHA}`);
-            core.info(`DISPATCHED_DELAY_SECONDS=${process.env.DELAY_SECONDS}`);
