@@ -1,0 +1,85 @@
+name: Research OS V3 Windows Download
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "v3/flutter_app/**"
+      - ".github/workflows/research-os-v3-windows-download.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build and upload Research OS V3 Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Windows runner if needed
+        working-directory: v3/flutter_app
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          if (-not (Test-Path "windows")) {
+            flutter create --platforms=windows --project-name research_os_v3_flutter .
+          }
+
+      - name: Install dependencies
+        working-directory: v3/flutter_app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: v3/flutter_app
+        run: flutter analyze
+
+      - name: Test
+        working-directory: v3/flutter_app
+        run: flutter test
+
+      - name: Build Windows release
+        working-directory: v3/flutter_app
+        shell: pwsh
+        run: |
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw "Flutter Windows build failed." }
+          $exe = Get-ChildItem "build\windows" -Filter "research_os_v3_flutter.exe" -File -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Research OS V3 executable was not produced." }
+          Write-Host "EXE=$($exe.FullName)"
+
+      - name: Package Windows release
+        working-directory: v3/flutter_app
+        shell: pwsh
+        run: |
+          $release = Get-ChildItem "build\windows" -Directory -Recurse |
+            Where-Object { Test-Path (Join-Path $_.FullName "research_os_v3_flutter.exe") } |
+            Select-Object -First 1
+          if (-not $release) { throw "Windows release directory was not found." }
+          $zip = Join-Path $env:RUNNER_TEMP "Research-OS-V3-Windows-x64.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $release.FullName "*") -DestinationPath $zip -CompressionLevel Optimal
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sha  Research-OS-V3-Windows-x64.zip" | Set-Content "$zip.sha256" -Encoding ascii
+          Write-Host "SHA256=$sha"
+
+      - name: Upload Windows EXE package
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-v3-windows-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/Research-OS-V3-Windows-x64.zip
+            ${{ runner.temp }}/Research-OS-V3-Windows-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
