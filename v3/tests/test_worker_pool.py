@@ -52,6 +52,57 @@ class WorkerPoolTests(unittest.TestCase):
         with self.assertRaises(WorkerPoolClosedError):
             pool.submit("task", lambda value: value)
 
+    def test_shutdown_without_wait_returns_while_running_task_continues(self):
+        pool = BoundedWorkerPool(max_workers=1, max_queue=1)
+        started = Event()
+        release = Event()
+
+        def blocking(value):
+            started.set()
+            release.wait(timeout=2)
+            return value
+
+        future = pool.submit("running", blocking)
+        self.assertTrue(started.wait(timeout=1))
+        started_at = time.monotonic()
+        pool.shutdown(wait=False)
+        self.assertLess(time.monotonic() - started_at, 0.5)
+        self.assertTrue(pool.stats().closed)
+        self.assertEqual(1, pool.stats().active)
+
+        release.set()
+        self.assertEqual("running", future.result(timeout=2))
+        deadline = time.time() + 1
+        while pool.stats().active and time.time() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(0, pool.stats().active)
+        self.assertEqual(0, pool.stats().queued)
+
+    def test_shutdown_cancel_pending_cancels_executor_backlog(self):
+        pool = BoundedWorkerPool(max_workers=1, max_queue=2)
+        started = Event()
+        release = Event()
+
+        def blocking(value):
+            started.set()
+            release.wait(timeout=2)
+            return value
+
+        running = pool.submit("running", blocking)
+        self.assertTrue(started.wait(timeout=1))
+        pending = pool.submit("pending", lambda value: value)
+
+        pool.shutdown(wait=False, cancel_pending=True)
+        release.set()
+
+        self.assertEqual("running", running.result(timeout=2))
+        self.assertTrue(pending.cancelled() or pending.done())
+        deadline = time.time() + 1
+        while pool.stats().active and time.time() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(0, pool.stats().active)
+        self.assertEqual(0, pool.stats().queued)
+
     def test_context_manager_closes_pool(self):
         with BoundedWorkerPool(max_workers=1, max_queue=1) as pool:
             self.assertEqual("ok", pool.submit("ok", lambda value: value).result(timeout=2))
