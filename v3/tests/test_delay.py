@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from research_os_v3.delay import GeneratedDelay
+from v3.research_os_v3.delay import GeneratedDelay
 
 
 class GeneratedDelayTests(unittest.TestCase):
