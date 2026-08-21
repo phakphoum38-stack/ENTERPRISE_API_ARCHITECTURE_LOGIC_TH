@@ -37,6 +37,34 @@ class WorkTrackerTests(unittest.TestCase):
             now[0] = 160.0
             self.assertEqual(tracker.stale(30), [])
 
+    def test_evidence_handoff_requires_owner_ci_and_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tracker = PersistentWorkTracker(Path(tmp) / "tracker.json")
+            tracker.register(
+                "w3",
+                "set-a",
+                owner_id="owner-a",
+                issue_url="https://github.com/example/repo/issues/130",
+            )
+            self.assertFalse(tracker.can_handoff("w3"))
+            tracker.update_metadata("w3", ci_status="passed", pr_url="https://github.com/example/repo/pull/1")
+            self.assertFalse(tracker.can_handoff("w3"))
+            tracker.add_evidence("w3", "actions://run/123")
+            self.assertTrue(tracker.can_handoff("w3"))
+
+    def test_dependency_and_owner_metadata_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tracker.json"
+            tracker = PersistentWorkTracker(path)
+            tracker.register("w4", "set-c", owner_id="owner-c", assistant_ids=["a1", "a2"], dependencies=["w1"], next_action="verify")
+            tracker.update_metadata("w4", blocker="waiting-for-w1", ci_status="pending")
+            restored = PersistentWorkTracker(path)
+            item = next(iter(restored.items()))
+            self.assertEqual(item.owner_id, "owner-c")
+            self.assertEqual(item.assistant_ids, ["a1", "a2"])
+            self.assertEqual(item.dependencies, ["w1"])
+            self.assertEqual(item.blocker, "waiting-for-w1")
+
 
 if __name__ == "__main__":
     unittest.main()
