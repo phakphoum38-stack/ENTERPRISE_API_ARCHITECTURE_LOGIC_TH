@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/v3.5-worker-pool-hardening
+  workflow_dispatch:
 
 permissions:
   contents: write
