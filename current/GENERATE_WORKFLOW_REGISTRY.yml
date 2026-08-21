@@ -96,6 +96,11 @@ stages:
     dispatchable: true
     role: ci-gate
 
+  - stage: 75
+    file: v3.5-pr-integrity.yml
+    dispatchable: true
+    role: sha-locked-validation-gate
+
   - stage: 80
     file: release.yml
     dispatchable: true
@@ -113,7 +118,7 @@ stages:
 
   - stage: 100
     file: generate-orchestrator.yml
-    dispatchable: true
+    dispatchable: false
     role: orchestrator
 
 rules:
@@ -127,3 +132,4 @@ rules:
   - support_multiple_stacks_per_repository: true
   - custom_stack_requires_explicit_workflow_and_gate: true
   - generated_evidence_must_match_exact_commit_sha: true
+  - sha_locked_validation_must_precede_release_gate: true

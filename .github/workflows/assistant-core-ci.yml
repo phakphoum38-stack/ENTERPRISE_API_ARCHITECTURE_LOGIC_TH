@@ -1,0 +1,54 @@
+name: Assistant Core CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/v3.5-worker-pool-hardening
+    paths:
+      - 'v3/assistant_core/**'
+      - 'v3/tests/test_assistant_core.py'
+      - '.github/workflows/assistant-core-ci.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - 'v3/assistant_core/**'
+      - 'v3/tests/test_assistant_core.py'
+      - '.github/workflows/assistant-core-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  assistant-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify exact revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "Verified SHA: $actual"
+
+      - name: Compile core
+        run: python -m compileall -q v3/assistant_core
+
+      - name: Run core tests
+        env:
+          PYTHONPATH: v3
+        run: python -m unittest v3.tests.test_assistant_core -v

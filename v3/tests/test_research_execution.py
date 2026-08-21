@@ -1,17 +1,38 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
 from research_os_v3.evidence import Evidence
 from research_os_v3.persistent_evidence import SQLiteEvidenceStore
-from research_os_v3.queue import DurableTaskQueue
+from research_os_v3.queue import DurableTaskQueue, QueueTask
 from research_os_v3.research_execution import ResearchExecutionCoordinator
 from research_os_v3.research_planner import ResearchPlanner
 
 
 class ResearchExecutionTests(unittest.TestCase):
+    def test_enqueue_persists_and_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "queue.sqlite"
+            queue = DurableTaskQueue(path)
+            queue.enqueue(QueueTask("t1", "r1", {"x": 1}))
+
+            with sqlite3.connect(path) as db:
+                row = db.execute(
+                    "SELECT task_id,status FROM research_queue WHERE task_id=?",
+                    ("t1",),
+                ).fetchone()
+            self.assertEqual(("t1", "queued"), row)
+
+            claimed = queue.claim(worker_id="test")
+            self.assertIsNotNone(claimed)
+            assert claimed is not None
+            self.assertEqual("t1", claimed.task_id)
+            self.assertEqual("r1", claimed.research_id)
+            queue.close()
+
     def test_dag_executes_in_dependency_order(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             queue = DurableTaskQueue(Path(tmp) / "queue.sqlite")
