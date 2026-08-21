@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Mapping
+from typing import Iterator, Mapping
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,7 @@ class DurableTaskQueue:
         self.path = path
         self.default_lease_seconds = default_lease_seconds
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             db.execute(
                 """CREATE TABLE IF NOT EXISTS research_queue (
                     task_id TEXT PRIMARY KEY,
@@ -58,9 +59,15 @@ class DurableTaskQueue:
             db.execute("CREATE INDEX IF NOT EXISTS idx_research_queue_ready ON research_queue(status, available_at)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_research_queue_lease ON research_queue(status, lease_until)")
 
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        """Open a short-lived SQLite transaction and always close it."""
+        with sqlite3.connect(self.path) as db:
+            yield db
+
     def enqueue(self, task: QueueTask) -> None:
         now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             db.execute(
                 "INSERT INTO research_queue "
                 "(task_id,research_id,payload,attempts,status,available_at,updated_at) "
@@ -76,7 +83,7 @@ class DurableTaskQueue:
         now_iso = now.isoformat()
         lease_until = (now + timedelta(seconds=lease_seconds)).isoformat()
         lease_id = uuid.uuid4().hex
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
                 "SELECT task_id,research_id,payload,attempts FROM research_queue "
@@ -98,7 +105,7 @@ class DurableTaskQueue:
         now = datetime.now(timezone.utc)
         now_iso = now.isoformat()
         new_until = (now + timedelta(seconds=lease_seconds)).isoformat()
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             row = db.execute(
                 "SELECT task_id,research_id,payload,attempts,lease_until FROM research_queue "
                 "WHERE task_id=? AND status='running' AND lease_id=?",
@@ -119,7 +126,7 @@ class DurableTaskQueue:
         now = datetime.now(timezone.utc)
         self._assert_lease(task_id, lease_id, now)
         available_at = (now + timedelta(seconds=max(0, delay_seconds))).isoformat()
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             db.execute(
                 "UPDATE research_queue SET status='queued', attempts=attempts+1, available_at=?, updated_at=?, lease_id=NULL, lease_until=NULL, worker_id=NULL WHERE task_id=? AND lease_id=?",
                 (available_at, now.isoformat(), task_id, lease_id),
@@ -130,7 +137,7 @@ class DurableTaskQueue:
 
     def recover_expired_leases(self) -> int:
         now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             cursor = db.execute(
                 "UPDATE research_queue SET status='queued', available_at=?, updated_at=?, lease_id=NULL, lease_until=NULL, worker_id=NULL WHERE status='running' AND lease_until IS NOT NULL AND lease_until<=?",
                 (now, now, now),
@@ -138,7 +145,7 @@ class DurableTaskQueue:
             return cursor.rowcount
 
     def _assert_lease(self, task_id: str, lease_id: str, now: datetime) -> None:
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             row = db.execute(
                 "SELECT lease_until FROM research_queue WHERE task_id=? AND status='running' AND lease_id=?",
                 (task_id, lease_id),
@@ -149,7 +156,7 @@ class DurableTaskQueue:
     def _set_status(self, task_id: str, status: str, lease_id: str) -> None:
         now = datetime.now(timezone.utc)
         self._assert_lease(task_id, lease_id, now)
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             cursor = db.execute(
                 "UPDATE research_queue SET status=?, updated_at=?, lease_id=NULL, lease_until=NULL, worker_id=NULL WHERE task_id=? AND lease_id=?",
                 (status, now.isoformat(), task_id, lease_id),
