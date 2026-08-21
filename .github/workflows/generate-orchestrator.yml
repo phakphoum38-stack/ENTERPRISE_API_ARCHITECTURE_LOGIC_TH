@@ -9,6 +9,11 @@ on:
         default: inventory
         type: choice
         options: [inventory, validate, issue-read, dispatch, repair]
+      ref:
+        description: 'Exact commit SHA or branch to validate'
+        required: false
+        default: ''
+        type: string
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -36,7 +41,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ inputs.ref || github.head_ref || github.ref_name }}
 
       - name: Inventory existing workflows
         shell: bash
