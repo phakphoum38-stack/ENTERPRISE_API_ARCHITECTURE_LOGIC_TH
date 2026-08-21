@@ -10,9 +10,12 @@ on:
 permissions:
   contents: read
 
+# Do not cancel an in-flight final gate when another push/commit arrives.
+# The gate must finish its required jobs so a cancelled child job is not
+# misreported as a final-gate failure caused by concurrency cancellation.
 concurrency:
-  group: research-os-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: research-os-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 env:
   PYTHON_VERSION: '3.11'
