@@ -4,10 +4,11 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from queue import Full, Queue
 from threading import Lock
-from typing import Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")
+EventSink = Callable[[str, str, dict[str, Any]], None]
 
 
 class QueueSaturatedError(RuntimeError):
@@ -41,9 +42,18 @@ class BoundedWorkerPool(Generic[T, R]):
     A timeout never force-kills a Python thread. It marks the Future as timed
     out to the caller while the underlying callable must cooperate with
     cancellation if it needs to stop execution early.
+
+    ``event_sink`` is an optional integration hook. It keeps the pool decoupled
+    from a specific runtime while allowing the owning runtime to publish the
+    lifecycle events into its existing observability bus.
     """
 
-    def __init__(self, max_workers: int, max_queue: int) -> None:
+    def __init__(
+        self,
+        max_workers: int,
+        max_queue: int,
+        event_sink: EventSink | None = None,
+    ) -> None:
         if max_workers < 1 or max_queue < 1:
             raise ValueError("max_workers and max_queue must be >= 1")
         self._capacity = max_queue
@@ -53,6 +63,7 @@ class BoundedWorkerPool(Generic[T, R]):
         self._active = 0
         self._timed_out = 0
         self._closed = False
+        self._event_sink = event_sink
 
     def __enter__(self) -> "BoundedWorkerPool[T, R]":
         return self
@@ -64,17 +75,21 @@ class BoundedWorkerPool(Generic[T, R]):
         """Submit one task without allowing the in-flight limit to be exceeded."""
         with self._lock:
             if self._closed:
+                self._emit("worker.submit_rejected", task, reason="closed")
                 raise WorkerPoolClosedError("worker pool is shut down")
             try:
                 self._queue.put_nowait(task)
             except Full as exc:
+                self._emit("worker.saturated", task, capacity=self._capacity)
                 raise QueueSaturatedError("worker pool in-flight capacity is full") from exc
             self._active += 1
 
+        self._emit("worker.submitted", task)
         try:
             future = self._executor.submit(self._run, task, fn)
         except BaseException:
             self._release()
+            self._emit("worker.submit_failed", task)
             raise
 
         future.add_done_callback(lambda _: self._release())
@@ -90,11 +105,18 @@ class BoundedWorkerPool(Generic[T, R]):
             with self._lock:
                 self._timed_out += 1
             future.cancel()
+            self._emit("worker.timeout", task, timeout=timeout)
             raise TaskTimeoutError(f"task timed out after {timeout:.3f}s") from exc
 
-    @staticmethod
-    def _run(task: T, fn: Callable[[T], R]) -> R:
-        return fn(task)
+    def _run(self, task: T, fn: Callable[[T], R]) -> R:
+        self._emit("worker.started", task)
+        try:
+            result = fn(task)
+        except BaseException as exc:
+            self._emit("worker.failed", task, error=type(exc).__name__)
+            raise
+        self._emit("worker.completed", task)
+        return result
 
     def _release(self) -> None:
         with self._lock:
@@ -116,4 +138,14 @@ class BoundedWorkerPool(Generic[T, R]):
         """Stop accepting work and optionally cancel executor-pending tasks."""
         with self._lock:
             self._closed = True
+        self._emit("worker.shutdown", "__pool__", cancel_pending=cancel_pending)
         self._executor.shutdown(wait=wait, cancel_futures=cancel_pending)
+
+    def _emit(self, event_type: str, task: object, **detail: Any) -> None:
+        if self._event_sink is None:
+            return
+        try:
+            self._event_sink(event_type, str(task), detail)
+        except Exception:
+            # Observability must never break task execution or pool lifecycle.
+            return
