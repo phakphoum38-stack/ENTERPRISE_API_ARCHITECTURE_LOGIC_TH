@@ -34,6 +34,11 @@
           <button type="button" class="run-btn" id="startWork">เริ่มงาน <span>→</span></button>
         </div>
 
+        <section class="account-card" aria-label="Google account and role">
+          <div><span class="eyebrow">ACCOUNT</span><strong id="accountEmail">Not signed in</strong><span id="accountRole" class="role-badge role-user">USER</span></div>
+          <div class="account-actions"><button type="button" class="tool-chip" id="authButton">Sign in with Google</button><span id="ownerTools" data-min-role="OWNER" hidden>OWNER controls</span></div>
+        </section>
+
         <form id="researchForm" class="research-composer">
           <div class="composer-top"><span class="spark">✦</span><textarea id="prompt" rows="4" required placeholder="Describe the research you want to investigate..."></textarea></div>
           <div class="composer-bottom"><div class="composer-tools"><button type="button" class="tool-chip enabled" id="deepMode" aria-pressed="true">◉ Deep Research <span>ON</span></button><button type="button" class="tool-chip">＋ Sources</button><button type="button" class="tool-chip">◫ Evidence</button></div><button class="run-btn" type="submit" id="runButton">Start research <span>→</span></button></div>
