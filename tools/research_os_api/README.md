@@ -11,14 +11,45 @@ API กลางแบบ **Provider-agnostic** สำหรับเชื่�
 
 ## เริ่มรัน
 
-```bash
-python tools/research_os_api/server.py --host 127.0.0.1 --port 8787
+### Windows — Local Research OS พร้อม Friend Service
+
+สำหรับ Research OS Web ที่ใช้ `RESEARCH_OS_AI_ROUTE=friend` ให้ใช้ launcher นี้แทนการเปิด API อย่างเดียว เพราะ Friend Service ที่ `127.0.0.1:8790` เป็น dependency ของ research route:
+
+```powershell
+.\scripts\start-research-os-local.ps1
+```
+
+Launcher จะ:
+
+1. สร้าง data/log directories
+2. ตรวจ `http://127.0.0.1:8790/owner/health`
+3. ถ้ายังไม่ทำงาน จะ start `owner_special/scripts/run_friend_service.py`
+4. รอจน health เป็น `ok`
+5. ตั้ง `RESEARCH_OS_FRIEND_URL` และ `RESEARCH_OS_AI_ROUTE=friend`
+6. จึง start Research OS API ที่ `8787`
+7. เมื่อรันแบบ foreground จะ cleanup Friend Service ตอนจบ
+
+Background mode:
+
+```powershell
+.\scripts\start-research-os-local.ps1 -Background
 ```
 
 ตรวจสถานะ:
 
-```bash
+```powershell
 curl http://127.0.0.1:8787/health
+curl http://127.0.0.1:8790/owner/health
+```
+
+> ไม่ควรแก้ปัญหา `Connection refused` ด้วยการ fallback ไป `mock` เพราะจะทำให้ research response อาจกลายเป็น mock/echo ที่ไม่ใช่ผลจาก Friend runtime จริง
+
+### API อย่างเดียว
+
+ถ้าตั้งใจใช้ API โดยไม่ใช้ Friend route:
+
+```bash
+python tools/research_os_api/server.py --host 127.0.0.1 --port 8787
 ```
 
 วิเคราะห์บทสนทนา:
@@ -41,13 +72,29 @@ curl -X POST http://127.0.0.1:8787/v1/ai/generate \
   -d '{"provider":"mock","prompt":"วิเคราะห์แนวคิดนี้"}'
 ```
 
+## Friend Service
+
+Canonical entrypoint:
+
+```bash
+python owner_special/scripts/run_friend_service.py --owner-id owner --host 127.0.0.1 --port 8790
+```
+
+Health endpoint:
+
+```text
+GET http://127.0.0.1:8790/owner/health
+```
+
+Chat endpoint requires the Owner identity headers and is consumed internally by `/v1/ai/generate` when `RESEARCH_OS_AI_ROUTE=friend`.
+
 ## Endpoints
 
 | Method | Endpoint | หน้าที่ |
 |---|---|---|
 | GET | `/health` | ตรวจสถานะ API |
 | GET | `/v1/providers` | รายชื่อ Provider Adapters |
-| POST | `/v1/ai/generate` | เรียก AI ผ่าน Adapter |
+| POST | `/v1/ai/generate` | เรียก AI ผ่าน Adapter หรือ Friend route |
 | POST | `/v1/conversations/analyze` | สร้าง Artifact Preview |
 | GET | `/v1/knowledge/artifacts` | อ่าน Artifact Index |
 | GET | `/v1/knowledge/graph` | อ่าน Knowledge Graph |
