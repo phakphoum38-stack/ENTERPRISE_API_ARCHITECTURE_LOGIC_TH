@@ -27,9 +27,14 @@ def main() -> None:
     assert registry.index("stage: 75") < registry.index("stage: 80"), "V3.5 gate must precede release gate"
     require(registry, "sha_locked_validation_must_precede_release_gate: true", "registry")
 
-    # Orchestrator guard: it must remain non-dispatchable.
-    require(orchestrator, "file: generate-orchestrator.yml", "orchestrator")
-    require(orchestrator, "dispatchable: false", "orchestrator")
+    # Orchestrator guard: the registry is the source of truth for dispatchability.
+    require(registry, "file: generate-orchestrator.yml", "orchestrator registry")
+    orchestrator_entry = registry.index("file: generate-orchestrator.yml")
+    orchestrator_tail = registry.find("file:", orchestrator_entry + len("file: generate-orchestrator.yml"))
+    orchestrator_block = registry[orchestrator_entry:orchestrator_tail if orchestrator_tail != -1 else len(registry)]
+    require(orchestrator_block, "dispatchable: false", "orchestrator registry")
+    require(orchestrator_block, "role: orchestrator", "orchestrator registry")
+    assert orchestrator.lstrip().startswith("name: Generate Orchestrator"), "orchestrator workflow name is invalid"
 
     # Exact-SHA guard must exist and compare the checked-out commit.
     require(integrity, "ref: ${{ steps.target.outputs.target_sha }}", "integrity")
