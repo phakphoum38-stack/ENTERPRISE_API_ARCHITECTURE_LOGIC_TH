@@ -11,14 +11,31 @@ from urllib.parse import parse_qs, urlsplit
 
 from agent_orchestrator import ORCHESTRATOR
 from agent_platform import REGISTRY
+from file_acl import ACLAuthorizationError, FileACLStore
+from google_identity import GoogleIdentityBroker
 from server import ResearchOSHandler
 
 
 class AgentResearchOSHandler(ResearchOSHandler):
-    """Adds agent discovery and orchestration routes while preserving V1 APIs."""
+    """Adds agent discovery, orchestration and resource ACL routes."""
 
     _agents_prefix = "/v1/agents"
     _prefix = "/v1/agents/orchestrations"
+    _acl_prefix = "/v1/files/acl"
+
+    @staticmethod
+    def _acl_store() -> FileACLStore:
+        root = GoogleIdentityBroker().root
+        return FileACLStore(root / "file_acl.json")
+
+    @staticmethod
+    def _signed_in_email() -> str:
+        result = GoogleIdentityBroker().status()
+        account = result.get("account") if isinstance(result.get("account"), dict) else {}
+        email = str(account.get("email") or "").strip()
+        if not result.get("connected") or not email:
+            raise ACLAuthorizationError("Google sign-in is required")
+        return email
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
@@ -54,6 +71,34 @@ class AgentResearchOSHandler(ResearchOSHandler):
                     },
                 },
             )
+            return
+
+        if path.startswith(self._acl_prefix + "/"):
+            resource_id = path[len(self._acl_prefix) + 1:].strip("/")
+            try:
+                actor = self._signed_in_email()
+                store = self._acl_store()
+                if resource_id == "":
+                    self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+                    return
+                action = self._first_query_value(query, "action") or "read"
+                allowed = store.authorize(resource_id, actor, action)
+                self._send(HTTPStatus.OK, {"resource_id": resource_id, "actor": actor, "action": action, "allowed": allowed})
+            except ACLAuthorizationError as exc:
+                self._send(HTTPStatus.FORBIDDEN, {"error": "acl_denied", "detail": str(exc)})
+            return
+
+        if path == self._acl_prefix:
+            try:
+                actor = self._signed_in_email()
+                resource_id = self._first_query_value(query, "resource")
+                if not resource_id:
+                    raise ValueError("resource is required")
+                self._send(HTTPStatus.OK, {"resource_id": resource_id, "actor": actor, "acl": self._acl_store().snapshot(resource_id)})
+            except ACLAuthorizationError as exc:
+                self._send(HTTPStatus.FORBIDDEN, {"error": "acl_denied", "detail": str(exc)})
+            except ValueError as exc:
+                self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
             return
 
         if path == self._prefix:
@@ -109,6 +154,49 @@ class AgentResearchOSHandler(ResearchOSHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
+
+        if path == self._acl_prefix:
+            try:
+                body = self._read_json()
+                resource_id = str(body.get("resource_id", "")).strip()
+                if not resource_id:
+                    raise ValueError("resource_id is required")
+                actor = self._signed_in_email()
+                acl = self._acl_store().create(resource_id, actor)
+                self._send(HTTPStatus.CREATED, {"resource_id": resource_id, "actor": actor, "acl": acl})
+            except ACLAuthorizationError as exc:
+                self._send(HTTPStatus.FORBIDDEN, {"error": "acl_denied", "detail": str(exc)})
+            except ValueError as exc:
+                self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+            return
+
+        if path.startswith(self._acl_prefix + "/"):
+            relative = path[len(self._acl_prefix) + 1:].strip("/")
+            parts = relative.split("/") if relative else []
+            if len(parts) != 2 or parts[1] not in {"share", "revoke", "transfer"}:
+                self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+                return
+            resource_id, action = parts
+            try:
+                body = self._read_json()
+                actor = self._signed_in_email()
+                store = self._acl_store()
+                target = str(body.get("email", "")).strip()
+                if not target:
+                    raise ValueError("email is required")
+                if action == "share":
+                    acl = store.share(resource_id, actor, target)
+                elif action == "revoke":
+                    acl = store.revoke(resource_id, actor, target)
+                else:
+                    acl = store.transfer(resource_id, actor, target)
+                self._send(HTTPStatus.OK, {"resource_id": resource_id, "actor": actor, "action": action, "acl": acl})
+            except ACLAuthorizationError as exc:
+                self._send(HTTPStatus.FORBIDDEN, {"error": "acl_denied", "detail": str(exc)})
+            except ValueError as exc:
+                self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+            return
+
         if path == self._prefix:
             try:
                 body = self._read_json()
