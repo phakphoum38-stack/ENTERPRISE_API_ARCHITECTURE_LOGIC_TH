@@ -38,7 +38,11 @@ def main() -> None:
     assert "concurrency:" in text, "orchestrator concurrency guard is missing"
     assert "cancel-in-progress: false" in text, "orchestrator must not cancel an active run"
     assert "RECOVERY_STAGE" in text and "RECOVERY_RUN_ID" in text, "recovery correlation is missing"
-    assert "refs/heads/${branch}" in text, "repair path must remain branch-isolated"
+
+    # The repair target must be derived from the current branch and checked as
+    # an actual shell value. Do not accept a comment-only marker as evidence.
+    assert 'repair_ref="refs/heads/${branch}"' in text, "repair path must remain branch-isolated"
+    assert 'test "$repair_ref" = "refs/heads/${branch}"' in text, "repair path must be verified"
 
     print(f"Generate orchestrator validation passed: {len(stages)} stages, {len(dispatchable)} dispatchable downstream workflows.")
 
