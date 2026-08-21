@@ -49,7 +49,7 @@ jobs:
           echo "TARGET_SHA=$TARGET_SHA"
 
       - name: Checkout locked SHA
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.target.outputs.target_sha }}
           fetch-depth: 1
@@ -73,18 +73,25 @@ jobs:
           test -f v3/tests/test_worker_pool.py
           test -f v3/tests/test_worker_pool_shutdown.py
           test -f v3/tests/test_worker_pool_timeout.py
+          test -f v3/tests/test_worker_pool_observability.py
           test -f v3/tests/test_worker_crash_recovery.py
+          test -f v3/tests/test_worker_recovery_evidence.py
           test -f v3/research_os_v3/delay.py
           test -f v3/research_os_v3/queue.py
-          python -m py_compile v3/worker_pool.py v3/research_os_v3/delay.py v3/research_os_v3/queue.py
+          test -f v3/research_os_v3/runner.py
+          python -m py_compile v3/worker_pool.py v3/research_os_v3/delay.py v3/research_os_v3/queue.py v3/research_os_v3/runner.py
 
-      - name: Run Worker Pool test suite
+      - name: Run Worker Pool and recovery evidence suite
+        env:
+          PYTHONPATH: v3
         run: |
           python -m unittest \
             v3.tests.test_worker_pool \
             v3.tests.test_worker_pool_shutdown \
             v3.tests.test_worker_pool_timeout \
+            v3.tests.test_worker_pool_observability \
             v3.tests.test_worker_crash_recovery \
+            v3.tests.test_worker_recovery_evidence \
             v3.tests.test_delay -v
 
       - name: Validate and reuse generated delay
@@ -110,6 +117,8 @@ jobs:
         run: |
           echo "VALIDATED_SHA=$TARGET_SHA"
           echo "WORKER_CRASH_RECOVERY_GATE=passed"
+          echo "WORKER_RECOVERY_EVIDENCE_GATE=passed"
+          echo "OBSERVABILITY_EVENT_GATE=passed"
           if [ -n "$DELAY_SECONDS" ]; then
             echo "VALIDATED_DELAY_SECONDS=$DELAY_SECONDS"
           fi
