@@ -61,16 +61,21 @@ class DurableTaskQueue:
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
-        """Open a short-lived SQLite connection, commit/rollback, and always close it."""
-        db = sqlite3.connect(self.path)
+        """Open a short-lived SQLite connection with explicit transaction ownership."""
+        db = sqlite3.connect(self.path, timeout=30, isolation_level=None)
         try:
             yield db
-            db.commit()
         except BaseException:
-            db.rollback()
+            try:
+                db.rollback()
+            finally:
+                db.close()
             raise
-        finally:
-            db.close()
+        else:
+            try:
+                db.commit()
+            finally:
+                db.close()
 
     def enqueue(self, task: QueueTask) -> None:
         now = datetime.now(timezone.utc).isoformat()
