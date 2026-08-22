@@ -23,6 +23,3 @@ flutter:
   uses-material-design: true
   assets:
     - assets/branding/research_os_master.webp
-    - assets/branding/research_os.ico
-    - assets/branding/research_os_512.png
-    - assets/branding/research_os_256.png
