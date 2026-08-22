@@ -15,8 +15,9 @@ class TeamWorkspace {
 }
 
 class TeamCenter extends StatefulWidget {
-  const TeamCenter({super.key, this.isOwner = true});
+  const TeamCenter({super.key, this.isOwner = true, this.onChanged});
   final bool isOwner;
+  final ValueChanged<TeamWorkspace>? onChanged;
 
   @override
   State<TeamCenter> createState() => _TeamCenterState();
@@ -47,6 +48,11 @@ class _TeamCenterState extends State<TeamCenter> {
 
   TeamWorkspace get _selected => _teams.firstWhere((team) => team.id == _selectedId);
 
+  void _selectTeam(String id) {
+    setState(() => _selectedId = id);
+    widget.onChanged?.call(_selected);
+  }
+
   Future<void> _createTeam() async {
     if (!widget.isOwner) return;
     final controller = TextEditingController();
@@ -69,14 +75,16 @@ class _TeamCenterState extends State<TeamCenter> {
     controller.dispose();
     if (!mounted || name == null || name.trim().isEmpty) return;
     final id = 'team-${DateTime.now().microsecondsSinceEpoch}';
+    final created = TeamWorkspace(
+      id: id,
+      name: name.trim(),
+      members: const <TeamMember>[TeamMember(userId: 'owner', displayName: 'Owner', role: 'owner')],
+    );
     setState(() {
-      _teams.add(TeamWorkspace(
-        id: id,
-        name: name.trim(),
-        members: const <TeamMember>[TeamMember(userId: 'owner', displayName: 'Owner', role: 'owner')],
-      ));
+      _teams.add(created);
       _selectedId = id;
     });
+    widget.onChanged?.call(created);
   }
 
   @override
@@ -98,11 +106,12 @@ class _TeamCenterState extends State<TeamCenter> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _selectedId,
+              key: const Key('team-switcher'),
+              initialValue: _selectedId,
               decoration: const InputDecoration(labelText: 'Current Team', border: OutlineInputBorder()),
               items: _teams.map((team) => DropdownMenuItem<String>(value: team.id, child: Text(team.name))).toList(),
               onChanged: (value) {
-                if (value != null) setState(() => _selectedId = value);
+                if (value != null) _selectTeam(value);
               },
             ),
             const SizedBox(height: 12),
