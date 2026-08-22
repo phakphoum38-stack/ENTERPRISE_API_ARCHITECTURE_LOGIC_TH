@@ -84,6 +84,7 @@ class _TeamCenterState extends State<TeamCenter> {
 
   @override
   Widget build(BuildContext context) {
+    final selected = _selected;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -100,27 +101,36 @@ class _TeamCenterState extends State<TeamCenter> {
               ],
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            PopupMenuButton<String>(
               key: const Key('team-switcher'),
+              tooltip: 'Current Team',
               initialValue: _selectedId,
-              decoration: const InputDecoration(labelText: 'Current Team', border: OutlineInputBorder()),
-              items: _teams.map((team) => DropdownMenuItem<String>(value: team.id, child: Text(team.name))).toList(),
-              onChanged: (value) {
-                if (value != null) _selectTeam(value);
-              },
+              onSelected: _selectTeam,
+              itemBuilder: (context) => _teams
+                  .map((team) => PopupMenuItem<String>(value: team.id, child: Text(team.name)))
+                  .toList(),
+              child: InputDecorator(
+                decoration: const InputDecoration(labelText: 'Current Team', border: OutlineInputBorder()),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(child: Text(selected.name)),
+                    const Icon(Icons.arrow_drop_down),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 12),
-            Text('Team ID: ${_selected.id}'),
-            Text('Members: ${_selected.members.length}'),
+            Text('Team ID: ${selected.id}'),
+            Text('Members: ${selected.members.length}'),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               children: <Widget>[
-                Chip(label: Text('Chat: ${_selected.id}')),
-                Chip(label: Text('Agents: ${_selected.id}')),
-                Chip(label: Text('Memory: ${_selected.id}')),
-                Chip(label: Text('Files: ${_selected.id}')),
-                Chip(label: Text('Tasks: ${_selected.id}')),
+                Chip(label: Text('Chat: ${selected.id}')),
+                Chip(label: Text('Agents: ${selected.id}')),
+                Chip(label: Text('Memory: ${selected.id}')),
+                Chip(label: Text('Files: ${selected.id}')),
+                Chip(label: Text('Tasks: ${selected.id}')),
               ],
             ),
           ],
