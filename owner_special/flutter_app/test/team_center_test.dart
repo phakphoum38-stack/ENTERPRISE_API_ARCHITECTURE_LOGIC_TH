@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/src/team_center.dart';
+import 'package:research_os_owner_special/src/team_center.dart';
 
 void main() {
   testWidgets('owner can switch teams and emits team context', (tester) async {
