@@ -80,15 +80,46 @@ jobs:
               return json.loads(out)
 
           pr_data = gh(f'/repos/{owner}/{repo}/pulls/{pr}')
+          head_data = gh(f'/repos/{owner}/{repo}/commits/{head}')
           merge_data = gh(f'/repos/{owner}/{repo}/commits/{merge}')
           status = gh(f'/repos/{owner}/{repo}/commits/{head}/status')
           checks = gh(f'/repos/{owner}/{repo}/commits/{head}/check-runs?per_page=100')
           runs = gh(f'/repos/{owner}/{repo}/actions/runs?head_sha={head}&per_page=100')
 
           parents = [p['sha'] for p in merge_data.get('parents', [])]
-          head_matches_pr = pr_data.get('head', {}).get('sha') == head
-          merge_matches_pr = pr_data.get('merge_commit_sha') == merge
-          lineage_ok = head_matches_pr and merge_matches_pr and head in parents
+          pr_head_sha = pr_data.get('head', {}).get('sha', '')
+          pr_merge_sha = pr_data.get('merge_commit_sha', '')
+          head_tree_sha = head_data.get('commit', {}).get('tree', {}).get('sha')
+          merge_tree_sha = merge_data.get('commit', {}).get('tree', {}).get('sha')
+
+          # Inputs intentionally use short SHAs in the workflow defaults. Reconcile
+          # them against GitHub's canonical 40-character SHAs instead of requiring
+          # exact string equality.
+          head_matches_pr = bool(pr_head_sha) and (
+              pr_head_sha == head or pr_head_sha.startswith(head)
+          )
+          merge_matches_pr = bool(pr_merge_sha) and (
+              pr_merge_sha == merge or pr_merge_sha.startswith(merge)
+          )
+          base_matches_merge_parent = any(
+              parent == base or parent.startswith(base) for parent in parents
+          )
+
+          # GitHub squash merges create a new merge commit whose only parent is the
+          # base commit, so the PR head is not a direct parent. In that case the
+          # strongest lineage proof available here is: merged PR metadata matches,
+          # the merge commit descends from the supplied base, and the merge tree is
+          # identical to the PR head tree.
+          direct_parent_lineage = head_matches_pr and merge_matches_pr and head_data.get('sha') in parents
+          squash_lineage = (
+              head_matches_pr
+              and merge_matches_pr
+              and base_matches_merge_parent
+              and len(parents) == 1
+              and head_tree_sha is not None
+              and head_tree_sha == merge_tree_sha
+          )
+          lineage_ok = bool(pr_data.get('merged')) and (direct_parent_lineage or squash_lineage)
 
           workflow_runs = []
           for r in runs.get('workflow_runs', []):
@@ -123,7 +154,13 @@ jobs:
               'merge_parents': parents,
               'head_matches_pr': head_matches_pr,
               'merge_matches_pr': merge_matches_pr,
-              'head_is_merge_parent': head in parents,
+              'head_is_merge_parent': head_data.get('sha') in parents,
+              'base_matches_merge_parent': base_matches_merge_parent,
+              'head_tree_sha': head_tree_sha,
+              'merge_tree_sha': merge_tree_sha,
+              'direct_parent_lineage': direct_parent_lineage,
+              'squash_lineage': squash_lineage,
+              'pr_merged': bool(pr_data.get('merged')),
               'head_commit_status': status.get('state'),
               'check_run_count': len(checks.get('check_runs', [])),
               'successful_check_runs': len(passed),
