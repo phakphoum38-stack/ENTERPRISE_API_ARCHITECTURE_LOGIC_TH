@@ -1,0 +1,70 @@
+version: "1.0"
+status: draft
+purpose: >-
+  Define the context contract consumed by the AI Conversation Center so that
+  conversations can reason over workflow, run, evidence, recovery, tools,
+  functions, and unfinished engineering work.
+
+context_sources:
+  - current/BUILD_COMPLETION_REGISTRY.yml
+  - current/ENGINEERING_BUILD_CENTER.md
+  - workflow
+  - run
+  - stage
+  - evidence
+  - recovery
+  - tools
+  - functions
+  - skills
+
+conversation_modes:
+  - general
+  - workflow
+  - research
+  - debug
+  - recovery
+  - architecture
+  - engineering
+
+pinned_context:
+  allowed:
+    - workflow_id
+    - run_id
+    - stage_id
+    - evidence_id
+    - recovery_id
+    - tool_id
+    - function_id
+    - build_item_id
+
+actions:
+  read_only:
+    - inspect_workflow
+    - inspect_run
+    - inspect_logs
+    - inspect_evidence
+    - inspect_recovery
+    - inspect_build_registry
+    - explain_failure
+  approval_required:
+    - run_workflow
+    - modify_workflow
+    - create_repair_branch
+    - create_pull_request
+  prohibited_without_admin_policy:
+    - merge_main
+    - mutate_production_directly
+
+response_requirements:
+  - cite_or_reference_context_sources
+  - distinguish_observed_facts_from_inference
+  - show_blockers_and_dependencies
+  - never_claim_incomplete_work_is_complete
+  - request_approval_before_high_impact_actions
+
+example_queries:
+  - "ตอนนี้อะไรยังไม่เสร็จ?"
+  - "อะไร block Production?"
+  - "ทำไม run ล่าสุด fail?"
+  - "ช่วยวางแผนทำ queue ต่อ"
+  - "สร้าง repair plan แต่ยังไม่ execute"
