@@ -139,14 +139,25 @@ class _FriendChatPageState extends State<_FriendChatPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text('Team: ${widget.team.name}', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
-        Wrap(spacing: 12, runSpacing: 8, children: [
-          FilterChip(key: const Key('turbo-million'), selected: _turboMillion, onSelected: (value) => setState(() => _turboMillion = value), label: const Text('Turbo Helpers 1,000,000')),
-          Chip(label: Text('Brain scale: $_scale')),
-          Chip(label: Text('Logical capacity: $_capacity')),
-          Chip(label: Text('Active workers: $_activeWorkers')),
-          Chip(label: Text('Batches: $_batches')),
-          Chip(label: Text('Factory: $_factory')),
-        ]),
+        SizedBox(
+          height: 48,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              FilterChip(key: const Key('turbo-million'), selected: _turboMillion, onSelected: (value) => setState(() => _turboMillion = value), label: const Text('Turbo Helpers 1,000,000')),
+              const SizedBox(width: 12),
+              Chip(label: Text('Brain scale: $_scale')),
+              const SizedBox(width: 12),
+              Chip(label: Text('Logical capacity: $_capacity')),
+              const SizedBox(width: 12),
+              Chip(label: Text('Active workers: $_activeWorkers')),
+              const SizedBox(width: 12),
+              Chip(label: Text('Batches: $_batches')),
+              const SizedBox(width: 12),
+              Chip(label: Text('Factory: $_factory')),
+            ]),
+          ),
+        ),
         const SizedBox(height: 20),
         Expanded(child: Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(18)), child: SelectableText(_answer, key: const Key('friend-answer')))),
         const SizedBox(height: 16),
