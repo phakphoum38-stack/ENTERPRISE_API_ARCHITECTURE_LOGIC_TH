@@ -1,0 +1,153 @@
+version: "1.0"
+status: active
+purpose: >-
+  Track tools, functions, platform capabilities, and production gates that are
+  planned or partially implemented. This registry is intentionally explicit
+  about incomplete work and is designed to feed the future Engineering/Build UI
+  and AI Conversation context.
+
+statuses:
+  - blocked
+  - in_progress
+  - planned
+  - ready_for_validation
+  - completed
+
+items:
+  - id: queue-event-bus
+    type: platform
+    name: Queue + Event Bus
+    status: in_progress
+    priority: critical
+    completion_percent: 0
+    dependencies: []
+    acceptance:
+      - job_id and event_id are immutable
+      - ack/nack supported
+      - retry and dead-letter handling supported
+      - idempotency supported
+      - visibility timeout supported
+
+  - id: stateless-runner
+    type: platform
+    name: Stateless Runner
+    status: planned
+    priority: critical
+    completion_percent: 0
+    dependencies:
+      - queue-event-bus
+    acceptance:
+      - claim job with lease
+      - heartbeat
+      - checkpoint
+      - graceful shutdown and drain
+      - crash recovery
+
+  - id: distributed-job-state
+    type: function
+    name: Distributed Job State + Lease
+    status: planned
+    priority: critical
+    completion_percent: 0
+    dependencies:
+      - queue-event-bus
+      - stateless-runner
+    acceptance:
+      - atomic claim
+      - lease expiry
+      - duplicate execution protection
+      - state transitions are auditable
+
+  - id: retry-timeout-idempotency
+    type: function
+    name: Retry + Timeout + Idempotency
+    status: planned
+    priority: high
+    completion_percent: 0
+    dependencies:
+      - distributed-job-state
+    acceptance:
+      - exponential backoff
+      - configurable timeout
+      - idempotency key enforcement
+      - dead-letter after retry policy
+
+  - id: runner-observability
+    type: platform
+    name: Runner Metrics + Tracing
+    status: planned
+    priority: high
+    completion_percent: 0
+    dependencies:
+      - stateless-runner
+    acceptance:
+      - queue latency
+      - execution latency
+      - runner utilization
+      - failure and retry metrics
+      - trace correlation by run_id/job_id
+
+  - id: production-load-gate
+    type: validation
+    name: Production Load + Concurrency Gate
+    status: planned
+    priority: high
+    completion_percent: 0
+    dependencies:
+      - queue-event-bus
+      - stateless-runner
+      - distributed-job-state
+    acceptance:
+      - 10 concurrent jobs
+      - 100 concurrent jobs
+      - 1000 concurrent jobs
+      - duplicate delivery test
+      - runner crash test
+      - queue interruption test
+
+  - id: engineering-build-ui
+    type: gui
+    name: Engineering Build Center
+    status: planned
+    priority: medium
+    completion_percent: 0
+    dependencies: []
+    acceptance:
+      - unfinished tools view
+      - unfinished functions view
+      - blockers and dependencies
+      - completion percentage
+      - AI Continue action
+
+  - id: ai-conversation-center
+    type: gui
+    name: AI Conversation Center
+    status: planned
+    priority: medium
+    completion_percent: 0
+    dependencies: []
+    acceptance:
+      - conversation history
+      - pinned context
+      - workflow/run/evidence context
+      - tool and function actions
+      - approval gates for high-impact actions
+
+  - id: evidence-explorer
+    type: gui
+    name: Evidence Explorer
+    status: planned
+    priority: medium
+    completion_percent: 0
+    dependencies: []
+    acceptance:
+      - evidence list
+      - provenance
+      - related run/stage/recovery
+      - audit trail
+
+rules:
+  - incomplete_items_must_not_be_reported_as_production_ready
+  - completion_percent_must_be_supported_by_tests_or_artifacts
+  - blocked_items_must_list_dependencies
+  - high_impact_ai_actions_require_explicit_approval
