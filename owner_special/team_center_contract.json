@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "owner": {
+    "user_id": "owner",
+    "role": "owner",
+    "services": [8787, 8788, 8789, 8790],
+    "friend_service": "internal-only"
+  },
+  "users": [
+    {"user_id": "user-a", "role": "member"},
+    {"user_id": "user-b", "role": "engineer"},
+    {"user_id": "user-c", "role": "agent"}
+  ],
+  "service_boundaries": {
+    "8787": "workspace",
+    "8788": "team-engineering",
+    "8789": "owner-admin",
+    "8790": "friend-internal"
+  },
+  "team_context": ["chat", "agents", "memory", "files", "tasks"],
+  "authorization_rule": "identity -> role -> team -> permission; port is not identity"
+}

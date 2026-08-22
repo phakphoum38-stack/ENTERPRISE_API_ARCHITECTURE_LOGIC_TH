@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'owner_api.dart';
+import 'team_center.dart';
 
 class OwnerFriendApp extends StatefulWidget {
   const OwnerFriendApp({required this.api, this.startup, this.startupError, super.key});
@@ -14,9 +15,20 @@ class OwnerFriendApp extends StatefulWidget {
 
 class _OwnerFriendAppState extends State<OwnerFriendApp> {
   int _index = 0;
+  TeamRecord _currentTeam = const TeamRecord(id: 'research', name: 'Research Team');
+
+  void _onTeamChanged(TeamRecord team) => setState(() => _currentTeam = team);
 
   @override
   Widget build(BuildContext context) {
+    final pages = <Widget>[
+      _FriendChatPage(api: widget.api, team: _currentTeam),
+      _CapabilitiesPage(api: widget.api, startup: widget.startup),
+      _MemoryPage(api: widget.api),
+      _ProviderPage(api: widget.api),
+      _TeamPage(team: _currentTeam),
+    ];
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Research OS Owner Special',
@@ -24,7 +36,12 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Research OS • Owner Special • Friend Complete V1.3'),
-          actions: <Widget>[Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Center(child: Text(widget.startupError == null ? 'Friend Service: connected' : 'Friend Service: offline')))],
+          actions: <Widget>[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Center(child: Text(widget.startupError == null ? 'Friend Service: connected' : 'Friend Service: offline')),
+            ),
+          ],
         ),
         body: Row(children: <Widget>[
           NavigationRail(
@@ -36,19 +53,63 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
               NavigationRailDestination(icon: Icon(Icons.psychology_outlined), selectedIcon: Icon(Icons.psychology), label: Text('Capabilities')),
               NavigationRailDestination(icon: Icon(Icons.memory_outlined), selectedIcon: Icon(Icons.memory), label: Text('Memory')),
               NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('Provider')),
+              NavigationRailDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: Text('Team')),
             ],
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: <Widget>[_FriendChatPage(api: widget.api), _CapabilitiesPage(api: widget.api, startup: widget.startup), _MemoryPage(api: widget.api), _ProviderPage(api: widget.api)][_index]),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: TeamCenter(onChanged: _onTeamChanged),
+                    ),
+                  ),
+                ),
+                Expanded(child: pages[_index]),
+              ],
+            ),
+          ),
         ]),
       ),
     );
   }
 }
 
+class _TeamPage extends StatelessWidget {
+  const _TeamPage({required this.team});
+  final TeamRecord team;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: <Widget>[
+        Text('Team Workspace', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 16),
+        Card(child: ListTile(leading: const Icon(Icons.groups), title: Text(team.name), subtitle: Text('Team ID: ${team.id}'))),
+        const SizedBox(height: 16),
+        const Wrap(spacing: 8, runSpacing: 8, children: <Widget>[
+          Chip(label: Text('Chat')),
+          Chip(label: Text('Agents')),
+          Chip(label: Text('Memory')),
+          Chip(label: Text('Files')),
+          Chip(label: Text('Tasks')),
+        ]),
+      ],
+    );
+  }
+}
+
 class _FriendChatPage extends StatefulWidget {
-  const _FriendChatPage({required this.api});
+  const _FriendChatPage({required this.api, required this.team});
   final OwnerFriendApi api;
+  final TeamRecord team;
   @override
   State<_FriendChatPage> createState() => _FriendChatPageState();
 }
@@ -96,6 +157,8 @@ class _FriendChatPageState extends State<_FriendChatPage> {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+        Text('Team: ${widget.team.name}', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
         Wrap(spacing: 12, runSpacing: 8, children: <Widget>[
           FilterChip(key: const Key('turbo-million'), selected: _turboMillion, onSelected: (value) => setState(() => _turboMillion = value), label: const Text('Turbo Helpers 1,000,000')),
           Chip(label: Text('Brain scale: $_scale')),
