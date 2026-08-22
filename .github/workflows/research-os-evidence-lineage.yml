@@ -1,0 +1,167 @@
+name: Research OS Evidence Lineage
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to reconcile
+        required: true
+        default: '137'
+        type: string
+      base_sha:
+        description: Base commit SHA
+        required: true
+        default: '5f84d78'
+        type: string
+      head_sha:
+        description: PR head SHA
+        required: true
+        default: 'e320cd1'
+        type: string
+      merge_sha:
+        description: Merge commit SHA
+        required: true
+        default: 'b4a6835ce530ea7bc08254abf53757641502ec9f'
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: read
+
+jobs:
+  reconcile:
+    name: Canonical Evidence / 111 → 115 → 116
+    runs-on: ubuntu-latest
+    env:
+      OWNER: ${{ github.repository_owner }}
+      REPO: ${{ github.event.repository.name }}
+      PR_NUMBER: ${{ inputs.pr_number || '137' }}
+      BASE_SHA: ${{ inputs.base_sha || '5f84d78' }}
+      HEAD_SHA: ${{ inputs.head_sha || 'e320cd1' }}
+      MERGE_SHA: ${{ inputs.merge_sha || 'b4a6835ce530ea7bc08254abf53757641502ec9f' }}
+    steps:
+      - name: Checkout merge target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MERGE_SHA }}
+          fetch-depth: 0
+
+      - name: Reconcile commit lineage and CI evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/lineage
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+
+          owner = os.environ['OWNER']
+          repo = os.environ['REPO']
+          pr = os.environ['PR_NUMBER']
+          base = os.environ['BASE_SHA']
+          head = os.environ['HEAD_SHA']
+          merge = os.environ['MERGE_SHA']
+          token = os.environ['GH_TOKEN']
+
+          def gh(path):
+              out = subprocess.check_output([
+                  'curl','-fsSL',
+                  '-H', f'Authorization: Bearer {token}',
+                  '-H', 'Accept: application/vnd.github+json',
+                  '-H', 'X-GitHub-Api-Version: 2022-11-28',
+                  f'https://api.github.com{path}'
+              ], text=True)
+              return json.loads(out)
+
+          pr_data = gh(f'/repos/{owner}/{repo}/pulls/{pr}')
+          merge_data = gh(f'/repos/{owner}/{repo}/commits/{merge}')
+          status = gh(f'/repos/{owner}/{repo}/commits/{head}/status')
+          checks = gh(f'/repos/{owner}/{repo}/commits/{head}/check-runs?per_page=100')
+          runs = gh(f'/repos/{owner}/{repo}/actions/runs?head_sha={head}&per_page=100')
+
+          parents = [p['sha'] for p in merge_data.get('parents', [])]
+          head_matches_pr = pr_data.get('head', {}).get('sha') == head
+          merge_matches_pr = pr_data.get('merge_commit_sha') == merge
+          lineage_ok = head_matches_pr and merge_matches_pr and head in parents
+
+          workflow_runs = []
+          for r in runs.get('workflow_runs', []):
+              workflow_runs.append({
+                  'id': r['id'],
+                  'name': r['name'],
+                  'status': r['status'],
+                  'conclusion': r['conclusion'],
+                  'head_sha': r['head_sha'],
+                  'event': r['event'],
+                  'url': r['html_url'],
+              })
+
+          passed = [
+              c for c in checks.get('check_runs', [])
+              if c.get('conclusion') == 'success'
+          ]
+          failed = [
+              c for c in checks.get('check_runs', [])
+              if c.get('conclusion') not in (None, 'success', 'neutral', 'skipped')
+          ]
+
+          evidence = {
+              'schema': 'research-os.canonical-evidence.v1',
+              'plan': '#111 -> existing-compatible-tools -> canonical-evidence -> #115 -> #116 -> FINAL -> LOCK',
+              'stage': '#111',
+              'status': 'GREEN' if lineage_ok else 'GAP',
+              'base_sha': base,
+              'pr_number': int(pr),
+              'head_sha': head,
+              'merge_sha': merge,
+              'merge_parents': parents,
+              'head_matches_pr': head_matches_pr,
+              'merge_matches_pr': merge_matches_pr,
+              'head_is_merge_parent': head in parents,
+              'head_commit_status': status.get('state'),
+              'check_run_count': len(checks.get('check_runs', [])),
+              'successful_check_runs': len(passed),
+              'failed_check_runs': len(failed),
+              'workflow_runs_for_head': workflow_runs,
+              'workflow_run_count': len(workflow_runs),
+              'traceability_gap': None if lineage_ok else 'PR head/merge lineage could not be fully reconciled',
+              'next_stage': '#115' if lineage_ok else '#111',
+              'generated_by': 'research-os-evidence-lineage',
+              'generated_at': os.environ.get('GITHUB_RUN_STARTED_AT'),
+          }
+
+          Path('evidence/lineage/canonical-evidence.json').write_text(
+              json.dumps(evidence, indent=2) + '\n', encoding='utf-8'
+          )
+
+          print(json.dumps(evidence, indent=2))
+          if not lineage_ok:
+              raise SystemExit('Evidence lineage GAP: keep #111 open; do not advance to FINAL')
+          PY
+
+      - name: Publish evidence to job summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f evidence/lineage/canonical-evidence.json ]; then
+            echo '## Canonical Evidence — #111' >> "$GITHUB_STEP_SUMMARY"
+            echo '### Plan' >> "$GITHUB_STEP_SUMMARY"
+            echo '#111 → Existing Compatible Tools → Canonical Evidence → #115 → #116 → FINAL → 🔒 LOCK' >> "$GITHUB_STEP_SUMMARY"
+            echo '### Evidence' >> "$GITHUB_STEP_SUMMARY"
+            cat evidence/lineage/canonical-evidence.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload canonical evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-evidence-lineage-${{ env.HEAD_SHA }}
+          path: evidence/lineage/canonical-evidence.json
+          if-no-files-found: error
+          retention-days: 90
