@@ -1,0 +1,123 @@
+name: Research OS Branding Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/research_os_flutter/**"
+      - "scripts/apply-research-os-branding.py"
+      - ".github/workflows/research-os-branding-gate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/research_os_flutter/**"
+      - "scripts/apply-research-os-branding.py"
+      - ".github/workflows/research-os-branding-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-branding-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branding-gate:
+    name: Generate and verify Research OS branding
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate canonical master asset
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          $master = "assets/branding/research_os_master.webp"
+          if (-not (Test-Path $master)) { throw "Missing canonical Research OS master asset: $master" }
+          $hash = (Get-FileHash $master -Algorithm SHA256).Hash
+          Write-Host "RESEARCH_OS_MASTER_SHA256=$hash"
+
+      - name: Install image tooling
+        run: python -m pip install --disable-pip-version-check --quiet pillow
+
+      - name: Generate canonical branding
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          python ../../scripts/apply-research-os-branding.py --app-root . --platform windows --platform web --platform linux
+
+          $required = @(
+            "assets/branding/research_os_512.png",
+            "assets/branding/research_os_256.png",
+            "assets/branding/research_os.ico"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) { throw "Generated shared branding asset missing: $path" }
+            if ((Get-Item $path).Length -lt 1000) { throw "Generated shared branding asset is unexpectedly small: $path" }
+          }
+
+          if (Test-Path "windows") {
+            $windowsIcon = "windows/runner/resources/app_icon.ico"
+            if (-not (Test-Path $windowsIcon)) { throw "Windows shell exists but generated Windows icon is missing: $windowsIcon" }
+            if ((Get-Item $windowsIcon).Length -lt 1000) { throw "Windows branding asset is unexpectedly small: $windowsIcon" }
+            Write-Host "WINDOWS_BRANDING=verified"
+          } else {
+            Write-Host "WINDOWS_BRANDING=skipped (Flutter Windows shell does not exist)"
+          }
+
+          if (Test-Path "web") { Write-Host "WEB_BRANDING=shell-present" } else { Write-Host "WEB_BRANDING=skipped (Flutter web shell does not exist)" }
+          if (Test-Path "linux") { Write-Host "LINUX_BRANDING=shell-present" } else { Write-Host "LINUX_BRANDING=skipped (Flutter Linux shell does not exist)" }
+
+      - name: Flutter analyze and tests
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          flutter pub get
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw "Flutter analyze failed." }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw "Flutter tests failed." }
+
+      - name: Build branded Windows release when shell exists
+        if: hashFiles('apps/research_os_flutter/windows/CMakeLists.txt') != ''
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw "Research OS Windows build failed." }
+
+      - name: Collect branding evidence
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          $stage = "$env:RUNNER_TEMP/Research-OS-Branding"
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Copy-Item "assets/branding/research_os_master.webp" $stage -Force
+          Copy-Item "assets/branding/research_os.ico" $stage -Force
+          Copy-Item "assets/branding/research_os_512.png" $stage -Force
+          Copy-Item "assets/branding/research_os_256.png" $stage -Force
+          if (Test-Path "windows/runner/resources/app_icon.ico") { Copy-Item "windows/runner/resources/app_icon.ico" $stage -Force }
+          "Research OS branding gate" | Set-Content "$stage/BRANDING_GATE.txt" -Encoding utf8
+
+      - name: Upload branding evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-branding-windows
+          path: ${{ runner.temp }}/Research-OS-Branding
+          if-no-files-found: error
