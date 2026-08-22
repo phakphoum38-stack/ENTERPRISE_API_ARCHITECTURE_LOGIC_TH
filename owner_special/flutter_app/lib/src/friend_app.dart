@@ -21,6 +21,14 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
 
   @override
   Widget build(BuildContext context) {
+    final pages = <Widget>[
+      _FriendChatPage(api: widget.api, team: _currentTeam),
+      _CapabilitiesPage(api: widget.api, startup: widget.startup),
+      _MemoryPage(api: widget.api),
+      _ProviderPage(api: widget.api),
+      _TeamPage(team: _currentTeam),
+    ];
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Research OS Owner Special',
@@ -29,8 +37,6 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
         appBar: AppBar(
           title: const Text('Research OS • Owner Special • Friend Complete V1.3'),
           actions: <Widget>[
-            TeamCenter(onChanged: _onTeamChanged),
-            const SizedBox(width: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Center(child: Text(widget.startupError == null ? 'Friend Service: connected' : 'Friend Service: offline')),
@@ -51,13 +57,24 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
             ],
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: <Widget>[
-            _FriendChatPage(api: widget.api, team: _currentTeam),
-            _CapabilitiesPage(api: widget.api, startup: widget.startup),
-            _MemoryPage(api: widget.api),
-            _ProviderPage(api: widget.api),
-            _TeamPage(team: _currentTeam),
-          ][_index]),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: TeamCenter(onChanged: _onTeamChanged),
+                    ),
+                  ),
+                ),
+                Expanded(child: pages[_index]),
+              ],
+            ),
+          ),
         ]),
       ),
     );
