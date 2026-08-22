@@ -43,7 +43,8 @@ class _TeamCenterState extends State<TeamCenter> {
 
   TeamWorkspace get _selected => _teams.firstWhere((team) => team.id == _selectedId);
 
-  void _selectTeam(String id) {
+  void _selectTeam(String? id) {
+    if (id == null || id == _selectedId) return;
     setState(() => _selectedId = id);
     widget.onChanged?.call(_selected);
   }
@@ -69,6 +70,13 @@ class _TeamCenterState extends State<TeamCenter> {
     );
     controller.dispose();
     if (!mounted || name == null || name.trim().isEmpty) return;
+
+    // Let the dialog route finish its semantics/layout teardown before mutating
+    // the underlying TeamCenter tree. This avoids parentDataDirty assertions in
+    // Flutter widget tests that call pumpAndSettle immediately after pop().
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
     final id = 'team-${DateTime.now().microsecondsSinceEpoch}';
     final created = TeamWorkspace(
       id: id,
@@ -101,21 +109,17 @@ class _TeamCenterState extends State<TeamCenter> {
               ],
             ),
             const SizedBox(height: 12),
-            PopupMenuButton<String>(
-              key: const Key('team-switcher'),
-              tooltip: 'Current Team',
-              initialValue: _selectedId,
-              onSelected: _selectTeam,
-              itemBuilder: (context) => _teams
-                  .map((team) => PopupMenuItem<String>(value: team.id, child: Text(team.name)))
-                  .toList(),
-              child: InputDecorator(
-                decoration: const InputDecoration(labelText: 'Current Team', border: OutlineInputBorder()),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(child: Text(selected.name)),
-                    const Icon(Icons.arrow_drop_down),
-                  ],
+            InputDecorator(
+              decoration: const InputDecoration(labelText: 'Current Team', border: OutlineInputBorder()),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  key: const Key('team-switcher'),
+                  value: _selectedId,
+                  isExpanded: true,
+                  onChanged: _selectTeam,
+                  items: _teams
+                      .map((team) => DropdownMenuItem<String>(value: team.id, child: Text(team.name)))
+                      .toList(),
                 ),
               ),
             ),
