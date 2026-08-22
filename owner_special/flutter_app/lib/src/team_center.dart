@@ -14,7 +14,6 @@ class TeamWorkspace {
   final List<TeamMember> members;
 }
 
-// Backward-compatible domain name used by the Friend UI.
 typedef TeamRecord = TeamWorkspace;
 
 class TeamCenter extends StatefulWidget {
@@ -71,18 +70,21 @@ class _TeamCenterState extends State<TeamCenter> {
     controller.dispose();
     if (!mounted || name == null || name.trim().isEmpty) return;
 
-    // Let the dialog route finish its semantics/layout teardown before mutating
-    // the underlying TeamCenter tree. This avoids parentDataDirty assertions in
-    // Flutter widget tests that call pumpAndSettle immediately after pop().
-    await WidgetsBinding.instance.endOfFrame;
+    // Do not mutate the TeamCenter render tree in the same frame as the dialog
+    // route is removed. Flutter's semantics pass can otherwise observe dirty
+    // parentData and fail widget tests during pumpAndSettle.
+    await Future<void>.delayed(Duration.zero);
     if (!mounted) return;
 
     final id = 'team-${DateTime.now().microsecondsSinceEpoch}';
     final created = TeamWorkspace(
       id: id,
       name: name.trim(),
-      members: const <TeamMember>[TeamMember(userId: 'owner', displayName: 'Owner', role: 'owner')],
+      members: const <TeamMember>[
+        TeamMember(userId: 'owner', displayName: 'Owner', role: 'owner'),
+      ],
     );
+    if (!mounted) return;
     setState(() {
       _teams.add(created);
       _selectedId = id;
@@ -95,48 +97,33 @@ class _TeamCenterState extends State<TeamCenter> {
     final selected = _selected;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        padding: const EdgeInsets.all(12),
+        child: Row(
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                const Icon(Icons.groups_outlined),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Team Center', style: Theme.of(context).textTheme.titleLarge)),
-                if (widget.isOwner)
-                  IconButton(tooltip: 'Create Team', onPressed: _createTeam, icon: const Icon(Icons.add)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            InputDecorator(
-              decoration: const InputDecoration(labelText: 'Current Team', border: OutlineInputBorder()),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  key: const Key('team-switcher'),
-                  value: _selectedId,
-                  isExpanded: true,
-                  onChanged: _selectTeam,
-                  items: _teams
-                      .map((team) => DropdownMenuItem<String>(value: team.id, child: Text(team.name)))
-                      .toList(),
-                ),
+            const Icon(Icons.groups_outlined),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DropdownButton<String>(
+                key: const Key('team-switcher'),
+                value: _selectedId,
+                isExpanded: true,
+                onChanged: _selectTeam,
+                items: _teams
+                    .map((team) => DropdownMenuItem<String>(
+                          value: team.id,
+                          child: Text(team.name),
+                        ))
+                    .toList(),
               ),
             ),
-            const SizedBox(height: 12),
-            Text('Team ID: ${selected.id}'),
+            const SizedBox(width: 8),
             Text('Members: ${selected.members.length}'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: <Widget>[
-                Chip(label: Text('Chat: ${selected.id}')),
-                Chip(label: Text('Agents: ${selected.id}')),
-                Chip(label: Text('Memory: ${selected.id}')),
-                Chip(label: Text('Files: ${selected.id}')),
-                Chip(label: Text('Tasks: ${selected.id}')),
-              ],
-            ),
+            if (widget.isOwner)
+              IconButton(
+                tooltip: 'Create Team',
+                onPressed: _createTeam,
+                icon: const Icon(Icons.add),
+              ),
           ],
         ),
       ),
