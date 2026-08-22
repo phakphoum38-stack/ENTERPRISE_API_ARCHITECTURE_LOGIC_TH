@@ -8,11 +8,14 @@ class TeamMember {
 }
 
 class TeamWorkspace {
-  const TeamWorkspace({required this.id, required this.name, required this.members});
+  const TeamWorkspace({required this.id, required this.name, this.members = const <TeamMember>[]});
   final String id;
   final String name;
   final List<TeamMember> members;
 }
+
+// Backward-compatible domain name used by the Friend UI.
+typedef TeamRecord = TeamWorkspace;
 
 class TeamCenter extends StatefulWidget {
   const TeamCenter({super.key, this.isOwner = true, this.onChanged});
@@ -32,16 +35,8 @@ class _TeamCenterState extends State<TeamCenter> {
         TeamMember(userId: 'owner', displayName: 'Owner', role: 'owner'),
       ],
     ),
-    const TeamWorkspace(
-      id: 'engineering',
-      name: 'Engineering Team',
-      members: <TeamMember>[],
-    ),
-    const TeamWorkspace(
-      id: 'ai',
-      name: 'AI Team',
-      members: <TeamMember>[],
-    ),
+    const TeamWorkspace(id: 'engineering', name: 'Engineering Team'),
+    const TeamWorkspace(id: 'ai', name: 'AI Team'),
   ];
 
   String _selectedId = 'research';
