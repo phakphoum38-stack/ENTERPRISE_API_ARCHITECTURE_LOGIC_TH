@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'friend_app_shell.dart';
+import 'friend_module_shell.dart';
+import 'friend_theme.dart';
 import 'owner_api.dart';
 import 'team_center.dart';
 
@@ -31,52 +34,37 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Research OS Owner Special',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Research OS • Owner Special • Friend Complete V1.3'),
-          actions: <Widget>[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Center(child: Text(widget.startupError == null ? 'Friend Service: connected' : 'Friend Service: offline')),
-            ),
-          ],
+      title: 'Friend',
+      theme: FriendTheme.build(),
+      home: FriendAppShell(
+        index: _index,
+        onIndexChanged: (value) => setState(() => _index = value),
+        pages: pages,
+        teamCenter: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: TeamCenter(onChanged: _onTeamChanged),
         ),
-        body: Row(children: <Widget>[
-          NavigationRail(
-            selectedIndex: _index,
-            onDestinationSelected: (value) => setState(() => _index = value),
-            labelType: NavigationRailLabelType.all,
-            destinations: const <NavigationRailDestination>[
-              NavigationRailDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: Text('Friend')),
-              NavigationRailDestination(icon: Icon(Icons.psychology_outlined), selectedIcon: Icon(Icons.psychology), label: Text('Capabilities')),
-              NavigationRailDestination(icon: Icon(Icons.memory_outlined), selectedIcon: Icon(Icons.memory), label: Text('Memory')),
-              NavigationRailDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: Text('Provider')),
-              NavigationRailDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: Text('Team')),
-            ],
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: TeamCenter(onChanged: _onTeamChanged),
-                    ),
-                  ),
-                ),
-                Expanded(child: pages[_index]),
-              ],
-            ),
-          ),
-        ]),
+        status: _StatusPill(connected: widget.startupError == null),
       ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.connected});
+  final bool connected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = connected ? const Color(0xFF34D399) : const Color(0xFFF59E0B);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: color.withValues(alpha: .12), borderRadius: BorderRadius.circular(999)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Text(connected ? 'Friend Service connected' : 'Friend Service offline'),
+      ]),
     );
   }
 }
@@ -87,21 +75,13 @@ class _TeamPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: <Widget>[
-        Text('Team Workspace', style: Theme.of(context).textTheme.headlineSmall),
+    return FriendModuleShell(
+      title: 'Team Workspace',
+      child: ListView(children: [
+        Card(child: ListTile(leading: const Icon(Icons.groups_outlined), title: Text(team.name), subtitle: Text('Team ID: ${team.id}'))),
         const SizedBox(height: 16),
-        Card(child: ListTile(leading: const Icon(Icons.groups), title: Text(team.name), subtitle: Text('Team ID: ${team.id}'))),
-        const SizedBox(height: 16),
-        const Wrap(spacing: 8, runSpacing: 8, children: <Widget>[
-          Chip(label: Text('Chat')),
-          Chip(label: Text('Agents')),
-          Chip(label: Text('Memory')),
-          Chip(label: Text('Files')),
-          Chip(label: Text('Tasks')),
-        ]),
-      ],
+        const Wrap(spacing: 8, runSpacing: 8, children: [Chip(label: Text('Chat')), Chip(label: Text('Agents')), Chip(label: Text('Memory')), Chip(label: Text('Files')), Chip(label: Text('Tasks'))]),
+      ]),
     );
   }
 }
@@ -154,12 +134,12 @@ class _FriendChatPageState extends State<_FriendChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+    return FriendModuleShell(
+      title: 'Friend Workspace',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text('Team: ${widget.team.name}', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
-        Wrap(spacing: 12, runSpacing: 8, children: <Widget>[
+        Wrap(spacing: 12, runSpacing: 8, children: [
           FilterChip(key: const Key('turbo-million'), selected: _turboMillion, onSelected: (value) => setState(() => _turboMillion = value), label: const Text('Turbo Helpers 1,000,000')),
           Chip(label: Text('Brain scale: $_scale')),
           Chip(label: Text('Logical capacity: $_capacity')),
@@ -168,12 +148,12 @@ class _FriendChatPageState extends State<_FriendChatPage> {
           Chip(label: Text('Factory: $_factory')),
         ]),
         const SizedBox(height: 20),
-        Expanded(child: Card(child: Padding(padding: const EdgeInsets.all(20), child: SelectableText(_answer, key: const Key('friend-answer'))))),
+        Expanded(child: Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(18)), child: SelectableText(_answer, key: const Key('friend-answer')))),
         const SizedBox(height: 16),
-        Row(children: <Widget>[
-          Expanded(child: TextField(key: const Key('friend-input'), controller: _controller, onSubmitted: (_) => _send(), decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'คุยกับเพื่อนของเรา…'))),
+        Row(children: [
+          Expanded(child: TextField(key: const Key('friend-input'), controller: _controller, onSubmitted: (_) => _send(), decoration: const InputDecoration(hintText: 'คุยกับเพื่อนของเรา…'))),
           const SizedBox(width: 12),
-          FilledButton.icon(key: const Key('friend-send'), onPressed: _busy ? null : _send, icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send), label: const Text('ส่ง')),
+          FilledButton.icon(key: const Key('friend-send'), onPressed: _busy ? null : _send, icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.arrow_upward), label: const Text('ส่ง')),
         ]),
       ]),
     );
@@ -186,23 +166,24 @@ class _CapabilitiesPage extends StatelessWidget {
   final Map<String, dynamic>? startup;
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: startup?['status'] is Map ? Future<Map<String, dynamic>>.value(Map<String, dynamic>.from(startup!['status'] as Map)) : api.status(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final status = snapshot.data!;
-        final profiles = Map<String, dynamic>.from(status['brain_profiles'] as Map? ?? const <String, dynamic>{});
-        final helper = Map<String, dynamic>.from(status['helper_scheduler'] as Map? ?? const <String, dynamic>{});
-        final capabilities = (status['capabilities'] as List? ?? const <Object>[]).map((item) => item.toString()).toList();
-        return ListView(padding: const EdgeInsets.all(24), children: <Widget>[
-          Text('Friend Complete Architecture', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 16),
-          Text('Brain: ${profiles.entries.map((entry) => '${entry.key}=${entry.value}').join(' • ')}'),
-          Text('Helpers: logical ${helper['max_logical_helpers'] ?? '-'} • active ${helper['max_active_workers'] ?? '-'}'),
-          const SizedBox(height: 16),
-          Wrap(spacing: 8, runSpacing: 8, children: capabilities.map((name) => Chip(label: Text(name))).toList()),
-        ]);
-      },
+    return FriendModuleShell(
+      title: 'Capabilities',
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: startup?['status'] is Map ? Future<Map<String, dynamic>>.value(Map<String, dynamic>.from(startup!['status'] as Map)) : api.status(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final status = snapshot.data!;
+          final profiles = Map<String, dynamic>.from(status['brain_profiles'] as Map? ?? const <String, dynamic>{});
+          final helper = Map<String, dynamic>.from(status['helper_scheduler'] as Map? ?? const <String, dynamic>{});
+          final capabilities = (status['capabilities'] as List? ?? const <Object>[]).map((item) => item.toString()).toList();
+          return ListView(children: [
+            Text('Brain: ${profiles.entries.map((entry) => '${entry.key}=${entry.value}').join(' • ')}'),
+            Text('Helpers: logical ${helper['max_logical_helpers'] ?? '-'} • active ${helper['max_active_workers'] ?? '-'}'),
+            const SizedBox(height: 16),
+            Wrap(spacing: 8, runSpacing: 8, children: capabilities.map((name) => Chip(label: Text(name))).toList()),
+          ]);
+        },
+      ),
     );
   }
 }
@@ -212,17 +193,20 @@ class _MemoryPage extends StatelessWidget {
   final OwnerFriendApi api;
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: api.memory(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final items = snapshot.data!['items'] as List? ?? const <Object>[];
-        if (items.isEmpty) return const Center(child: Text('ยังไม่มีความจำใน profile/session นี้'));
-        return ListView.builder(padding: const EdgeInsets.all(24), itemCount: items.length, itemBuilder: (context, index) {
-          final item = Map<String, dynamic>.from(items[index] as Map);
-          return ListTile(title: Text(item['kind']?.toString() ?? ''), subtitle: Text(item['text']?.toString() ?? ''));
-        });
-      },
+    return FriendModuleShell(
+      title: 'Memory',
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: api.memory(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final items = snapshot.data!['items'] as List? ?? const <Object>[];
+          if (items.isEmpty) return const Center(child: Text('ยังไม่มีความจำใน profile/session นี้'));
+          return ListView.builder(itemCount: items.length, itemBuilder: (context, index) {
+            final item = Map<String, dynamic>.from(items[index] as Map);
+            return ListTile(title: Text(item['kind']?.toString() ?? ''), subtitle: Text(item['text']?.toString() ?? ''));
+          });
+        },
+      ),
     );
   }
 }
@@ -251,11 +235,7 @@ class _ProviderPageState extends State<_ProviderPage> {
     try {
       final status = await widget.api.providerStatus();
       if (!mounted) return;
-      setState(() {
-        _status = status;
-        _baseUrl.text = status['base_url']?.toString() ?? '';
-        _model.text = status['model']?.toString() ?? '';
-      });
+      setState(() { _status = status; _baseUrl.text = status['base_url']?.toString() ?? ''; _model.text = status['model']?.toString() ?? ''; });
     } catch (error) { if (mounted) setState(() => _message = '$error'); }
   }
 
@@ -275,19 +255,20 @@ class _ProviderPageState extends State<_ProviderPage> {
   @override
   Widget build(BuildContext context) {
     final credentialPresent = _status?['credential_present'] == true;
-    return ListView(padding: const EdgeInsets.all(24), children: <Widget>[
-      Text('OpenAI-compatible Provider', style: Theme.of(context).textTheme.headlineSmall),
-      const SizedBox(height: 8),
-      Text('Credential: ${credentialPresent ? 'stored securely' : 'not configured'} • backend: ${_status?['secret_backend'] ?? '-'}'),
-      const SizedBox(height: 20),
-      TextField(key: const Key('provider-base-url'), controller: _baseUrl, decoration: const InputDecoration(labelText: 'Base URL', border: OutlineInputBorder())),
-      const SizedBox(height: 12),
-      TextField(key: const Key('provider-model'), controller: _model, decoration: const InputDecoration(labelText: 'Model', border: OutlineInputBorder())),
-      const SizedBox(height: 12),
-      TextField(key: const Key('provider-api-key'), controller: _apiKey, obscureText: true, decoration: const InputDecoration(labelText: 'API key (leave blank to keep existing)', border: OutlineInputBorder())),
-      const SizedBox(height: 16),
-      FilledButton.icon(key: const Key('provider-save-test'), onPressed: _busy ? null : _saveAndTest, icon: const Icon(Icons.link), label: const Text('Save & Test Connection')),
-      if (_message.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 16), child: SelectableText(_message, key: const Key('provider-message'))),
-    ]);
+    return FriendModuleShell(
+      title: 'Provider',
+      child: ListView(children: [
+        Text('Credential: ${credentialPresent ? 'stored securely' : 'not configured'} • backend: ${_status?['secret_backend'] ?? '-'}'),
+        const SizedBox(height: 20),
+        TextField(key: const Key('provider-base-url'), controller: _baseUrl, decoration: const InputDecoration(labelText: 'Base URL')),
+        const SizedBox(height: 12),
+        TextField(key: const Key('provider-model'), controller: _model, decoration: const InputDecoration(labelText: 'Model')),
+        const SizedBox(height: 12),
+        TextField(key: const Key('provider-api-key'), controller: _apiKey, obscureText: true, decoration: const InputDecoration(labelText: 'API key (leave blank to keep existing)')),
+        const SizedBox(height: 16),
+        FilledButton.icon(key: const Key('provider-save-test'), onPressed: _busy ? null : _saveAndTest, icon: const Icon(Icons.link), label: const Text('Save & Test Connection')),
+        if (_message.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 16), child: SelectableText(_message, key: const Key('provider-message'))),
+      ]),
+    );
   }
 }
