@@ -33,7 +33,9 @@ foreach ($directory in $directories) {
   (Join-Path $DataDir "sessions\conversations.json"),
   "User"
 )
-[Environment]::SetEnvironmentVariable("RESEARCH_OS_API_HOST", "0.0.0.0", "User")
+# Local desktop API is loopback-only by default. Users who explicitly need
+# network exposure must opt in by setting RESEARCH_OS_API_HOST themselves.
+[Environment]::SetEnvironmentVariable("RESEARCH_OS_API_HOST", "127.0.0.1", "User")
 [Environment]::SetEnvironmentVariable("RESEARCH_OS_API_PORT", "8787", "User")
 
 Write-Host ""
