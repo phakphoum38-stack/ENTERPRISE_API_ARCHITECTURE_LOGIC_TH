@@ -156,26 +156,28 @@ class _FriendChatPageState extends State<_FriendChatPage> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
-        Text('Team: ${widget.team.name}', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        Wrap(spacing: 12, runSpacing: 8, children: <Widget>[
-          FilterChip(key: const Key('turbo-million'), selected: _turboMillion, onSelected: (value) => setState(() => _turboMillion = value), label: const Text('Turbo Helpers 1,000,000')),
-          Chip(label: Text('Brain scale: $_scale')),
-          Chip(label: Text('Logical capacity: $_capacity')),
-          Chip(label: Text('Active workers: $_activeWorkers')),
-          Chip(label: Text('Batches: $_batches')),
-          Chip(label: Text('Factory: $_factory')),
+      child: SingleChildScrollView(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+          Text('Team: ${widget.team.name}', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          Wrap(spacing: 12, runSpacing: 8, children: <Widget>[
+            FilterChip(key: const Key('turbo-million'), selected: _turboMillion, onSelected: (value) => setState(() => _turboMillion = value), label: const Text('Turbo Helpers 1,000,000')),
+            Chip(label: Text('Brain scale: $_scale')),
+            Chip(label: Text('Logical capacity: $_capacity')),
+            Chip(label: Text('Active workers: $_activeWorkers')),
+            Chip(label: Text('Batches: $_batches')),
+            Chip(label: Text('Factory: $_factory')),
+          ]),
+          const SizedBox(height: 20),
+          Card(child: Padding(padding: const EdgeInsets.all(20), child: SelectableText(_answer, key: const Key('friend-answer')))),
+          const SizedBox(height: 16),
+          Row(children: <Widget>[
+            Expanded(child: TextField(key: const Key('friend-input'), controller: _controller, onSubmitted: (_) => _send(), decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'คุยกับเพื่อนของเรา…'))),
+            const SizedBox(width: 12),
+            FilledButton.icon(key: const Key('friend-send'), onPressed: _busy ? null : _send, icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send), label: const Text('ส่ง')),
+          ]),
         ]),
-        const SizedBox(height: 20),
-        Expanded(child: Card(child: Padding(padding: const EdgeInsets.all(20), child: SelectableText(_answer, key: const Key('friend-answer'))))),
-        const SizedBox(height: 16),
-        Row(children: <Widget>[
-          Expanded(child: TextField(key: const Key('friend-input'), controller: _controller, onSubmitted: (_) => _send(), decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'คุยกับเพื่อนของเรา…'))),
-          const SizedBox(width: 12),
-          FilledButton.icon(key: const Key('friend-send'), onPressed: _busy ? null : _send, icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send), label: const Text('ส่ง')),
-        ]),
-      ]),
+      ),
     );
   }
 }
