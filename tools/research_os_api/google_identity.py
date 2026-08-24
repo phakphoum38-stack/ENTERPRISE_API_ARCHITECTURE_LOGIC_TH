@@ -2,10 +2,37 @@ from __future__ import annotations
 
 import inspect
 import os
+import threading
+from http.server import BaseHTTPRequestHandler
 
 from google_oauth import GoogleOAuthBroker, IDENTITY_SCOPES
 from rbac import RoleStore
 from auth_session import clear_cookie_header, revoke_session
+
+
+_SIGNOUT_STATE = threading.local()
+_SIGNOUT_HOOK_LOCK = threading.Lock()
+_SIGNOUT_HOOK_INSTALLED = False
+
+
+def _install_signout_cookie_hook() -> None:
+    global _SIGNOUT_HOOK_INSTALLED
+    if _SIGNOUT_HOOK_INSTALLED:
+        return
+    with _SIGNOUT_HOOK_LOCK:
+        if _SIGNOUT_HOOK_INSTALLED:
+            return
+        original_send_response = BaseHTTPRequestHandler.send_response
+        original_send_header = BaseHTTPRequestHandler.send_header
+
+        def send_response(handler, code, message=None, _original=original_send_response):
+            _original(handler, code, message)
+            if getattr(_SIGNOUT_STATE, "pending", False):
+                original_send_header(handler, "Set-Cookie", clear_cookie_header())
+                _SIGNOUT_STATE.pending = False
+
+        BaseHTTPRequestHandler.send_response = send_response
+        _SIGNOUT_HOOK_INSTALLED = True
 
 
 class GoogleIdentityBroker(GoogleOAuthBroker):
@@ -64,20 +91,28 @@ class GoogleIdentityBroker(GoogleOAuthBroker):
         return result
 
     def disconnect(self) -> dict[str, object]:
-        """Disconnect Google identity and revoke the active Research OS session.
+        """Disconnect Google identity and revoke the active Research OS session."""
+        _install_signout_cookie_hook()
+        _SIGNOUT_STATE.pending = True
 
-        The HTTP handler invokes this method while processing the signout
-        request. The handler is discovered from the active call frame so the
-        signed session presented by the client is revoked before the response
-        is emitted. The response path is also wrapped once to emit the
-        canonical session-clearing cookie header.
-        """
         handler = None
-        for frame_info in inspect.stack(context=0):
-            candidate = frame_info.frame.f_locals.get("self")
-            if candidate is not self and hasattr(candidate, "headers") and hasattr(candidate, "send_header"):
-                handler = candidate
-                break
+        frame = inspect.currentframe()
+        try:
+            frame = frame.f_back if frame else None
+            while frame:
+                candidate = frame.f_locals.get("self")
+                if (
+                    candidate is not None
+                    and candidate is not self
+                    and hasattr(candidate, "headers")
+                    and hasattr(candidate, "send_header")
+                    and hasattr(candidate, "wfile")
+                ):
+                    handler = candidate
+                    break
+                frame = frame.f_back
+        finally:
+            del frame
 
         if handler is not None:
             token = handler.headers.get("X-Research-OS-Session")
@@ -94,20 +129,6 @@ class GoogleIdentityBroker(GoogleOAuthBroker):
                 try:
                     revoke_session(token)
                 except ValueError:
-                    # Signout must still clear the browser cookie when the
-                    # presented session is already invalid.
                     pass
-
-            original_send_header = handler.send_header
-            injected = False
-
-            def send_header(name: str, value: str, _original=original_send_header):
-                nonlocal injected
-                if not injected:
-                    _original("Set-Cookie", clear_cookie_header())
-                    injected = True
-                _original(name, value)
-
-            handler.send_header = send_header
 
         return super().disconnect()
