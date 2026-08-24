@@ -17,6 +17,18 @@ except ImportError:  # pragma: no cover - supports unittest discover/top-level i
 SESSION_HEADER = "X-Research-OS-Session"
 
 
+def _header_value(headers: Mapping[str, str], name: str) -> str:
+    """Read an HTTP header without relying on a particular casing."""
+    direct = headers.get(name)
+    if direct:
+        return str(direct)
+    wanted = name.lower()
+    for key, value in headers.items():
+        if str(key).lower() == wanted:
+            return str(value)
+    return ""
+
+
 def extract_session_token(headers: Mapping[str, str]) -> str | None:
     """Return a session token from the trusted session header or cookie.
 
@@ -24,10 +36,10 @@ def extract_session_token(headers: Mapping[str, str]) -> str | None:
     browser-facing mechanism.  No role, email, or user id is accepted from
     request JSON or query parameters.
     """
-    header_token = (headers.get(SESSION_HEADER) or "").strip()
+    header_token = _header_value(headers, SESSION_HEADER).strip()
     if header_token:
         return header_token
-    raw_cookie = headers.get("Cookie") or ""
+    raw_cookie = _header_value(headers, "Cookie")
     if not raw_cookie:
         return None
     cookie = SimpleCookie()
