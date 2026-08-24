@@ -9,7 +9,7 @@ from __future__ import annotations
 from http.cookies import SimpleCookie
 from typing import Any, Mapping
 
-from auth_session import SESSION_COOKIE, verify_session
+from .auth_session import SESSION_COOKIE, verify_session
 
 SESSION_HEADER = "X-Research-OS-Session"
 
