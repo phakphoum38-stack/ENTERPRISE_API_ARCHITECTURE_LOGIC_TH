@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -28,25 +29,20 @@ jobs:
     steps:
       - name: Checkout exact revision
         uses: actions/checkout@v5
-
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-
       - name: Compile Research OS
         run: python -m compileall -q v3/research_os_v3 v3/tests
-
       - name: Run Research OS test suite
         env:
           PYTHONPATH: v3
         run: python -m unittest discover -s v3/tests -p 'test_*.py' -v
-
       - name: Run V3.5 recovery evidence gate
         env:
           PYTHONPATH: v3
         run: python -m unittest v3.tests.test_worker_recovery_evidence -v
-
       - name: Static import smoke
         env:
           PYTHONPATH: v3
@@ -59,29 +55,23 @@ jobs:
     steps:
       - name: Checkout exact revision
         uses: actions/checkout@v5
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
       - name: Generate Windows platform
         working-directory: v3/flutter_app
         run: flutter create --platforms=windows --project-name=research_os_v3_flutter .
-
       - name: Flutter dependencies
         working-directory: v3/flutter_app
         run: flutter pub get
-
       - name: Flutter analyze
         working-directory: v3/flutter_app
         run: flutter analyze
-
       - name: Flutter tests
         working-directory: v3/flutter_app
         run: flutter test
-
       - name: Flutter build smoke
         working-directory: v3/flutter_app
         run: flutter build windows --release
