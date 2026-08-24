@@ -134,17 +134,22 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             raise ValueError("JSON body must be an object")
         return value
 
-    def _authorize_cloud_sync(self) -> dict[str, Any] | None:
-        """Require both the server capability and the verified per-user session."""
+    def _authorize_sync_key(self) -> bool:
         if not sync_configured():
             self._send(HTTPStatus.SERVICE_UNAVAILABLE, {
                 "error": "cloud_sync_not_configured",
                 "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using protected cloud operations.",
             })
-            return None
+            return False
         candidate = self.headers.get("X-Research-OS-Sync-Key")
         if not authorize_sync(candidate):
             self._send(HTTPStatus.UNAUTHORIZED, {"error": "invalid_sync_key", "detail": "Cloud sync key is missing or invalid."})
+            return False
+        return True
+
+    def _authorize_cloud_sync(self) -> dict[str, Any] | None:
+        """Require both the server capability and the verified per-user session."""
+        if not self._authorize_sync_key():
             return None
         try:
             principal = require_session(self.headers)
@@ -333,7 +338,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, self._analyze_conversation(body))
                 return
             if path == "/v1/memory/commit":
-                if self._authorize_cloud_sync() is None:
+                if not self._authorize_sync_key():
                     return
                 self._send(HTTPStatus.OK, self._commit_memory(body))
                 return
