@@ -12,6 +12,7 @@ from pathlib import Path
 
 import agent_server
 from agent_orchestrator import AgentOrchestrator
+from auth_session import issue_session
 from v2_server import Provenance, V2ResearchOSHandler, WorkspaceKnowledgeEngine
 
 
@@ -19,8 +20,11 @@ class V2CompatibilityTests(unittest.TestCase):
     def setUp(self) -> None:
         self.original = agent_server.ORCHESTRATOR
         self.original_data_dir = os.environ.get("RESEARCH_OS_DATA_DIR")
+        self.original_secret = os.environ.get("RESEARCH_OS_SESSION_SECRET")
         self.temp = tempfile.TemporaryDirectory()
         os.environ["RESEARCH_OS_DATA_DIR"] = self.temp.name
+        os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-only-v2-server-session-secret"
+        self.session = issue_session({"sub": "v2-test-user", "email": "v2-test@example.test", "role": "user"})
         agent_server.ORCHESTRATOR = AgentOrchestrator(
             storage_path=Path(self.temp.name) / "agents" / "orchestrations.json"
         )
@@ -38,14 +42,21 @@ class V2CompatibilityTests(unittest.TestCase):
             os.environ.pop("RESEARCH_OS_DATA_DIR", None)
         else:
             os.environ["RESEARCH_OS_DATA_DIR"] = self.original_data_dir
+        if self.original_secret is None:
+            os.environ.pop("RESEARCH_OS_SESSION_SECRET", None)
+        else:
+            os.environ["RESEARCH_OS_SESSION_SECRET"] = self.original_secret
         self.temp.cleanup()
 
-    def request(self, path: str, *, method: str = "GET", body=None):
+    def request(self, path: str, *, method: str = "GET", body=None, authenticated: bool = True):
         data = None if body is None else json.dumps(body).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if authenticated:
+            headers["X-Research-OS-Session"] = self.session
         request = urllib.request.Request(
             self.base + path,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method=method,
         )
         try:
@@ -189,6 +200,11 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(missing["error"]["code"], "orchestration_not_found")
         self.assertEqual(missing["error"]["status"], 404)
+
+    def test_protected_routes_fail_closed_without_session(self) -> None:
+        status, payload = self.request("/v1/agents", authenticated=False)
+        self.assertEqual(status, 401)
+        self.assertIn("error", payload)
 
 
 if __name__ == "__main__":
