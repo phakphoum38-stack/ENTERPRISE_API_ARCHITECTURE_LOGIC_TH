@@ -11,12 +11,15 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import time
+from pathlib import Path
 from typing import Any
 
 SESSION_COOKIE = "research_os_session"
 DEFAULT_TTL_SECONDS = 8 * 60 * 60
+_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def _secret() -> bytes:
@@ -24,6 +27,25 @@ def _secret() -> bytes:
     if not value:
         raise RuntimeError("RESEARCH_OS_SESSION_SECRET is required")
     return value.encode("utf-8")
+
+
+def _data_root() -> Path:
+    configured = (os.getenv("RESEARCH_OS_V3_DATA_DIR") or "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    if os.name == "nt":
+        return Path(os.getenv("PROGRAMDATA") or r"C:\ProgramData") / "ResearchOSV3"
+    xdg = (os.getenv("XDG_DATA_HOME") or "").strip()
+    if xdg:
+        return Path(xdg).expanduser() / "research-os-v3"
+    return Path.home() / ".local" / "share" / "research-os-v3"
+
+
+def _user_scope(user_id: str) -> Path:
+    value = str(user_id or "").strip()
+    if not value or not _SAFE_USER_ID.fullmatch(value) or value in {".", ".."}:
+        raise ValueError("invalid user id for session state")
+    return _data_root() / "users" / value / "profiles" / "default" / "sessions"
 
 
 def _encode(payload: dict[str, Any]) -> str:
@@ -49,9 +71,53 @@ def _decode(token: str) -> dict[str, Any]:
             raise ValueError("session expired")
         if not payload.get("user_id") or not payload.get("email"):
             raise ValueError("session identity is incomplete")
+        if not payload.get("session_id"):
+            raise ValueError("session id is missing")
         return payload
     except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ValueError("invalid research session") from exc
+
+
+class SessionRevocationStore:
+    """Durable per-user revocation markers in the canonical V3 data root."""
+
+    def _scope(self, user_id: str) -> Path:
+        scope = _user_scope(user_id)
+        scope.mkdir(parents=True, exist_ok=True)
+        return scope / "revocation"
+
+    def _marker(self, user_id: str, session_id_value: str) -> Path:
+        if not session_id_value or "/" in session_id_value or "\\" in session_id_value:
+            raise ValueError("invalid session id")
+        directory = self._scope(user_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / f"{session_id_value}.revoked"
+
+    def revoke(self, user_id: str, session_id_value: str) -> None:
+        marker = self._marker(user_id, session_id_value)
+        marker.write_text(str(int(time.time())), encoding="utf-8")
+
+    def revoke_all(self, user_id: str) -> None:
+        directory = self._scope(user_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        marker = directory / "all.revoked"
+        marker.write_text(str(int(time.time())), encoding="utf-8")
+
+    def is_revoked(self, session_id_value: str, user_id: str, issued_at: int | None = None) -> bool:
+        marker = self._marker(user_id, session_id_value)
+        if marker.exists():
+            return True
+        all_marker = marker.parent / "all.revoked"
+        if not all_marker.exists() or issued_at is None:
+            return False
+        try:
+            return int(issued_at) <= int(all_marker.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            return False
+
+
+def session_id(token: str) -> str:
+    return str(_decode(token)["session_id"])
 
 
 def issue_session(account: dict[str, Any], *, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> str:
@@ -72,10 +138,26 @@ def issue_session(account: dict[str, Any], *, ttl_seconds: int = DEFAULT_TTL_SEC
     return _encode(payload)
 
 
+def revoke_session(token: str) -> None:
+    payload = _decode(token)
+    SessionRevocationStore().revoke(str(payload["user_id"]), str(payload["session_id"]))
+
+
+def revoke_all_sessions(user_id: str) -> None:
+    SessionRevocationStore().revoke_all(user_id)
+
+
 def verify_session(token: str | None) -> dict[str, Any]:
     if not token:
         raise ValueError("authentication required")
-    return _decode(token)
+    payload = _decode(token)
+    if SessionRevocationStore().is_revoked(
+        str(payload["session_id"]),
+        str(payload["user_id"]),
+        int(payload["iat"]),
+    ):
+        raise ValueError("session revoked")
+    return payload
 
 
 def cookie_header(token: str, *, secure: bool = True) -> str:
