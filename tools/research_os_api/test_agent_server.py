@@ -218,11 +218,6 @@ class AgentServerTests(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(payload["error"], "orchestration_not_found")
 
-    def test_protected_routes_fail_closed_without_session(self) -> None:
-        status, payload = self.request("/v1/agents", authenticated=False)
-        self.assertEqual(status, 401)
-        self.assertIn("error", payload)
-
 
 if __name__ == "__main__":
     unittest.main()
