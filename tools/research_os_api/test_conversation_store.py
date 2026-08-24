@@ -53,6 +53,33 @@ class ConversationStoreTests(unittest.TestCase):
         self.assertTrue(conversation_store.delete_session("chat-1"))
         self.assertEqual([], conversation_store.list_sessions())
 
+    def test_user_scopes_are_isolated(self):
+        conversation_store.upsert_session(
+            {"id": "alice-chat", "title": "Alice", "updated_at": 10, "messages": []},
+            user_id="alice",
+        )
+        conversation_store.upsert_session(
+            {"id": "bob-chat", "title": "Bob", "updated_at": 20, "messages": []},
+            user_id="bob",
+        )
+
+        alice = conversation_store.list_sessions("alice")
+        bob = conversation_store.list_sessions("bob")
+        self.assertEqual(["alice-chat"], [item["id"] for item in alice])
+        self.assertEqual(["bob-chat"], [item["id"] for item in bob])
+
+        self.assertTrue(conversation_store.delete_session("alice-chat", user_id="alice"))
+        self.assertEqual([], conversation_store.list_sessions("alice"))
+        self.assertEqual(["bob-chat"], [item["id"] for item in conversation_store.list_sessions("bob")])
+
+    def test_user_scope_rejects_path_traversal(self):
+        with self.assertRaises(ValueError):
+            conversation_store.list_sessions("../alice")
+        with self.assertRaises(ValueError):
+            conversation_store.upsert_session({"id": "chat"}, user_id="alice/bob")
+        with self.assertRaises(ValueError):
+            conversation_store.delete_session("chat", user_id="..")
+
 
 if __name__ == "__main__":
     unittest.main()
