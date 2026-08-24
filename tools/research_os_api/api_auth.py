@@ -9,7 +9,10 @@ from __future__ import annotations
 from http.cookies import SimpleCookie
 from typing import Any, Mapping
 
-from .auth_session import SESSION_COOKIE, verify_session
+try:  # Package import for normal application execution.
+    from .auth_session import SESSION_COOKIE, verify_session
+except ImportError:  # Top-level import used by the repository's unittest discovery.
+    from auth_session import SESSION_COOKIE, verify_session
 
 SESSION_HEADER = "X-Research-OS-Session"
 
