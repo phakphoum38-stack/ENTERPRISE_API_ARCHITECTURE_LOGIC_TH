@@ -100,7 +100,14 @@ class _Sidebar extends StatelessWidget {
                           Icon(item.icon, color: selected ? Theme.of(context).colorScheme.primary : null),
                           if (!compact) ...[
                             const SizedBox(width: 10),
-                            Text(item.label, style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                            Expanded(
+                              child: Text(
+                                item.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+                              ),
+                            ),
                           ],
                         ],
                       ),
