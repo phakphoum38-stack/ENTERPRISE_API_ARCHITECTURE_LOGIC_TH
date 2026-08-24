@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from api_auth import require_session
 from conversation_store import (
     authorize as authorize_sync,
     delete_session as delete_cloud_session,
@@ -50,35 +51,12 @@ def _load_module(name: str, path: Path):
     return module
 
 
-
-FRIEND_BASE_URL = os.getenv(
-    "RESEARCH_OS_FRIEND_URL",
-    "http://127.0.0.1:8790",
-).rstrip("/")
-
-FRIEND_OWNER_ID = os.getenv(
-    "RESEARCH_OS_FRIEND_OWNER",
-    "owner",
-)
+FRIEND_BASE_URL = os.getenv("RESEARCH_OS_FRIEND_URL", "http://127.0.0.1:8790").rstrip("/")
+FRIEND_OWNER_ID = os.getenv("RESEARCH_OS_FRIEND_OWNER", "owner")
 
 
-def _friend_chat(
-    text: str,
-    *,
-    session_id: str | None = None,
-    complexity: int = 3,
-    risk: int = 1,
-    parallelism: int = 2,
-    helper_budget: int = 0,
-) -> dict[str, Any]:
-    payload = {
-        "text": text,
-        "complexity": max(1, int(complexity)),
-        "risk": max(1, int(risk)),
-        "parallelism": max(1, int(parallelism)),
-        "helper_budget": max(0, int(helper_budget)),
-    }
-
+def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 3, risk: int = 1, parallelism: int = 2, helper_budget: int = 0) -> dict[str, Any]:
+    payload = {"text": text, "complexity": max(1, int(complexity)), "risk": max(1, int(risk)), "parallelism": max(1, int(parallelism)), "helper_budget": max(0, int(helper_budget))}
     request = urllib.request.Request(
         f"{FRIEND_BASE_URL}/owner/chat",
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -90,23 +68,16 @@ def _friend_chat(
         },
         method="POST",
     )
-
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             value = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(
-            f"Friend service HTTP {exc.code}: {detail}"
-        ) from exc
+        raise RuntimeError(f"Friend service HTTP {exc.code}: {detail}") from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(
-            f"Friend service unavailable at {FRIEND_BASE_URL}: {exc.reason}"
-        ) from exc
-
+        raise RuntimeError(f"Friend service unavailable at {FRIEND_BASE_URL}: {exc.reason}") from exc
     if not isinstance(value, dict):
         raise RuntimeError("Friend service returned an invalid response")
-
     return value
 
 
@@ -163,24 +134,28 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             raise ValueError("JSON body must be an object")
         return value
 
-    def _authorize_cloud_sync(self) -> bool:
+    def _authorize_cloud_sync(self) -> dict[str, Any] | None:
+        """Require both the server capability and the verified per-user session."""
         if not sync_configured():
-            self._send(
-                HTTPStatus.SERVICE_UNAVAILABLE,
-                {
-                    "error": "cloud_sync_not_configured",
-                    "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using protected cloud operations.",
-                },
-            )
-            return False
+            self._send(HTTPStatus.SERVICE_UNAVAILABLE, {
+                "error": "cloud_sync_not_configured",
+                "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using protected cloud operations.",
+            })
+            return None
         candidate = self.headers.get("X-Research-OS-Sync-Key")
         if not authorize_sync(candidate):
-            self._send(
-                HTTPStatus.UNAUTHORIZED,
-                {"error": "invalid_sync_key", "detail": "Cloud sync key is missing or invalid."},
-            )
-            return False
-        return True
+            self._send(HTTPStatus.UNAUTHORIZED, {"error": "invalid_sync_key", "detail": "Cloud sync key is missing or invalid."})
+            return None
+        try:
+            principal = require_session(self.headers)
+        except ValueError:
+            self._send(HTTPStatus.UNAUTHORIZED, {"error": "invalid_session", "detail": "A valid Research OS session is required."})
+            return None
+        user_id = str(principal.get("user_id") or "").strip()
+        if not user_id:
+            self._send(HTTPStatus.UNAUTHORIZED, {"error": "invalid_session", "detail": "Verified session identity is incomplete."})
+            return None
+        return principal
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
@@ -195,33 +170,16 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     workspace = get_google_workspace_dashboard()
                     google_workspace_connected = bool(workspace.get("connected"))
                 except Exception:
-                    # Google Workspace is optional. Liveness must not fail because
-                    # an optional integration cannot initialize in service context.
                     pass
-                self._send(
-                    HTTPStatus.OK,
-                    {
-                        "status": "ok",
-                        "service": "research-os-api",
-                        "version": "0.6.0",
-                        "ui": WEB_DIR.is_dir(),
-                        "memory": True,
-                        "memory_commit": sync_configured(),
-                        "github": True,
-                        "cloud_sync": sync_configured(),
-                        "google_workspace": True,
-                        "google_workspace_connected": google_workspace_connected,
-                    },
-                )
+                self._send(HTTPStatus.OK, {
+                    "status": "ok", "service": "research-os-api", "version": "0.6.0",
+                    "ui": WEB_DIR.is_dir(), "memory": True, "memory_commit": sync_configured(),
+                    "github": True, "cloud_sync": sync_configured(), "google_workspace": True,
+                    "google_workspace_connected": google_workspace_connected,
+                })
                 return
             if path == "/v1/providers":
-                self._send(
-                    HTTPStatus.OK,
-                    {
-                        "providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"],
-                        "active": os.getenv("RESEARCH_OS_PROVIDER", "mock"),
-                    },
-                )
+                self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})
                 return
             if path == "/v1/auth/google/status":
                 self._send(HTTPStatus.OK, GoogleIdentityBroker().status())
@@ -230,10 +188,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 params = parse_qs(parsed.query)
                 error = str(params.get("error", [""])[0]).strip()
                 if error:
-                    self._send_html(
-                        HTTPStatus.BAD_REQUEST,
-                        f"<html><body><h2>Research OS Google sign-in failed</h2><p>{error}</p><p>You can close this window.</p></body></html>",
-                    )
+                    self._send_html(HTTPStatus.BAD_REQUEST, f"<html><body><h2>Research OS Google sign-in failed</h2><p>{error}</p><p>You can close this window.</p></body></html>")
                     return
                 code = str(params.get("code", [""])[0]).strip()
                 state = str(params.get("state", [""])[0]).strip()
@@ -241,10 +196,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     raise ValueError("Google sign-in callback requires code and state")
                 result = GoogleIdentityBroker().complete(code=code, state=state)
                 email = ((result.get("account") or {}).get("email") or "Google account")
-                self._send_html(
-                    HTTPStatus.OK,
-                    f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>",
-                )
+                self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
                 return
             if path == "/v1/google-workspace/dashboard":
                 self._send(HTTPStatus.OK, get_google_workspace_dashboard())
@@ -256,10 +208,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 params = parse_qs(parsed.query)
                 error = str(params.get("error", [""])[0]).strip()
                 if error:
-                    self._send_html(
-                        HTTPStatus.BAD_REQUEST,
-                        f"<html><body><h2>Google Workspace connection failed</h2><p>{error}</p><p>You can close this window.</p></body></html>",
-                    )
+                    self._send_html(HTTPStatus.BAD_REQUEST, f"<html><body><h2>Google Workspace connection failed</h2><p>{error}</p><p>You can close this window and return to Research OS.</p></body></html>")
                     return
                 code = str(params.get("code", [""])[0]).strip()
                 state = str(params.get("state", [""])[0]).strip()
@@ -267,24 +216,14 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     raise ValueError("Google OAuth callback requires code and state")
                 result = GoogleOAuthBroker().complete(code=code, state=state)
                 email = ((result.get("account") or {}).get("email") or "Google account")
-                self._send_html(
-                    HTTPStatus.OK,
-                    f"<html><body><h2>Research OS connected to Google Workspace</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>",
-                )
+                self._send_html(HTTPStatus.OK, f"<html><body><h2>Research OS connected to Google Workspace</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
                 return
             if path == "/v1/conversations/cloud":
-                if not self._authorize_cloud_sync():
+                principal = self._authorize_cloud_sync()
+                if principal is None:
                     return
-                sessions = list_cloud_sessions()
-                self._send(
-                    HTTPStatus.OK,
-                    {
-                        "sessions": sessions,
-                        "count": len(sessions),
-                        "durability": "ephemeral-json",
-                        "knowledge_persisted": False,
-                    },
-                )
+                sessions = list_cloud_sessions(str(principal["user_id"]))
+                self._send(HTTPStatus.OK, {"sessions": sessions, "count": len(sessions), "durability": "ephemeral-json", "knowledge_persisted": False})
                 return
             if path == "/v1/memory/search":
                 params = parse_qs(parsed.query)
@@ -296,10 +235,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     raise ValueError("limit must be an integer") from exc
                 hits = search_memory(ARTIFACT_DIR, query, limit)
-                self._send(
-                    HTTPStatus.OK,
-                    {"query": query, "count": len(hits), "hits": hits, "source": "research/artifacts"},
-                )
+                self._send(HTTPStatus.OK, {"query": query, "count": len(hits), "hits": hits, "source": "research/artifacts"})
                 return
             if path == "/v1/knowledge/artifacts":
                 self._send(HTTPStatus.OK, {"artifacts": self._artifact_index()})
@@ -311,12 +247,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/github/dashboard":
                 params = parse_qs(parsed.query)
-                repository = str(
-                    params.get(
-                        "repository",
-                        [os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY)],
-                    )[0]
-                ).strip()
+                repository = str(params.get("repository", [os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY)])[0]).strip()
                 self._send(HTTPStatus.OK, github_dashboard(repository))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
@@ -352,81 +283,34 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, config.dashboard())
                 return
             if path == "/v1/conversations/cloud/sync":
-                if not self._authorize_cloud_sync():
+                principal = self._authorize_cloud_sync()
+                if principal is None:
                     return
                 session = body.get("session")
                 if not isinstance(session, dict):
                     raise ValueError("session must be an object")
-                saved = upsert_cloud_session(session)
-                self._send(
-                    HTTPStatus.OK,
-                    {
-                        "session": saved,
-                        "synced": True,
-                        "knowledge_persisted": False,
-                    },
-                )
+                saved = upsert_cloud_session(session, user_id=str(principal["user_id"]))
+                self._send(HTTPStatus.OK, {"session": saved, "synced": True, "knowledge_persisted": False})
                 return
             if path == "/v1/conversations/cloud/delete":
-                if not self._authorize_cloud_sync():
+                principal = self._authorize_cloud_sync()
+                if principal is None:
                     return
                 session_id = str(body.get("session_id", "")).strip()
-                deleted = delete_cloud_session(session_id)
+                deleted = delete_cloud_session(session_id, user_id=str(principal["user_id"]))
                 self._send(HTTPStatus.OK, {"session_id": session_id, "deleted": deleted})
                 return
             if path == "/v1/ai/generate":
                 prompt = str(body.get("prompt", "")).strip()
                 if not prompt:
                     raise ValueError("prompt is required")
-
-                route = os.getenv(
-                    "RESEARCH_OS_AI_ROUTE",
-                    "friend",
-                ).strip().lower()
-
+                route = os.getenv("RESEARCH_OS_AI_ROUTE", "friend").strip().lower()
                 if route == "direct-provider":
-                    result = build_provider(body.get("provider")).generate(
-                        prompt,
-                        system=str(body.get("system", "")),
-                        model=body.get("model"),
-                    )
-                    self._send(
-                        HTTPStatus.OK,
-                        {
-                            "provider": result.provider,
-                            "model": result.model,
-                            "text": result.text,
-                            "session_id": body.get("session_id"),
-                            "route": "direct-provider",
-                        },
-                    )
+                    result = build_provider(body.get("provider")).generate(prompt, system=str(body.get("system", "")), model=body.get("model"))
+                    self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "session_id": body.get("session_id"), "route": "direct-provider"})
                     return
-
-                friend = _friend_chat(
-                    prompt,
-                    session_id=str(
-                        body.get("session_id") or "main-api"
-                    ),
-                    complexity=int(body.get("complexity", 3)),
-                    risk=int(body.get("risk", 1)),
-                    parallelism=int(body.get("parallelism", 2)),
-                    helper_budget=int(body.get("helper_budget", 0)),
-                )
-
-                self._send(
-                    HTTPStatus.OK,
-                    {
-                        "provider": friend.get("provider"),
-                        "model": "friend-unified-master",
-                        "text": friend.get("text", ""),
-                        "session_id": body.get("session_id"),
-                        "route": "friend",
-                        "decision": friend.get("decision"),
-                        "factory": friend.get("factory"),
-                        "helpers": friend.get("helpers"),
-                        "metadata": friend.get("metadata"),
-                    },
-                )
+                friend = _friend_chat(prompt, session_id=str(body.get("session_id") or "main-api"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)))
+                self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers"), "metadata": friend.get("metadata")})
                 return
             if path == "/v1/ai/answer-with-memory":
                 question = str(body.get("question", "")).strip()
@@ -435,68 +319,21 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 limit = int(body.get("limit", 5))
                 hits = search_memory(ARTIFACT_DIR, question, limit)
                 context = build_context(hits)
-                system = (
-                    "Answer using the supplied Research OS memory. Distinguish stored facts from inference. "
-                    "When memory is insufficient, say so. Do not invent artifact contents."
-                )
+                system = "Answer using the supplied Research OS memory. Distinguish stored facts from inference. When memory is insufficient, say so. Do not invent artifact contents."
                 prompt = f"Memory:\n{context or '(no matching memory)'}\n\nQuestion:\n{question}"
-                route = os.getenv(
-                    "RESEARCH_OS_AI_ROUTE",
-                    "friend",
-                ).strip().lower()
-
+                route = os.getenv("RESEARCH_OS_AI_ROUTE", "friend").strip().lower()
                 if route == "direct-provider":
-                    result = build_provider(body.get("provider")).generate(
-                        prompt,
-                        system=system,
-                        model=body.get("model"),
-                    )
-                    self._send(
-                        HTTPStatus.OK,
-                        {
-                            "provider": result.provider,
-                            "model": result.model,
-                            "text": result.text,
-                            "memory_hits": hits,
-                            "memory_count": len(hits),
-                            "session_id": body.get("session_id"),
-                            "route": "direct-provider",
-                        },
-                    )
+                    result = build_provider(body.get("provider")).generate(prompt, system=system, model=body.get("model"))
+                    self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "direct-provider"})
                     return
-
-                friend = _friend_chat(
-                    f"{system}\n\n{prompt}",
-                    session_id=str(
-                        body.get("session_id") or "main-api-memory"
-                    ),
-                    complexity=int(body.get("complexity", 3)),
-                    risk=int(body.get("risk", 1)),
-                    parallelism=int(body.get("parallelism", 2)),
-                    helper_budget=int(body.get("helper_budget", 0)),
-                )
-
-                self._send(
-                    HTTPStatus.OK,
-                    {
-                        "provider": friend.get("provider"),
-                        "model": "friend-unified-master",
-                        "text": friend.get("text", ""),
-                        "memory_hits": hits,
-                        "memory_count": len(hits),
-                        "session_id": body.get("session_id"),
-                        "route": "friend",
-                        "decision": friend.get("decision"),
-                        "factory": friend.get("factory"),
-                        "helpers": friend.get("helpers"),
-                    },
-                )
+                friend = _friend_chat(f"{system}\n\n{prompt}", session_id=str(body.get("session_id") or "main-api-memory"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)))
+                self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers")})
                 return
             if path == "/v1/conversations/analyze":
                 self._send(HTTPStatus.OK, self._analyze_conversation(body))
                 return
             if path == "/v1/memory/commit":
-                if not self._authorize_cloud_sync():
+                if self._authorize_cloud_sync() is None:
                     return
                 self._send(HTTPStatus.OK, self._commit_memory(body))
                 return
@@ -519,25 +356,12 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         curator = _load_module("research_os_curator", CURATOR_PATH)
         normalized = curator._normalize_source(source)
         relationships = [curator._parse_relationship(item) for item in body.get("relationships", [])]
-        artifact = curator._deterministic_extract(
-            normalized,
-            str(body.get("title", "Research Session")),
-            str(body.get("status", "hypothesis")),
-            [str(x) for x in body.get("tags", [])],
-            [str(x) for x in body.get("evidence", [])],
-            relationships,
-            ARTIFACT_DIR,
-        )
+        artifact = curator._deterministic_extract(normalized, str(body.get("title", "Research Session")), str(body.get("status", "hypothesis")), [str(x) for x in body.get("tags", [])], [str(x) for x in body.get("evidence", [])], relationships, ARTIFACT_DIR)
         return curator, artifact
 
     def _analyze_conversation(self, body: dict[str, Any]) -> dict[str, Any]:
         curator, artifact = self._extract_conversation_artifact(body)
-        return {
-            "artifact": curator.asdict(artifact),
-            "accepted": artifact.quality_score >= int(body.get("min_quality", 20)),
-            "persisted": False,
-            "note": "API analysis is preview-only; persistence requires explicit memory commit.",
-        }
+        return {"artifact": curator.asdict(artifact), "accepted": artifact.quality_score >= int(body.get("min_quality", 20)), "persisted": False, "note": "API analysis is preview-only; persistence requires explicit memory commit."}
 
     def _commit_memory(self, body: dict[str, Any]) -> dict[str, Any]:
         if body.get("confirm") is not True:
@@ -545,39 +369,12 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         curator, artifact = self._extract_conversation_artifact(body)
         min_quality = int(body.get("min_quality", 20))
         if artifact.quality_score < min_quality:
-            return {
-                "artifact": curator.asdict(artifact),
-                "accepted": False,
-                "persisted": False,
-                "reason": "quality_below_threshold",
-                "durability": "runtime-ephemeral",
-            }
+            return {"artifact": curator.asdict(artifact), "accepted": False, "persisted": False, "reason": "quality_below_threshold", "durability": "runtime-ephemeral"}
         if artifact.duplicate_of and not bool(body.get("allow_duplicate", False)):
-            return {
-                "artifact": curator.asdict(artifact),
-                "accepted": True,
-                "persisted": False,
-                "reason": "duplicate",
-                "duplicate_of": artifact.duplicate_of,
-                "durability": "runtime-ephemeral",
-            }
-        target = curator._write_artifact(
-            ARTIFACT_DIR,
-            artifact,
-            allow_duplicate=bool(body.get("allow_duplicate", False)),
-        )
+            return {"artifact": curator.asdict(artifact), "accepted": True, "persisted": False, "reason": "duplicate", "duplicate_of": artifact.duplicate_of, "durability": "runtime-ephemeral"}
+        target = curator._write_artifact(ARTIFACT_DIR, artifact, allow_duplicate=bool(body.get("allow_duplicate", False)))
         curator._update_index(ARTIFACT_DIR)
-        return {
-            "artifact": curator.asdict(artifact),
-            "accepted": True,
-            "persisted": True,
-            "path": str(target.relative_to(ROOT)) if ROOT in target.parents else str(target),
-            "durability": "runtime-ephemeral",
-            "note": (
-                "Memory is available to Research OS immediately. "
-                "Render free-service filesystem is ephemeral; durable Git-backed memory is a later storage phase."
-            ),
-        }
+        return {"artifact": curator.asdict(artifact), "accepted": True, "persisted": True, "path": str(target.relative_to(ROOT)) if ROOT in target.parents else str(target), "durability": "runtime-ephemeral", "note": "Memory is available to Research OS immediately. Render free-service filesystem is ephemeral; durable Git-backed memory is a later storage phase."}
 
     @staticmethod
     def _artifact_index() -> list[dict[str, str]]:
@@ -594,14 +391,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                         if ":" in line:
                             key, value = line.split(":", 1)
                             metadata[key.strip()] = value.strip().strip('"')
-            results.append(
-                {
-                    "artifact_id": metadata.get("artifact_id", path.stem),
-                    "title": metadata.get("title", ""),
-                    "status": metadata.get("status", ""),
-                    "path": str(path.relative_to(ROOT)) if ROOT in path.parents else str(path),
-                }
-            )
+            results.append({"artifact_id": metadata.get("artifact_id", path.stem), "title": metadata.get("title", ""), "status": metadata.get("status", ""), "path": str(path.relative_to(ROOT)) if ROOT in path.parents else str(path)})
         return results
 
     def log_message(self, fmt: str, *args: Any) -> None:
