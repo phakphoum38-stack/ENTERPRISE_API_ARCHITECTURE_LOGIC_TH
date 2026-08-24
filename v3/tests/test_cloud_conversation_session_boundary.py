@@ -1,12 +1,17 @@
 import json
 import os
+import sys
 import tempfile
 import threading
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
-from tools.research_os_api import agent_server, server
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "research_os_api"))
+
+from tools.research_os_api import server
 from tools.research_os_api.auth_session import issue_session, revoke_session
 
 
@@ -14,11 +19,7 @@ class CloudConversationSessionBoundaryTests(unittest.TestCase):
     def setUp(self):
         self._old_env = {
             key: os.environ.get(key)
-            for key in (
-                "RESEARCH_OS_SESSION_SECRET",
-                "RESEARCH_OS_V3_DATA_DIR",
-                "RESEARCH_OS_SYNC_KEY",
-            )
+            for key in ("RESEARCH_OS_SESSION_SECRET", "RESEARCH_OS_V3_DATA_DIR", "RESEARCH_OS_SYNC_KEY")
         }
         os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-cloud-session-boundary-secret"
         os.environ["RESEARCH_OS_V3_DATA_DIR"] = tempfile.mkdtemp(prefix="research-os-cloud-test-")
@@ -66,32 +67,26 @@ class CloudConversationSessionBoundaryTests(unittest.TestCase):
     def test_alice_and_bob_are_isolated_for_read_write_delete(self):
         alice = issue_session({"sub": "alice", "email": "alice@example.com"})
         bob = issue_session({"sub": "bob", "email": "bob@example.com"})
-
         status, _ = self.request(
             "POST", "/v1/conversations/cloud/sync", token=alice, sync_key="test-sync-key",
             body={"session": {"id": "alice-chat", "title": "Alice", "updated_at": 10, "messages": []}},
         )
         self.assertEqual(200, status)
-
         status, payload = self.request("GET", "/v1/conversations/cloud", token=bob, sync_key="test-sync-key")
         self.assertEqual(200, status)
         self.assertEqual([], payload["sessions"])
-
         status, payload = self.request("GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key")
         self.assertEqual(200, status)
         self.assertEqual(["alice-chat"], [item["id"] for item in payload["sessions"]])
-
         status, payload = self.request(
             "POST", "/v1/conversations/cloud/delete", token=bob, sync_key="test-sync-key",
             body={"session_id": "alice-chat"},
         )
         self.assertEqual(200, status)
         self.assertFalse(payload["deleted"])
-
         status, payload = self.request("GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key")
         self.assertEqual(200, status)
         self.assertEqual(["alice-chat"], [item["id"] for item in payload["sessions"]])
-
         status, payload = self.request(
             "POST", "/v1/conversations/cloud/delete", token=alice, sync_key="test-sync-key",
             body={"session_id": "alice-chat"},
@@ -103,11 +98,9 @@ class CloudConversationSessionBoundaryTests(unittest.TestCase):
         alice = issue_session({"sub": "alice", "email": "alice@example.com"})
         bob = issue_session({"sub": "bob", "email": "bob@example.com"})
         revoke_session(alice)
-
         status, payload = self.request("GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key")
         self.assertEqual(401, status)
         self.assertEqual("invalid_session", payload["error"])
-
         status, _ = self.request("GET", "/v1/conversations/cloud", token=bob, sync_key="test-sync-key")
         self.assertEqual(200, status)
 
