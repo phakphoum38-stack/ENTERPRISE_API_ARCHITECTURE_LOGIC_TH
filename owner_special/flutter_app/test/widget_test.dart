@@ -15,7 +15,7 @@ class FakeOwnerFriendApi implements OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey}) async => <String, dynamic>{'enabled': true, 'credential_present': true, 'secret_backend': 'test', 'base_url': baseUrl, 'model': model};
   @override
-  Future<Map<String, dynamic>> testProvider() async => <String, dynamic>{'connected': true};
+  Future<Map<String, dynamic>> testProvider() async => <Map<String, dynamic>>[<String, dynamic>{'connected': true}].first;
   @override
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) async => <String, dynamic>{'text': 'friend:$text', 'decision': <String, dynamic>{'scale': helperBudget >= 1000000 ? 'fast-1m' : '6^6', 'capacity': helperBudget >= 1000000 ? 1000000 : 46656}, 'helpers': <String, dynamic>{'active_workers': 128, 'batches': 7813}, 'factory': <String, dynamic>{'stages': <String>['master', 'factory', 'team', 'tests', 'release']}};
 }
@@ -23,6 +23,8 @@ class FakeOwnerFriendApi implements OwnerFriendApi {
 void main() {
   testWidgets('Owner Friend desktop uses bounded million-helper mode', (tester) async {
     await tester.pumpWidget(OwnerFriendApp(api: FakeOwnerFriendApi()));
+    // Turbo Helpers is enabled by default. Do not tap the chip here because
+    // tapping an already-selected FilterChip toggles million-helper mode off.
     await tester.enterText(find.byKey(const Key('friend-input')), 'hello');
     await tester.tap(find.byKey(const Key('friend-send')));
     await tester.pumpAndSettle();

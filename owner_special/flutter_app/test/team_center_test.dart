@@ -18,7 +18,7 @@ void main() {
     await tester.tap(find.text('Engineering Team').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Engineering Team'), findsOneWidget);
+    expect(find.text('Team ID: engineering'), findsOneWidget);
     expect(selected?.id, 'engineering');
   });
 

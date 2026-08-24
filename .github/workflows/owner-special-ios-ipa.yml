@@ -38,9 +38,10 @@ jobs:
         working-directory: owner_special/flutter_app
         shell: bash
         run: |
+          set -euo pipefail
+
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           project = Path('ios/Runner.xcodeproj/project.pbxproj')
           text = project.read_text(encoding='utf-8')
@@ -49,17 +50,25 @@ jobs:
               if 'PRODUCT_BUNDLE_IDENTIFIER =' in line:
                   indent = line[:len(line) - len(line.lstrip())]
                   current = line.split('=', 1)[1].strip().rstrip(';')
-                  if 'RunnerTests' in current:
-                      line = f'{indent}PRODUCT_BUNDLE_IDENTIFIER = com.phakphoum38.researchos.RunnerTests;'
-                  else:
-                      line = f'{indent}PRODUCT_BUNDLE_IDENTIFIER = com.phakphoum38.researchos;'
+                  bundle_id = 'com.phakphoum38.researchos.RunnerTests' if 'RunnerTests' in current else 'com.phakphoum38.researchos'
+                  line = f'{indent}PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};'
               out.append(line)
           project.write_text('\n'.join(out) + '\n', encoding='utf-8')
           PY
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Research OS" ios/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleName Research OS" ios/Runner/Info.plist || true
-          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/Runner.xcodeproj/project.pbxproj
-          /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" ios/Runner/Info.plist
+
+          PLIST="ios/Runner/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Delete :CFBundleDisplayName' "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleDisplayName string Research OS' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Delete :CFBundleName' "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleName string Research OS' "$PLIST"
+
+          grep -n 'PRODUCT_BUNDLE_IDENTIFIER' ios/Runner.xcodeproj/project.pbxproj
+          DISPLAY_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$PLIST")
+          BUNDLE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")
+          echo "Research OS display name: $DISPLAY_NAME"
+          echo "Research OS bundle name: $BUNDLE_NAME"
+          test "$DISPLAY_NAME" = 'Research OS'
+          test "$BUNDLE_NAME" = 'Research OS'
 
       - name: Flutter analyze and test
         working-directory: owner_special/flutter_app
@@ -76,6 +85,7 @@ jobs:
         working-directory: owner_special/flutter_app
         shell: bash
         run: |
+          set -euo pipefail
           APP="build/ios/iphoneos/Runner.app"
           test -d "$APP"
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
@@ -89,6 +99,7 @@ jobs:
         working-directory: owner_special/flutter_app
         shell: bash
         run: |
+          set -euo pipefail
           rm -rf build/unsigned_ipa
           mkdir -p build/unsigned_ipa/Payload
           cp -R build/ios/iphoneos/Runner.app build/unsigned_ipa/Payload/ResearchOS.app
