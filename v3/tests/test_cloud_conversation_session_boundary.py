@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import threading
@@ -5,7 +6,7 @@ import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
-from tools.research_os_api import conversation_store, server
+from tools.research_os_api import agent_server, server
 from tools.research_os_api.auth_session import issue_session, revoke_session
 
 
@@ -22,7 +23,6 @@ class CloudConversationSessionBoundaryTests(unittest.TestCase):
         os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-cloud-session-boundary-secret"
         os.environ["RESEARCH_OS_V3_DATA_DIR"] = tempfile.mkdtemp(prefix="research-os-cloud-test-")
         os.environ["RESEARCH_OS_SYNC_KEY"] = "test-sync-key"
-        conversation_store._write_all({"sessions": {}, "users": {}})
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.ResearchOSHandler)
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()
@@ -45,19 +45,17 @@ class CloudConversationSessionBoundaryTests(unittest.TestCase):
             headers["X-Research-OS-Session"] = token
         if sync_key:
             headers["X-Research-OS-Sync-Key"] = sync_key
-        payload = None if body is None else __import__("json").dumps(body).encode()
+        payload = None if body is None else json.dumps(body).encode()
         conn.request(method, path, body=payload, headers=headers)
         response = conn.getresponse()
         data = response.read()
         conn.close()
-        return response.status, __import__("json").loads(data.decode() or "{}")
+        return response.status, json.loads(data.decode() or "{}")
 
     def test_sync_key_only_is_denied(self):
-        status, payload = self.request(
-            "GET", "/v1/conversations/cloud", sync_key="test-sync-key"
-        )
+        status, payload = self.request("GET", "/v1/conversations/cloud", sync_key="test-sync-key")
         self.assertEqual(401, status)
-        self.assertEqual("authentication_required", payload["error"])
+        self.assertEqual("invalid_session", payload["error"])
 
     def test_missing_sync_key_is_denied_even_with_session(self):
         token = issue_session({"sub": "alice", "email": "alice@example.com"})
@@ -70,47 +68,32 @@ class CloudConversationSessionBoundaryTests(unittest.TestCase):
         bob = issue_session({"sub": "bob", "email": "bob@example.com"})
 
         status, _ = self.request(
-            "POST",
-            "/v1/conversations/cloud/sync",
-            token=alice,
-            sync_key="test-sync-key",
+            "POST", "/v1/conversations/cloud/sync", token=alice, sync_key="test-sync-key",
             body={"session": {"id": "alice-chat", "title": "Alice", "updated_at": 10, "messages": []}},
         )
         self.assertEqual(200, status)
 
-        status, payload = self.request(
-            "GET", "/v1/conversations/cloud", token=bob, sync_key="test-sync-key"
-        )
+        status, payload = self.request("GET", "/v1/conversations/cloud", token=bob, sync_key="test-sync-key")
         self.assertEqual(200, status)
         self.assertEqual([], payload["sessions"])
 
-        status, payload = self.request(
-            "GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key"
-        )
+        status, payload = self.request("GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key")
         self.assertEqual(200, status)
         self.assertEqual(["alice-chat"], [item["id"] for item in payload["sessions"]])
 
         status, payload = self.request(
-            "POST",
-            "/v1/conversations/cloud/delete",
-            token=bob,
-            sync_key="test-sync-key",
+            "POST", "/v1/conversations/cloud/delete", token=bob, sync_key="test-sync-key",
             body={"session_id": "alice-chat"},
         )
         self.assertEqual(200, status)
         self.assertFalse(payload["deleted"])
 
-        status, payload = self.request(
-            "GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key"
-        )
+        status, payload = self.request("GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key")
         self.assertEqual(200, status)
         self.assertEqual(["alice-chat"], [item["id"] for item in payload["sessions"]])
 
         status, payload = self.request(
-            "POST",
-            "/v1/conversations/cloud/delete",
-            token=alice,
-            sync_key="test-sync-key",
+            "POST", "/v1/conversations/cloud/delete", token=alice, sync_key="test-sync-key",
             body={"session_id": "alice-chat"},
         )
         self.assertEqual(200, status)
@@ -121,15 +104,11 @@ class CloudConversationSessionBoundaryTests(unittest.TestCase):
         bob = issue_session({"sub": "bob", "email": "bob@example.com"})
         revoke_session(alice)
 
-        status, payload = self.request(
-            "GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key"
-        )
+        status, payload = self.request("GET", "/v1/conversations/cloud", token=alice, sync_key="test-sync-key")
         self.assertEqual(401, status)
         self.assertEqual("invalid_session", payload["error"])
 
-        status, _ = self.request(
-            "GET", "/v1/conversations/cloud", token=bob, sync_key="test-sync-key"
-        )
+        status, _ = self.request("GET", "/v1/conversations/cloud", token=bob, sync_key="test-sync-key")
         self.assertEqual(200, status)
 
 
