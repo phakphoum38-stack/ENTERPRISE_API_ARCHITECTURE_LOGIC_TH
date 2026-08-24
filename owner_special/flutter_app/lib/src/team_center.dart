@@ -117,34 +117,44 @@ class _TeamCenterState extends State<TeamCenter> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Icon(Icons.groups_outlined),
-            const SizedBox(width: 8),
-            Expanded(
-              child: DropdownButton<String>(
-                key: const Key('team-switcher'),
-                value: _selectedId,
-                isExpanded: true,
-                onChanged: _selectTeam,
-                items: _teams
-                    .map((team) => DropdownMenuItem<String>(
-                          value: team.id,
-                          child: Text(team.name),
-                        ))
-                    .toList(),
-              ),
+            Row(
+              children: <Widget>[
+                const Icon(Icons.groups_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButton<String>(
+                    key: const Key('team-switcher'),
+                    value: _selectedId,
+                    isExpanded: true,
+                    onChanged: _selectTeam,
+                    items: _teams
+                        .map((team) => DropdownMenuItem<String>(
+                              value: team.id,
+                              child: Text(team.name),
+                            ))
+                        .toList(),
+                  ),
+                ),
+                if (widget.isOwner)
+                  IconButton(
+                    tooltip: 'Create Team',
+                    onPressed: _createTeam,
+                    icon: const Icon(Icons.add),
+                  ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text('Team ID: ${selected.id}'),
-            const SizedBox(width: 8),
-            Text('Members: ${selected.members.length}'),
-            if (widget.isOwner)
-              IconButton(
-                tooltip: 'Create Team',
-                onPressed: _createTeam,
-                icon: const Icon(Icons.add),
-              ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              children: <Widget>[
+                Text('Team ID: ${selected.id}'),
+                Text('Members: ${selected.members.length}'),
+              ],
+            ),
           ],
         ),
       ),
