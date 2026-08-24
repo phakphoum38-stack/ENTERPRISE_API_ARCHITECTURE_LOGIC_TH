@@ -50,13 +50,60 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
 
+      - name: Preflight Main API 8787 runtime
+        shell: pwsh
+        run: |
+          $apiDir=Join-Path $PWD 'tools\research_os_api'
+          if(-not (Test-Path $apiDir)){throw "Research OS API directory missing: $apiDir"}
+          Push-Location $apiDir
+          try {
+            python -c "import render_server; print('API_IMPORT=PASS'); print('API_ENTRY=' + render_server.__file__)"
+            if($LASTEXITCODE -ne 0){throw 'Research OS API import failed'}
+          }
+          finally { Pop-Location }
+
       - name: Start Main API 8787
         shell: pwsh
         run: |
           $data="$env:RUNNER_TEMP\ResearchOSData"
           New-Item -ItemType Directory -Force -Path $data | Out-Null
-          .\scripts\start-research-os-local.ps1 -DataDir $data -Provider mock -Port 8787 -Background
-          for($i=0;$i-lt 40;$i++){try{$h=Invoke-RestMethod 'http://127.0.0.1:8787/health' -TimeoutSec 2;if($h.status -eq 'ok'){Write-Host 'PORT_8787=PASS';return}}catch{};Start-Sleep -Milliseconds 500}
+          .\scripts\start-research-os-local.ps1 -DataDir $data -Provider mock -HostAddress 127.0.0.1 -Port 8787 -FriendPort 8790 -Background
+          $pidFile="$data\run\research-os-api.pid"
+          $apiOut="$data\logs\research-os-api.out.log"
+          $apiErr="$data\logs\research-os-api.err.log"
+          $friendOut="$data\logs\research-os-friend.out.log"
+          $friendErr="$data\logs\research-os-friend.err.log"
+          if(-not (Test-Path $pidFile)){throw "API PID file missing: $pidFile"}
+          $pidText=(Get-Content $pidFile -Raw).Trim()
+          $apiPid=0
+          if(-not [int]::TryParse($pidText,[ref]$apiPid)){throw "Invalid API PID: $pidText"}
+          Write-Host "API_PID=$apiPid"
+          $apiProcess=Get-Process -Id $apiPid -ErrorAction SilentlyContinue
+          if(-not $apiProcess){
+            Write-Host '--- API stdout ---';Get-Content $apiOut -ErrorAction SilentlyContinue
+            Write-Host '--- API stderr ---';Get-Content $apiErr -ErrorAction SilentlyContinue
+            Write-Host '--- Friend stdout ---';Get-Content $friendOut -ErrorAction SilentlyContinue
+            Write-Host '--- Friend stderr ---';Get-Content $friendErr -ErrorAction SilentlyContinue
+            throw '8787 API process exited immediately after background start'
+          }
+          for($i=0;$i-lt 60;$i++){
+            try{
+              $h=Invoke-RestMethod 'http://127.0.0.1:8787/health' -TimeoutSec 2
+              if($h.status -eq 'ok'){
+                Write-Host 'PORT_8787=PASS'
+                Write-Host ('HEALTH=' + ($h | ConvertTo-Json -Compress))
+                return
+              }
+            }catch{}
+            $apiProcess=Get-Process -Id $apiPid -ErrorAction SilentlyContinue
+            if(-not $apiProcess){break}
+            Start-Sleep -Milliseconds 500
+          }
+          Write-Host '--- API stdout ---';Get-Content $apiOut -ErrorAction SilentlyContinue
+          Write-Host '--- API stderr ---';Get-Content $apiErr -ErrorAction SilentlyContinue
+          Write-Host '--- Friend stdout ---';Get-Content $friendOut -ErrorAction SilentlyContinue
+          Write-Host '--- Friend stderr ---';Get-Content $friendErr -ErrorAction SilentlyContinue
+          if(-not (Get-Process -Id $apiPid -ErrorAction SilentlyContinue)){throw '8787 API process exited before becoming ready'}
           throw '8787 did not become ready'
 
       - name: Start and execute actual V3 Master 8788 + 10x10
