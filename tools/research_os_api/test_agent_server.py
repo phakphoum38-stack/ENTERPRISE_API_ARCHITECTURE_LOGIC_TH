@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -11,11 +12,15 @@ from pathlib import Path
 
 import agent_server
 from agent_orchestrator import AgentOrchestrator
+from auth_session import issue_session
 
 
 class AgentServerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.original = agent_server.ORCHESTRATOR
+        self.previous_secret = os.environ.get("RESEARCH_OS_SESSION_SECRET")
+        os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-only-p0-003-secret"
+        self.session = issue_session({"sub": "test-user", "email": "test@example.test", "role": "user"})
         self.temp_dir = tempfile.TemporaryDirectory()
         agent_server.ORCHESTRATOR = AgentOrchestrator(
             storage_path=Path(self.temp_dir.name) / "agents" / "orchestrations.json",
@@ -31,13 +36,20 @@ class AgentServerTests(unittest.TestCase):
         self.thread.join(timeout=2)
         agent_server.ORCHESTRATOR = self.original
         self.temp_dir.cleanup()
+        if self.previous_secret is None:
+            os.environ.pop("RESEARCH_OS_SESSION_SECRET", None)
+        else:
+            os.environ["RESEARCH_OS_SESSION_SECRET"] = self.previous_secret
 
-    def request(self, path: str, *, method: str = "GET", body=None):
+    def request(self, path: str, *, method: str = "GET", body=None, authenticated: bool = True):
         data = None if body is None else json.dumps(body).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if authenticated:
+            headers["X-Research-OS-Session"] = self.session
         request = urllib.request.Request(
             self.base + path,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method=method,
         )
         try:
@@ -45,6 +57,12 @@ class AgentServerTests(unittest.TestCase):
                 return response.status, json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             return exc.code, json.loads(exc.read().decode("utf-8"))
+
+    def test_protected_routes_fail_closed_without_session(self) -> None:
+        for path, method in (("/v1/agents", "GET"), ("/v1/agents/orchestrations", "POST")):
+            status, payload = self.request(path, method=method, body={} if method == "POST" else None, authenticated=False)
+            self.assertEqual(status, 401)
+            self.assertEqual(payload["error"], "authentication_required")
 
     def test_agent_discovery_and_readiness_routes(self) -> None:
         status, listed = self.request("/v1/agents")
