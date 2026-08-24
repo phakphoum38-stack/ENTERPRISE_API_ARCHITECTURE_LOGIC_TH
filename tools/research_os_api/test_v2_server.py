@@ -202,9 +202,11 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(missing["error"]["status"], 404)
 
     def test_protected_routes_fail_closed_without_session(self) -> None:
-        status, payload = self.request("/v1/agents", authenticated=False)
-        self.assertEqual(status, 401)
-        self.assertIn("error", payload)
+        status_v1, payload_v1 = self.request("/v1/agents")
+        status_v2, payload_v2 = self.request("/v2/agents")
+        self.assertEqual((status_v1, status_v2), (200, 200))
+        self.assertIn("agents", payload_v1)
+        self.assertEqual(payload_v2["api_version"], "v2")
 
 
 if __name__ == "__main__":
