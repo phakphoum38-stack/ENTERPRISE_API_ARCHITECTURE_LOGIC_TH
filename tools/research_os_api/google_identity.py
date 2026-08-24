@@ -1,9 +1,38 @@
 from __future__ import annotations
 
+import inspect
 import os
+import threading
+from http.server import BaseHTTPRequestHandler
 
 from google_oauth import GoogleOAuthBroker, IDENTITY_SCOPES
 from rbac import RoleStore
+from auth_session import clear_cookie_header, revoke_session
+
+
+_SIGNOUT_STATE = threading.local()
+_SIGNOUT_HOOK_LOCK = threading.Lock()
+_SIGNOUT_HOOK_INSTALLED = False
+
+
+def _install_signout_cookie_hook() -> None:
+    global _SIGNOUT_HOOK_INSTALLED
+    if _SIGNOUT_HOOK_INSTALLED:
+        return
+    with _SIGNOUT_HOOK_LOCK:
+        if _SIGNOUT_HOOK_INSTALLED:
+            return
+        original_send_response = BaseHTTPRequestHandler.send_response
+        original_send_header = BaseHTTPRequestHandler.send_header
+
+        def send_response(handler, code, message=None, _original=original_send_response):
+            _original(handler, code, message)
+            if getattr(_SIGNOUT_STATE, "pending", False):
+                original_send_header(handler, "Set-Cookie", clear_cookie_header())
+                _SIGNOUT_STATE.pending = False
+
+        BaseHTTPRequestHandler.send_response = send_response
+        _SIGNOUT_HOOK_INSTALLED = True
 
 
 class GoogleIdentityBroker(GoogleOAuthBroker):
@@ -60,3 +89,46 @@ class GoogleIdentityBroker(GoogleOAuthBroker):
         account = result.get("account") if isinstance(result.get("account"), dict) else {}
         result["account"] = self._with_role(account)
         return result
+
+    def disconnect(self) -> dict[str, object]:
+        """Disconnect Google identity and revoke the active Research OS session."""
+        _install_signout_cookie_hook()
+        _SIGNOUT_STATE.pending = True
+
+        handler = None
+        frame = inspect.currentframe()
+        try:
+            frame = frame.f_back if frame else None
+            while frame:
+                candidate = frame.f_locals.get("self")
+                if (
+                    candidate is not None
+                    and candidate is not self
+                    and hasattr(candidate, "headers")
+                    and hasattr(candidate, "send_header")
+                    and hasattr(candidate, "wfile")
+                ):
+                    handler = candidate
+                    break
+                frame = frame.f_back
+        finally:
+            del frame
+
+        if handler is not None:
+            token = handler.headers.get("X-Research-OS-Session")
+            if not token:
+                cookie = handler.headers.get("Cookie", "")
+                marker = "research_os_session="
+                for part in cookie.split(";"):
+                    part = part.strip()
+                    if part.startswith(marker):
+                        token = part[len(marker):]
+                        break
+
+            if token:
+                try:
+                    revoke_session(token)
+                except ValueError:
+                    pass
+
+        return super().disconnect()

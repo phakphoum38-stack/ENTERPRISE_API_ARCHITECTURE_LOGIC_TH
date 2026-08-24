@@ -69,19 +69,29 @@ var
   ResultCode: Integer;
   PowerShellExe: String;
   PythonPath: String;
+  AppPath: String;
+  ServiceHostPath: String;
   GuardPath: String;
   GuardScript: String;
   Parameters: String;
 begin
   PythonPath := ExpandConstant('{app}\runtime\python\python.exe');
+  AppPath := ExpandConstant('{app}\app\{#MyAppExeName}');
+  ServiceHostPath := ExpandConstant('{app}\service_host\ResearchOS.Owner.ServiceHost.exe');
   GuardPath := ExpandConstant('{tmp}\research-os-owner-runtime-quiesce.ps1');
   GuardScript :=
-    'param([Parameter(Mandatory=$true)][string]$Target,[int]$Port=8790)' + #13#10 +
+    'param([Parameter(Mandatory=$true)][string]$PythonTarget,[Parameter(Mandatory=$true)][string]$AppTarget,[Parameter(Mandatory=$true)][string]$ServiceHostTarget,[int]$Port=8790)' + #13#10 +
     '$ErrorActionPreference = ''Stop''' + #13#10 +
-    'function Get-OwnerPython {' + #13#10 +
-    '  $targetFull = [IO.Path]::GetFullPath($Target)' + #13#10 +
+    'function Normalize-Path([string]$Path) {' + #13#10 +
+    '  if ([string]::IsNullOrWhiteSpace($Path)) { return $null }' + #13#10 +
+    '  try { return [IO.Path]::GetFullPath($Path) } catch { return $null }' + #13#10 +
+    '}' + #13#10 +
+    '$targets = @($PythonTarget,$AppTarget,$ServiceHostTarget) | ForEach-Object { Normalize-Path $_ } | Where-Object { $_ }' + #13#10 +
+    'function Get-OwnerProcesses {' + #13#10 +
     '  return @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {' + #13#10 +
-    '    $_.Name -ieq ''python.exe'' -and $_.ExecutablePath -and ([IO.Path]::GetFullPath($_.ExecutablePath) -ieq $targetFull)' + #13#10 +
+    '    if (-not $_.ExecutablePath) { return $false }' + #13#10 +
+    '    $full = Normalize-Path $_.ExecutablePath' + #13#10 +
+    '    return $full -and ($targets -icontains $full)' + #13#10 +
     '  })' + #13#10 +
     '}' + #13#10 +
     'function Get-OwnerListeners {' + #13#10 +
@@ -90,28 +100,28 @@ begin
     'try {' + #13#10 +
     '  $running = @()' + #13#10 +
     '  for ($i = 0; $i -lt 20; $i++) {' + #13#10 +
-    '    $running = @(Get-OwnerPython)' + #13#10 +
+    '    $running = @(Get-OwnerProcesses)' + #13#10 +
     '    if ($running.Count -eq 0) { break }' + #13#10 +
     '    Start-Sleep -Milliseconds 500' + #13#10 +
     '  }' + #13#10 +
-    '  $running = @(Get-OwnerPython)' + #13#10 +
+    '  $running = @(Get-OwnerProcesses)' + #13#10 +
     '  if ($running.Count -gt 0) {' + #13#10 +
     '    foreach ($p in $running) {' + #13#10 +
-    '      Write-Host "Forcing bundled Owner Python PID $($p.ProcessId): $($p.ExecutablePath)"' + #13#10 +
+    '      Write-Host "Forcing Owner process PID $($p.ProcessId): $($p.ExecutablePath)"' + #13#10 +
     '      try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop } catch {' + #13#10 +
     '        if (Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue) { throw }' + #13#10 +
     '      }' + #13#10 +
     '    }' + #13#10 +
     '  }' + #13#10 +
     '  for ($i = 0; $i -lt 20; $i++) {' + #13#10 +
-    '    $running = @(Get-OwnerPython)' + #13#10 +
+    '    $running = @(Get-OwnerProcesses)' + #13#10 +
     '    if ($running.Count -eq 0) { break }' + #13#10 +
     '    Start-Sleep -Milliseconds 250' + #13#10 +
     '  }' + #13#10 +
-    '  $running = @(Get-OwnerPython)' + #13#10 +
+    '  $running = @(Get-OwnerProcesses)' + #13#10 +
     '  if ($running.Count -gt 0) {' + #13#10 +
-    '    $pids = ($running | ForEach-Object ProcessId) -join '',''' + #13#10 +
-    '    Write-Error "Bundled Owner Python remained alive after forced shutdown. PID(s): $pids"' + #13#10 +
+    '    $details = ($running | ForEach-Object { "$($_.ProcessId):$($_.ExecutablePath)" }) -join '';''' + #13#10 +
+    '    Write-Error "Owner process(es) remained alive after forced shutdown: $details"' + #13#10 +
     '    exit 11' + #13#10 +
     '  }' + #13#10 +
     '  $listeners = @()' + #13#10 +
@@ -143,7 +153,8 @@ begin
   PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
   Parameters :=
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath +
-    '" -Target "' + PythonPath + '" -Port 8790';
+    '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath +
+    '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790';
 
   if not Exec(
     PowerShellExe,
@@ -160,7 +171,7 @@ begin
 
   if ResultCode = 0 then
   begin
-    Log('Owner runtime quiesced: bundled Python is gone and port 8790 is released.');
+    Log('Owner runtime quiesced: desktop app, service host, bundled Python, and port 8790 are released.');
     Result := True;
     Exit;
   end;

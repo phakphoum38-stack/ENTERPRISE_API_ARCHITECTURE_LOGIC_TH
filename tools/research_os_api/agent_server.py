@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from agent_orchestrator import ORCHESTRATOR
 from agent_platform import REGISTRY
+from api_auth import require_session
 from file_acl import ACLAuthorizationError, FileACLStore
 from google_identity import GoogleIdentityBroker
 from server import ResearchOSHandler
@@ -22,25 +23,48 @@ class AgentResearchOSHandler(ResearchOSHandler):
     _agents_prefix = "/v1/agents"
     _prefix = "/v1/agents/orchestrations"
     _acl_prefix = "/v1/files/acl"
+    _protected_prefixes = (_agents_prefix, _acl_prefix)
 
     @staticmethod
     def _acl_store() -> FileACLStore:
         root = GoogleIdentityBroker().root
         return FileACLStore(root / "file_acl.json")
 
-    @staticmethod
-    def _signed_in_email() -> str:
-        result = GoogleIdentityBroker().status()
-        account = result.get("account") if isinstance(result.get("account"), dict) else {}
-        email = str(account.get("email") or "").strip()
-        if not result.get("connected") or not email:
-            raise ACLAuthorizationError("Google sign-in is required")
+    def _require_principal(self) -> dict[str, object] | None:
+        """Resolve the trusted Research OS session before serving protected routes."""
+        try:
+            return require_session(dict(self.headers.items()))
+        except ValueError as exc:
+            self._send(
+                HTTPStatus.UNAUTHORIZED,
+                {"error": "authentication_required", "detail": str(exc)},
+            )
+        except RuntimeError as exc:
+            self._send(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": "authentication_unavailable", "detail": str(exc)},
+            )
+        return None
+
+    def _signed_in_email(self) -> str:
+        principal = self._require_principal()
+        if not principal:
+            raise ACLAuthorizationError("Research OS session is required")
+        email = str(principal.get("email") or "").strip()
+        if not email:
+            raise ACLAuthorizationError("Research OS session identity is incomplete")
         return email
+
+    def _is_protected_path(self, path: str) -> bool:
+        return any(path == prefix or path.startswith(prefix + "/") for prefix in self._protected_prefixes)
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+
+        if self._is_protected_path(path) and not self._require_principal():
+            return
 
         if path == self._agents_prefix:
             agents = REGISTRY.list()
@@ -155,6 +179,9 @@ class AgentResearchOSHandler(ResearchOSHandler):
     def do_POST(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
 
+        if self._is_protected_path(path) and not self._require_principal():
+            return
+
         if path == self._acl_prefix:
             try:
                 body = self._read_json()
@@ -215,7 +242,7 @@ class AgentResearchOSHandler(ResearchOSHandler):
             return
 
         if path.startswith(self._prefix + "/"):
-            relative = path[len(self._prefix) + 1 :].strip("/")
+            relative = path[len(self._prefix) + 1:].strip("/")
             parts = relative.split("/") if relative else []
             if len(parts) != 2 or parts[1] not in {"execute", "confirm", "retry", "cancel"}:
                 self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})

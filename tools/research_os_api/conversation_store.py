@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import threading
 from pathlib import Path
@@ -13,6 +14,7 @@ from typing import Any
 from local_storage import conversation_store_path, ensure_layout
 
 _LOCK = threading.RLock()
+_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def _store_path() -> Path:
@@ -31,19 +33,27 @@ def authorize(candidate: str | None) -> bool:
     return secrets.compare_digest(expected, candidate.strip())
 
 
+def _validate_user_id(user_id: str) -> str:
+    value = str(user_id or "").strip()
+    if not value or not _SAFE_USER_ID.fullmatch(value) or value in {".", ".."}:
+        raise ValueError("invalid user_id")
+    return value[:128]
+
+
 def _read_all() -> dict[str, Any]:
     path = _store_path()
     if not path.exists():
-        return {"sessions": {}}
+        return {"sessions": {}, "users": {}}
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return {"sessions": {}}
+        return {"sessions": {}, "users": {}}
     if not isinstance(value, dict):
-        return {"sessions": {}}
-    sessions = value.get("sessions")
-    if not isinstance(sessions, dict):
+        return {"sessions": {}, "users": {}}
+    if not isinstance(value.get("sessions"), dict):
         value["sessions"] = {}
+    if not isinstance(value.get("users"), dict):
+        value["users"] = {}
     return value
 
 
@@ -55,15 +65,37 @@ def _write_all(value: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
-def list_sessions() -> list[dict[str, Any]]:
+def _user_sessions(value: dict[str, Any], user_id: str) -> dict[str, Any]:
+    users = value.setdefault("users", {})
+    bucket = users.setdefault(user_id, {})
+    if not isinstance(bucket, dict):
+        bucket = {}
+        users[user_id] = bucket
+    sessions = bucket.setdefault("sessions", {})
+    if not isinstance(sessions, dict):
+        sessions = {}
+        bucket["sessions"] = sessions
+    return sessions
+
+
+def list_sessions(user_id: str | None = None) -> list[dict[str, Any]]:
+    """List sessions, optionally scoped to one verified user.
+
+    ``user_id=None`` is retained for local/legacy callers only. Cloud routes
+    must always pass the verified Research OS principal id.
+    """
     with _LOCK:
-        sessions = _read_all()["sessions"]
+        value = _read_all()
+        if user_id is None:
+            sessions = value["sessions"]
+        else:
+            sessions = _user_sessions(value, _validate_user_id(user_id))
         values = [item for item in sessions.values() if isinstance(item, dict)]
         values.sort(key=lambda item: int(item.get("updated_at", 0)), reverse=True)
         return values
 
 
-def upsert_session(session: dict[str, Any]) -> dict[str, Any]:
+def upsert_session(session: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
     session_id = str(session.get("id", "")).strip()
     if not session_id:
         raise ValueError("session.id is required")
@@ -95,18 +127,26 @@ def upsert_session(session: dict[str, Any]) -> dict[str, Any]:
     }
     with _LOCK:
         value = _read_all()
-        value["sessions"][normalized["id"]] = normalized
+        if user_id is None:
+            value["sessions"][normalized["id"]] = normalized
+        else:
+            scoped_user = _validate_user_id(user_id)
+            _user_sessions(value, scoped_user)[normalized["id"]] = normalized
         _write_all(value)
     return normalized
 
 
-def delete_session(session_id: str) -> bool:
+def delete_session(session_id: str, user_id: str | None = None) -> bool:
     session_id = session_id.strip()
     if not session_id:
         raise ValueError("session_id is required")
     with _LOCK:
         value = _read_all()
-        existed = value["sessions"].pop(session_id, None) is not None
+        if user_id is None:
+            sessions = value["sessions"]
+        else:
+            sessions = _user_sessions(value, _validate_user_id(user_id))
+        existed = sessions.pop(session_id, None) is not None
         if existed:
             _write_all(value)
         return existed

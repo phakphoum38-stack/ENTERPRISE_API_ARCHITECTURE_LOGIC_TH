@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -11,11 +12,15 @@ from pathlib import Path
 
 import agent_server
 from agent_orchestrator import AgentOrchestrator
+from auth_session import issue_session
 
 
 class AgentServerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.original = agent_server.ORCHESTRATOR
+        self.original_secret = os.environ.get("RESEARCH_OS_SESSION_SECRET")
+        os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-only-agent-server-session-secret"
+        self.session = issue_session({"sub": "agent-test-user", "email": "agent-test@example.test", "role": "user"})
         self.temp_dir = tempfile.TemporaryDirectory()
         agent_server.ORCHESTRATOR = AgentOrchestrator(
             storage_path=Path(self.temp_dir.name) / "agents" / "orchestrations.json",
@@ -30,14 +35,21 @@ class AgentServerTests(unittest.TestCase):
         self.server.server_close()
         self.thread.join(timeout=2)
         agent_server.ORCHESTRATOR = self.original
+        if self.original_secret is None:
+            os.environ.pop("RESEARCH_OS_SESSION_SECRET", None)
+        else:
+            os.environ["RESEARCH_OS_SESSION_SECRET"] = self.original_secret
         self.temp_dir.cleanup()
 
-    def request(self, path: str, *, method: str = "GET", body=None):
+    def request(self, path: str, *, method: str = "GET", body=None, authenticated: bool = True):
         data = None if body is None else json.dumps(body).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if authenticated:
+            headers["X-Research-OS-Session"] = self.session
         request = urllib.request.Request(
             self.base + path,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method=method,
         )
         try:

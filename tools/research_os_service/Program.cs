@@ -63,7 +63,7 @@ sealed class ResearchOsApiWorker : BackgroundService
 
         startInfo.Environment["RESEARCH_OS_DATA_DIR"] = dataDir;
         startInfo.Environment["RESEARCH_OS_CONVERSATION_STORE"] = Path.Combine(dataDir, "sessions", "conversations.json");
-        startInfo.Environment["RESEARCH_OS_API_HOST"] = Environment.GetEnvironmentVariable("RESEARCH_OS_API_HOST") ?? "0.0.0.0";
+        startInfo.Environment["RESEARCH_OS_API_HOST"] = Environment.GetEnvironmentVariable("RESEARCH_OS_API_HOST") ?? "127.0.0.1";
         startInfo.Environment["RESEARCH_OS_API_PORT"] = Environment.GetEnvironmentVariable("RESEARCH_OS_API_PORT") ?? "8787";
         startInfo.Environment["HOST"] = startInfo.Environment["RESEARCH_OS_API_HOST"]!;
         startInfo.Environment["PORT"] = startInfo.Environment["RESEARCH_OS_API_PORT"]!;

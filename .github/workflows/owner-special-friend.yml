@@ -17,6 +17,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   friend-complete:
     strategy:
@@ -25,8 +28,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - name: Compile Owner and V3 Python sources
         shell: bash
@@ -57,8 +60,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - uses: subosito/flutter-action@v2
         with: {channel: stable, cache: true}
@@ -112,7 +115,7 @@ jobs:
         shell: pwsh
         run: if ($env:OWNER_FRIEND_PID) { Stop-Process ([int]$env:OWNER_FRIEND_PID) -Force -ErrorAction SilentlyContinue }
       - name: Upload owner_special/flutter_app/build/windows/x64/runner/Release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: owner-special-desktop-${{ github.sha }}
           path: owner_special/flutter_app/build/windows/x64/runner/Release/**
@@ -124,12 +127,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with: {dotnet-version: '8.0.x'}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: owner-special-desktop-${{ github.sha }}
           path: owner_special/installer/desktop
@@ -168,7 +171,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Owner Setup compilation failed' }
           if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe')) { throw 'Owner Setup EXE missing' }
       - name: Upload raw owner_special Setup.exe for validation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: owner-special-setup-build-${{ github.sha }}
           path: owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.0-x64.exe
@@ -180,11 +183,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - name: Download prebuilt owner_special Setup.exe
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: owner-special-setup-build-${{ github.sha }}
           path: owner_special/installer/output
@@ -204,7 +207,7 @@ jobs:
         shell: pwsh
         run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
       - name: Upload validated owner_special Setup.exe and evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: owner-special-setup-${{ github.sha }}
           path: |
@@ -218,11 +221,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - name: Download validated Setup.exe for final composition
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: owner-special-setup-${{ github.sha }}
           path: owner_special/dist/validated-installer
@@ -296,7 +299,7 @@ jobs:
           print(final)
           PY
       - name: Upload owner_special final release outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: owner-special-friend-complete-${{ github.sha }}
           path: |
