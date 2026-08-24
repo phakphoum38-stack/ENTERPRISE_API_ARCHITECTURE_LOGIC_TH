@@ -1,27 +1,49 @@
+import os
+import tempfile
 import threading
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from unittest.mock import patch
 
-from tools.research_os_api import server
+from tools.research_os_api import agent_server, server
 from tools.research_os_api.auth_session import issue_session
 
 
 class SignoutRevocationHttpTests(unittest.TestCase):
     def setUp(self):
-        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.ResearchOSHandler)
-        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
-        self.thread.start()
-        self.port = self.httpd.server_address[1]
+        self._env = {
+            "RESEARCH_OS_SESSION_SECRET": "test-signout-revocation-secret",
+            "RESEARCH_OS_V3_DATA_DIR": tempfile.mkdtemp(prefix="research-os-session-test-"),
+        }
+        self._old_env = {key: os.environ.get(key) for key in self._env}
+        os.environ.update(self._env)
+
+        self.api_httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.ResearchOSHandler)
+        self.agent_httpd = ThreadingHTTPServer(("127.0.0.1", 0), agent_server.AgentResearchOSHandler)
+        self.threads = [
+            threading.Thread(target=self.api_httpd.serve_forever, daemon=True),
+            threading.Thread(target=self.agent_httpd.serve_forever, daemon=True),
+        ]
+        for thread in self.threads:
+            thread.start()
 
     def tearDown(self):
-        self.httpd.shutdown()
-        self.thread.join(timeout=2)
-        self.httpd.server_close()
+        for httpd in (self.api_httpd, self.agent_httpd):
+            httpd.shutdown()
+            httpd.server_close()
+        for thread in self.threads:
+            thread.join(timeout=2)
+        for key, value in self._old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
-    def request(self, method, path, token=None):
-        conn = HTTPConnection("127.0.0.1", self.port, timeout=5)
+    @staticmethod
+    def request(httpd, method, path, token=None):
+        host, port = httpd.server_address
+        conn = HTTPConnection(host, port, timeout=5)
         headers = {}
         if token:
             headers["X-Research-OS-Session"] = token
@@ -33,23 +55,29 @@ class SignoutRevocationHttpTests(unittest.TestCase):
         return response.status, body, set_cookie
 
     def test_signout_revokes_session_and_clears_cookie(self):
-        session_a = issue_session("owner-a")
-        session_b = issue_session("owner-b")
+        session_a = issue_session({"sub": "owner-a", "email": "a@example.com"})
+        session_b = issue_session({"sub": "owner-b", "email": "b@example.com"})
+
+        # Establish that both sessions are accepted before signout.
+        status, _, _ = self.request(self.agent_httpd, "GET", "/v1/agents/readiness", session_a)
+        self.assertEqual(status, 200)
+        status, _, _ = self.request(self.agent_httpd, "GET", "/v1/agents/readiness", session_b)
+        self.assertEqual(status, 200)
 
         with patch.object(server.GoogleIdentityBroker, "disconnect", return_value={"disconnected": True}):
             status, _, set_cookie = self.request(
-                "POST", "/v1/auth/google/signout", session_a.token
+                self.api_httpd, "POST", "/v1/auth/google/signout", session_a
             )
 
         self.assertEqual(status, 200)
         self.assertIn("research_os_session=;", set_cookie or "")
 
-        # The canonical protected boundary must reject the revoked token.
-        status, _, _ = self.request("GET", "/v1/agents/readiness", session_a.token)
+        # Canonical protected boundary must reject the revoked session.
+        status, _, _ = self.request(self.agent_httpd, "GET", "/v1/agents/readiness", session_a)
         self.assertEqual(status, 401)
 
-        # A different session must not be revoked as a side effect.
-        status, _, _ = self.request("GET", "/v1/agents/readiness", session_b.token)
+        # Independent session must remain valid.
+        status, _, _ = self.request(self.agent_httpd, "GET", "/v1/agents/readiness", session_b)
         self.assertEqual(status, 200)
 
 
