@@ -12,6 +12,7 @@ from pathlib import Path
 
 import agent_server
 from agent_orchestrator import AgentOrchestrator
+from auth_session import issue_session
 from v2_server import Provenance, V2ResearchOSHandler, WorkspaceKnowledgeEngine
 
 
@@ -19,6 +20,11 @@ class V2CompatibilityTests(unittest.TestCase):
     def setUp(self) -> None:
         self.original = agent_server.ORCHESTRATOR
         self.original_data_dir = os.environ.get("RESEARCH_OS_DATA_DIR")
+        self.previous_secret = os.environ.get("RESEARCH_OS_SESSION_SECRET")
+        os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-only-p0-003-secret"
+        self.session = issue_session(
+            {"sub": "test-user", "email": "test@example.test", "role": "user"}
+        )
         self.temp = tempfile.TemporaryDirectory()
         os.environ["RESEARCH_OS_DATA_DIR"] = self.temp.name
         agent_server.ORCHESTRATOR = AgentOrchestrator(
@@ -38,14 +44,21 @@ class V2CompatibilityTests(unittest.TestCase):
             os.environ.pop("RESEARCH_OS_DATA_DIR", None)
         else:
             os.environ["RESEARCH_OS_DATA_DIR"] = self.original_data_dir
+        if self.previous_secret is None:
+            os.environ.pop("RESEARCH_OS_SESSION_SECRET", None)
+        else:
+            os.environ["RESEARCH_OS_SESSION_SECRET"] = self.previous_secret
         self.temp.cleanup()
 
-    def request(self, path: str, *, method: str = "GET", body=None):
+    def request(self, path: str, *, method: str = "GET", body=None, authenticated: bool = True):
         data = None if body is None else json.dumps(body).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if authenticated:
+            headers["X-Research-OS-Session"] = self.session
         request = urllib.request.Request(
             self.base + path,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method=method,
         )
         try:
