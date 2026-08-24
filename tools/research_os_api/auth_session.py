@@ -13,7 +13,6 @@ import json
 import os
 import re
 import secrets
-import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -99,7 +98,9 @@ class SessionRevocationStore:
         marker.write_text(str(int(time.time())), encoding="utf-8")
 
     def revoke_all(self, user_id: str) -> None:
-        marker = self._scope(user_id) / "all.revoked"
+        directory = self._scope(user_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        marker = directory / "all.revoked"
         marker.write_text(str(int(time.time())), encoding="utf-8")
 
     def is_revoked(self, session_id_value: str, user_id: str, issued_at: int | None = None) -> bool:
