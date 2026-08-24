@@ -25,6 +25,42 @@ class TeamCenter extends StatefulWidget {
   State<TeamCenter> createState() => _TeamCenterState();
 }
 
+class _CreateTeamDialog extends StatefulWidget {
+  const _CreateTeamDialog();
+
+  @override
+  State<_CreateTeamDialog> createState() => _CreateTeamDialogState();
+}
+
+class _CreateTeamDialogState extends State<_CreateTeamDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.of(context).pop(_controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Create New Team'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Team name'),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: <Widget>[
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(onPressed: _submit, child: const Text('Create')),
+      ],
+    );
+  }
+}
+
 class _TeamCenterState extends State<TeamCenter> {
   final List<TeamWorkspace> _teams = <TeamWorkspace>[
     const TeamWorkspace(
@@ -50,30 +86,13 @@ class _TeamCenterState extends State<TeamCenter> {
 
   Future<void> _createTeam() async {
     if (!widget.isOwner) return;
-    final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create New Team'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Team name'),
-          onSubmitted: (_) => Navigator.of(context).pop(controller.text.trim()),
-        ),
-        actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text.trim()), child: const Text('Create')),
-        ],
-      ),
+      builder: (_) => const _CreateTeamDialog(),
     );
-    controller.dispose();
     if (!mounted || name == null || name.trim().isEmpty) return;
 
-    // Do not mutate the TeamCenter render tree in the same frame as the dialog
-    // route is removed. Flutter's semantics pass can otherwise observe dirty
-    // parentData and fail widget tests during pumpAndSettle.
-    await Future<void>.delayed(Duration.zero);
+    await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
     final id = 'team-${DateTime.now().microsecondsSinceEpoch}';
@@ -116,6 +135,8 @@ class _TeamCenterState extends State<TeamCenter> {
                     .toList(),
               ),
             ),
+            const SizedBox(width: 8),
+            Text('Team ID: ${selected.id}'),
             const SizedBox(width: 8),
             Text('Members: ${selected.members.length}'),
             if (widget.isOwner)
