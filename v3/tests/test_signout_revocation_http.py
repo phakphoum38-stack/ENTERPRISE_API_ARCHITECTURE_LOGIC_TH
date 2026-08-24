@@ -4,7 +4,6 @@ import threading
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
-from unittest.mock import patch
 
 from tools.research_os_api import agent_server, server
 from tools.research_os_api.auth_session import issue_session
@@ -64,10 +63,11 @@ class SignoutRevocationHttpTests(unittest.TestCase):
         status, _, _ = self.request(self.agent_httpd, "GET", "/v1/agents/readiness", session_b)
         self.assertEqual(status, 200)
 
-        with patch.object(server.GoogleIdentityBroker, "disconnect", return_value={"disconnected": True}):
-            status, _, set_cookie = self.request(
-                self.api_httpd, "POST", "/v1/auth/google/signout", session_a
-            )
+        # Exercise the real signout path so the test proves the HTTP handler,
+        # session revocation, and cookie clearing work together.
+        status, _, set_cookie = self.request(
+            self.api_httpd, "POST", "/v1/auth/google/signout", session_a
+        )
 
         self.assertEqual(status, 200)
         self.assertIn("research_os_session=;", set_cookie or "")
