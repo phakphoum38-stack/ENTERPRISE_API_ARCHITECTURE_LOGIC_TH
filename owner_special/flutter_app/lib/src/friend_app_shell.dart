@@ -20,7 +20,7 @@ class FriendAppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final safeIndex = index.clamp(0, pages.length - 1);
+    final safeIndex = index.clamp(0, pages.length - 1).toInt();
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
@@ -137,7 +137,7 @@ class _EngineCard extends StatelessWidget {
           : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('6^6 Engine', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 3),
-              Row(children: [Text('READY', style: theme.textTheme.bodySmall?.copyWith(color: semantic.success, fontWeight: FontWeight.w700)), const Spacer(), Text('46,656 logical capacity', style: theme.textTheme.bodySmall)]),
+              Row(children: [Text('READY', style: theme.textTheme.bodySmall?.copyWith(color: semantic.success, fontWeight: FontWeight.w700)), const Spacer(), Expanded(child: Text('46,656 logical capacity', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: theme.textTheme.bodySmall))]),
             ]),
     );
   }
@@ -151,7 +151,6 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -159,7 +158,8 @@ class _Header extends StatelessWidget {
       runSpacing: 12,
       children: [
         if (!compact) teamCenter,
-        Row(mainAxisSize: MainAxisSize.min, children: [status, if (compact) ...[const SizedBox(width: 8), teamCenter]]),
+        status,
+        if (compact) ConstrainedBox(constraints: const BoxConstraints(maxWidth: 220), child: teamCenter),
       ],
     );
   }
