@@ -176,12 +176,15 @@ jobs:
         shell: pwsh
         run: |
           $out = "artifacts-windows"
-          New-Item -ItemType Directory -Force -Path "$out\windows-release" | Out-Null
-          Copy-Item "D:\w\build\windows\x64\runner\Release\*" "$out\windows-release" -Recurse -Force
-          Copy-Item "installer\output\Research-OS-Setup-*-x64.exe" "$out" -Force
+          $release = "$out\windows-release"
+          New-Item -ItemType Directory -Force -Path $release | Out-Null
+          Copy-Item "D:\w\build\windows\x64\runner\Release\*" $release -Recurse -Force
+          $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Setup EXE is missing during artifact staging" }
+          Copy-Item $setup.FullName "$out" -Force
           $zip = Join-Path $PWD "research-os-windows-release-$env:TARGET_SHA.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
-          Compress-Archive -Path "$out\windows-release\*" -DestinationPath $zip -Force
+          Compress-Archive -Path "$release\*", "$out\Research-OS-Setup-*-x64.exe" -DestinationPath $zip -Force
           Copy-Item $zip "$out" -Force
           Get-ChildItem "$out" -Recurse -File | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLowerInvariant())  $($_.Path)" } | Set-Content "$out\SHA256SUMS.txt" -Encoding utf8
       - name: Upload Windows artifacts
