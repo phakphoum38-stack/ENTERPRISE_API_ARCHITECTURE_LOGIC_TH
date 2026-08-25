@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   restore:
-    if: github.event.head_commit.message != 'chore(ui): restore canonical Research OS UI'
+    if: ${{ github.event.head_commit.message != 'chore(ui): restore canonical Research OS UI' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current branch
