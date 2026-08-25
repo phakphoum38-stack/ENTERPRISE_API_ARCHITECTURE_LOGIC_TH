@@ -26,7 +26,9 @@ void main() {
     // Turbo Helpers is enabled by default. Do not tap the chip here because
     // tapping an already-selected FilterChip toggles million-helper mode off.
     await tester.enterText(find.byKey(const Key('friend-input')), 'hello');
-    await tester.tap(find.byKey(const Key('friend-send')));
+    final sendButton = find.byKey(const Key('friend-send'));
+    await tester.ensureVisible(sendButton);
+    await tester.tap(sendButton);
     await tester.pumpAndSettle();
     expect(find.text('friend:hello'), findsOneWidget);
     expect(find.text('Brain scale: fast-1m'), findsOneWidget);
