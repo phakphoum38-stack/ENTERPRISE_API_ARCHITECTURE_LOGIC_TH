@@ -20,18 +20,17 @@ class EnterprisePageHeader extends StatelessWidget {
     final isPhone = media.size.width < 600;
     final keyboardOpen = media.viewInsets.bottom > 0;
 
-    // On a phone with the keyboard open, the header intentionally collapses
-    // so it cannot compete with the active editor/input viewport.
     if (isPhone && keyboardOpen) {
       return const SizedBox.shrink();
     }
 
-    final content = Column(
+    final titleContent = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Text(
           title,
+          softWrap: true,
           style: Theme.of(context)
               .textTheme
               .headlineSmall
@@ -46,37 +45,33 @@ class EnterprisePageHeader extends StatelessWidget {
       ],
     );
 
-    final leading = <Widget>[
-      if (icon != null) ...<Widget>[
-        Container(
-          width: 44,
-          height: 44,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(
-            icon,
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
+    Widget buildIcon() {
+      if (icon == null) return const SizedBox.shrink();
+      return Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(14),
         ),
-        const SizedBox(width: 14),
-      ],
-    ];
+        child: Icon(
+          icon,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
+      );
+    }
 
     if (isPhone) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              ...leading,
-              Expanded(child: content),
-            ],
-          ),
+          if (icon != null) ...<Widget>[
+            buildIcon(),
+            const SizedBox(height: 10),
+          ],
+          titleContent,
           if (actions.isNotEmpty) ...<Widget>[
             const SizedBox(height: 12),
             SizedBox(
@@ -95,8 +90,11 @@ class EnterprisePageHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        ...leading,
-        Expanded(child: content),
+        if (icon != null) ...<Widget>[
+          buildIcon(),
+          const SizedBox(width: 14),
+        ],
+        Expanded(child: titleContent),
         if (actions.isNotEmpty) ...<Widget>[
           const SizedBox(width: 12),
           Flexible(
@@ -139,10 +137,19 @@ class EnterpriseSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    title,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   if (subtitle != null) ...<Widget>[
                     const SizedBox(height: 3),
-                    Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      subtitle!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ],
               ),
@@ -186,7 +193,14 @@ class EnterpriseStatusTile extends StatelessWidget {
                 children: <Widget>[
                   Text(title, style: Theme.of(context).textTheme.labelLarge),
                   const SizedBox(height: 2),
-                  Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    value,
+                    softWrap: true,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   if (caption != null) ...<Widget>[
                     const SizedBox(height: 2),
                     Text(caption!, style: Theme.of(context).textTheme.bodySmall),
