@@ -59,8 +59,8 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final semantic = theme.extension<FriendSemanticColors>()!;
-    final color = connected ? semantic.success : semantic.warning;
+    final semantic = theme.extension<FriendSemanticColors>();
+    final color = connected ? semantic?.success ?? Colors.green : semantic?.warning ?? Colors.orange;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(999)),
@@ -113,8 +113,8 @@ class _DashboardPage extends StatelessWidget {
         final helper = Map<String, dynamic>.from(status['helper_scheduler'] as Map? ?? const <String, dynamic>{});
         final capabilities = (status['capabilities'] as List? ?? const <Object>[]).length;
         return ListView(padding: EdgeInsets.zero, children: [
-          _PageHeader(title: 'Dashboard', subtitle: 'System health, orchestration and evidence at a glance', action: FilledButton.icon(onPressed: () {}, icon: const Icon(Icons.verified_outlined, size: 18), label: const Text('Run 6^6 Audit'))),
-          const SizedBox(height: 24),
+          _PageHeader(title: 'Dashboard', subtitle: 'System health, orchestration and evidence at a glance'),
+          const SizedBox(height: 20),
           LayoutBuilder(builder: (context, constraints) {
             final columns = constraints.maxWidth >= 900 ? 4 : constraints.maxWidth >= 560 ? 2 : 1;
             return GridView.count(
@@ -125,22 +125,26 @@ class _DashboardPage extends StatelessWidget {
               crossAxisSpacing: 16,
               childAspectRatio: columns == 1 ? 4.0 : 1.85,
               children: [
-                _MetricCard(title: 'Brain', value: profiles['6^6']?.toString() ?? '46,656', detail: 'Adaptive orchestration online'),
-                _MetricCard(title: 'Skills', value: '$capabilities', detail: 'Executable capability registry'),
-                _MetricCard(title: 'Tools', value: '16', detail: 'Permission-checked tool bus'),
-                _MetricCard(title: 'Agents', value: '11', detail: 'Specialist agent mesh'),
+                _MetricCard('Brain', profiles['6^6']?.toString() ?? '46,656', 'Adaptive orchestration online'),
+                _MetricCard('Skills', '$capabilities', 'Executable capability registry'),
+                _MetricCard('Tools', '16', 'Permission-checked tool bus'),
+                _MetricCard('Agents', '11', 'Specialist agent mesh'),
               ],
             );
           }),
           const SizedBox(height: 16),
-          LayoutBuilder(builder: (context, constraints) {
-            final split = constraints.maxWidth >= 900;
-            final activity = const _ActivityCard();
-            final health = const _HealthCard();
-            return split ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(flex: 7, child: activity), const SizedBox(width: 16), Expanded(flex: 4, child: health)]) : Column(children: [activity, const SizedBox(height: 16), health]);
-          }),
-          const SizedBox(height: 16),
-          _EvidenceSummaryCard(logicalHelpers: helper['max_logical_helpers']?.toString() ?? '1,000,000'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Recent Evidence', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                const _EvidenceRow('6^6 certification', '36 / 36 passed', '2 min ago'),
+                const _EvidenceRow('Friend response protocol', '30 / 30 passed', '18 min ago'),
+                _EvidenceRow('Helper scheduler', '${helper['max_logical_helpers'] ?? '1,000,000'} logical helpers', 'live'),
+              ]),
+            ),
+          ),
         ]);
       },
     );
@@ -148,7 +152,7 @@ class _DashboardPage extends StatelessWidget {
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.title, required this.value, required this.detail});
+  const _MetricCard(this.title, this.value, this.detail);
   final String title;
   final String value;
   final String detail;
@@ -166,56 +170,6 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    const values = [78.0, 46.0, 88.0, 58.0, 92.0, 66.0, 80.0, 51.0, 96.0, 74.0, 84.0, 63.0];
-    return Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Runtime Activity', style: theme.textTheme.titleMedium),
-      const SizedBox(height: 4),
-      Text('Live orchestration', style: theme.textTheme.bodySmall),
-      const SizedBox(height: 28),
-      SizedBox(height: 150, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [for (final value in values) Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Align(alignment: Alignment.bottomCenter, child: Container(height: value, decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(5))))))])),
-    ])));
-  }
-}
-
-class _HealthCard extends StatelessWidget {
-  const _HealthCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final semantic = theme.extension<FriendSemanticColors>()!;
-    final rows = [('Friend Response', 'Ready', semantic.success), ('Scam Risk Analysis', 'Ready', semantic.success), ('Drive OAuth', 'Required', semantic.warning), ('External Providers', 'Offline', semantic.muted)];
-    return Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('System Health', style: theme.textTheme.titleMedium),
-      const SizedBox(height: 14),
-      for (final row in rows) Padding(padding: const EdgeInsets.symmetric(vertical: 9), child: Row(children: [Expanded(child: Text(row.$1)), Text(row.$2, style: theme.textTheme.bodySmall?.copyWith(color: row.$3, fontWeight: FontWeight.w700))])),
-    ])));
-  }
-}
-
-class _EvidenceSummaryCard extends StatelessWidget {
-  const _EvidenceSummaryCard({required this.logicalHelpers});
-  final String logicalHelpers;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Recent Evidence', style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 12),
-      const _EvidenceRow('6^6 certification', '36 / 36 passed', '2 min ago'),
-      const _EvidenceRow('Friend response protocol', '30 / 30 passed', '18 min ago'),
-      const _EvidenceRow('Scam risk skill', '37 / 37 passed', '31 min ago'),
-      _EvidenceRow('Helper scheduler', '$logicalHelpers logical helpers', 'live'),
-    ])));
-  }
-}
-
 class _EvidenceRow extends StatelessWidget {
   const _EvidenceRow(this.title, this.result, this.time);
   final String title;
@@ -225,7 +179,11 @@ class _EvidenceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 9), child: Row(children: [Expanded(child: Text(title)), Expanded(child: Text(result, style: theme.textTheme.bodySmall)), Text(time, style: theme.textTheme.bodySmall)]));
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(children: [
+      Expanded(child: Text(title)),
+      Expanded(child: Text(result, style: theme.textTheme.bodySmall)),
+      Text(time, style: theme.textTheme.bodySmall),
+    ]));
   }
 }
 
@@ -233,6 +191,7 @@ class _FriendChatPage extends StatefulWidget {
   const _FriendChatPage({required this.api, required this.team});
   final OwnerFriendApi api;
   final TeamRecord team;
+
   @override
   State<_FriendChatPage> createState() => _FriendChatPageState();
 }
@@ -249,17 +208,28 @@ class _FriendChatPageState extends State<_FriendChatPage> {
   String _factory = '-';
 
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _busy) return;
     setState(() => _busy = true);
     try {
-      final response = await widget.api.chat(text, complexity: 6, risk: 3, parallelism: 8, helperBudget: _turboMillion ? 1000000 : 0, requestedSkills: const <String>['analysis', 'planning', 'memory', 'quality']);
-      final decision = Map<String, dynamic>.from(response['decision'] as Map);
+      final response = await widget.api.chat(
+        text,
+        complexity: 6,
+        risk: 3,
+        parallelism: 8,
+        helperBudget: _turboMillion ? 1000000 : 0,
+        requestedSkills: const <String>['analysis', 'planning', 'memory', 'quality'],
+      );
+      final decision = Map<String, dynamic>.from(response['decision'] as Map? ?? const <String, dynamic>{});
       final helpers = Map<String, dynamic>.from(response['helpers'] as Map? ?? const <String, dynamic>{});
-      final factory = Map<String, dynamic>.from(response['factory'] as Map);
+      final factory = Map<String, dynamic>.from(response['factory'] as Map? ?? const <String, dynamic>{});
+      if (!mounted) return;
       setState(() {
         _answer = response['text']?.toString() ?? '';
         _scale = decision['scale']?.toString() ?? '-';
@@ -269,7 +239,7 @@ class _FriendChatPageState extends State<_FriendChatPage> {
         _factory = (factory['stages'] as List? ?? const <Object>[]).join(' → ');
       });
     } catch (error) {
-      setState(() => _answer = 'Friend Service error: $error');
+      if (mounted) setState(() => _answer = 'Friend Service error: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -278,32 +248,36 @@ class _FriendChatPageState extends State<_FriendChatPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final semantic = theme.extension<FriendSemanticColors>()!;
+    final semantic = theme.extension<FriendSemanticColors>();
+    final success = semantic?.success ?? Colors.green;
     return LayoutBuilder(builder: (context, constraints) {
       final compact = constraints.maxWidth < 900;
       final chat = Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [Expanded(child: Text('Friend Chat', style: theme.textTheme.displaySmall)), FilledButton(onPressed: () => setState(() => _answer = 'Friend Runtime พร้อมรับงาน'), child: const Text('New chat'))]),
+        Row(children: [
+          Expanded(child: Text('Friend Chat', style: theme.textTheme.displaySmall)),
+          FilledButton(onPressed: () => setState(() => _answer = 'Friend Runtime พร้อมรับงาน'), child: const Text('New chat')),
+        ]),
         const SizedBox(height: 4),
-        Text('Intent-first • context continuity • action-first', style: theme.textTheme.bodySmall),
-        const SizedBox(height: 20),
+        Text('Team: ${widget.team.name} • Intent-first • context continuity', style: theme.textTheme.bodySmall),
+        const SizedBox(height: 18),
         Expanded(child: Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)), child: ListView(children: [
-          Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(12)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('คุณ'), SizedBox(height: 6), Text('เช็คโปรเจกต์แล้วทำส่วนที่ยังขาดให้ครบ 6^6')]))),
-          const SizedBox(height: 16),
-          Align(alignment: Alignment.centerRight, child: Container(constraints: const BoxConstraints(maxWidth: 620), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.primary.withValues(alpha: .28))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('เพื่อน • Research OS', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            SelectableText(_answer, key: const Key('friend-answer')),
-            const SizedBox(height: 12),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              FilterChip(key: const Key('turbo-million'), selected: _turboMillion, onSelected: (value) => setState(() => _turboMillion = value), label: const Text('Turbo Helpers 1,000,000')),
-              Chip(label: Text('6^6 / $_capacity')),
-              Chip(label: Text('Workers $_activeWorkers')),
-              Chip(label: Text('Batches $_batches')),
-            ]),
-          ]))),
+          const Text('คุณ'),
+          const SizedBox(height: 6),
+          const Text('เช็คโปรเจกต์แล้วทำส่วนที่ยังขาดให้ครบ 6^6'),
+          const SizedBox(height: 18),
+          Text('เพื่อน • Research OS', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SelectableText(_answer, key: const Key('friend-answer')),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            FilterChip(key: const Key('turbo-million'), selected: _turboMillion, onSelected: (value) => setState(() => _turboMillion = value), label: const Text('Turbo Helpers 1,000,000')),
+            Chip(label: Text('6^6 / $_capacity')),
+            Chip(label: Text('Workers $_activeWorkers')),
+            Chip(label: Text('Batches $_batches')),
+          ]),
         ]))),
         const SizedBox(height: 14),
-        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Row(children: [
           Expanded(child: TextField(key: const Key('friend-input'), controller: _controller, onSubmitted: (_) => _send(), decoration: const InputDecoration(hintText: 'พิมพ์ข้อความถึงเพื่อน…'))),
           const SizedBox(width: 10),
           FilledButton.icon(key: const Key('friend-send'), onPressed: _busy ? null : _send, icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.arrow_upward, size: 18), label: const Text('Send')),
@@ -312,24 +286,24 @@ class _FriendChatPageState extends State<_FriendChatPage> {
 
       final contextCard = Card(child: Padding(padding: const EdgeInsets.all(24), child: ListView(children: [
         Text('Context', style: theme.textTheme.titleLarge),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         Text('Current intent', style: theme.textTheme.bodySmall),
         const SizedBox(height: 8),
         const Chip(label: Text('completeness audit')),
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
         Text('Selected agents', style: theme.textTheme.bodySmall),
         const SizedBox(height: 8),
         const Wrap(spacing: 8, runSpacing: 8, children: [Chip(label: Text('Developer')), Chip(label: Text('Research'))]),
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
         Text('Policy', style: theme.textTheme.bodySmall),
         const SizedBox(height: 6),
         const Text('Write actions require confirmation'),
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
         Text('Evidence', style: theme.textTheme.bodySmall),
         const SizedBox(height: 6),
-        Text(_factory == '-' ? 'Latest checks will appear here with time and source references.' : _factory, style: theme.textTheme.bodySmall),
-        const SizedBox(height: 18),
-        Row(children: [Icon(Icons.check_circle_outline, color: semantic.success, size: 18), const SizedBox(width: 8), Text('Brain scale: $_scale')]),
+        Text(_factory == '-' ? 'Latest checks will appear here.' : _factory, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 16),
+        Row(children: [Icon(Icons.check_circle_outline, color: success, size: 18), const SizedBox(width: 8), Text('Brain scale: $_scale')]),
       ])));
 
       return ListView(children: [
@@ -348,26 +322,33 @@ class _CapabilitiesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FriendModuleShell(title: 'Skills & Tools', actions: [FilledButton.icon(onPressed: () {}, icon: const Icon(Icons.add, size: 18), label: const Text('Add skill'))], child: FutureBuilder<Map<String, dynamic>>(
-      future: startup?['status'] is Map ? Future<Map<String, dynamic>>.value(Map<String, dynamic>.from(startup!['status'] as Map)) : api.status(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final status = snapshot.data!;
-        final profiles = Map<String, dynamic>.from(status['brain_profiles'] as Map? ?? const <String, dynamic>{});
-        final helper = Map<String, dynamic>.from(status['helper_scheduler'] as Map? ?? const <String, dynamic>{});
-        final capabilities = (status['capabilities'] as List? ?? const <Object>[]).map((item) => item.toString()).toList();
-        final names = [...capabilities, 'conversation-response', 'scam-risk-analysis', 'coding', 'research', 'documents', 'automation'];
-        return ListView(children: [
-          Text('Executable capabilities, tool permissions and readiness', style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 16),
-          const TextField(decoration: InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search skills, tools or agents…')),
-          const SizedBox(height: 16),
-          for (final name in names.toSet()) Card(child: ListTile(leading: const CircleAvatar(child: Text('S')), title: Text(name), subtitle: Text(name == 'scam-risk-analysis' ? 'Fraud / game integrity' : 'Intent + routing'), trailing: const Chip(label: Text('Ready')))),
-          const SizedBox(height: 12),
-          Card(child: ListTile(title: const Text('Tool Bus'), subtitle: Text('${helper['max_active_workers'] ?? 16} active worker budget • permission checked • local-first'), trailing: FilledButton(onPressed: () {}, child: const Text('Inspect registry')))),
-          if (profiles.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text('Brain profiles: ${profiles.entries.map((e) => '${e.key}=${e.value}').join(' • ')}')),
-        ]);
-      },
+    final future = startup?['status'] is Map
+        ? Future<Map<String, dynamic>>.value(Map<String, dynamic>.from(startup!['status'] as Map))
+        : api.status();
+    return FriendModuleShell(
+      title: 'Skills & Tools',
+      actions: [FilledButton.icon(onPressed: () {}, icon: const Icon(Icons.add, size: 18), label: const Text('Add skill'))],
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: future,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final status = snapshot.data!;
+          final profiles = Map<String, dynamic>.from(status['brain_profiles'] as Map? ?? const <String, dynamic>{});
+          final helper = Map<String, dynamic>.from(status['helper_scheduler'] as Map? ?? const <String, dynamic>{});
+          final capabilities = (status['capabilities'] as List? ?? const <Object>[]).map((item) => item.toString()).toList();
+          final names = <String>{...capabilities, 'conversation-response', 'scam-risk-analysis', 'coding', 'research', 'documents', 'automation'};
+          return ListView(children: [
+            Text('Executable capabilities, tool permissions and readiness', style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 16),
+            const TextField(decoration: InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search skills, tools or agents…')),
+            const SizedBox(height: 16),
+            ...names.map((name) => Card(child: ListTile(leading: const CircleAvatar(child: Text('S')), title: Text(name), subtitle: Text(name == 'scam-risk-analysis' ? 'Fraud / game integrity' : 'Intent + routing'), trailing: const Chip(label: Text('Ready'))))),
+            const SizedBox(height: 12),
+            Card(child: ListTile(title: const Text('Tool Bus'), subtitle: Text('${helper['max_active_workers'] ?? 16} active worker budget • permission checked • local-first'), trailing: FilledButton(onPressed: () {}, child: const Text('Inspect registry')))),
+            if (profiles.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text('Brain profiles: ${profiles.entries.map((e) => '${e.key}=${e.value}').join(' • ')}')),
+          ]);
+        },
+      ),
     );
   }
 }
@@ -382,7 +363,7 @@ class _AgentsPage extends StatelessWidget {
     return ListView(padding: EdgeInsets.zero, children: [
       const _PageHeader(title: 'Agents', subtitle: 'Specialist agent mesh and execution readiness'),
       const SizedBox(height: 20),
-      for (final agent in agents) const Card(child: ListTile(leading: Icon(Icons.smart_toy_outlined), title: Text('Agent'), subtitle: Text('Ready • permission checked • local-first'), trailing: Chip(label: Text('Ready')))),
+      ...agents.map((agent) => Card(child: ListTile(leading: const Icon(Icons.smart_toy_outlined), title: Text(agent), subtitle: const Text('Ready • permission checked • local-first'), trailing: const Chip(label: Text('Ready'))))),
       const SizedBox(height: 16),
       FutureBuilder<Map<String, dynamic>>(future: api.status(), builder: (context, snapshot) => Card(child: ListTile(title: const Text('6^6 orchestration'), subtitle: Text('Logical capacity: ${snapshot.data?['helper_scheduler']?['max_logical_helpers'] ?? '46,656'}'), trailing: const Icon(Icons.check_circle_outline)))),
     ]);
@@ -432,14 +413,15 @@ class _EvidenceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final semantic = Theme.of(context).extension<FriendSemanticColors>()!;
-    return Card(child: ListTile(leading: Icon(Icons.verified_outlined, color: semantic.success), title: Text(title), subtitle: Text(result), trailing: Text(time, style: Theme.of(context).textTheme.bodySmall)));
+    final semantic = Theme.of(context).extension<FriendSemanticColors>();
+    return Card(child: ListTile(leading: Icon(Icons.verified_outlined, color: semantic?.success), title: Text(title), subtitle: Text(result), trailing: Text(time, style: Theme.of(context).textTheme.bodySmall)));
   }
 }
 
 class _ProviderPage extends StatefulWidget {
   const _ProviderPage({required this.api});
   final OwnerFriendApi api;
+
   @override
   State<_ProviderPage> createState() => _ProviderPageState();
 }
@@ -453,36 +435,64 @@ class _ProviderPageState extends State<_ProviderPage> {
   bool _busy = false;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
+
   @override
-  void dispose() { _baseUrl.dispose(); _model.dispose(); _apiKey.dispose(); super.dispose(); }
+  void dispose() {
+    _baseUrl.dispose();
+    _model.dispose();
+    _apiKey.dispose();
+    super.dispose();
+  }
 
   Future<void> _load() async {
     try {
       final status = await widget.api.providerStatus();
       if (!mounted) return;
-      setState(() { _status = status; _baseUrl.text = status['base_url']?.toString() ?? ''; _model.text = status['model']?.toString() ?? ''; });
-    } catch (error) { if (mounted) setState(() => _message = '$error'); }
+      setState(() {
+        _status = status;
+        _baseUrl.text = status['base_url']?.toString() ?? '';
+        _model.text = status['model']?.toString() ?? '';
+      });
+    } catch (error) {
+      if (mounted) setState(() => _message = '$error');
+    }
   }
 
   Future<void> _saveAndTest() async {
     if (_busy) return;
-    setState(() { _busy = true; _message = ''; });
+    setState(() {
+      _busy = true;
+      _message = '';
+    });
     try {
-      final saved = await widget.api.configureProvider(baseUrl: _baseUrl.text.trim(), model: _model.text.trim(), apiKey: _apiKey.text.trim().isEmpty ? null : _apiKey.text.trim());
+      final saved = await widget.api.configureProvider(
+        baseUrl: _baseUrl.text.trim(),
+        model: _model.text.trim(),
+        apiKey: _apiKey.text.trim().isEmpty ? null : _apiKey.text.trim(),
+      );
       _apiKey.clear();
       final tested = await widget.api.testProvider();
       if (!mounted) return;
-      setState(() { _status = saved; _message = tested['connected'] == true ? 'Provider connected' : 'Provider test failed: ${tested['error'] ?? 'unknown'}'; });
-    } catch (error) { if (mounted) setState(() => _message = '$error'); }
-    finally { if (mounted) setState(() => _busy = false); }
+      setState(() {
+        _status = saved;
+        _message = tested['connected'] == true ? 'Provider connected' : 'Provider test failed: ${tested['error'] ?? 'unknown'}';
+      });
+    } catch (error) {
+      if (mounted) setState(() => _message = '$error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final credentialPresent = _status?['credential_present'] == true;
     return ListView(padding: EdgeInsets.zero, children: [
-      _PageHeader(title: 'Settings', subtitle: 'Provider connection and runtime configuration'),
+      const _PageHeader(title: 'Settings', subtitle: 'Provider connection and runtime configuration'),
       const SizedBox(height: 20),
       Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Provider', style: Theme.of(context).textTheme.titleLarge),
@@ -497,7 +507,7 @@ class _ProviderPageState extends State<_ProviderPage> {
         const SizedBox(height: 16),
         FilledButton.icon(key: const Key('provider-save-test'), onPressed: _busy ? null : _saveAndTest, icon: const Icon(Icons.link), label: const Text('Save & Test Connection')),
         if (_message.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 16), child: SelectableText(_message, key: const Key('provider-message'))),
-      ])),
+      ]))),
     ]);
   }
 }
