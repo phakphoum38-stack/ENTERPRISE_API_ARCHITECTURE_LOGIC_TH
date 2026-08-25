@@ -1,0 +1,51 @@
+name: Restore Canonical Research OS UI
+
+on:
+  push:
+    branches:
+      - fix/windows-service-forward-google-oauth
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    if: ${{ github.event.head_commit.message != 'chore(ui): restore canonical Research OS UI' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore canonical Research OS UI files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin 4f4a582d9ef32fd99f323f7171ad0845859db0db --depth=1
+          git checkout 4f4a582d9ef32fd99f323f7171ad0845859db0db -- \
+            apps/research_os_flutter/lib/src/app_shell.dart \
+            apps/research_os_flutter/lib/src/features/chat/chat_page.dart \
+            apps/research_os_flutter/lib/src/ui/enterprise_components.dart \
+            apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart \
+            apps/research_os_flutter/test/desktop_shell_test.dart
+
+      - name: Commit canonical UI restoration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/research_os_flutter/lib/src/app_shell.dart \
+            apps/research_os_flutter/lib/src/features/chat/chat_page.dart \
+            apps/research_os_flutter/lib/src/ui/enterprise_components.dart \
+            apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart \
+            apps/research_os_flutter/test/desktop_shell_test.dart
+          if git diff --cached --quiet; then
+            echo "Canonical UI already present."
+            exit 0
+          fi
+          git commit -m "chore(ui): restore canonical Research OS UI"
+          git push origin HEAD:fix/windows-service-forward-google-oauth
