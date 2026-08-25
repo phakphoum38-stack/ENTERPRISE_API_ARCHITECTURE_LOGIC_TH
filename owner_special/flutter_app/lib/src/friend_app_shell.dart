@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'friend_theme.dart';
+
 class FriendAppShell extends StatelessWidget {
   const FriendAppShell({required this.index, required this.onIndexChanged, required this.pages, required this.teamCenter, required this.status, super.key});
   final int index;
@@ -128,16 +130,21 @@ class _EngineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final semantic = theme.extension<FriendSemanticColors>()!;
+    final semantic = theme.extension<FriendSemanticColors>();
+    final success = semantic?.success ?? Colors.green;
     return Container(
       padding: EdgeInsets.all(compact ? 10 : 16),
       decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(10)),
       child: compact
-          ? Icon(Icons.bolt, color: semantic.success)
+          ? Icon(Icons.bolt, color: success)
           : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('6^6 Engine', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 3),
-              Row(children: [Text('READY', style: theme.textTheme.bodySmall?.copyWith(color: semantic.success, fontWeight: FontWeight.w700)), const Spacer(), Expanded(child: Text('46,656 logical capacity', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: theme.textTheme.bodySmall))]),
+              Row(children: [
+                Text('READY', style: theme.textTheme.bodySmall?.copyWith(color: success, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Expanded(child: Text('46,656 logical capacity', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: theme.textTheme.bodySmall)),
+              ]),
             ]),
     );
   }
