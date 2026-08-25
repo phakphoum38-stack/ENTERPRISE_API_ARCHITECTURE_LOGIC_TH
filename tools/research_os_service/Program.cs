@@ -68,6 +68,22 @@ sealed class ResearchOsApiWorker : BackgroundService
         startInfo.Environment["HOST"] = startInfo.Environment["RESEARCH_OS_API_HOST"]!;
         startInfo.Environment["PORT"] = startInfo.Environment["RESEARCH_OS_API_PORT"]!;
 
+        foreach (var variable in new[]
+        {
+            "RESEARCH_OS_GOOGLE_CLIENT_ID",
+            "RESEARCH_OS_GOOGLE_CLIENT_SECRET",
+            "RESEARCH_OS_GOOGLE_REDIRECT_URI",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+        })
+        {
+            var value = Environment.GetEnvironmentVariable(variable);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                startInfo.Environment[variable] = value;
+            }
+        }
+
         _process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         if (!_process.Start())
         {
