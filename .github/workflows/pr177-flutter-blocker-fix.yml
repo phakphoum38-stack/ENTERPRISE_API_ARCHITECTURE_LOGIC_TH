@@ -1,0 +1,63 @@
+name: PR177 Flutter Blocker Fix
+
+on:
+  push:
+    branches:
+      - fix/windows-service-forward-google-oauth
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ github.event.head_commit.message != 'chore(ci): apply PR177 Flutter blocker fixes' }}
+    runs-on: windows-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply targeted Flutter fixes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = (Get-Location).Path
+          $components = Join-Path $root 'apps/research_os_flutter/lib/src/ui/enterprise_components.dart'
+          $chat = Join-Path $root 'apps/research_os_flutter/lib/src/features/chat/chat_page.dart'
+
+          $text = Get-Content -LiteralPath $components -Raw
+          $old = 'final keyboardOpen = media.viewInsets.bottom > 0;'
+          $new = 'final keyboardOpen = View.of(context).viewInsets.bottom > 0;'
+          if (-not $text.Contains($old)) { throw 'Expected EnterprisePageHeader keyboard expression was not found.' }
+          $text = $text.Replace($old, $new)
+          Set-Content -LiteralPath $components -Value $text -Encoding UTF8
+
+          $chatText = Get-Content -LiteralPath $chat -Raw
+          $oldChat = "label: Text('Memory ${message.memoryCount} รายการ'),"
+          $newChat = "label: Text('ใช้ Memory ${message.memoryCount} รายการ'),"
+          if (-not $chatText.Contains($oldChat)) { throw 'Expected Memory chip label was not found.' }
+          $chatText = $chatText.Replace($oldChat, $newChat)
+          Set-Content -LiteralPath $chat -Value $chatText -Encoding UTF8
+
+          Push-Location 'apps/research_os_flutter'
+          dart format lib test
+          flutter pub get
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter analyze failed after targeted fixes.' }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed after targeted fixes.' }
+          Pop-Location
+
+      - name: Commit fixes and remove temporary fixer
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/research_os_flutter/lib/src/ui/enterprise_components.dart \
+            apps/research_os_flutter/lib/src/features/chat/chat_page.dart
+          git rm .github/workflows/pr177-flutter-blocker-fix.yml
+          git commit -m "chore(ci): apply PR177 Flutter blocker fixes"
+          git push origin HEAD:fix/windows-service-forward-google-oauth
