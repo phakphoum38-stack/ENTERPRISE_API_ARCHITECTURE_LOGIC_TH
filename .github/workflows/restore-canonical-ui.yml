@@ -49,3 +49,6 @@ jobs:
           fi
           git commit -m "chore(ui): restore canonical Research OS UI"
           git push origin HEAD:fix/windows-service-forward-google-oauth
+
+      - name: Report restored files
+        run: git status --short
