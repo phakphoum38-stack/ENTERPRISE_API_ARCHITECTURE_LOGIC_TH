@@ -18,7 +18,10 @@ class EnterprisePageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final isPhone = media.size.width < 600;
-    final keyboardOpen = media.viewInsets.bottom > 0;
+    // Read the platform view directly. A Scaffold may derive a MediaQuery
+    // for its body with consumed viewInsets, which can hide the software
+    // keyboard from descendants even though the FlutterView still reports it.
+    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
 
     if (isPhone && keyboardOpen) {
       return const SizedBox.shrink();
