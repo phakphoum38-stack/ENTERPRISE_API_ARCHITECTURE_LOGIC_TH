@@ -31,6 +31,13 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
       _getJson('/v1/knowledge/graph');
 
+  Future<Map<String, dynamic>> getBrainCapacity() =>
+      _getJson('/v1/brain/capacity');
+  Future<Map<String, dynamic>> getBrainSkills() =>
+      _getJson('/v1/brain/skills');
+  Future<Map<String, dynamic>> getBrainProviders() =>
+      _getJson('/v1/brain/providers');
+
   Future<Map<String, dynamic>> getGoogleIdentityStatus() =>
       _getJson('/v1/auth/google/status');
   Future<Map<String, dynamic>> startGoogleIdentitySignIn() =>

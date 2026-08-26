@@ -135,6 +135,12 @@ jobs:
         run: |
           dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o tools/research_os_service/publish
           if (-not (Test-Path "tools\research_os_service\publish\ResearchOS.ServiceHost.exe")) { throw "ServiceHost executable is missing" }
+      - name: Publish Owner Friend ServiceHost
+        working-directory: src
+        shell: pwsh
+        run: |
+          dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish
+          if (-not (Test-Path "owner_special\windows_service\publish\ResearchOS.Owner.ServiceHost.exe")) { throw "Owner Friend ServiceHost executable is missing" }
       - name: Stage installer package
         working-directory: src
         shell: pwsh
@@ -154,10 +160,18 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$package\scripts" | Out-Null
           Copy-Item "scripts\*research-os*.ps1" "$package\scripts" -Force
           Copy-Item "scripts\v2-data-preservation.ps1" "$package\scripts" -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path "$package\owner_special\scripts" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$package\owner_special\research_os_friend" | Out-Null
+          Copy-Item "owner_special\scripts\*" "$package\owner_special\scripts" -Recurse -Force
+          Copy-Item "owner_special\research_os_friend\*" "$package\owner_special\research_os_friend" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "$package\service_host" | Out-Null
+          Copy-Item "owner_special\windows_service\publish\*" "$package\service_host" -Recurse -Force
           $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim()
           New-Item -ItemType Directory -Force -Path "$package\runtime\python" | Out-Null
           Copy-Item "$pythonRoot\*" "$package\runtime\python" -Recurse -Force
           if (-not (Test-Path "$package\runtime\python\python.exe")) { throw "Bundled Python runtime missing" }
+          if (-not (Test-Path "$package\owner_special\scripts\install-owner-service.ps1")) { throw "Owner Friend installer script missing" }
+          if (-not (Test-Path "$package\service_host\ResearchOS.Owner.ServiceHost.exe")) { throw "Owner Friend ServiceHost missing" }
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
