@@ -1,0 +1,107 @@
+name: Continuous Generated Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: continuous-generated-release-main
+  cancel-in-progress: true
+
+jobs:
+  dispatch-windows-build:
+    name: Generate current Windows release
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout main source of truth
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Generate build manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/manifest
+          cat > build/manifest/build-info.json <<EOF
+          {
+            "repository": "${GITHUB_REPOSITORY}",
+            "source_branch": "main",
+            "source_commit": "$(git rev-parse HEAD)",
+            "trigger": "${GITHUB_EVENT_NAME}",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "windows_workflow": "research-os-windows-artifact.yml",
+            "release_policy": "build-from-current-main"
+          }
+          EOF
+          cat build/manifest/build-info.json
+
+      - name: Upload source manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: continuous-build-manifest-${{ github.sha }}
+          path: build/manifest/build-info.json
+
+      - name: Dispatch Windows artifact workflow from main
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          started_epoch="$(date +%s)"
+          echo "started_epoch=$started_epoch" >> "$GITHUB_OUTPUT"
+          gh workflow run research-os-windows-artifact.yml --repo "$GITHUB_REPOSITORY" --ref main
+          echo "Windows workflow dispatched from main."
+
+      - name: Wait for Windows build result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STARTED_EPOCH: ${{ steps.dispatch.outputs.started_epoch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow="research-os-windows-artifact.yml"
+          for attempt in $(seq 1 90); do
+            run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --branch main --event workflow_dispatch --limit 20 --json databaseId,status,conclusion,createdAt --jq 'map(select((.createdAt|fromdateiso8601) >= ('"$STARTED_EPOCH"' - 30))) | sort_by(.createdAt) | last')"
+            if [[ -n "$run" && "$run" != "null" ]]; then
+              id="$(jq -r '.databaseId' <<< "$run")"
+              status="$(jq -r '.status' <<< "$run")"
+              conclusion="$(jq -r '.conclusion // ""' <<< "$run")"
+              echo "Windows run=$id status=$status conclusion=$conclusion"
+              if [[ "$status" == "completed" ]]; then
+                if [[ "$conclusion" != "success" ]]; then
+                  echo "Windows artifact build failed: $id"
+                  exit 1
+                fi
+                echo "Windows artifact build passed: $id"
+                echo "windows_run_id=$id" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            sleep 30
+          done
+          echo "Timed out waiting for Windows artifact workflow."
+          exit 1
+
+  nightly-source-check:
+    name: Scheduled source freshness check
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify main exists
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Report source revision
+        run: git log -1 --format='%H %cI %s'
