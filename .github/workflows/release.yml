@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       candidate_run_id:
-        description: Successful Research OS Candidate workflow run ID
+        description: Successful Research OS V3 Candidate workflow run ID
         required: true
         type: string
       tag_name:
@@ -51,7 +51,7 @@ jobs:
           status="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json status --jq '.status')"
           conclusion="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
           head_sha="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
-          test "$workflow" = "Research OS Candidate"
+          test "$workflow" = "Research OS V3 Candidate"
           test "$status" = "completed"
           test "$conclusion" = "success"
           test "$head_sha" = "$TARGET_SHA"
@@ -64,7 +64,7 @@ jobs:
           mkdir -p release-input
           gh run download "$CANDIDATE_RUN_ID" \
             --repo "${{ github.repository }}" \
-            --name "research-os-verified-candidate-$TARGET_SHA" \
+            --name "research-os-v3-verified-candidate-$TARGET_SHA" \
             --dir release-input
 
       - name: Verify exact SHA and digest
@@ -77,12 +77,10 @@ jobs:
           manifest = json.loads(Path("release-input/candidate-manifest.json").read_text(encoding="utf-8-sig"))
           assert manifest["target_sha"] == os.environ["TARGET_SHA"]
           assert manifest["validation"] == "passed"
-          item = manifest["artifact"]
-          setup = Path("release-input") / item["name"]
+          item = manifest["installer"]
+          setup = Path("release-input") / item["filename"]
           actual = hashlib.sha256(setup.read_bytes()).hexdigest()
           assert actual == item["sha256"], (actual, item["sha256"])
-          assert manifest["release_created"] is False
-          assert manifest["tag_created"] is False
           print("Candidate SHA and digest verified.")
           PY
 
@@ -105,7 +103,7 @@ jobs:
           if [ -z "$tag" ]; then
             tag="research-os-${TARGET_SHA:0:12}"
           fi
-          setup="$(find release-input -maxdepth 1 -name 'Research-OS-Setup-*-x64.exe' -print -quit)"
+          setup="$(find release-input -maxdepth 1 -name 'Research-OS-V3-Setup-*-x64.exe' -print -quit)"
           test -n "$setup"
           gh release create "$tag" "$setup" release-input/SHA256SUMS.txt release-input/candidate-manifest.json \
             --repo "${{ github.repository }}" \
