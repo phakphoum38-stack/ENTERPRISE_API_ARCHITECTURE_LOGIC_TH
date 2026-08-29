@@ -19,7 +19,7 @@ jobs:
   dispatch-windows-build:
     name: Generate current Windows release
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     steps:
       - name: Checkout main source of truth
         uses: actions/checkout@v4
@@ -40,7 +40,8 @@ jobs:
             "trigger": "${GITHUB_EVENT_NAME}",
             "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "windows_workflow": "research-os-windows-artifact.yml",
-            "release_policy": "build-from-current-main"
+            "release_policy": "build-from-current-main",
+            "artifact_policy": "complete-windows-friend-package-required"
           }
           EOF
           cat build/manifest/build-info.json
@@ -50,6 +51,8 @@ jobs:
         with:
           name: continuous-build-manifest-${{ github.sha }}
           path: build/manifest/build-info.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Dispatch Windows artifact workflow from main
         id: dispatch
@@ -64,6 +67,7 @@ jobs:
           echo "Windows workflow dispatched from main."
 
       - name: Wait for Windows build result
+        id: wait_windows
         env:
           GH_TOKEN: ${{ github.token }}
           STARTED_EPOCH: ${{ steps.dispatch.outputs.started_epoch }}
@@ -83,8 +87,8 @@ jobs:
                   echo "Windows artifact build failed: $id"
                   exit 1
                 fi
-                echo "Windows artifact build passed: $id"
                 echo "windows_run_id=$id" >> "$GITHUB_OUTPUT"
+                echo "Windows artifact build passed: $id"
                 exit 0
               fi
             fi
@@ -92,6 +96,39 @@ jobs:
           done
           echo "Timed out waiting for Windows artifact workflow."
           exit 1
+
+      - name: Verify complete Windows artifact exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINDOWS_RUN_ID: ${{ steps.wait_windows.outputs.windows_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$WINDOWS_RUN_ID" ]]; then
+            echo "Missing Windows run id from completed build."
+            exit 1
+          fi
+
+          artifacts="$(gh run view "$WINDOWS_RUN_ID" --repo "$GITHUB_REPOSITORY" --json artifacts --jq '.artifacts')"
+          echo "$artifacts" | jq -r '.[] | [.name, .sizeInBytes, .expired] | @tsv'
+
+          expected="Research-OS-Windows-x64-Friend-Complete-${GITHUB_SHA}"
+          match="$(jq -r --arg expected "$expected" 'map(select(.name == $expected and .expired == false)) | length' <<< "$artifacts")"
+          if [[ "$match" != "1" ]]; then
+            echo "Required complete Windows artifact not found: $expected"
+            echo "Artifacts returned by Windows run:"
+            echo "$artifacts" | jq -r '.[].name'
+            exit 1
+          fi
+
+          size="$(jq -r --arg expected "$expected" '.[] | select(.name == $expected) | .sizeInBytes' <<< "$artifacts")"
+          if [[ "$size" -le 0 ]]; then
+            echo "Required Windows artifact is empty: $expected"
+            exit 1
+          fi
+          echo "COMPLETE_WINDOWS_ARTIFACT=PASS"
+          echo "artifact=$expected"
+          echo "size_bytes=$size"
 
   nightly-source-check:
     name: Scheduled source freshness check
