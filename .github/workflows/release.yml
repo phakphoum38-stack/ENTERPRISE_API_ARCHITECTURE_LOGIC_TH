@@ -94,7 +94,7 @@ jobs:
           echo "Conclusion: $conclusion"
           echo "Head SHA: $head_sha"
 
-          test "$workflow" = "Research OS V3 Candidate"
+          test "$workflow" = "Research OS Candidate"
           test "$status" = "completed"
           test "$conclusion" = "success"
           test "$head_sha" = "$TARGET_SHA"
