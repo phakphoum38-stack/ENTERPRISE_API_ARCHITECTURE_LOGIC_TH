@@ -7,14 +7,17 @@ on:
         description: Exact candidate commit SHA
         required: true
         type: string
+
       candidate_run_id:
         description: Successful Research OS V3 Candidate workflow run ID
         required: true
         type: string
+
       tag_name:
         description: Release tag, for example v3.0.0
         required: false
         type: string
+
       publish:
         description: Actually create a GitHub Release and tag
         required: false
@@ -31,82 +34,319 @@ concurrency:
 
 jobs:
   release:
+    name: Verify and publish Research OS V3 release
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+
     env:
       TARGET_SHA: ${{ inputs.target_sha }}
       CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+
     steps:
-      - name: Checkout exact candidate
+      - name: Checkout exact candidate commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.TARGET_SHA }}
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 1
 
-      - name: Verify candidate run lineage
+      - name: Validate candidate workflow run
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          workflow="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
-          status="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json status --jq '.status')"
-          conclusion="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
-          head_sha="$(gh run view "$CANDIDATE_RUN_ID" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+          set -euo pipefail
+
+          test -n "$TARGET_SHA"
+          test -n "$CANDIDATE_RUN_ID"
+
+          echo "Target SHA: $TARGET_SHA"
+          echo "Candidate run ID: $CANDIDATE_RUN_ID"
+
+          workflow="$(
+            gh run view "$CANDIDATE_RUN_ID" \
+              --repo "${{ github.repository }}" \
+              --json workflowName \
+              --jq '.workflowName'
+          )"
+
+          status="$(
+            gh run view "$CANDIDATE_RUN_ID" \
+              --repo "${{ github.repository }}" \
+              --json status \
+              --jq '.status'
+          )"
+
+          conclusion="$(
+            gh run view "$CANDIDATE_RUN_ID" \
+              --repo "${{ github.repository }}" \
+              --json conclusion \
+              --jq '.conclusion'
+          )"
+
+          head_sha="$(
+            gh run view "$CANDIDATE_RUN_ID" \
+              --repo "${{ github.repository }}" \
+              --json headSha \
+              --jq '.headSha'
+          )"
+
+          echo "Workflow: $workflow"
+          echo "Status: $status"
+          echo "Conclusion: $conclusion"
+          echo "Head SHA: $head_sha"
+
           test "$workflow" = "Research OS V3 Candidate"
           test "$status" = "completed"
           test "$conclusion" = "success"
           test "$head_sha" = "$TARGET_SHA"
 
-      - name: Download verified candidate
+          echo "Candidate workflow validation passed."
+
+      - name: Download verified V3 candidate
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
+          rm -rf release-input release-normalized
+
           mkdir -p release-input
+          mkdir -p release-normalized
+
           gh run download "$CANDIDATE_RUN_ID" \
             --repo "${{ github.repository }}" \
             --name "research-os-v3-verified-candidate-$TARGET_SHA" \
             --dir release-input
 
-      - name: Verify exact SHA and digest
+          echo "=== Downloaded artifact ==="
+          find release-input \
+            -type f \
+            -print \
+            | sort
+
+      - name: Normalize V3 candidate artifact layout
         shell: bash
         run: |
-          python - <<'PY'
-          import hashlib, json, os
+          set -euo pipefail
+
+          manifest="$(
+            find release-input \
+              -type f \
+              -name 'candidate-manifest.json' \
+              -print \
+              -quit
+          )"
+
+          checksums="$(
+            find release-input \
+              -type f \
+              -name 'SHA256SUMS.txt' \
+              -print \
+              -quit
+          )"
+
+          setup="$(
+            find release-input \
+              -type f \
+              -name 'Research-OS-V3-Setup-*-x64.exe' \
+              -print \
+              -quit
+          )"
+
+          test -n "$manifest"
+          test -n "$checksums"
+          test -n "$setup"
+
+          cp "$manifest" \
+            release-normalized/candidate-manifest.json
+
+          cp "$checksums" \
+            release-normalized/SHA256SUMS.txt
+
+          cp "$setup" \
+            release-normalized/
+
+          echo "=== Normalized candidate ==="
+
+          find release-normalized \
+            -maxdepth 1 \
+            -type f \
+            -print \
+            | sort
+
+      - name: Verify V3 candidate manifest and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
           from pathlib import Path
 
-          manifest = json.loads(Path("release-input/candidate-manifest.json").read_text(encoding="utf-8-sig"))
-          assert manifest["target_sha"] == os.environ["TARGET_SHA"]
+          root = Path("release-normalized")
+
+          manifest_path = root / "candidate-manifest.json"
+          checksum_path = root / "SHA256SUMS.txt"
+
+          assert manifest_path.is_file(), manifest_path
+          assert checksum_path.is_file(), checksum_path
+
+          manifest = json.loads(
+              manifest_path.read_text(
+                  encoding="utf-8-sig"
+              )
+          )
+
+          target_sha = os.environ["TARGET_SHA"]
+
+          assert manifest["target_sha"] == target_sha, (
+              manifest["target_sha"],
+              target_sha,
+          )
+
           assert manifest["validation"] == "passed"
-          item = manifest["installer"]
-          setup = Path("release-input") / item["filename"]
-          actual = hashlib.sha256(setup.read_bytes()).hexdigest()
-          assert actual == item["sha256"], (actual, item["sha256"])
+
+          installer = manifest["installer"]
+
+          filename = installer["filename"]
+          expected_sha256 = installer["sha256"]
+
+          setup = root / filename
+
+          assert setup.is_file(), (
+              f"Installer not found: {setup}"
+          )
+
+          actual_sha256 = hashlib.sha256(
+              setup.read_bytes()
+          ).hexdigest()
+
+          assert actual_sha256 == expected_sha256, (
+              actual_sha256,
+              expected_sha256,
+          )
+
+          print(f"Manifest: {manifest_path}")
+          print(f"Installer: {setup}")
+          print(f"SHA256: {actual_sha256}")
           print("Candidate SHA and digest verified.")
           PY
+
+      - name: Verify SHA256SUMS evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd release-normalized
+
+          test -f candidate-manifest.json
+          test -f SHA256SUMS.txt
+
+          installer="$(
+            find . \
+              -maxdepth 1 \
+              -type f \
+              -name 'Research-OS-V3-Setup-*-x64.exe' \
+              -print \
+              -quit
+          )"
+
+          test -n "$installer"
+
+          expected="$(
+            awk -v file="$(basename "$installer")" \
+              '$2 == file || $2 == "*" file {print $1; exit}' \
+              SHA256SUMS.txt
+          )"
+
+          test -n "$expected"
+
+          actual="$(
+            sha256sum "$installer" \
+              | awk '{print $1}'
+          )"
+
+          test "$actual" = "$expected"
+
+          echo "SHA256SUMS evidence verified."
 
       - name: Upload release-ready artifact
         uses: actions/upload-artifact@v4
         with:
           name: research-os-release-ready-${{ env.TARGET_SHA }}
-          path: release-input/**
+          path: release-normalized/**
           if-no-files-found: error
           retention-days: 30
+
+      - name: Validate release metadata
+        if: ${{ inputs.publish == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${{ inputs.tag_name }}"
+
+          if [ -z "$tag" ]; then
+            tag="research-os-${TARGET_SHA:0:12}"
+          fi
+
+          echo "Release tag: $tag"
+
+          case "$tag" in
+            refs/*)
+              echo "Invalid release tag: $tag"
+              exit 1
+              ;;
+          esac
+
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
 
       - name: Create GitHub Release
         if: ${{ inputs.publish == true }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUESTED_TAG: ${{ inputs.tag_name }}
         run: |
-          tag="$REQUESTED_TAG"
-          if [ -z "$tag" ]; then
-            tag="research-os-${TARGET_SHA:0:12}"
-          fi
-          setup="$(find release-input -maxdepth 1 -name 'Research-OS-V3-Setup-*-x64.exe' -print -quit)"
+          set -euo pipefail
+
+          setup="$(
+            find release-normalized \
+              -maxdepth 1 \
+              -type f \
+              -name 'Research-OS-V3-Setup-*-x64.exe' \
+              -print \
+              -quit
+          )"
+
           test -n "$setup"
-          gh release create "$tag" "$setup" release-input/SHA256SUMS.txt release-input/candidate-manifest.json \
+
+          test -f release-normalized/SHA256SUMS.txt
+          test -f release-normalized/candidate-manifest.json
+
+          gh release create "$RELEASE_TAG" \
+            "$setup" \
+            release-normalized/SHA256SUMS.txt \
+            release-normalized/candidate-manifest.json \
             --repo "${{ github.repository }}" \
             --target "$TARGET_SHA" \
-            --title "Research OS $tag" \
-            --notes "Verified Research OS candidate $TARGET_SHA"
+            --title "Research OS $RELEASE_TAG" \
+            --notes "Verified Research OS V3 candidate $TARGET_SHA"
+
+      - name: Release summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Research OS Release"
+            echo
+            echo "- Target SHA: \`$TARGET_SHA\`"
+            echo "- Candidate run: \`$CANDIDATE_RUN_ID\`"
+            echo "- Publish requested: \`${{ inputs.publish }}\`"
+            if [ -n "${RELEASE_TAG:-}" ]; then
+              echo "- Release tag: \`$RELEASE_TAG\`"
+            fi
+            echo
+            echo "V3 candidate artifact was verified against its manifest SHA256."
+          } >> "$GITHUB_STEP_SUMMARY"
