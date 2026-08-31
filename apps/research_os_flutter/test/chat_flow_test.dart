@@ -54,7 +54,7 @@ void main() {
     expect(composer, findsOneWidget);
 
     await tester.enterText(composer, 'สวัสดีเพื่อน ทดสอบแชทตัวเอง');
-    await tester.tap(find.byTooltip('ส่ง'));
+    await tester.tap(find.byKey(const Key('chat-send-button')));
     await tester.pumpAndSettle();
 
     expect(find.text('สวัสดีเพื่อน ทดสอบแชทตัวเอง'), findsWidgets);
@@ -66,7 +66,7 @@ void main() {
     expect(apiClient.questions.first, 'สวัสดีเพื่อน ทดสอบแชทตัวเอง');
 
     await tester.enterText(composer, 'จำคำตอบรอบแรกได้ไหม');
-    await tester.tap(find.byTooltip('ส่ง'));
+    await tester.tap(find.byKey(const Key('chat-send-button')));
     await tester.pumpAndSettle();
 
     expect(
