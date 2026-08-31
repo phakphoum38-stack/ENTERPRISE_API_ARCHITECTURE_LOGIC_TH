@@ -662,9 +662,10 @@ class _Composer extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             IconButton.filled(
+              key: const Key('chat-send-button'),
               tooltip: 'ส่ง',
               onPressed: sending || loading ? null : onSend,
-              icon: sending
+                icon: sending
                   ? const SizedBox(
                       width: 20,
                       height: 20,
