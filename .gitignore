@@ -228,3 +228,22 @@ __marimo__/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Flutter generated/build artifacts
+**/.dart_tool/
+**/build/
+**/ephemeral/
+**/windows_service/obj/
+**/windows_service/bin/
+**/obj/
+**/bin/
+
+# Flutter generated metadata
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
