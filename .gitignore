@@ -368,3 +368,6 @@ htmlcov/
 .env.*
 !.env.example
 !.env.template
+
+# Research OS Owner Special installer staging output
+owner_special/installer/package/

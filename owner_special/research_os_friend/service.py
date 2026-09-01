@@ -105,12 +105,12 @@ class OwnerFriendService:
                 path = urlparse(self.path).path
                 try:
                     if path == "/owner/health":
-                        self._send_json(200, {"status": "ok", "edition": "owner-special", "version": "1.3.0-owner", "loopback_only": True})
+                        self._send_json(200, {"status": "ok", "edition": "owner-special", "version": "1.3.1-owner", "loopback_only": True})
                         return
                     owner_id, profile_id, session_id = self._scope()
                     if path == "/owner/status":
                         architecture = service.runtime.architecture()
-                        architecture.update({"service": "owner-friend", "version": "1.3.0-owner", "profile_id": profile_id, "session_id": session_id})
+                        architecture.update({"service": "owner-friend", "version": "1.3.1-owner", "profile_id": profile_id, "session_id": session_id})
                         self._send_json(200, architecture)
                         return
                     if path == "/owner/provider":
