@@ -34,18 +34,13 @@ void main() {
     final inspector = find.byKey(const Key('friend-workspace-context-inspector'));
     expect(inspector, findsOneWidget);
 
-    final inspectorScrollable = find.ancestor(
-      of: inspector,
-      matching: find.byType(Scrollable),
-    );
-    expect(inspectorScrollable, findsOneWidget);
-
+    // Keep the assertion resilient to Flutter's internal scrollable widget tree.
+    // Drag the inspector itself until the runtime status is built into the viewport.
     final orchestrator = find.textContaining('ORCHESTRATOR');
-    await tester.scrollUntilVisible(
-      orchestrator,
-      400,
-      scrollable: inspectorScrollable,
-    );
+    for (var attempt = 0; attempt < 6 && orchestrator.evaluate().isEmpty; attempt++) {
+      await tester.drag(inspector, const Offset(0, -300));
+      await tester.pumpAndSettle();
+    }
 
     expect(orchestrator, findsOneWidget);
     expect(find.text('Runtime capacity not loaded'), findsOneWidget);
