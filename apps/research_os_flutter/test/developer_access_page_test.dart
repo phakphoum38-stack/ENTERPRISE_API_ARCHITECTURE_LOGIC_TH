@@ -8,7 +8,8 @@ import 'package:research_os_flutter/src/api/developer_access_api_client.dart';
 import 'package:research_os_flutter/src/features/developer_access/developer_access_page.dart';
 
 void main() {
-  testWidgets('owner inbox shows pending requests and active grants', (tester) async {
+  testWidgets('owner inbox shows pending requests and active grants',
+      (tester) async {
     final client = MockClient((request) async {
       if (request.url.path == '/v2/developer/session') {
         return http.Response(
@@ -89,7 +90,8 @@ void main() {
     expect(find.text('Revoke'), findsOneWidget);
   });
 
-  testWidgets('owner inbox degrades safely when developer API is offline', (tester) async {
+  testWidgets('owner inbox degrades safely when developer API is offline',
+      (tester) async {
     final client = MockClient((request) async {
       throw http.ClientException('offline');
     });
@@ -107,6 +109,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('ต้องลงชื่อเข้าใช้ในฐานะเจ้าของไฟล์'), findsOneWidget);
-    expect(find.textContaining('เชื่อม Developer API ไม่สำเร็จ'), findsOneWidget);
+    expect(
+        find.textContaining('เชื่อม Developer API ไม่สำเร็จ'), findsOneWidget);
   });
 }

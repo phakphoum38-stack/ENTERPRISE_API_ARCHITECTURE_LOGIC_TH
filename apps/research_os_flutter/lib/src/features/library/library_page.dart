@@ -93,7 +93,8 @@ class _LibraryPageState extends State<LibraryPage> {
           _PageHeading(
             icon: Icons.local_library_outlined,
             title: 'Knowledge Library',
-            subtitle: 'ค้นหาและเปิดดู Research Artifacts และ Memory จากศูนย์กลางเดียว',
+            subtitle:
+                'ค้นหาและเปิดดู Research Artifacts และ Memory จากศูนย์กลางเดียว',
             action: IconButton(
               tooltip: 'Refresh',
               onPressed: _loading ? null : _loadArtifacts,
@@ -107,7 +108,8 @@ class _LibraryPageState extends State<LibraryPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text('Search knowledge', style: Theme.of(context).textTheme.titleMedium),
+                  Text('Search knowledge',
+                      style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
                   SearchBar(
                     controller: _searchController,
@@ -141,7 +143,8 @@ class _LibraryPageState extends State<LibraryPage> {
           Row(
             children: <Widget>[
               Expanded(
-                child: Text('Knowledge results', style: Theme.of(context).textTheme.titleLarge),
+                child: Text('Knowledge results',
+                    style: Theme.of(context).textTheme.titleLarge),
               ),
               Chip(label: Text('${_items.length} items')),
             ],
@@ -154,7 +157,8 @@ class _LibraryPageState extends State<LibraryPage> {
                 leading: const Icon(Icons.error_outline),
                 title: const Text('โหลด Knowledge ไม่สำเร็จ'),
                 subtitle: Text(_error!),
-                trailing: IconButton(onPressed: _loadArtifacts, icon: const Icon(Icons.refresh)),
+                trailing: IconButton(
+                    onPressed: _loadArtifacts, icon: const Icon(Icons.refresh)),
               ),
             ),
           if (!_loading && _error == null && _items.isEmpty)
@@ -178,7 +182,11 @@ class _LibraryPageState extends State<LibraryPage> {
 }
 
 class _PageHeading extends StatelessWidget {
-  const _PageHeading({required this.icon, required this.title, required this.subtitle, required this.action});
+  const _PageHeading(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.action});
   final IconData icon;
   final String title;
   final String subtitle;
@@ -224,7 +232,9 @@ class _ArtifactCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final artifact = item['artifact'];
     final source = artifact is Map<String, dynamic> ? artifact : item;
-    final title = source['title']?.toString() ?? source['artifact_id']?.toString() ?? 'Untitled artifact';
+    final title = source['title']?.toString() ??
+        source['artifact_id']?.toString() ??
+        'Untitled artifact';
     final status = source['status']?.toString() ?? 'unknown';
     final path = source['path']?.toString() ?? '';
     final excerpt = item['excerpt']?.toString();
@@ -244,11 +254,14 @@ class _ArtifactCard extends StatelessWidget {
                 children: <Widget>[
                   Row(
                     children: <Widget>[
-                      Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
+                      Expanded(
+                          child: Text(title,
+                              style: Theme.of(context).textTheme.titleMedium)),
                       Chip(label: Text(status)),
                     ],
                   ),
-                  if (path.isNotEmpty) Text(path, style: Theme.of(context).textTheme.bodySmall),
+                  if (path.isNotEmpty)
+                    Text(path, style: Theme.of(context).textTheme.bodySmall),
                   if (excerpt != null && excerpt.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 8),
                     Text(excerpt, maxLines: 3, overflow: TextOverflow.ellipsis),

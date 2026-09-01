@@ -2,7 +2,8 @@ import 'local_api_types.dart';
 
 const bool supported = false;
 
-Future<LocalApiCommandResult> _unsupported() async => const LocalApiCommandResult(
+Future<LocalApiCommandResult> _unsupported() async =>
+    const LocalApiCommandResult(
       ok: false,
       message: 'Local API Control รองรับเฉพาะ Windows Desktop',
     );

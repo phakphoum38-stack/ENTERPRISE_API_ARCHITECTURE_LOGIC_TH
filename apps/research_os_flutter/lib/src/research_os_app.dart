@@ -59,17 +59,15 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: dark
-          ? const Color(0xFF0C1015)
-          : const Color(0xFFF3F6FA),
+      scaffoldBackgroundColor:
+          dark ? const Color(0xFF0C1015) : const Color(0xFFF3F6FA),
       dividerColor: borderColor,
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        backgroundColor: dark
-            ? const Color(0xFF101419)
-            : const Color(0xFFFDFEFF),
+        backgroundColor:
+            dark ? const Color(0xFF101419) : const Color(0xFFFDFEFF),
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
           color: scheme.onSurface,
@@ -90,7 +88,8 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: dark ? const Color(0xFF151A21) : Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: borderColor),
@@ -107,13 +106,15 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           side: BorderSide(color: borderColor),
         ),
       ),

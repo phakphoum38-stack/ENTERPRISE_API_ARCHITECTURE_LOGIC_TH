@@ -36,7 +36,8 @@ class FakeSystemMonitorApiClient extends ResearchOSApiClient {
 }
 
 void main() {
-  testWidgets('system monitor shows service health and workflow', (tester) async {
+  testWidgets('system monitor shows service health and workflow',
+      (tester) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);

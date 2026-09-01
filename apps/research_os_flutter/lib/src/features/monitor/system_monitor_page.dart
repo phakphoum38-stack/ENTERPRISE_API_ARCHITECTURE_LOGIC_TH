@@ -64,7 +64,8 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
 
     final stopwatch = Stopwatch()..start();
     try {
-      final results = await Future.wait<Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
+      final results = await Future.wait<
+          Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
         widget.apiClient.getHealth(),
         widget.apiClient.getProviders(),
         widget.apiClient.getGitHubDashboard(),
@@ -95,9 +96,10 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
   @override
   Widget build(BuildContext context) {
     final workflows = _github['workflow_runs'];
-    final latestWorkflow = workflows is List && workflows.isNotEmpty && workflows.first is Map
-        ? Map<String, dynamic>.from(workflows.first as Map)
-        : const <String, dynamic>{};
+    final latestWorkflow =
+        workflows is List && workflows.isNotEmpty && workflows.first is Map
+            ? Map<String, dynamic>.from(workflows.first as Map)
+            : const <String, dynamic>{};
 
     return Scaffold(
       appBar: AppBar(
@@ -113,16 +115,20 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: <Widget>[
-          Text('ศูนย์ตรวจสอบระบบ', style: Theme.of(context).textTheme.headlineMedium),
+          Text('ศูนย์ตรวจสอบระบบ',
+              style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
-          const Text('ตรวจ API, Provider, Memory, GitHub Actions และเวลาตอบสนองจากจุดเดียว'),
+          const Text(
+              'ตรวจ API, Provider, Memory, GitHub Actions และเวลาตอบสนองจากจุดเดียว'),
           const SizedBox(height: 12),
           Card(
             child: ListTile(
-              leading: Icon(_isLocalApi ? Icons.computer_outlined : Icons.cloud_outlined),
+              leading: Icon(
+                  _isLocalApi ? Icons.computer_outlined : Icons.cloud_outlined),
               title: Text(_isLocalApi ? 'Local API' : 'Cloud API'),
               subtitle: SelectableText(widget.apiClient.baseUrl),
-              trailing: Chip(label: Text(_isLocalApi ? 'Local-first' : 'Remote')),
+              trailing:
+                  Chip(label: Text(_isLocalApi ? 'Local-first' : 'Remote')),
             ),
           ),
           const SizedBox(height: 20),
@@ -133,7 +139,8 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
                 leading: const Icon(Icons.error_outline),
                 title: const Text('ตรวจสอบระบบไม่สำเร็จ'),
                 subtitle: Text(_error!),
-                trailing: IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
+                trailing: IconButton(
+                    onPressed: _refresh, icon: const Icon(Icons.refresh)),
               ),
             ),
           if (!_loading && _error == null)
@@ -152,7 +159,8 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
                       width: width,
                       title: 'API',
                       value: _health['status']?.toString() ?? 'unknown',
-                      detail: '${_health['service'] ?? 'research-os-api'} • v${_health['version'] ?? '-'}',
+                      detail:
+                          '${_health['service'] ?? 'research-os-api'} • v${_health['version'] ?? '-'}',
                       icon: Icons.dns_outlined,
                     ),
                     _MonitorCard(
@@ -165,7 +173,8 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
                     _MonitorCard(
                       width: width,
                       title: 'Memory',
-                      value: _health['memory'] == true ? 'ready' : 'unavailable',
+                      value:
+                          _health['memory'] == true ? 'ready' : 'unavailable',
                       detail: _health['memory_commit'] == true
                           ? 'Memory + explicit commit ready'
                           : 'Knowledge memory service',
@@ -188,12 +197,14 @@ class _SystemMonitorPageState extends State<SystemMonitorPage> {
             ),
           if (!_loading && _error == null) ...<Widget>[
             const SizedBox(height: 24),
-            Text('GitHub Actions ล่าสุด', style: Theme.of(context).textTheme.titleLarge),
+            Text('GitHub Actions ล่าสุด',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Card(
               child: ListTile(
                 leading: const Icon(Icons.account_tree_outlined),
-                title: Text(latestWorkflow['name']?.toString() ?? 'ยังไม่มีข้อมูล Workflow'),
+                title: Text(latestWorkflow['name']?.toString() ??
+                    'ยังไม่มีข้อมูล Workflow'),
                 subtitle: Text(
                   'สถานะ: ${latestWorkflow['status'] ?? 'unknown'} • ผลลัพธ์: ${latestWorkflow['conclusion'] ?? 'unknown'}',
                   maxLines: 2,
@@ -244,7 +255,10 @@ class _MonitorCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text(value, style: Theme.of(context).textTheme.titleLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(value,
+                        style: Theme.of(context).textTheme.titleLarge,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     Text(detail, maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
                 ),

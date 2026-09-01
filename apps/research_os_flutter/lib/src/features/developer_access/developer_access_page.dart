@@ -33,7 +33,8 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
     });
     try {
       final session = await widget.client.getSession();
-      final results = await Future.wait<Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
+      final results = await Future.wait<
+          Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
         widget.client.getOwnerRequests(status: 'pending'),
         widget.client.getOwnerGrants(),
       ]);
@@ -61,19 +62,27 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
   static List<Map<String, dynamic>> _items(Map<String, dynamic> payload) {
     final raw = payload['items'];
     if (raw is! List) return const [];
-    return raw.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
 
   List<String> _requestedScopes(Map<String, dynamic> request) {
     final raw = request['requested_scopes'];
     if (raw is! List) return const <String>['read'];
-    return raw.map((value) => value.toString()).where((value) => value.isNotEmpty).toList();
+    return raw
+        .map((value) => value.toString())
+        .where((value) => value.isNotEmpty)
+        .toList();
   }
 
-  Future<void> _approve(Map<String, dynamic> request, {required bool readOnly}) async {
+  Future<void> _approve(Map<String, dynamic> request,
+      {required bool readOnly}) async {
     final requestId = request['request_id']?.toString() ?? '';
     if (requestId.isEmpty) return;
-    final scopes = readOnly ? const <String>['read'] : _requestedScopes(request);
+    final scopes =
+        readOnly ? const <String>['read'] : _requestedScopes(request);
     try {
       await widget.client.approveRequest(
         requestId,
@@ -82,12 +91,16 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(readOnly ? 'อนุมัติ Read-only 1 ชั่วโมงแล้ว' : 'อนุมัติตาม Scope ที่ขอ 1 ชั่วโมงแล้ว')),
+        SnackBar(
+            content: Text(readOnly
+                ? 'อนุมัติ Read-only 1 ชั่วโมงแล้ว'
+                : 'อนุมัติตาม Scope ที่ขอ 1 ชั่วโมงแล้ว')),
       );
       await _refresh();
     } on DeveloperAccessApiException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -95,13 +108,16 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
     final requestId = request['request_id']?.toString() ?? '';
     if (requestId.isEmpty) return;
     try {
-      await widget.client.rejectRequest(requestId, reason: 'Rejected by resource owner');
+      await widget.client
+          .rejectRequest(requestId, reason: 'Rejected by resource owner');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ปฏิเสธคำขอแล้ว')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('ปฏิเสธคำขอแล้ว')));
       await _refresh();
     } on DeveloperAccessApiException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -109,13 +125,16 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
     final grantId = grant['grant_id']?.toString() ?? '';
     if (grantId.isEmpty) return;
     try {
-      await widget.client.revokeGrant(grantId, reason: 'Revoked by resource owner');
+      await widget.client
+          .revokeGrant(grantId, reason: 'Revoked by resource owner');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เพิกถอนสิทธิ์แล้ว')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('เพิกถอนสิทธิ์แล้ว')));
       await _refresh();
     } on DeveloperAccessApiException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -137,34 +156,44 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : !_signedIn
-              ? _SignedOutState(error: _error, baseUrl: widget.client.baseUrl, onRetry: _refresh)
+              ? _SignedOutState(
+                  error: _error,
+                  baseUrl: widget.client.baseUrl,
+                  onRetry: _refresh)
               : RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: <Widget>[
-                      _HeaderCard(principal: _principal ?? 'Authenticated owner'),
+                      _HeaderCard(
+                          principal: _principal ?? 'Authenticated owner'),
                       const SizedBox(height: 18),
-                      Text('คำขอที่รออนุมัติ (${_requests.length})', style: Theme.of(context).textTheme.titleLarge),
+                      Text('คำขอที่รออนุมัติ (${_requests.length})',
+                          style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: 10),
                       if (_requests.isEmpty)
-                        const _EmptyCard(message: 'ไม่มีคำขอ Developer ที่รออนุมัติ')
+                        const _EmptyCard(
+                            message: 'ไม่มีคำขอ Developer ที่รออนุมัติ')
                       else
                         ..._requests.map(
                           (request) => _RequestCard(
                             request: request,
                             onApprove: () => _approve(request, readOnly: false),
-                            onApproveReadOnly: () => _approve(request, readOnly: true),
+                            onApproveReadOnly: () =>
+                                _approve(request, readOnly: true),
                             onReject: () => _reject(request),
                           ),
                         ),
                       const SizedBox(height: 22),
-                      Text('สิทธิ์ที่กำลังใช้งาน (${_grants.length})', style: Theme.of(context).textTheme.titleLarge),
+                      Text('สิทธิ์ที่กำลังใช้งาน (${_grants.length})',
+                          style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: 10),
                       if (_grants.isEmpty)
-                        const _EmptyCard(message: 'ไม่มี Developer grant ที่ active')
+                        const _EmptyCard(
+                            message: 'ไม่มี Developer grant ที่ active')
                       else
-                        ..._grants.map((grant) => _GrantCard(grant: grant, onRevoke: () => _revoke(grant))),
+                        ..._grants.map((grant) => _GrantCard(
+                            grant: grant, onRevoke: () => _revoke(grant))),
                     ],
                   ),
                 ),
@@ -185,17 +214,22 @@ class _HeaderCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            CircleAvatar(backgroundColor: scheme.primaryContainer, child: const Icon(Icons.admin_panel_settings_outlined)),
+            CircleAvatar(
+                backgroundColor: scheme.primaryContainer,
+                child: const Icon(Icons.admin_panel_settings_outlined)),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const Text('Owner Approval Inbox', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  const Text('Owner Approval Inbox',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
                   Text(principal, key: const Key('developer-access-principal')),
                   const SizedBox(height: 8),
-                  const Text('การอนุมัติเป็นสิทธิ์ overlay เท่านั้น เจ้าของไฟล์ยังคง ownership และการเข้าถึงไฟล์เดิมเหมือนเดิม'),
+                  const Text(
+                      'การอนุมัติเป็นสิทธิ์ overlay เท่านั้น เจ้าของไฟล์ยังคง ownership และการเข้าถึงไฟล์เดิมเหมือนเดิม'),
                 ],
               ),
             ),
@@ -221,7 +255,8 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scopes = (request['requested_scopes'] as List? ?? const []).join(', ');
+    final scopes =
+        (request['requested_scopes'] as List? ?? const []).join(', ');
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -231,7 +266,12 @@ class _RequestCard extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Expanded(child: Text(request['resource_name']?.toString() ?? request['resource_id']?.toString() ?? 'Resource', style: const TextStyle(fontWeight: FontWeight.w800))),
+                Expanded(
+                    child: Text(
+                        request['resource_name']?.toString() ??
+                            request['resource_id']?.toString() ??
+                            'Resource',
+                        style: const TextStyle(fontWeight: FontWeight.w800))),
                 const Chip(label: Text('PENDING')),
               ],
             ),
@@ -245,9 +285,18 @@ class _RequestCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: <Widget>[
-                FilledButton.icon(onPressed: onApprove, icon: const Icon(Icons.check), label: const Text('อนุมัติ 1 ชม.')),
-                OutlinedButton.icon(onPressed: onApproveReadOnly, icon: const Icon(Icons.visibility_outlined), label: const Text('Read-only 1 ชม.')),
-                TextButton.icon(onPressed: onReject, icon: const Icon(Icons.close), label: const Text('ปฏิเสธ')),
+                FilledButton.icon(
+                    onPressed: onApprove,
+                    icon: const Icon(Icons.check),
+                    label: const Text('อนุมัติ 1 ชม.')),
+                OutlinedButton.icon(
+                    onPressed: onApproveReadOnly,
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text('Read-only 1 ชม.')),
+                TextButton.icon(
+                    onPressed: onReject,
+                    icon: const Icon(Icons.close),
+                    label: const Text('ปฏิเสธ')),
               ],
             ),
           ],
@@ -269,8 +318,11 @@ class _GrantCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         leading: const Icon(Icons.verified_user_outlined),
-        title: Text(grant['resource_name']?.toString() ?? grant['resource_id']?.toString() ?? 'Resource'),
-        subtitle: Text('Developer: ${grant['developer_id'] ?? '-'}\nScopes: $scopes\nOwner access unchanged: ${grant['owner_access_unchanged'] == true ? 'Yes' : 'Unknown'}'),
+        title: Text(grant['resource_name']?.toString() ??
+            grant['resource_id']?.toString() ??
+            'Resource'),
+        subtitle: Text(
+            'Developer: ${grant['developer_id'] ?? '-'}\nScopes: $scopes\nOwner access unchanged: ${grant['owner_access_unchanged'] == true ? 'Yes' : 'Unknown'}'),
         isThreeLine: true,
         trailing: TextButton(onPressed: onRevoke, child: const Text('Revoke')),
       ),
@@ -286,13 +338,18 @@ class _EmptyCard extends StatelessWidget {
   Widget build(BuildContext context) => Card(
         child: Padding(
           padding: const EdgeInsets.all(18),
-          child: Row(children: <Widget>[const Icon(Icons.inbox_outlined), const SizedBox(width: 10), Text(message)]),
+          child: Row(children: <Widget>[
+            const Icon(Icons.inbox_outlined),
+            const SizedBox(width: 10),
+            Text(message)
+          ]),
         ),
       );
 }
 
 class _SignedOutState extends StatelessWidget {
-  const _SignedOutState({required this.error, required this.baseUrl, required this.onRetry});
+  const _SignedOutState(
+      {required this.error, required this.baseUrl, required this.onRetry});
   final String? error;
   final String baseUrl;
   final VoidCallback onRetry;
@@ -311,14 +368,26 @@ class _SignedOutState extends StatelessWidget {
               children: <Widget>[
                 const Icon(Icons.lock_person_outlined, size: 48),
                 const SizedBox(height: 12),
-                const Text('ต้องลงชื่อเข้าใช้ในฐานะเจ้าของไฟล์', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                const Text('ต้องลงชื่อเข้าใช้ในฐานะเจ้าของไฟล์',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                const Text('Research OS จะไม่รับ Developer ID จาก client โดยตรง การยืนยันตัวตนต้องผ่าน trusted identity gateway ของ Developer Platform'),
+                const Text(
+                    'Research OS จะไม่รับ Developer ID จาก client โดยตรง การยืนยันตัวตนต้องผ่าน trusted identity gateway ของ Developer Platform'),
                 const SizedBox(height: 8),
-                SelectableText(baseUrl, style: Theme.of(context).textTheme.bodySmall),
-                if (error != null) ...<Widget>[const SizedBox(height: 10), Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error))],
+                SelectableText(baseUrl,
+                    style: Theme.of(context).textTheme.bodySmall),
+                if (error != null) ...<Widget>[
+                  const SizedBox(height: 10),
+                  Text(error!,
+                      style:
+                          TextStyle(color: Theme.of(context).colorScheme.error))
+                ],
                 const SizedBox(height: 16),
-                FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('ตรวจสถานะอีกครั้ง')),
+                FilledButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('ตรวจสถานะอีกครั้ง')),
               ],
             ),
           ),

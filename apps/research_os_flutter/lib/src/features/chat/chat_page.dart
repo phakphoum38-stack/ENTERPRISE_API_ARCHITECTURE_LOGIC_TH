@@ -76,7 +76,7 @@ class _ChatPageState extends State<ChatPage> {
         _sessions.add(_activeSession);
       }
     } on Object catch (error) {
-      _error = 'โหลดประวัติการสนทนาไม่สำเร็จ: $error';
+      _error = 'เน€เธยเน€เธเธเน€เธเธ…เน€เธโ€เน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธเธ”เน€เธยเน€เธเธ’เน€เธเธเน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ“เน€เธโฌเน€เธเธเน€เธยเน€เธย: $error';
       _activeSession = _ChatSession.empty();
       _sessions
         ..clear()
@@ -147,7 +147,7 @@ User: $latestPrompt''';
       try {
         await widget.apiClient.deleteCloudConversation(_syncKey!, deletedId);
       } on Object catch (error) {
-        if (mounted) setState(() => _error = 'ลบจาก Cloud ไม่สำเร็จ: $error');
+        if (mounted) setState(() => _error = 'เน€เธเธ…เน€เธยเน€เธยเน€เธเธ’เน€เธย Cloud เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ“เน€เธโฌเน€เธเธเน€เธยเน€เธย: $error');
       }
     }
   }
@@ -157,20 +157,20 @@ User: $latestPrompt''';
     final value = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('เปลี่ยนชื่อบทสนทนา'),
+        title: const Text('เน€เธโฌเน€เธยเน€เธเธ…เน€เธเธ•เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธโ€”เน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’'),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'ชื่อบทสนทนา'),
+          decoration: const InputDecoration(labelText: 'เน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธโ€”เน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’'),
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก'),
+            child: const Text('เน€เธเธเน€เธยเน€เธโฌเน€เธเธ…เน€เธเธ”เน€เธย'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('บันทึก'),
+            child: const Text('เน€เธยเน€เธเธ‘เน€เธยเน€เธโ€”เน€เธเธ–เน€เธย'),
           ),
         ],
       ),
@@ -195,7 +195,7 @@ User: $latestPrompt''';
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             const Text(
-              'ใส่ Sync Key เดียวกันบน iPhone และ Windows เพื่อใช้ประวัติชุดเดียวกัน คีย์จะเก็บเฉพาะบนอุปกรณ์นี้และไม่บันทึกเข้า Knowledge.',
+              'เน€เธยเน€เธเธเน€เธย Sync Key เน€เธโฌเน€เธโ€เน€เธเธ•เน€เธเธเน€เธเธเน€เธยเน€เธเธ‘เน€เธยเน€เธยเน€เธย iPhone เน€เธยเน€เธเธ…เน€เธเธ Windows เน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธเธ”เน€เธยเน€เธเธเน€เธโ€เน€เธโฌเน€เธโ€เน€เธเธ•เน€เธเธเน€เธเธเน€เธยเน€เธเธ‘เน€เธย เน€เธยเน€เธเธ•เน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธโฌเน€เธยเน€เธยเน€เธยเน€เธโฌเน€เธยเน€เธยเน€เธเธ’เน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธโ€เน€เธยเน€เธยเน€เธเธ•เน€เธยเน€เธยเน€เธเธ…เน€เธเธเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ‘เน€เธยเน€เธโ€”เน€เธเธ–เน€เธยเน€เธโฌเน€เธยเน€เธยเน€เธเธ’ Knowledge.',
             ),
             const SizedBox(height: 16),
             TextField(
@@ -213,15 +213,15 @@ User: $latestPrompt''';
           if (_cloudEnabled)
             TextButton(
               onPressed: () => Navigator.pop(context, ''),
-              child: const Text('ปิด Cloud Sync'),
+              child: const Text('เน€เธยเน€เธเธ”เน€เธโ€ Cloud Sync'),
             ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก'),
+            child: const Text('เน€เธเธเน€เธยเน€เธโฌเน€เธเธ…เน€เธเธ”เน€เธย'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('เชื่อมต่อ'),
+            child: const Text('เน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธเธเน€เธโ€ขเน€เธยเน€เธเธ'),
           ),
         ],
       ),
@@ -250,7 +250,7 @@ User: $latestPrompt''';
       );
     } on Object catch (error) {
       if (!silent && mounted) {
-        setState(() => _error = 'Cloud Sync ไม่สำเร็จ: $error');
+        setState(() => _error = 'Cloud Sync เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ“เน€เธโฌเน€เธเธเน€เธยเน€เธย: $error');
       }
     }
   }
@@ -298,7 +298,7 @@ User: $latestPrompt''';
         await _pushSession(session, silent: true);
       }
     } on Object catch (error) {
-      if (mounted) setState(() => _error = 'Cloud Sync ไม่สำเร็จ: $error');
+      if (mounted) setState(() => _error = 'Cloud Sync เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ“เน€เธโฌเน€เธเธเน€เธยเน€เธย: $error');
     } finally {
       if (mounted) setState(() => _syncing = false);
     }
@@ -339,7 +339,7 @@ User: $latestPrompt''';
                       ),
                       if (_cloudEnabled)
                         IconButton(
-                          tooltip: 'Sync ตอนนี้',
+                          tooltip: 'Sync เน€เธโ€ขเน€เธเธเน€เธยเน€เธยเน€เธเธ•เน€เธย',
                           onPressed: _syncing
                               ? null
                               : () async {
@@ -369,7 +369,7 @@ User: $latestPrompt''';
                           selected: session.id == _activeSession.id,
                           leading: const Icon(Icons.forum_outlined),
                           title: Text(session.title),
-                          subtitle: Text('${session.messages.length} ข้อความ'),
+                          subtitle: Text('${session.messages.length} เน€เธยเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ’เน€เธเธ'),
                           onTap: () {
                             setState(() => _activeSession = session);
                             Navigator.pop(context);
@@ -388,11 +388,11 @@ User: $latestPrompt''';
                             itemBuilder: (context) => const <PopupMenuEntry<String>>[
                               PopupMenuItem(
                                 value: 'rename',
-                                child: Text('เปลี่ยนชื่อ'),
+                                child: Text('เน€เธโฌเน€เธยเน€เธเธ…เน€เธเธ•เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ—เน€เธยเน€เธเธ'),
                               ),
                               PopupMenuItem(
                                 value: 'delete',
-                                child: Text('ลบ'),
+                                child: Text('เน€เธเธ…เน€เธย'),
                               ),
                             ],
                           ),
@@ -426,9 +426,9 @@ User: $latestPrompt''';
     final contextualPrompt = _conversationPrompt(prompt);
     setState(() {
       _messages.add(_ChatMessage(role: 'user', text: prompt));
-      if (_messages.length == 1 && _activeSession.title == 'บทสนทนาใหม่') {
+      if (_messages.length == 1 && _activeSession.title == 'เน€เธยเน€เธโ€”เน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธเธเน€เธย') {
         _activeSession.title = prompt.length > 36
-            ? '${prompt.substring(0, 36)}…'
+            ? '${prompt.substring(0, 36)}เนโฌเธ'
             : prompt;
       }
       _controller.clear();
@@ -449,7 +449,7 @@ User: $latestPrompt''';
         _messages.add(
           _ChatMessage(
             role: 'assistant',
-            text: answer.isEmpty ? 'ไม่ได้รับข้อความตอบกลับ' : answer,
+            text: answer.isEmpty ? 'เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธโ€เน€เธยเน€เธเธเน€เธเธ‘เน€เธยเน€เธยเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ’เน€เธเธเน€เธโ€ขเน€เธเธเน€เธยเน€เธยเน€เธเธ…เน€เธเธ‘เน€เธย' : answer,
             memoryCount: memoryHits is List ? memoryHits.length : null,
           ),
         );
@@ -475,7 +475,7 @@ User: $latestPrompt''';
               EnterprisePageHeader(
                 title: 'AI Workspace',
                 subtitle:
-                    'สนทนากับ AI โดยใช้ Session History, Local Memory และ Cloud Sync ตามที่เลือก',
+                    'เน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เน€เธยเน€เธเธ‘เน€เธย AI เน€เธยเน€เธโ€เน€เธเธเน€เธยเน€เธยเน€เธย Session History, Local Memory เน€เธยเน€เธเธ…เน€เธเธ Cloud Sync เน€เธโ€ขเน€เธเธ’เน€เธเธเน€เธโ€”เน€เธเธ•เน€เธยเน€เธโฌเน€เธเธ…เน€เธเธ—เน€เธเธเน€เธย',
                 icon: Icons.auto_awesome_outlined,
                 actions: <Widget>[
                   OutlinedButton.icon(
@@ -611,7 +611,7 @@ class _ChatWorkspaceToolbar extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.sync, size: 18),
-                label: Text(syncing ? 'Syncing…' : 'Sync now'),
+                label: Text(syncing ? 'Syncingเนโฌเธ' : 'Sync now'),
                 onPressed: onSyncPressed,
               ),
           ],
@@ -653,8 +653,8 @@ class _Composer extends StatelessWidget {
                 textInputAction: TextInputAction.newline,
                 decoration: InputDecoration(
                   hintText: useMemory
-                      ? 'ถาม AI โดยใช้ Memory และบริบทการสนทนา…'
-                      : 'ถาม AI โดยใช้บริบทการสนทนา…',
+                      ? 'เน€เธโ€“เน€เธเธ’เน€เธเธ AI เน€เธยเน€เธโ€เน€เธเธเน€เธยเน€เธยเน€เธย Memory เน€เธยเน€เธเธ…เน€เธเธเน€เธยเน€เธเธเน€เธเธ”เน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เน€เธเธเน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เนโฌเธ'
+                      : 'เน€เธโ€“เน€เธเธ’เน€เธเธ AI เน€เธยเน€เธโ€เน€เธเธเน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธ”เน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เน€เธเธเน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เนโฌเธ',
                   border: InputBorder.none,
                   filled: false,
                 ),
@@ -662,6 +662,7 @@ class _Composer extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             IconButton.filled(
+              key: const Key('chat-send-button'),
               tooltip: 'ส่ง',
               onPressed: sending || loading ? null : onSend,
               icon: sending
@@ -694,7 +695,7 @@ class _ErrorPanel extends StatelessWidget {
         title: const Text('AI Workspace status'),
         subtitle: Text(message),
         trailing: IconButton(
-          tooltip: 'ปิด',
+          tooltip: 'เน€เธยเน€เธเธ”เน€เธโ€',
           onPressed: onDismiss,
           icon: const Icon(Icons.close),
         ),
@@ -730,14 +731,14 @@ class _EmptyChat extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              'เริ่ม AI Workspace',
+              'เน€เธโฌเน€เธเธเน€เธเธ”เน€เธยเน€เธเธ AI Workspace',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 620),
               child: const Text(
-                'บทสนทนาบันทึกบนอุปกรณ์นี้อัตโนมัติ เปิด Memory เมื่อต้องการใช้ Knowledge ของ Research OS และเปิด Cloud Sync เมื่อต้องการคุยต่อข้ามอุปกรณ์',
+                'เน€เธยเน€เธโ€”เน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เน€เธยเน€เธเธ‘เน€เธยเน€เธโ€”เน€เธเธ–เน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธโ€เน€เธยเน€เธยเน€เธเธ•เน€เธยเน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธยเน€เธยเน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธเธ” เน€เธโฌเน€เธยเน€เธเธ”เน€เธโ€ Memory เน€เธโฌเน€เธเธเน€เธเธ—เน€เธยเน€เธเธเน€เธโ€ขเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธเธเน€เธยเน€เธยเน€เธย Knowledge เน€เธยเน€เธเธเน€เธย Research OS เน€เธยเน€เธเธ…เน€เธเธเน€เธโฌเน€เธยเน€เธเธ”เน€เธโ€ Cloud Sync เน€เธโฌเน€เธเธเน€เธเธ—เน€เธยเน€เธเธเน€เธโ€ขเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธเธเน€เธยเน€เธเธเน€เธเธเน€เธโ€ขเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธเธเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธโ€เน€เธย',
                 textAlign: TextAlign.center,
               ),
             ),
@@ -785,7 +786,7 @@ class _MessageBubble extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('คัดลอกคำตอบแล้ว'),
+        content: Text('เน€เธยเน€เธเธ‘เน€เธโ€เน€เธเธ…เน€เธเธเน€เธยเน€เธยเน€เธเธ“เน€เธโ€ขเน€เธเธเน€เธยเน€เธยเน€เธเธ…เน€เธยเน€เธเธ'),
         duration: Duration(seconds: 1),
       ),
     );
@@ -825,13 +826,13 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  isUser ? 'คุณ' : 'Research OS AI',
+                  isUser ? 'เน€เธยเน€เธเธเน€เธโ€' : 'Research OS AI',
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 if (!isUser) ...<Widget>[
                   const SizedBox(width: 6),
                   IconButton(
-                    tooltip: 'คัดลอกคำตอบ',
+                    tooltip: 'เน€เธยเน€เธเธ‘เน€เธโ€เน€เธเธ…เน€เธเธเน€เธยเน€เธยเน€เธเธ“เน€เธโ€ขเน€เธเธเน€เธย',
                     visualDensity: VisualDensity.compact,
                     constraints: const BoxConstraints(),
                     padding: const EdgeInsets.all(6),
@@ -854,7 +855,7 @@ class _MessageBubble extends StatelessWidget {
               Chip(
                 visualDensity: VisualDensity.compact,
                 avatar: const Icon(Icons.memory_outlined, size: 16),
-                label: Text('Memory ${message.memoryCount} รายการ'),
+                label: Text('Memory ${message.memoryCount} เน€เธเธเน€เธเธ’เน€เธเธเน€เธยเน€เธเธ’เน€เธเธ'),
               ),
             ],
           ],
@@ -876,7 +877,7 @@ class _ChatSession {
     final now = DateTime.now();
     return _ChatSession(
       id: 'chat-${now.microsecondsSinceEpoch.toRadixString(36)}',
-      title: 'บทสนทนาใหม่',
+      title: 'เน€เธยเน€เธโ€”เน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธเธเน€เธย',
       messages: <_ChatMessage>[],
       updatedAt: now,
     );
@@ -893,7 +894,7 @@ class _ChatSession {
     }
     return _ChatSession(
       id: (json['id'] ?? '').toString(),
-      title: (json['title'] ?? 'บทสนทนา').toString(),
+      title: (json['title'] ?? 'เน€เธยเน€เธโ€”เน€เธเธเน€เธยเน€เธโ€”เน€เธยเน€เธเธ’').toString(),
       messages: rawMessages is List
           ? rawMessages
               .whereType<Map>()

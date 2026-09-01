@@ -21,7 +21,8 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7),
   ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8),
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
-  ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
+  ResearchNavItem(
+      'Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
 ];
 
 class ResearchSidebar extends StatelessWidget {
@@ -96,7 +97,8 @@ class ResearchSidebar extends StatelessWidget {
                                 key: Key('desktop-shell-title'),
                                 style: TextStyle(fontWeight: FontWeight.w800),
                               ),
-                              Text('Enterprise Workspace', style: TextStyle(fontSize: 11)),
+                              Text('Enterprise Workspace',
+                                  style: TextStyle(fontSize: 11)),
                             ],
                           ),
                         ),
@@ -142,7 +144,8 @@ class ResearchSidebar extends StatelessWidget {
                   ? Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: <Widget>[
-                        Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
+                        Icon(Icons.shield_outlined,
+                            size: 16, color: scheme.primary),
                         const SizedBox(width: 8),
                         const Flexible(
                           child: Text(
@@ -154,7 +157,8 @@ class ResearchSidebar extends StatelessWidget {
                         ),
                       ],
                     )
-                  : Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
+                  : Icon(Icons.shield_outlined,
+                      size: 16, color: scheme.primary),
             ),
           ),
         ],
@@ -212,7 +216,8 @@ class ResearchMobileDrawer extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Research OS',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -340,13 +345,17 @@ class _SidebarDestination extends StatelessWidget {
             child: SizedBox(
               height: 44,
               child: Row(
-                mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+                mainAxisAlignment: expanded
+                    ? MainAxisAlignment.start
+                    : MainAxisAlignment.center,
                 children: <Widget>[
                   SizedBox(
                     width: expanded ? 44 : 58,
                     child: Icon(
                       item.icon,
-                      color: selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
+                      color: selected
+                          ? scheme.onSecondaryContainer
+                          : scheme.onSurfaceVariant,
                     ),
                   ),
                   if (expanded)
@@ -355,7 +364,9 @@ class _SidebarDestination extends StatelessWidget {
                         item.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+                        style: TextStyle(
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500),
                       ),
                     ),
                 ],

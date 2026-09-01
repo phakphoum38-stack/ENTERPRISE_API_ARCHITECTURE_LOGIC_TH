@@ -50,8 +50,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         SettingsPage(
           apiClient: widget.apiClient,
           themeMode: widget.themeMode,
-          onThemeModeChanged:
-              widget.onThemeModeChanged ?? (ThemeMode value) {},
+          onThemeModeChanged: widget.onThemeModeChanged ?? (ThemeMode value) {},
           onApiBaseUrlChanged: widget.onApiBaseUrlChanged,
         ),
         DeveloperAccessPage(),
@@ -117,7 +116,8 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                       elevation: _sidebarExpanded ? 12 : 0,
                       shadowColor: Theme.of(context).shadowColor,
                       shape: Border(
-                        right: BorderSide(color: Theme.of(context).dividerColor),
+                        right:
+                            BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       child: ResearchSidebar(
                         expanded: _sidebarExpanded,

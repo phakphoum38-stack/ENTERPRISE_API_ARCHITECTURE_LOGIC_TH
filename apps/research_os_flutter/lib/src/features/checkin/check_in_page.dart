@@ -91,9 +91,8 @@ class _CheckInPageState extends State<CheckInPage> {
       final currentNote = (active['note'] ?? '').toString().trim();
       final extraNote = _noteController.text.trim();
       if (extraNote.isNotEmpty) {
-        active['note'] = currentNote.isEmpty
-            ? extraNote
-            : '$currentNote • $extraNote';
+        active['note'] =
+            currentNote.isEmpty ? extraNote : '$currentNote • $extraNote';
       }
       _noteController.clear();
     });
@@ -108,8 +107,7 @@ class _CheckInPageState extends State<CheckInPage> {
   String _date(DateTime value) =>
       '${_two(value.day)}/${_two(value.month)}/${value.year}';
 
-  String _time(DateTime value) =>
-      '${_two(value.hour)}:${_two(value.minute)}';
+  String _time(DateTime value) => '${_two(value.hour)}:${_two(value.minute)}';
 
   String _duration(Map<String, dynamic> record) {
     final start = _dateFrom(record['check_in']);
@@ -163,9 +161,10 @@ class _CheckInPageState extends State<CheckInPage> {
                   children: <Widget>[
                     Text(
                       'Check-in',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
                     ),
                     const SizedBox(height: 4),
                     Text(

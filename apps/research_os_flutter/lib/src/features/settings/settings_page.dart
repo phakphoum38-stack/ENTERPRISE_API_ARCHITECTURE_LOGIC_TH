@@ -54,7 +54,9 @@ class _SettingsPageState extends State<SettingsPage> {
       final rawProviders = payload['providers'];
       setState(() {
         _activeProvider = payload['active']?.toString() ?? 'unknown';
-        _providers = rawProviders is List ? rawProviders.map((item) => item.toString()).toList() : const <String>[];
+        _providers = rawProviders is List
+            ? rawProviders.map((item) => item.toString()).toList()
+            : const <String>[];
         _loading = false;
       });
     } on Object catch (error) {
@@ -79,7 +81,8 @@ class _SettingsPageState extends State<SettingsPage> {
       _apiController.text = normalized;
       await callback(normalized);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('บันทึก API Base URL แล้ว')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('บันทึก API Base URL แล้ว')));
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString());
@@ -96,7 +99,8 @@ class _SettingsPageState extends State<SettingsPage> {
         EnterprisePageHeader(
           icon: Icons.settings_outlined,
           title: 'Settings',
-          subtitle: 'จัดการ Appearance, API endpoint และ AI Provider โดยคง Secret ไว้ฝั่ง Backend',
+          subtitle:
+              'จัดการ Appearance, API endpoint และ AI Provider โดยคง Secret ไว้ฝั่ง Backend',
           actions: <Widget>[
             IconButton(
               tooltip: 'รีเฟรช Provider',
@@ -114,13 +118,24 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(18),
               child: SegmentedButton<ThemeMode>(
                 segments: const <ButtonSegment<ThemeMode>>[
-                  ButtonSegment<ThemeMode>(value: ThemeMode.system, icon: Icon(Icons.brightness_auto), label: Text('System')),
-                  ButtonSegment<ThemeMode>(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined), label: Text('Light')),
-                  ButtonSegment<ThemeMode>(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined), label: Text('Dark')),
+                  ButtonSegment<ThemeMode>(
+                      value: ThemeMode.system,
+                      icon: Icon(Icons.brightness_auto),
+                      label: Text('System')),
+                  ButtonSegment<ThemeMode>(
+                      value: ThemeMode.light,
+                      icon: Icon(Icons.light_mode_outlined),
+                      label: Text('Light')),
+                  ButtonSegment<ThemeMode>(
+                      value: ThemeMode.dark,
+                      icon: Icon(Icons.dark_mode_outlined),
+                      label: Text('Dark')),
                 ],
                 selected: <ThemeMode>{widget.themeMode},
                 onSelectionChanged: (selection) {
-                  if (selection.isNotEmpty) widget.onThemeModeChanged(selection.first);
+                  if (selection.isNotEmpty) {
+                    widget.onThemeModeChanged(selection.first);
+                  }
                 },
               ),
             ),
@@ -145,7 +160,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     decoration: const InputDecoration(
                       labelText: 'API Base URL',
                       hintText: 'http://192.168.x.x:8787',
-                      helperText: 'ใส่ URL ของ API บนเครื่อง Windows ได้ภายหลัง โดยไม่ต้อง Build แอปใหม่',
+                      helperText:
+                          'ใส่ URL ของ API บนเครื่อง Windows ได้ภายหลัง โดยไม่ต้อง Build แอปใหม่',
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -154,19 +170,30 @@ class _SettingsPageState extends State<SettingsPage> {
                     runSpacing: 8,
                     children: <Widget>[
                       FilledButton.icon(
-                        onPressed: _savingEndpoint ? null : () => _saveEndpoint(),
+                        onPressed:
+                            _savingEndpoint ? null : () => _saveEndpoint(),
                         icon: _savingEndpoint
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.save_outlined),
                         label: const Text('บันทึก'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _savingEndpoint ? null : () => _saveEndpoint(ApiEndpointStore.localDefault),
+                        onPressed: _savingEndpoint
+                            ? null
+                            : () =>
+                                _saveEndpoint(ApiEndpointStore.localDefault),
                         icon: const Icon(Icons.computer_outlined),
                         label: const Text('Local 127.0.0.1'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _savingEndpoint ? null : () => _saveEndpoint(ApiEndpointStore.renderDefault),
+                        onPressed: _savingEndpoint
+                            ? null
+                            : () =>
+                                _saveEndpoint(ApiEndpointStore.renderDefault),
                         icon: const Icon(Icons.cloud_outlined),
                         label: const Text('Render'),
                       ),
@@ -184,7 +211,8 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 28),
         EnterpriseSection(
           title: 'Provider Manager',
-          subtitle: 'Provider ถูกจัดการจาก Backend; Flutter แสดงเฉพาะสถานะและตัวเลือกที่พร้อมใช้',
+          subtitle:
+              'Provider ถูกจัดการจาก Backend; Flutter แสดงเฉพาะสถานะและตัวเลือกที่พร้อมใช้',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -195,19 +223,31 @@ class _SettingsPageState extends State<SettingsPage> {
                     leading: const Icon(Icons.error_outline),
                     title: const Text('โหลด Provider ไม่สำเร็จ'),
                     subtitle: Text(_error!),
-                    trailing: IconButton(onPressed: _loadProviders, icon: const Icon(Icons.refresh)),
+                    trailing: IconButton(
+                        onPressed: _loadProviders,
+                        icon: const Icon(Icons.refresh)),
                   ),
                 ),
               if (!_loading && _error == null) ...<Widget>[
-                EnterpriseStatusTile(icon: Icons.smart_toy_outlined, title: 'Active Provider', value: _activeProvider, caption: 'Backend managed'),
+                EnterpriseStatusTile(
+                    icon: Icons.smart_toy_outlined,
+                    title: 'Active Provider',
+                    value: _activeProvider,
+                    caption: 'Backend managed'),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: _providers.map((provider) => Chip(
-                    avatar: Icon(provider == _activeProvider ? Icons.check_circle : Icons.circle_outlined, size: 18),
-                    label: Text(provider),
-                  )).toList(),
+                  children: _providers
+                      .map((provider) => Chip(
+                            avatar: Icon(
+                                provider == _activeProvider
+                                    ? Icons.check_circle
+                                    : Icons.circle_outlined,
+                                size: 18),
+                            label: Text(provider),
+                          ))
+                      .toList(),
                 ),
               ],
             ],
@@ -219,9 +259,20 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: 'ค่าใช้งานของแอปแยกจาก Secret และข้อมูล Backend',
           child: Column(
             children: <Widget>[
-              Card(child: ListTile(leading: Icon(Icons.storage_outlined), title: Text('Local-first storage ready'), subtitle: Text('เมื่อรัน API บน Windows ให้ RESEARCH_OS_DATA_DIR ชี้ไปยังพื้นที่ข้อมูลบนเครื่อง'))),
+              Card(
+                  child: ListTile(
+                      leading: Icon(Icons.storage_outlined),
+                      title: Text('Local-first storage ready'),
+                      subtitle: Text(
+                          'เมื่อรัน API บน Windows ให้ RESEARCH_OS_DATA_DIR ชี้ไปยังพื้นที่ข้อมูลบนเครื่อง'))),
               SizedBox(height: 8),
-              Card(child: ListTile(leading: Icon(Icons.security_outlined), title: Text('Secrets stay on the backend'), subtitle: Text('Flutter จะไม่จัดเก็บหรือแสดง Gemini API key, GitHub token หรือ Google refresh token'), trailing: Chip(label: Text('Protected')))),
+              Card(
+                  child: ListTile(
+                      leading: Icon(Icons.security_outlined),
+                      title: Text('Secrets stay on the backend'),
+                      subtitle: Text(
+                          'Flutter จะไม่จัดเก็บหรือแสดง Gemini API key, GitHub token หรือ Google refresh token'),
+                      trailing: Chip(label: Text('Protected')))),
             ],
           ),
         ),

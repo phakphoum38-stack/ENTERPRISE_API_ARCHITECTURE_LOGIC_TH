@@ -25,8 +25,7 @@ class DesktopShellApiClient extends ResearchOSApiClient {
       <String, dynamic>{'artifacts': <Map<String, dynamic>>[]};
 
   @override
-  Future<Map<String, dynamic>> getKnowledgeGraph() async =>
-      <String, dynamic>{
+  Future<Map<String, dynamic>> getKnowledgeGraph() async => <String, dynamic>{
         'nodes': <Map<String, dynamic>>[],
         'edges': <Map<String, dynamic>>[],
       };
@@ -45,7 +44,8 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 }
 
 void main() {
-  testWidgets('desktop shell shows organized enterprise sidebar', (tester) async {
+  testWidgets('desktop shell shows organized enterprise sidebar',
+      (tester) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);

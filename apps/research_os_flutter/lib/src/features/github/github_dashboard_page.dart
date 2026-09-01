@@ -77,7 +77,8 @@ class _GitHubDashboardPageState extends State<GitHubDashboardPage> {
           _Heading(
             icon: Icons.account_tree_outlined,
             title: 'GitHub Control Center',
-            subtitle: 'ติดตาม Repository, Workflow, Commit และ Pull Request ผ่าน Research OS API',
+            subtitle:
+                'ติดตาม Repository, Workflow, Commit และ Pull Request ผ่าน Research OS API',
             action: IconButton(
               tooltip: 'Refresh',
               onPressed: _loading ? null : _refresh,
@@ -121,11 +122,13 @@ class _GitHubDashboardPageState extends State<GitHubDashboardPage> {
                 leading: const Icon(Icons.error_outline),
                 title: const Text('โหลดข้อมูล GitHub ไม่สำเร็จ'),
                 subtitle: Text(_error!),
-                trailing: IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
+                trailing: IconButton(
+                    onPressed: _refresh, icon: const Icon(Icons.refresh)),
               ),
             ),
           if (_dashboard != null) ...<Widget>[
-            Text('Repository overview', style: Theme.of(context).textTheme.titleLarge),
+            Text('Repository overview',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 10),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -142,10 +145,22 @@ class _GitHubDashboardPageState extends State<GitHubDashboardPage> {
                   crossAxisSpacing: 12,
                   mainAxisExtent: 104,
                   children: <Widget>[
-                    _MetricCard(title: 'Default branch', value: '${_dashboard?['default_branch'] ?? '-'}', icon: Icons.call_split),
-                    _MetricCard(title: 'Visibility', value: '${_dashboard?['visibility'] ?? '-'}', icon: Icons.visibility_outlined),
-                    _MetricCard(title: 'Open Issues', value: '${_dashboard?['open_issues_count'] ?? 0}', icon: Icons.error_outline),
-                    _MetricCard(title: 'Forks', value: '${_dashboard?['forks_count'] ?? 0}', icon: Icons.fork_right),
+                    _MetricCard(
+                        title: 'Default branch',
+                        value: '${_dashboard?['default_branch'] ?? '-'}',
+                        icon: Icons.call_split),
+                    _MetricCard(
+                        title: 'Visibility',
+                        value: '${_dashboard?['visibility'] ?? '-'}',
+                        icon: Icons.visibility_outlined),
+                    _MetricCard(
+                        title: 'Open Issues',
+                        value: '${_dashboard?['open_issues_count'] ?? 0}',
+                        icon: Icons.error_outline),
+                    _MetricCard(
+                        title: 'Forks',
+                        value: '${_dashboard?['forks_count'] ?? 0}',
+                        icon: Icons.fork_right),
                   ],
                 );
               },
@@ -161,7 +176,8 @@ class _GitHubDashboardPageState extends State<GitHubDashboardPage> {
                 child: ListTile(
                   leading: const Icon(Icons.commit),
                   title: Text('${item['message'] ?? '-'}'),
-                  subtitle: Text('${item['sha'] ?? ''} • ${item['author'] ?? 'unknown'}'),
+                  subtitle: Text(
+                      '${item['sha'] ?? ''} • ${item['author'] ?? 'unknown'}'),
                 ),
               ),
             ),
@@ -172,13 +188,16 @@ class _GitHubDashboardPageState extends State<GitHubDashboardPage> {
               (item) => Card(
                 child: ListTile(
                   leading: const Icon(Icons.merge_type),
-                  title: Text('#${item['number'] ?? '-'} ${item['title'] ?? ''}'),
+                  title:
+                      Text('#${item['number'] ?? '-'} ${item['title'] ?? ''}'),
                   subtitle: Text('${item['author'] ?? 'unknown'}'),
-                  trailing: Chip(label: Text(item['draft'] == true ? 'Draft' : 'Open')),
+                  trailing: Chip(
+                      label: Text(item['draft'] == true ? 'Draft' : 'Open')),
                 ),
               ),
             ),
-            if (pulls.isEmpty) const _EmptyCard(label: 'ไม่มี Pull Request ที่เปิดอยู่'),
+            if (pulls.isEmpty)
+              const _EmptyCard(label: 'ไม่มี Pull Request ที่เปิดอยู่'),
           ],
         ],
       ),
@@ -187,7 +206,11 @@ class _GitHubDashboardPageState extends State<GitHubDashboardPage> {
 }
 
 class _Heading extends StatelessWidget {
-  const _Heading({required this.icon, required this.title, required this.subtitle, required this.action});
+  const _Heading(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.action});
   final IconData icon;
   final String title;
   final String subtitle;
@@ -226,7 +249,8 @@ class _Heading extends StatelessWidget {
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.title, required this.value, required this.icon});
+  const _MetricCard(
+      {required this.title, required this.value, required this.icon});
   final String title;
   final String value;
   final IconData icon;
@@ -246,7 +270,10 @@ class _MetricCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleLarge),
+                  Text(value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge),
                 ],
               ),
             ),
@@ -268,7 +295,9 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: <Widget>[
-          Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
+          Expanded(
+              child:
+                  Text(title, style: Theme.of(context).textTheme.titleLarge)),
           Chip(label: Text('$count')),
         ],
       ),

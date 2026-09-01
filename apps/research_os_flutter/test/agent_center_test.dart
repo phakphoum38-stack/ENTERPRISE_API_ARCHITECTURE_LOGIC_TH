@@ -19,13 +19,17 @@ class FakeAgentApiClient extends ResearchOSApiClient {
     String? query,
     String? agent,
     int? limit,
-  }) async => <String, dynamic>{'runs': runs, 'count': runs.length};
+  }) async =>
+      <String, dynamic>{'runs': runs, 'count': runs.length};
 
   @override
   Future<Map<String, dynamic>> getV2Workspaces() async => <String, dynamic>{
         'api_version': 'v2',
         'workspaces': <Map<String, dynamic>>[
-          <String, dynamic>{'workspace_id': 'research', 'name': 'Research workspace'},
+          <String, dynamic>{
+            'workspace_id': 'research',
+            'name': 'Research workspace'
+          },
         ],
         'count': 1,
       };
@@ -194,7 +198,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Build a research summary'), findsOneWidget);
-    expect(find.byKey(const Key('orchestration-dependency-graph')), findsOneWidget);
+    expect(find.byKey(const Key('orchestration-dependency-graph')),
+        findsOneWidget);
     expect(find.text('planned'), findsWidgets);
     expect(api.runs.single['steps'], hasLength(2));
 
@@ -224,7 +229,8 @@ void main() {
 
     expect(find.byKey(const Key('workspace-selector')), findsOneWidget);
     expect(find.text('Research workspace'), findsOneWidget);
-    expect(find.bySemanticsLabel('Search workspace knowledge'), findsNWidgets(2));
+    expect(
+        find.bySemanticsLabel('Search workspace knowledge'), findsNWidgets(2));
 
     await tester.enterText(
       find.byKey(const Key('knowledge-search-query')),
@@ -243,7 +249,8 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('Agent Center V2 exposes timeline health and cancellation controls',
+  testWidgets(
+      'Agent Center V2 exposes timeline health and cancellation controls',
       (tester) async {
     final api = FakeAgentApiClient();
     api.runs.add(<String, dynamic>{
@@ -264,7 +271,8 @@ void main() {
     await tester.pumpWidget(testApp(api));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('orchestration-dependency-graph')), findsOneWidget);
+    expect(find.byKey(const Key('orchestration-dependency-graph')),
+        findsOneWidget);
     expect(find.byKey(const Key('cancel-run-v2controls')), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('load-agent-health')));
@@ -273,7 +281,8 @@ void main() {
     expect(find.text('V2 Agent Center Engineer'), findsOneWidget);
     expect(find.text('ready'), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(const Key('timeline-run-v2controls')));
+    await tester
+        .ensureVisible(find.byKey(const Key('timeline-run-v2controls')));
     await tester.tap(find.byKey(const Key('timeline-run-v2controls')));
     await tester.pumpAndSettle();
     expect(find.text('run.created'), findsOneWidget);

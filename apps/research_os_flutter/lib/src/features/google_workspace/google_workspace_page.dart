@@ -56,15 +56,20 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
       final rawUrl = payload['authorization_url']?.toString() ?? '';
       final uri = Uri.tryParse(rawUrl);
       if (uri == null || !uri.hasScheme) {
-        throw const ResearchOSApiException('Backend did not return a valid Google authorization URL.');
+        throw const ResearchOSApiException(
+            'Backend did not return a valid Google authorization URL.');
       }
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!launched) {
-        throw const ResearchOSApiException('ไม่สามารถเปิดหน้าล็อกอิน Google ได้');
+        throw const ResearchOSApiException(
+            'ไม่สามารถเปิดหน้าล็อกอิน Google ได้');
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('เปิด Google แล้ว เมื่อล็อกอินเสร็จให้กลับมาหน้านี้และกดรีเฟรช')),
+        const SnackBar(
+            content: Text(
+                'เปิด Google แล้ว เมื่อล็อกอินเสร็จให้กลับมาหน้านี้และกดรีเฟรช')),
       );
     } on Object catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -104,7 +109,8 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
     }
     setState(() => _working = true);
     try {
-      final payload = await widget.apiClient.setGoogleWorkspaceServices(enabledServices.toList()..sort());
+      final payload = await widget.apiClient
+          .setGoogleWorkspaceServices(enabledServices.toList()..sort());
       if (!mounted) return;
       setState(() => _dashboard = payload);
     } on Object catch (error) {
@@ -121,7 +127,8 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
     final services = _dashboard['services'] is List
         ? List<dynamic>.from(_dashboard['services'] as List)
         : const <dynamic>[];
-    final enabledCount = services.where((item) => item is Map && item['enabled'] == true).length;
+    final enabledCount =
+        services.where((item) => item is Map && item['enabled'] == true).length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
@@ -129,7 +136,8 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
         _Heading(
           icon: Icons.apps_outlined,
           title: 'Google Workspace Hub',
-          subtitle: 'เชื่อมบริการ Google ผ่าน OAuth โดยเก็บ Client Secret และ Token ไว้ฝั่ง Backend เท่านั้น',
+          subtitle:
+              'เชื่อมบริการ Google ผ่าน OAuth โดยเก็บ Client Secret และ Token ไว้ฝั่ง Backend เท่านั้น',
           action: IconButton(
             tooltip: 'รีเฟรชสถานะ',
             onPressed: _loading || _working ? null : _refresh,
@@ -144,7 +152,8 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
               leading: const Icon(Icons.error_outline),
               title: const Text('Google Workspace'),
               subtitle: Text(_error!),
-              trailing: IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
+              trailing: IconButton(
+                  onPressed: _refresh, icon: const Icon(Icons.refresh)),
             ),
           ),
         Card(
@@ -155,14 +164,20 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    Icon(connected ? Icons.cloud_done_outlined : Icons.cloud_off_outlined, size: 32),
+                    Icon(
+                        connected
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_off_outlined,
+                        size: 32),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            connected ? 'Google account connected' : 'Google account not connected',
+                            connected
+                                ? 'Google account connected'
+                                : 'Google account not connected',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 4),
@@ -174,7 +189,12 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
                         ],
                       ),
                     ),
-                    Chip(label: Text(connected ? 'Connected' : oauthConfigured ? 'Ready' : 'Not configured')),
+                    Chip(
+                        label: Text(connected
+                            ? 'Connected'
+                            : oauthConfigured
+                                ? 'Ready'
+                                : 'Not configured')),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -184,7 +204,9 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
                   children: <Widget>[
                     FilledButton.icon(
                       key: const Key('google-workspace-connect'),
-                      onPressed: _working || connected || !oauthConfigured ? null : _connect,
+                      onPressed: _working || connected || !oauthConfigured
+                          ? null
+                          : _connect,
                       icon: const Icon(Icons.login),
                       label: const Text('เชื่อมบัญชี Google'),
                     ),
@@ -208,12 +230,15 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
         const SizedBox(height: 24),
         Row(
           children: <Widget>[
-            Expanded(child: Text('Workspace services', style: Theme.of(context).textTheme.titleLarge)),
+            Expanded(
+                child: Text('Workspace services',
+                    style: Theme.of(context).textTheme.titleLarge)),
             Chip(label: Text('$enabledCount/${services.length} enabled')),
           ],
         ),
         const SizedBox(height: 6),
-        const Text('เปิดเฉพาะบริการที่ต้องใช้ เพื่อลด OAuth scopes ที่ไม่จำเป็น'),
+        const Text(
+            'เปิดเฉพาะบริการที่ต้องใช้ เพื่อลด OAuth scopes ที่ไม่จำเป็น'),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -227,7 +252,9 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
               spacing: 12,
               runSpacing: 12,
               children: services.map((raw) {
-                final item = raw is Map ? Map<String, dynamic>.from(raw) : const <String, dynamic>{};
+                final item = raw is Map
+                    ? Map<String, dynamic>.from(raw)
+                    : const <String, dynamic>{};
                 final service = item['service']?.toString() ?? 'unknown';
                 final enabled = item['enabled'] == true;
                 final state = item['state']?.toString() ?? 'unknown';
@@ -236,7 +263,9 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
                   child: Card(
                     child: SwitchListTile(
                       value: enabled,
-                      onChanged: _working ? null : (value) => _setService(service, value),
+                      onChanged: _working
+                          ? null
+                          : (value) => _setService(service, value),
                       secondary: Icon(_iconFor(service)),
                       title: Text(_titleFor(service)),
                       subtitle: Text('$state • ${_descriptionFor(service)}'),
@@ -252,7 +281,8 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
           child: ListTile(
             leading: Icon(Icons.security_outlined),
             title: Text('Backend-only credentials'),
-            subtitle: Text('Flutter ไม่ได้รับ Google Client Secret, access token หรือ refresh token และ OAuth callback กลับเข้า Local API โดยตรง'),
+            subtitle: Text(
+                'Flutter ไม่ได้รับ Google Client Secret, access token หรือ refresh token และ OAuth callback กลับเข้า Local API โดยตรง'),
             trailing: Chip(label: Text('Local-first')),
           ),
         ),
@@ -307,7 +337,11 @@ class _GoogleWorkspacePageState extends State<GoogleWorkspacePage> {
 }
 
 class _Heading extends StatelessWidget {
-  const _Heading({required this.icon, required this.title, required this.subtitle, required this.action});
+  const _Heading(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.action});
   final IconData icon;
   final String title;
   final String subtitle;

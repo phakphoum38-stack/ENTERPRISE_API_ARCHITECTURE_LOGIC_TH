@@ -39,7 +39,8 @@ class ApiEndpointStore {
         !uri.hasScheme ||
         (uri.scheme != 'http' && uri.scheme != 'https') ||
         uri.host.isEmpty) {
-      throw const FormatException('API Base URL ต้องเป็น http:// หรือ https:// ที่ถูกต้อง');
+      throw const FormatException(
+          'API Base URL ต้องเป็น http:// หรือ https:// ที่ถูกต้อง');
     }
     return normalized;
   }

@@ -51,9 +51,10 @@ class ResearchOSApiClient {
       _getJson('/v1/google-workspace/oauth/status');
   Future<Map<String, dynamic>> startGoogleWorkspaceOAuth() =>
       _postJson('/v1/google-workspace/oauth/start', const <String, Object?>{});
-  Future<Map<String, dynamic>> disconnectGoogleWorkspace() =>
-      _postJson('/v1/google-workspace/oauth/disconnect', const <String, Object?>{});
-  Future<Map<String, dynamic>> setGoogleWorkspaceServices(List<String> services) =>
+  Future<Map<String, dynamic>> disconnectGoogleWorkspace() => _postJson(
+      '/v1/google-workspace/oauth/disconnect', const <String, Object?>{});
+  Future<Map<String, dynamic>> setGoogleWorkspaceServices(
+          List<String> services) =>
       _postJson('/v1/google-workspace/services', <String, Object?>{
         'enabled_services': services,
       });
@@ -105,7 +106,9 @@ class ResearchOSApiClient {
       params['status'] = status.trim();
     }
     if (query != null && query.trim().isNotEmpty) params['q'] = query.trim();
-    if (agent != null && agent.trim().isNotEmpty) params['agent'] = agent.trim();
+    if (agent != null && agent.trim().isNotEmpty) {
+      params['agent'] = agent.trim();
+    }
     if (limit != null) params['limit'] = '$limit';
     final uri = _uri('/v1/agents/orchestrations').replace(
       queryParameters: params.isEmpty ? null : params,
@@ -140,8 +143,7 @@ class ResearchOSApiClient {
         <String, Object?>{'confirmed': confirmed},
       );
 
-  Future<Map<String, dynamic>> confirmOrchestration(String runId) =>
-      _postJson(
+  Future<Map<String, dynamic>> confirmOrchestration(String runId) => _postJson(
         '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/confirm',
         const <String, Object?>{},
       );
@@ -158,8 +160,7 @@ class ResearchOSApiClient {
         },
       );
 
-  Future<Map<String, dynamic>> cancelOrchestration(String runId) =>
-      _postJson(
+  Future<Map<String, dynamic>> cancelOrchestration(String runId) => _postJson(
         '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/cancel',
         const <String, Object?>{},
       );

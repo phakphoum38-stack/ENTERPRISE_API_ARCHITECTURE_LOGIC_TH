@@ -29,7 +29,8 @@ class _HomePageState extends State<HomePage> {
       _error = null;
     });
     try {
-      final results = await Future.wait<Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
+      final results = await Future.wait<
+          Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
         widget.apiClient.getHealth(),
         widget.apiClient.getProviders(),
       ]);
@@ -108,7 +109,10 @@ class _HomePageState extends State<HomePage> {
                       children: <Widget>[
                         Text(
                           'Research OS',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
                         ),
@@ -151,7 +155,8 @@ class _HomePageState extends State<HomePage> {
                           ],
                         ),
                       ),
-                      TextButton(onPressed: _refresh, child: const Text('Retry')),
+                      TextButton(
+                          onPressed: _refresh, child: const Text('Retry')),
                     ],
                   ),
                 ),
@@ -182,7 +187,8 @@ class _HomePageState extends State<HomePage> {
                       icon: Icons.dns_outlined,
                       title: 'Local API',
                       value: apiReady ? 'Online' : 'Offline',
-                      detail: _health?['version']?.toString() ?? 'Research OS API',
+                      detail:
+                          _health?['version']?.toString() ?? 'Research OS API',
                     ),
                     _StatusCard(
                       icon: Icons.smart_toy_outlined,
@@ -199,7 +205,9 @@ class _HomePageState extends State<HomePage> {
                     _StatusCard(
                       icon: Icons.apps_outlined,
                       title: 'Workspace',
-                      value: _health?['google_workspace'] == true ? 'Available' : 'Not ready',
+                      value: _health?['google_workspace'] == true
+                          ? 'Available'
+                          : 'Not ready',
                       detail: 'Google Workspace connector',
                     ),
                   ],
@@ -209,23 +217,35 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 28),
             _SectionHeader(
               title: 'Workspaces',
-              subtitle: 'Core areas are grouped by purpose instead of one long menu',
+              subtitle:
+                  'Core areas are grouped by purpose instead of one long menu',
             ),
             const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 980 ? 3 : constraints.maxWidth >= 620 ? 2 : 1;
-                final width = (constraints.maxWidth - ((columns - 1) * 12)) / columns;
+                final columns = constraints.maxWidth >= 980
+                    ? 3
+                    : constraints.maxWidth >= 620
+                        ? 2
+                        : 1;
+                final width =
+                    (constraints.maxWidth - ((columns - 1) * 12)) / columns;
                 return Wrap(
                   spacing: 12,
                   runSpacing: 12,
                   children: const <Widget>[
-                    _WorkspaceCard(Icons.auto_awesome_outlined, 'AI & Agents', 'Chat, specialist agents and task runtime'),
-                    _WorkspaceCard(Icons.local_library_outlined, 'Knowledge', 'Library, memory and knowledge graph'),
-                    _WorkspaceCard(Icons.link_outlined, 'Connections', 'GitHub and Google Workspace integrations'),
-                    _WorkspaceCard(Icons.security_outlined, 'Local System', 'Windows Service, API, storage and backup'),
-                    _WorkspaceCard(Icons.monitor_heart_outlined, 'Monitoring', 'Health, runtime and system visibility'),
-                    _WorkspaceCard(Icons.tune_outlined, 'Configuration', 'Providers, endpoints and application settings'),
+                    _WorkspaceCard(Icons.auto_awesome_outlined, 'AI & Agents',
+                        'Chat, specialist agents and task runtime'),
+                    _WorkspaceCard(Icons.local_library_outlined, 'Knowledge',
+                        'Library, memory and knowledge graph'),
+                    _WorkspaceCard(Icons.link_outlined, 'Connections',
+                        'GitHub and Google Workspace integrations'),
+                    _WorkspaceCard(Icons.security_outlined, 'Local System',
+                        'Windows Service, API, storage and backup'),
+                    _WorkspaceCard(Icons.monitor_heart_outlined, 'Monitoring',
+                        'Health, runtime and system visibility'),
+                    _WorkspaceCard(Icons.tune_outlined, 'Configuration',
+                        'Providers, endpoints and application settings'),
                   ].map((card) => SizedBox(width: width, child: card)).toList(),
                 );
               },
@@ -247,9 +267,15 @@ class _SectionHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+        Text(title,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 3),
-        Text(subtitle, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        Text(subtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ],
     );
   }
@@ -271,9 +297,12 @@ class _HealthBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(Icons.circle, size: 9, color: ready ? Colors.green : scheme.error),
+          Icon(Icons.circle,
+              size: 9, color: ready ? Colors.green : scheme.error),
           const SizedBox(width: 7),
-          Text(ready ? 'System ready' : 'API offline', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          Text(ready ? 'System ready' : 'API offline',
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
         ],
       ),
     );
@@ -281,7 +310,11 @@ class _HealthBadge extends StatelessWidget {
 }
 
 class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.icon, required this.title, required this.value, required this.detail});
+  const _StatusCard(
+      {required this.icon,
+      required this.title,
+      required this.value,
+      required this.detail});
   final IconData icon;
   final String title;
   final String value;
@@ -302,18 +335,34 @@ class _StatusCard extends StatelessWidget {
                   width: 36,
                   height: 36,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: scheme.secondaryContainer, borderRadius: BorderRadius.circular(10)),
-                  child: Icon(icon, size: 20, color: scheme.onSecondaryContainer),
+                  decoration: BoxDecoration(
+                      color: scheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(10)),
+                  child:
+                      Icon(icon, size: 20, color: scheme.onSecondaryContainer),
                 ),
                 const Spacer(),
                 Icon(Icons.circle, size: 8, color: scheme.primary),
               ],
             ),
             const Spacer(),
-            Text(title, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+            Text(title,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant)),
             const SizedBox(height: 2),
-            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-            Text(detail, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+            Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            Text(detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),
@@ -339,7 +388,9 @@ class _WorkspaceCard extends StatelessWidget {
               width: 44,
               height: 44,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(13)),
+              decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(13)),
               child: Icon(icon, color: scheme.primary),
             ),
             const SizedBox(width: 14),
@@ -347,9 +398,13 @@ class _WorkspaceCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                  Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
-                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+                  Text(subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
