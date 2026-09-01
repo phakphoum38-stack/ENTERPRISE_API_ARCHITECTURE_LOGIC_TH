@@ -33,12 +33,21 @@ void main() {
 
     final inspector = find.byKey(const Key('friend-workspace-context-inspector'));
     expect(inspector, findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.textContaining('ORCHESTRATOR'),
-      400,
-      scrollable: inspector,
+
+    final inspectorScrollable = find.ancestor(
+      of: inspector,
+      matching: find.byType(Scrollable),
     );
-    expect(find.textContaining('ORCHESTRATOR'), findsOneWidget);
+    expect(inspectorScrollable, findsOneWidget);
+
+    final orchestrator = find.textContaining('ORCHESTRATOR');
+    await tester.scrollUntilVisible(
+      orchestrator,
+      400,
+      scrollable: inspectorScrollable,
+    );
+
+    expect(orchestrator, findsOneWidget);
     expect(find.text('Runtime capacity not loaded'), findsOneWidget);
   });
 }
