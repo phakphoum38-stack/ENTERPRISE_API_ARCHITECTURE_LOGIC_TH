@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/research_os_api_client.dart';
+import 'agent_runtime_bridge.dart';
 import 'chat_page.dart';
 import 'design_studio_panel.dart';
 
@@ -61,12 +62,28 @@ class _FriendWorkspacePageState extends State<FriendWorkspacePage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 1100;
-        if (!wide) return ChatPage(apiClient: widget.apiClient);
+        if (!wide) {
+          return Column(
+            children: <Widget>[
+              AgentRuntimeBridge(apiClient: widget.apiClient),
+              const SizedBox(height: 10),
+              Expanded(child: ChatPage(apiClient: widget.apiClient)),
+            ],
+          );
+        }
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Expanded(child: ChatPage(apiClient: widget.apiClient)),
+            Expanded(
+              child: Column(
+                children: <Widget>[
+                  AgentRuntimeBridge(apiClient: widget.apiClient),
+                  const SizedBox(height: 12),
+                  Expanded(child: ChatPage(apiClient: widget.apiClient)),
+                ],
+              ),
+            ),
             const SizedBox(width: 14),
             SizedBox(
               width: 380,
@@ -204,9 +221,9 @@ class _InspectorLabel extends StatelessWidget {
 
 class _InspectorValue extends StatelessWidget {
   const _InspectorValue(this.text);
-  final String text;
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 4), child: Text(text));
+  final String text;
 }
 
 class _EvidenceRow extends StatelessWidget {
