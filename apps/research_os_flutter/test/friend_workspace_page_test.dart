@@ -30,6 +30,14 @@ void main() {
     expect(find.text('Current intent'), findsOneWidget);
     expect(find.text('Agent Mesh'), findsOneWidget);
     expect(find.text('Permission boundary'), findsOneWidget);
+
+    final inspector = find.byKey(const Key('friend-workspace-context-inspector'));
+    expect(inspector, findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.textContaining('ORCHESTRATOR'),
+      400,
+      scrollable: inspector,
+    );
     expect(find.textContaining('ORCHESTRATOR'), findsOneWidget);
     expect(find.text('Runtime capacity not loaded'), findsOneWidget);
   });
