@@ -14,8 +14,8 @@ class _DesignStudioPanelState extends State<DesignStudioPanel> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic> _capacity = const {};
-  List<dynamic> _agents = const [];
-  List<dynamic> _skills = const [];
+  Map<String, dynamic> _agents = const {};
+  Map<String, dynamic> _skills = const {};
 
   @override
   void initState() {
@@ -26,16 +26,16 @@ class _DesignStudioPanelState extends State<DesignStudioPanel> {
   Future<void> _refresh() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait<dynamic>([
+      final results = await Future.wait<Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
         widget.apiClient.getBrainCapacity(),
         widget.apiClient.getAgents(),
         widget.apiClient.getBrainSkills(),
       ]);
       if (!mounted) return;
       setState(() {
-        _capacity = results[0] as Map<String, dynamic>;
-        _agents = results[1] as List<dynamic>;
-        _skills = results[2] as List<dynamic>;
+        _capacity = results[0];
+        _agents = results[1];
+        _skills = results[2];
         _loading = false;
       });
     } catch (error) {
@@ -46,6 +46,7 @@ class _DesignStudioPanelState extends State<DesignStudioPanel> {
 
   String _capacityText() => (_capacity['maximum_leaf_capacity'] ?? _capacity['capacity'] ?? '46,656').toString();
   String _scaleText() => (_capacity['scale'] ?? '6^6').toString();
+  int _count(Map<String, dynamic> value, String key) => value[key] is List ? (value[key] as List).length : 0;
 
   @override
   Widget build(BuildContext context) {
@@ -69,19 +70,16 @@ class _DesignStudioPanelState extends State<DesignStudioPanel> {
             Wrap(spacing: 8, runSpacing: 8, children: [
               Chip(label: Text('${_scaleText()} READY')),
               Chip(label: Text('${_capacityText()} logical capacity')),
-              Chip(label: Text('${_agents.length} agents')),
-              Chip(label: Text('${_skills.length} skills')),
+              Chip(label: Text('${_count(_agents, 'agents')} agents')),
+              Chip(label: Text('${_count(_skills, 'skills')} skills')),
             ]),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             const _StepTile(number: '1', title: 'Registry & Policy', detail: 'Read agent registry, skills and permission boundary.'),
             const _StepTile(number: '2', title: 'Build Design System', detail: 'Compose UI from available capabilities and evidence.'),
             const _StepTile(number: '3', title: 'Accessibility & Status', detail: 'Check readable states, permissions and runtime readiness.'),
             const _StepTile(number: '4', title: 'Implementation Handoff', detail: 'Prepare evidence-backed handoff; no external write without explicit execution.'),
-            const SizedBox(height: 12),
             const Divider(),
-            const SizedBox(height: 8),
             const Text('Evidence', style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
             const _EvidenceRow(icon: Icons.check_circle_outline, title: 'Design created', detail: 'Friend Workspace Design Studio'),
             const _EvidenceRow(icon: Icons.smart_toy_outlined, title: 'GUI Designer', detail: 'Agent role ready'),
             _EvidenceRow(icon: Icons.hub_outlined, title: _scaleText(), detail: '${_capacityText()} logical capacity'),
