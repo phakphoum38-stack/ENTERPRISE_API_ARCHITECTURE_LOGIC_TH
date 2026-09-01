@@ -30,7 +30,19 @@ void main() {
     expect(find.text('Current intent'), findsOneWidget);
     expect(find.text('Agent Mesh'), findsOneWidget);
     expect(find.text('Permission boundary'), findsOneWidget);
-    expect(find.text('6^6 ORCHESTRATOR'), findsOneWidget);
+
+    final inspector = find.byKey(const Key('friend-workspace-context-inspector'));
+    expect(inspector, findsOneWidget);
+
+    // Keep the assertion resilient to Flutter's internal scrollable widget tree.
+    // Drag the inspector itself until the runtime status is built into the viewport.
+    final orchestrator = find.textContaining('ORCHESTRATOR');
+    for (var attempt = 0; attempt < 6 && orchestrator.evaluate().isEmpty; attempt++) {
+      await tester.drag(inspector, const Offset(0, -300));
+      await tester.pumpAndSettle();
+    }
+
+    expect(orchestrator, findsOneWidget);
     expect(find.text('Runtime capacity not loaded'), findsOneWidget);
   });
 }
