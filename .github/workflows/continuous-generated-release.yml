@@ -75,9 +75,6 @@ jobs:
         run: |
           set -euo pipefail
           workflow="research-os-windows-artifact.yml"
-          # Child Windows build allows up to 55 minutes; poll for 90 minutes
-          # so normal queue time plus the full child timeout cannot cause a
-          # false timeout in this parent workflow.
           for attempt in $(seq 1 180); do
             run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --branch main --event workflow_dispatch --limit 20 --json databaseId,status,conclusion,createdAt --jq 'map(select((.createdAt|fromdateiso8601) >= ('"$STARTED_EPOCH"' - 30))) | sort_by(.createdAt) | last')"
             if [[ -n "$run" && "$run" != "null" ]]; then
@@ -112,8 +109,10 @@ jobs:
             exit 1
           fi
 
-          artifacts="$(gh run view "$WINDOWS_RUN_ID" --repo "$GITHUB_REPOSITORY" --json artifacts --jq '.artifacts')"
-          echo "$artifacts" | jq -r '.[] | [.name, .sizeInBytes, .expired] | @tsv'
+          # `gh run view --json` does not expose an `artifacts` field.
+          # Query the Actions REST endpoint for the exact completed run instead.
+          artifacts="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$WINDOWS_RUN_ID/artifacts" --jq '.artifacts[]' | jq -s '.')"
+          echo "$artifacts" | jq -r '.[] | [.name, .size_in_bytes, .expired] | @tsv'
 
           expected="Research-OS-Windows-x64-Friend-Complete-${GITHUB_SHA}"
           match="$(jq -r --arg expected "$expected" 'map(select(.name == $expected and .expired == false)) | length' <<< "$artifacts")"
@@ -124,7 +123,7 @@ jobs:
             exit 1
           fi
 
-          size="$(jq -r --arg expected "$expected" '.[] | select(.name == $expected) | .sizeInBytes' <<< "$artifacts")"
+          size="$(jq -r --arg expected "$expected" '.[] | select(.name == $expected) | .size_in_bytes' <<< "$artifacts")"
           if [[ "$size" -le 0 ]]; then
             echo "Required Windows artifact is empty: $expected"
             exit 1
