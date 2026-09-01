@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .skills import Skill, SkillRegistry
 from .tools import Tool, ToolRegistry
+from .schedule_generation.adapter import ScheduleGenerateTool
 
 
 def _tag(label: str):
@@ -31,4 +32,14 @@ def install_builtin_skills(registry: SkillRegistry) -> SkillRegistry:
 def install_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
     registry.register(Tool("echo", "Deterministic local diagnostic tool.", _tag("tool:echo")))
     registry.register(Tool("summarize", "Local summary adapter for smoke/testing.", _tag("tool:summarize")))
+
+    schedule_generate = ScheduleGenerateTool()
+    registry.register(
+        Tool(
+            schedule_generate.name,
+            schedule_generate.description,
+            schedule_generate,
+        )
+    )
+
     return registry
