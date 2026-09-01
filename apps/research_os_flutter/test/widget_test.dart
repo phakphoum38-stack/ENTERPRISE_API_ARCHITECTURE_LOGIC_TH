@@ -191,7 +191,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
- testWidgets('knowledge graph shows nodes and relationships', (tester) async {
+  testWidgets('knowledge graph shows nodes and relationships', (tester) async {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -207,10 +207,7 @@ void main() {
     expect(find.byKey(const Key('knowledge-graph-heading')), findsOneWidget);
     expect(find.text('Research Memory'), findsOneWidget);
     expect(find.text('Knowledge Graph'), findsWidgets);
-    
-    // เปลี่ยนจาก 'RES-A → RES-B' เป็น 'RES-A -> RES-B' ให้ตรงกับ UI ที่แก้ไป
-    expect(find.text('RES-A -> RES-B'), findsOneWidget); 
-    
+    expect(find.text('RES-A -> RES-B'), findsOneWidget);
     expect(find.textContaining('supports'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
