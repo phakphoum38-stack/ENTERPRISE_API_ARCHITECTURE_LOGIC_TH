@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from .brain import FriendBrain
 from .context import FriendContext
 from .evidence import EvidenceRecorder
@@ -37,6 +39,13 @@ class FriendOrchestrator:
         skill_outputs = tuple(self.skills.run(skill, request.text) for skill in selected_skills)
         tool_outputs = tuple(tool.handler(request.text) for tool in selected_tools)
         provider_context = tuple(item.text for item in context.memories) + skill_outputs + tool_outputs
+
+        tool_results: dict[str, object] = {}
+        for tool, output in zip(selected_tools, tool_outputs):
+            try:
+                tool_results[tool.name] = json.loads(output)
+            except (TypeError, json.JSONDecodeError):
+                tool_results[tool.name] = output
         provider_name, answer = self.providers.complete(prompt=request.text, context=provider_context)
         self.memory.remember(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id, kind="request", text=request.text)
         self.memory.remember(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id, kind="response", text=answer)
@@ -54,5 +63,10 @@ class FriendOrchestrator:
             provider=provider_name,
             memory_items=memory_items,
             evidence_id=evidence_id,
-            metadata={"edition": self.owner.edition, "owner": self.owner.owner_id, "capabilities": self.brain.capabilities_for(request)},
+            metadata={
+                "edition": self.owner.edition,
+                "owner": self.owner.owner_id,
+                "capabilities": self.brain.capabilities_for(request),
+                "tool_results": tool_results,
+            },
         )

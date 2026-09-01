@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from .models import FriendRequest
 from .provider_settings import ProviderManager
 from .runtime import FriendRuntime
+from .schedule_generation.preview import PreviewNotFoundError
 
 OWNER_HEADER = "X-Research-OS-Owner"
 PROFILE_HEADER = "X-Research-OS-Profile"
@@ -105,13 +106,27 @@ class OwnerFriendService:
                 path = urlparse(self.path).path
                 try:
                     if path == "/owner/health":
-                        self._send_json(200, {"status": "ok", "edition": "owner-special", "version": "1.3.0-owner", "loopback_only": True})
+                        self._send_json(200, {"status": "ok", "edition": "owner-special", "version": "1.3.1-owner", "loopback_only": True})
                         return
                     owner_id, profile_id, session_id = self._scope()
                     if path == "/owner/status":
                         architecture = service.runtime.architecture()
-                        architecture.update({"service": "owner-friend", "version": "1.3.0-owner", "profile_id": profile_id, "session_id": session_id})
+                        architecture.update({"service": "owner-friend", "version": "1.3.1-owner", "profile_id": profile_id, "session_id": session_id})
                         self._send_json(200, architecture)
+                        return
+
+                    if path.startswith("/owner/schedule/previews/"):
+                        preview_id = path.rsplit("/", 1)[-1].strip()
+                        if not preview_id:
+                            raise ValueError("preview_id is required")
+
+                        preview = service.runtime.previews.get(
+                            owner_id=owner_id,
+                            profile_id=profile_id,
+                            session_id=session_id,
+                            preview_id=preview_id,
+                        )
+                        self._send_json(200, preview.to_dict())
                         return
                     if path == "/owner/provider":
                         self._send_json(200, service.provider_manager.safe_status())
@@ -123,6 +138,8 @@ class OwnerFriendService:
                     self._send_json(404, {"error": "not_found"})
                 except PermissionError as exc:
                     self._send_json(403, {"error": "forbidden", "message": str(exc)})
+                except PreviewNotFoundError as exc:
+                    self._send_json(404, {"error": "not_found", "message": str(exc)})
                 except (ValueError, KeyError, json.JSONDecodeError) as exc:
                     self._send_json(400, {"error": "bad_request", "message": str(exc)})
                 except Exception as exc:
@@ -133,6 +150,23 @@ class OwnerFriendService:
                 try:
                     owner_id, profile_id, session_id = self._scope()
                     payload = self._read_payload()
+
+                    if path.startswith("/owner/schedule/previews/") and path.endswith("/confirm"):
+                        preview_id = path[
+                            len("/owner/schedule/previews/"):-len("/confirm")
+                        ].strip("/")
+                        if not preview_id:
+                            raise ValueError("preview_id is required")
+
+                        preview = service.runtime.previews.confirm(
+                            owner_id=owner_id,
+                            profile_id=profile_id,
+                            session_id=session_id,
+                            preview_id=preview_id,
+                        )
+                        self._send_json(200, preview.to_dict())
+                        return
+
                     if path == "/owner/provider/config":
                         status = service.provider_manager.configure(
                             base_url=str(payload.get("base_url", "")),
@@ -165,6 +199,26 @@ class OwnerFriendService:
                         requested_tools=tuple(str(item) for item in payload.get("requested_tools", []) or []),
                     )
                     response = service.runtime.ask(request)
+
+                    metadata = dict(response.metadata)
+                    preview_payload = None
+
+                    if "schedule.generate" in response.decision.selected_tools:
+                        tool_results = metadata.get("tool_results", {})
+                        if isinstance(tool_results, dict):
+                            generated = tool_results.get("schedule.generate")
+                            if isinstance(generated, dict):
+                                preview = service.runtime.previews.create(
+                                    owner_id=owner_id,
+                                    profile_id=profile_id,
+                                    session_id=session_id,
+                                    result=generated,
+                                )
+                                preview_payload = {
+                                    "preview_id": preview.preview_id,
+                                    "status": preview.status,
+                                }
+
                     helper_allocation = service.runtime.helpers.allocate(request, response.decision.scale)
                     factory_scale = response.decision.scale.value
                     factory = service.runtime.bridge.factory_plan(factory_scale)
@@ -177,10 +231,15 @@ class OwnerFriendService:
                         "decision": {"scale": response.decision.scale.value, "capacity": response.decision.maximum_leaf_capacity, "plan": list(response.decision.plan), "skills": list(response.decision.selected_skills), "tools": list(response.decision.selected_tools), "summary": response.decision.summary},
                         "helpers": helper_allocation.snapshot(),
                         "factory": factory,
-                        "metadata": response.metadata,
+                        "metadata": {
+                            **metadata,
+                            **({"preview": preview_payload} if preview_payload is not None else {}),
+                        },
                     })
                 except PermissionError as exc:
                     self._send_json(403, {"error": "forbidden", "message": str(exc)})
+                except PreviewNotFoundError as exc:
+                    self._send_json(404, {"error": "not_found", "message": str(exc)})
                 except (ValueError, KeyError, json.JSONDecodeError) as exc:
                     self._send_json(400, {"error": "bad_request", "message": str(exc)})
                 except Exception as exc:

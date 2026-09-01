@@ -1,15 +1,141 @@
-﻿# ============================================================
-# Python
+# ============================================================
+# Python / Research OS
 # ============================================================
 
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
+
+# C extensions
 *.so
 
+# Distribution / packaging
 .Python
-*.egg-info/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
 .eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+# .python-version
+
+# pipenv
+# Pipfile.lock
+
+# UV
+# uv.lock
+
+# poetry
+# poetry.lock
+# poetry.toml
+
+# pdm
+.pdm-python
+.pdm-build/
+# pdm.lock
+# pdm.toml
+
+# pixi
+.pixi
+# pixi.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis
+*.rdb
+*.aof
+*.pid
+
+# RabbitMQ
+mnesia/
+rabbitmq/
+rabbitmq-data/
+
+# ActiveMQ
+activemq-data/
+
+# SageMath
+*.sage.py
+
+# Environments
+.env
+.env.*
+!.env.example
+!.env.template
+.envrc
 .venv/
 venv/
 ENV/
@@ -17,25 +143,57 @@ env/
 env.bak/
 venv.bak/
 
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.nox/
-.hypothesis/
-.mypy_cache/
-.pyre/
-.pytype/
-.ruff_cache/
-cython_debug/
-.ipynb_checkpoints/
+# Spyder
+.spyderproject
+.spyproject
 
-# Python local configuration
-.env
-.env.*
-!.env.example
-!.env.template
+# Rope
+.ropeproject
+
+# mkdocs
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Cython
+cython_debug/
+
+# PyCharm
+.idea/
+
+# Abstra
+.abstra/
+
+# Visual Studio Code
+# Keep .vscode ignored by default.
+.vscode/
+
+# Temporary execution files
+tempCodeRunnerFile.py
+
+# Ruff
+.ruff_cache/
+
+# PyPI
+.pypirc
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+
+# Streamlit
+.streamlit/secrets.toml
+
 
 # ============================================================
 # Flutter / Dart
@@ -44,18 +202,25 @@ cython_debug/
 **/.dart_tool/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
+**/.flutter-plugins-dependencies
 **/build/
 **/coverage/
-**/ephemeral/
 
+# Flutter generated metadata
+**/.flutter-plugins-dependencies
 **/ios/Flutter/.last_build_id
+
+# Dart / Flutter generated files
 **/*.symbols
 **/*.map.json
 
+
 # ============================================================
 # Flutter Windows
-# Keep Windows source; ignore generated output only.
 # ============================================================
+
+# Keep the Windows project source itself.
+# Ignore only generated/build output.
 
 **/windows/flutter/ephemeral/
 **/windows/runner/Debug/
@@ -63,15 +228,18 @@ cython_debug/
 **/windows/runner/Profile/
 **/windows/runner/x64/
 **/windows/build/
+
+# CMake / native build output
 **/windows/obj/
 **/windows/bin/
 
-# Native generated output anywhere in repository
+# Native build artifacts anywhere in the repository
 **/obj/
 **/bin/
 
+
 # ============================================================
-# Flutter Android
+# Android generated files
 # ============================================================
 
 **/android/.gradle/
@@ -80,42 +248,56 @@ cython_debug/
 **/android/app/profile/
 **/android/app/release/
 
+
 # ============================================================
-# Flutter iOS / macOS
+# iOS generated files
 # ============================================================
 
 **/ios/Pods/
 **/ios/.symlinks/
 **/ios/Flutter/ephemeral/
-**/ios/Flutter/.last_build_id
+**/ios/Flutter/.last_build_id/
+
+
+# ============================================================
+# macOS generated files
+# ============================================================
+
 **/macos/Flutter/ephemeral/
 
-# ============================================================
-# IDE / OS
-# ============================================================
 
-.idea/
-.vscode/
-.vs/
-
-*.iml
-*.ipr
-*.iws
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-*.swp
-*.swo
-*~
+# ============================================================
+# IDE / Operating System
+# ============================================================
 
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+.idea/
+.vscode/
+
+*.iml
+*.ipr
+*.iws
+
+*.swp
+*.swo
+*~
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Xcode
 *.xcuserstate
 
+
 # ============================================================
-# Logs / temporary files
+# Logs / Temporary files
 # ============================================================
 
 *.log
@@ -123,42 +305,69 @@ Desktop.ini
 *.temp
 *.bak
 *.orig
+
+# Crash dumps
 *.dmp
 
+
 # ============================================================
-# Build / release artifacts
+# Build / Release artifacts
 # ============================================================
 
+# Generic build output
+/build/
 /dist/
 /out/
 
+# Windows installers generated locally
 *.msi
 *.msix
 *.appx
+
+# Executables generated locally
+# Keep source-controlled release scripts; ignore local binaries.
 *.exe
 
+
 # ============================================================
-# Local Research OS artifacts
+# Test artifacts
+# ============================================================
+
+coverage/
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+
+# ============================================================
+# Local Research OS / service artifacts
 # ============================================================
 
 **/logs/
 **/tmp/
 **/.cache/
+
+# Local service runtime data
 **/runtime/
 **/state/
 
-# ============================================================
-# Local service generated artifacts
-# ============================================================
-
-**/windows_service/obj/
-**/windows_service/bin/
 
 # ============================================================
-# Other generated/package artifacts
+# Secrets / Local configuration
 # ============================================================
 
-*.class
-*.pid
-*.rdb
-*.aof
+# Never commit local credentials.
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local configuration
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Research OS Owner Special installer staging output
+owner_special/installer/package/
