@@ -19,7 +19,7 @@ jobs:
   dispatch-windows-build:
     name: Generate current Windows release
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - name: Checkout main source of truth
         uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           workflow="research-os-windows-artifact.yml"
-          for attempt in $(seq 1 90); do
+          for attempt in $(seq 1 120); do
             run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --branch main --event workflow_dispatch --limit 20 --json databaseId,status,conclusion,createdAt --jq 'map(select((.createdAt|fromdateiso8601) >= ('"$STARTED_EPOCH"' - 30))) | sort_by(.createdAt) | last')"
             if [[ -n "$run" && "$run" != "null" ]]; then
               id="$(jq -r '.databaseId' <<< "$run")"
