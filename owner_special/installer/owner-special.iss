@@ -55,13 +55,7 @@ var
   CmdExe: String;
 begin
   CmdExe := ExpandConstant('{cmd}');
-  Result := Exec(
-    CmdExe,
-    '/C sc.exe query ResearchOSOwnerFriendService | findstr /C:"STOPPED" >nul',
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode) and (ResultCode = 0);
+  Result := Exec(CmdExe, '/C sc.exe query ResearchOSOwnerFriendService | findstr /C:"STOPPED" >nul', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
 function QuiesceOwnerRuntime(): Boolean;
@@ -138,11 +132,11 @@ begin
     '  }' + #13#10 +
     '  $listeners = @(Get-OwnerListeners)' + #13#10 +
     '  if ($listeners.Count -gt 0) {' + #13#10 +
-    '    $pids = ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique) -join '',''' + #13#10 +
-    '    foreach ($pid in ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique)) { Stop-OwnerProcess -ProcessId $pid }' + #13#10 +
+    '    $listenerPids = ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique) -join '',''' + #13#10 +
+    '    foreach ($listenerPid in ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique)) { Stop-OwnerProcess -ProcessId $listenerPid }' + #13#10 +
     '    Start-Sleep -Milliseconds 500' + #13#10 +
     '    $remaining = @(Get-OwnerListeners)' + #13#10 +
-    '    if ($remaining.Count -gt 0) { Write-Error "Owner port $Port remained in LISTEN state. PID(s): $pids"; exit 12 }' + #13#10 +
+    '    if ($remaining.Count -gt 0) { Write-Error "Owner port $Port remained in LISTEN state. PID(s): $listenerPids"; exit 12 }' + #13#10 +
     '  }' + #13#10 +
     '  Start-Sleep -Milliseconds 500' + #13#10 +
     '  exit 0' + #13#10 +
@@ -159,10 +153,7 @@ begin
   end;
 
   PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-  Parameters :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath +
-    '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath +
-    '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790';
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath + '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath + '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790';
 
   if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
