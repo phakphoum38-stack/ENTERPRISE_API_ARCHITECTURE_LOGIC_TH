@@ -1,5 +1,5 @@
 #define MyAppName "Research OS Owner Special"
-#define MyAppVersion "1.3.0-owner"
+#define MyAppVersion "1.3.1-owner"
 #define MyAppPublisher "Research OS Owner"
 #define MyAppExeName "research_os_owner_special.exe"
 
@@ -18,7 +18,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 OutputDir=output
-OutputBaseFilename=Research-OS-Owner-Special-Setup-1.3.0-x64
+OutputBaseFilename=Research-OS-Owner-Special-Setup-1.3.1-x64
 UninstallDisplayName=Research OS Owner Special
 UninstallDisplayIcon={app}\app\{#MyAppExeName}
 SetupLogging=yes
@@ -55,13 +55,7 @@ var
   CmdExe: String;
 begin
   CmdExe := ExpandConstant('{cmd}');
-  Result := Exec(
-    CmdExe,
-    '/C sc.exe query ResearchOSOwnerFriendService | findstr /C:"STOPPED" >nul',
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode) and (ResultCode = 0);
+  Result := Exec(CmdExe, '/C sc.exe query ResearchOSOwnerFriendService | findstr /C:"STOPPED" >nul', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
 function QuiesceOwnerRuntime(): Boolean;
@@ -97,6 +91,19 @@ begin
     'function Get-OwnerListeners {' + #13#10 +
     '  return @(Get-NetTCPConnection -ErrorAction Stop | Where-Object { $_.LocalPort -eq $Port -and $_.State -eq ''Listen'' })' + #13#10 +
     '}' + #13#10 +
+    'function Stop-OwnerProcess([int]$ProcessId) {' + #13#10 +
+    '  if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return }' + #13#10 +
+    '  Write-Host "Stopping Owner process PID $ProcessId"' + #13#10 +
+    '  $taskkill = Join-Path $env:SystemRoot ''System32\taskkill.exe''' + #13#10 +
+    '  $killOutput = & $taskkill /PID $ProcessId /T /F 2>&1 | Out-String' + #13#10 +
+    '  $killCode = $LASTEXITCODE' + #13#10 +
+    '  Write-Host $killOutput.Trim()' + #13#10 +
+    '  if ($killCode -ne 0 -and (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {' + #13#10 +
+    '    try { Stop-Process -Id $ProcessId -Force -ErrorAction Stop } catch {' + #13#10 +
+    '      throw "Unable to terminate Owner PID $ProcessId. taskkill exit $killCode. $($_.Exception.Message)"' + #13#10 +
+    '    }' + #13#10 +
+    '  }' + #13#10 +
+    '}' + #13#10 +
     'try {' + #13#10 +
     '  $running = @()' + #13#10 +
     '  for ($i = 0; $i -lt 20; $i++) {' + #13#10 +
@@ -105,14 +112,7 @@ begin
     '    Start-Sleep -Milliseconds 500' + #13#10 +
     '  }' + #13#10 +
     '  $running = @(Get-OwnerProcesses)' + #13#10 +
-    '  if ($running.Count -gt 0) {' + #13#10 +
-    '    foreach ($p in $running) {' + #13#10 +
-    '      Write-Host "Forcing Owner process PID $($p.ProcessId): $($p.ExecutablePath)"' + #13#10 +
-    '      try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop } catch {' + #13#10 +
-    '        if (Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue) { throw }' + #13#10 +
-    '      }' + #13#10 +
-    '    }' + #13#10 +
-    '  }' + #13#10 +
+    '  foreach ($p in $running) { Stop-OwnerProcess -ProcessId $p.ProcessId }' + #13#10 +
     '  for ($i = 0; $i -lt 20; $i++) {' + #13#10 +
     '    $running = @(Get-OwnerProcesses)' + #13#10 +
     '    if ($running.Count -eq 0) { break }' + #13#10 +
@@ -132,9 +132,11 @@ begin
     '  }' + #13#10 +
     '  $listeners = @(Get-OwnerListeners)' + #13#10 +
     '  if ($listeners.Count -gt 0) {' + #13#10 +
-    '    $pids = ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique) -join '',''' + #13#10 +
-    '    Write-Error "Owner port $Port remained in LISTEN state. PID(s): $pids"' + #13#10 +
-    '    exit 12' + #13#10 +
+    '    $listenerPids = ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique) -join '',''' + #13#10 +
+    '    foreach ($listenerPid in ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique)) { Stop-OwnerProcess -ProcessId $listenerPid }' + #13#10 +
+    '    Start-Sleep -Milliseconds 500' + #13#10 +
+    '    $remaining = @(Get-OwnerListeners)' + #13#10 +
+    '    if ($remaining.Count -gt 0) { Write-Error "Owner port $Port remained in LISTEN state. PID(s): $listenerPids"; exit 12 }' + #13#10 +
     '  }' + #13#10 +
     '  Start-Sleep -Milliseconds 500' + #13#10 +
     '  exit 0' + #13#10 +
@@ -151,18 +153,9 @@ begin
   end;
 
   PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-  Parameters :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath +
-    '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath +
-    '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790';
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath + '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath + '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790';
 
-  if not Exec(
-    PowerShellExe,
-    Parameters,
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode) then
+  if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
     Log('Could not launch Owner runtime quiesce helper; refusing file replacement.');
     Result := False;
@@ -238,7 +231,7 @@ begin
 
   if not QuiesceOwnerRuntime() then
   begin
-    Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement to prevent Access denied (code 5). See setup log for the quiesce helper exit code.';
+    Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log for the quiesce helper exit code.';
     Exit;
   end;
 end;
