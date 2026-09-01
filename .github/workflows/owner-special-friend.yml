@@ -169,12 +169,12 @@ jobs:
           $iscc="${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           & $iscc '.\owner-special.iss'
           if ($LASTEXITCODE -ne 0) { throw 'Owner Setup compilation failed' }
-          if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe')) { throw 'Owner Setup EXE missing' }
+          if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe')) { throw 'Owner Setup EXE missing' }
       - name: Upload raw owner_special Setup.exe for validation
         uses: actions/upload-artifact@v6
         with:
           name: owner-special-setup-build-${{ github.sha }}
-          path: owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.0-x64.exe
+          path: owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
           if-no-files-found: error
           retention-days: 30
 
@@ -194,24 +194,24 @@ jobs:
       - name: Verify prebuilt owner_special Setup.exe exists
         shell: pwsh
         run: |
-          $setup="$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+          $setup="$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
           if (-not (Test-Path $setup -PathType Leaf)) { throw 'Prebuilt Owner Setup EXE missing before validation' }
           Get-FileHash $setup -Algorithm SHA256 | Format-List | Out-Host
       - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase clean
         shell: pwsh
-        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
       - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase upgrade
         shell: pwsh
-        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
       - name: Run owner_special/scripts/validate-owner-installer.ps1 -Phase uninstall
         shell: pwsh
-        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.0-x64.exe"
+        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
       - name: Upload validated owner_special Setup.exe and evidence
         uses: actions/upload-artifact@v6
         with:
           name: owner-special-setup-${{ github.sha }}
           path: |
-            owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.0-x64.exe
+            owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
             owner_special/installer/output/owner-v1.3-validation.json
           if-no-files-found: error
           retention-days: 30
@@ -264,7 +264,7 @@ jobs:
           from pathlib import Path
           dist=Path('owner_special/dist')
           validated=dist/'validated-installer'
-          setup=validated/'Research-OS-Owner-Special-Setup-1.3.0-x64.exe'
+          setup=validated/'Research-OS-Owner-Special-Setup-1.3.1-x64.exe'
           evidence=validated/'owner-v1.3-validation.json'
           source=dist/'Research-OS-Owner-Special-Friend-Complete.zip'
           source_sha=dist/'BUNDLE_SHA256.txt'
@@ -293,11 +293,10 @@ jobs:
           if not final.is_file(): raise SystemExit('Final Owner Special release ZIP missing')
           with zipfile.ZipFile(final) as archive:
               names=set(archive.namelist())
-              required={'Research-OS-Owner-Special-Setup-1.3.0-x64.exe','owner-v1.3-validation.json','Research-OS-Owner-Special-Friend-Complete.zip','BUNDLE_SHA256.txt','bundle-result.json'}
+              required={'Research-OS-Owner-Special-Setup-1.3.1-x64.exe','owner-v1.3-validation.json','Research-OS-Owner-Special-Friend-Complete.zip','BUNDLE_SHA256.txt','bundle-result.json'}
               missing=required-names
               if missing: raise SystemExit(f'Missing final Owner Special release files: {sorted(missing)}')
           print(final)
-          PY
       - name: Upload owner_special final release outputs
         uses: actions/upload-artifact@v6
         with:
@@ -308,7 +307,7 @@ jobs:
             owner_special/dist/Research-OS-Owner-Special-Friend-Complete.zip
             owner_special/dist/BUNDLE_SHA256.txt
             owner_special/dist/bundle-result.json
-            owner_special/dist/validated-installer/Research-OS-Owner-Special-Setup-1.3.0-x64.exe
+            owner_special/dist/validated-installer/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
             owner_special/dist/validated-installer/owner-v1.3-validation.json
           if-no-files-found: error
           retention-days: 30
