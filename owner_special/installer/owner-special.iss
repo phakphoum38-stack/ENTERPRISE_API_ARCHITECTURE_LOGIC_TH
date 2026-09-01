@@ -92,8 +92,15 @@ begin
     '  return @(Get-NetTCPConnection -ErrorAction Stop | Where-Object { $_.LocalPort -eq $Port -and $_.State -eq ''Listen'' })' + #13#10 +
     '}' + #13#10 +
     'function Stop-OwnerProcess([int]$ProcessId) {' + #13#10 +
+    '  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction Stop' + #13#10 +
+    '  if (-not $process) { throw "Process PID $ProcessId disappeared before ownership verification; refusing termination." }' + #13#10 +
+    '  if (-not $process.ExecutablePath) { throw "Process PID $ProcessId has no executable path; refusing termination." }' + #13#10 +
+    '  $full = Normalize-Path $process.ExecutablePath' + #13#10 +
+    '  if (-not $full -or -not ($targets -icontains $full)) {' + #13#10 +
+    '    throw "Refusing to terminate foreign process PID $ProcessId. ExecutablePath=$($process.ExecutablePath)"' + #13#10 +
+    '  }' + #13#10 +
     '  if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return }' + #13#10 +
-    '  Write-Host "Stopping Owner process PID $ProcessId"' + #13#10 +
+    '  Write-Host "Stopping Owner process PID $ProcessId ($($process.ExecutablePath))"' + #13#10 +
     '  $taskkill = Join-Path $env:SystemRoot ''System32\taskkill.exe''' + #13#10 +
     '  $killOutput = & $taskkill /PID $ProcessId /T /F 2>&1 | Out-String' + #13#10 +
     '  $killCode = $LASTEXITCODE' + #13#10 +
