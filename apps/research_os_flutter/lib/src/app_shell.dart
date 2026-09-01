@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
-import 'features/chat/chat_page.dart';
+import 'features/chat/friend_workspace_page.dart';
 import 'features/developer_access/developer_access_page.dart';
 import 'features/github/github_dashboard_page.dart';
 import 'features/google_workspace/google_workspace_page.dart';
@@ -39,7 +39,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   List<Widget> get _pages => <Widget>[
         HomePage(apiClient: widget.apiClient),
-        ChatPage(apiClient: widget.apiClient),
+        FriendWorkspacePage(apiClient: widget.apiClient),
         AgentCenterPage(apiClient: widget.apiClient),
         LibraryPage(apiClient: widget.apiClient),
         KnowledgeGraphPage(apiClient: widget.apiClient),
