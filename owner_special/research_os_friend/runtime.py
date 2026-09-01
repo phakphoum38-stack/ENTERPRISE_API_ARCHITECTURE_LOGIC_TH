@@ -15,6 +15,7 @@ from .orchestrator import FriendOrchestrator
 from .persistent_memory import PersistentScopedMemory
 from .policy import OwnerPolicy
 from .providers import MockProvider, ProviderRouter
+from .schedule_generation.preview import SchedulePreviewStore
 from .reasoning import DecisionPlanner
 from .skills import SkillRegistry
 from .tools import ToolRegistry
@@ -29,6 +30,7 @@ class FriendRuntime:
     bridge: V3Bridge
     helpers: HelperScheduler
     data_root: Path | None = None
+    previews: SchedulePreviewStore | None = None
 
     @classmethod
     def create_owner_special(cls, owner_id: str, *, display_name: str = "Owner", evidence_path: Path | None = None, data_root: Path | None = None, repository_root: Path | None = None) -> "FriendRuntime":
@@ -47,13 +49,15 @@ class FriendRuntime:
         normalized_root = Path(data_root).resolve() if data_root is not None else None
         if normalized_root is None:
             memory: ScopedMemory = ScopedMemory()
+            previews = SchedulePreviewStore(Path.cwd() / ".research_os_previews")
         else:
             owner_root = normalized_root / "owners" / owner.owner_id
             memory = PersistentScopedMemory(owner_root / "memory" / "memory.json")
+            previews = SchedulePreviewStore(normalized_root)
             if evidence_path is None:
                 evidence_path = owner_root / "evidence" / "events.jsonl"
         orchestrator = FriendOrchestrator(owner=owner, brain=FriendBrain(bridge), planner=DecisionPlanner(), skills=skills, tools=tools, providers=providers, memory=memory, policy=OwnerPolicy(), evidence=EvidenceRecorder(evidence_path))
-        return cls(owner=owner, orchestrator=orchestrator, capabilities=capabilities, bridge=bridge, helpers=HelperScheduler(), data_root=normalized_root)
+        return cls(owner=owner, orchestrator=orchestrator, capabilities=capabilities, bridge=bridge, helpers=HelperScheduler(), data_root=normalized_root, previews=previews)
 
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
