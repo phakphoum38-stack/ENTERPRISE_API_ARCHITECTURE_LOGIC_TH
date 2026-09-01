@@ -133,6 +133,7 @@ class _ContextInspector extends StatelessWidget {
           border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: ListView(
+          key: const Key('friend-workspace-context-inspector'),
           padding: const EdgeInsets.all(18),
           children: <Widget>[
             Row(children: <Widget>[
