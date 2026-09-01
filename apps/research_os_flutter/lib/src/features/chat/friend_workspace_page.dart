@@ -52,6 +52,8 @@ class _FriendWorkspacePageState extends State<FriendWorkspacePage> {
     return value is num ? value.toInt() : int.tryParse('$value');
   }
 
+  String _scaleValue() => (_capacity?['scale'] ?? '6^6').toString();
+
   int _listLength(Map<String, dynamic>? payload, String key) {
     final value = payload?[key];
     return value is List ? value.length : 0;
@@ -67,15 +69,14 @@ class _FriendWorkspacePageState extends State<FriendWorkspacePage> {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Expanded(
-              child: ChatPageSlot(),
-            ),
+            Expanded(child: ChatPage(apiClient: widget.apiClient)),
             const SizedBox(width: 14),
             SizedBox(
               width: 360,
               child: _ContextInspector(
                 loading: _loading,
                 error: _error,
+                scale: _scaleValue(),
                 capacity: _capacityValue(),
                 agents: _listLength(_agents, 'agents'),
                 readyAgents: _listLength(_readiness, 'agents'),
@@ -90,21 +91,11 @@ class _FriendWorkspacePageState extends State<FriendWorkspacePage> {
   }
 }
 
-class ChatPageSlot extends StatelessWidget {
-  const ChatPageSlot({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final page = context.findAncestorStateOfType<_FriendWorkspacePageState>();
-    if (page == null) return const SizedBox.shrink();
-    return ChatPage(apiClient: page.widget.apiClient);
-  }
-}
-
 class _ContextInspector extends StatelessWidget {
   const _ContextInspector({
     required this.loading,
     required this.error,
+    required this.scale,
     required this.capacity,
     required this.agents,
     required this.readyAgents,
@@ -114,6 +105,7 @@ class _ContextInspector extends StatelessWidget {
 
   final bool loading;
   final String? error;
+  final String scale;
   final int? capacity;
   final int agents;
   final int readyAgents;
@@ -123,6 +115,7 @@ class _ContextInspector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final runtimeReady = capacity != null;
     return Container(
       decoration: BoxDecoration(
         color: scheme.surface,
@@ -137,37 +130,26 @@ class _ContextInspector extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Context Inspector',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
               IconButton(
                 tooltip: 'Refresh runtime context',
                 onPressed: loading ? null : onRefresh,
                 icon: loading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.refresh),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            'Visible intent, agents, permissions and evidence',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text('Visible intent, agents, permissions and evidence', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 18),
           const _InspectorLabel('Current intent'),
           const _InspectorValue('build + verify'),
           const SizedBox(height: 14),
           const _InspectorLabel('Agent Mesh'),
-          _InspectorValue(
-            agents == 0 ? 'Not loaded' : '$readyAgents / $agents ready',
-          ),
+          _InspectorValue(agents == 0 ? 'Not loaded' : '$readyAgents / $agents ready'),
           const SizedBox(height: 14),
           const _InspectorLabel('Skills & Tools'),
           const _InspectorValue('Registry-backed capability routing'),
@@ -186,9 +168,7 @@ class _ContextInspector extends StatelessWidget {
           const _InspectorValue('Local-first • evidence-aware'),
           const SizedBox(height: 14),
           const _InspectorLabel('Permission boundary'),
-          const _InspectorValue(
-            'Writes require an explicit execution path; external actions remain credential-scoped.',
-          ),
+          const _InspectorValue('Writes require an explicit execution path; external actions remain credential-scoped.'),
           const SizedBox(height: 18),
           Card(
             margin: EdgeInsets.zero,
@@ -203,21 +183,15 @@ class _ContextInspector extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '6^6 ORCHESTRATOR',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
+                          '$scale ORCHESTRATOR',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                         ),
                       ),
-                      const Chip(label: Text('READY')),
+                      Chip(label: Text(runtimeReady ? 'READY' : 'CHECK')),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    capacity == null
-                        ? 'Runtime capacity not loaded'
-                        : '$capacity logical capacity',
-                  ),
+                  Text(capacity == null ? 'Runtime capacity not loaded' : '$capacity logical capacity'),
                   const SizedBox(height: 4),
                   Text('$runs recent orchestration runs'),
                 ],
@@ -238,10 +212,7 @@ class _ContextInspector extends StatelessWidget {
           ),
           if (error != null) ...<Widget>[
             const SizedBox(height: 12),
-            Text(
-              error!,
-              style: TextStyle(color: scheme.error),
-            ),
+            Text(error!, style: TextStyle(color: scheme.error)),
           ],
         ],
       ),
@@ -255,12 +226,7 @@ class _InspectorLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-    );
+    return Text(text, style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700));
   }
 }
 
@@ -270,10 +236,7 @@ class _InspectorValue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Text(text),
-    );
+    return Padding(padding: const EdgeInsets.only(top: 4), child: Text(text));
   }
 }
 
