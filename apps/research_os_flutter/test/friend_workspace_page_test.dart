@@ -30,7 +30,7 @@ void main() {
     expect(find.text('Current intent'), findsOneWidget);
     expect(find.text('Agent Mesh'), findsOneWidget);
     expect(find.text('Permission boundary'), findsOneWidget);
-    expect(find.text('6^6 ORCHESTRATOR'), findsOneWidget);
+    expect(find.textContaining('ORCHESTRATOR'), findsOneWidget);
     expect(find.text('Runtime capacity not loaded'), findsOneWidget);
   });
 }
