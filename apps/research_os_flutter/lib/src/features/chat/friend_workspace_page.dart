@@ -116,105 +116,108 @@ class _ContextInspector extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final runtimeReady = capacity != null;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: ListView(
-        padding: const EdgeInsets.all(18),
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  'Context Inspector',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Theme.of(context).dividerColor),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.all(18),
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'Context Inspector',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Refresh runtime context',
+                  onPressed: loading ? null : onRefresh,
+                  icon: loading
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text('Visible intent, agents, permissions and evidence', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 18),
+            const _InspectorLabel('Current intent'),
+            const _InspectorValue('build + verify'),
+            const SizedBox(height: 14),
+            const _InspectorLabel('Agent Mesh'),
+            _InspectorValue(agents == 0 ? 'Not loaded' : '$readyAgents / $agents ready'),
+            const SizedBox(height: 14),
+            const _InspectorLabel('Skills & Tools'),
+            const _InspectorValue('Registry-backed capability routing'),
+            const SizedBox(height: 14),
+            const _InspectorLabel('Selected agents'),
+            const Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                Chip(label: Text('GUI Designer')),
+                Chip(label: Text('Developer')),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const _InspectorLabel('Memory & Evidence'),
+            const _InspectorValue('Local-first • evidence-aware'),
+            const SizedBox(height: 14),
+            const _InspectorLabel('Permission boundary'),
+            const _InspectorValue('Writes require an explicit execution path; external actions remain credential-scoped.'),
+            const SizedBox(height: 18),
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        const Icon(Icons.hub_outlined),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$scale ORCHESTRATOR',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        Chip(label: Text(runtimeReady ? 'READY' : 'CHECK')),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(capacity == null ? 'Runtime capacity not loaded' : '$capacity logical capacity'),
+                    const SizedBox(height: 4),
+                    Text('$runs recent orchestration runs'),
+                  ],
                 ),
               ),
-              IconButton(
-                tooltip: 'Refresh runtime context',
-                onPressed: loading ? null : onRefresh,
-                icon: loading
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text('Visible intent, agents, permissions and evidence', style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 18),
-          const _InspectorLabel('Current intent'),
-          const _InspectorValue('build + verify'),
-          const SizedBox(height: 14),
-          const _InspectorLabel('Agent Mesh'),
-          _InspectorValue(agents == 0 ? 'Not loaded' : '$readyAgents / $agents ready'),
-          const SizedBox(height: 14),
-          const _InspectorLabel('Skills & Tools'),
-          const _InspectorValue('Registry-backed capability routing'),
-          const SizedBox(height: 14),
-          const _InspectorLabel('Selected agents'),
-          const Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              Chip(label: Text('GUI Designer')),
-              Chip(label: Text('Developer')),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const _InspectorLabel('Memory & Evidence'),
-          const _InspectorValue('Local-first • evidence-aware'),
-          const SizedBox(height: 14),
-          const _InspectorLabel('Permission boundary'),
-          const _InspectorValue('Writes require an explicit execution path; external actions remain credential-scoped.'),
-          const SizedBox(height: 18),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      const Icon(Icons.hub_outlined),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '$scale ORCHESTRATOR',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                      Chip(label: Text(runtimeReady ? 'READY' : 'CHECK')),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(capacity == null ? 'Runtime capacity not loaded' : '$capacity logical capacity'),
-                  const SizedBox(height: 4),
-                  Text('$runs recent orchestration runs'),
-                ],
-              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          const _InspectorLabel('Evidence'),
-          const _EvidenceRow(
-            icon: Icons.design_services_outlined,
-            title: 'Design created',
-            detail: 'GUI Designer • implementation handoff',
-          ),
-          const _EvidenceRow(
-            icon: Icons.fact_check_outlined,
-            title: 'Regression',
-            detail: 'Runtime result appears after verification',
-          ),
-          if (error != null) ...<Widget>[
-            const SizedBox(height: 12),
-            Text(error!, style: TextStyle(color: scheme.error)),
+            const SizedBox(height: 14),
+            const _InspectorLabel('Evidence'),
+            const _EvidenceRow(
+              icon: Icons.design_services_outlined,
+              title: 'Design created',
+              detail: 'GUI Designer • implementation handoff',
+            ),
+            const _EvidenceRow(
+              icon: Icons.fact_check_outlined,
+              title: 'Regression',
+              detail: 'Runtime result appears after verification',
+            ),
+            if (error != null) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(error!, style: TextStyle(color: scheme.error)),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
