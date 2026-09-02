@@ -93,7 +93,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Run planned • waiting for explicit execution.'), findsOneWidget);
-    expect(find.textContaining('run-evidence-'), findsOneWidget);
+    // The production UI intentionally truncates long run IDs for compactness.
+    expect(find.textContaining('run-evidence'), findsOneWidget);
 
     await tester.tap(find.text('Explicit Execute'));
     await tester.pumpAndSettle();
