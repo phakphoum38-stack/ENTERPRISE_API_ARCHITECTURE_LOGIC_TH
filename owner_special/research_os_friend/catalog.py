@@ -3,6 +3,7 @@ from __future__ import annotations
 from .skills import Skill, SkillRegistry
 from .tools import Tool, ToolRegistry
 from .schedule_generation.adapter import ScheduleGenerateTool
+from .calendar_tools import calendar_health, calendar_sync, calendar_sync_status
 
 
 def _tag(label: str):
@@ -39,6 +40,27 @@ def install_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
             schedule_generate.name,
             schedule_generate.description,
             schedule_generate,
+        )
+    )
+    registry.register(
+        Tool(
+            "calendar.health",
+            "Check the local phakphum-calendar Research OS bridge without exposing Google credentials.",
+            calendar_health,
+        )
+    )
+    registry.register(
+        Tool(
+            "calendar.sync",
+            "Queue a phakphum-calendar synchronization asynchronously and return a job ID.",
+            calendar_sync,
+        )
+    )
+    registry.register(
+        Tool(
+            "calendar.sync.status",
+            "Read the status/result of a previously queued phakphum-calendar synchronization job.",
+            calendar_sync_status,
         )
     )
 
