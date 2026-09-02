@@ -22,6 +22,7 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8),
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
   ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
+  ResearchNavItem('Account', 'Google Sign-In', Icons.account_circle_outlined, 12),
 ];
 
 class ResearchSidebar extends StatelessWidget {
@@ -122,168 +123,7 @@ class ResearchSidebar extends StatelessWidget {
             ),
           ),
           const Divider(height: 1),
-          Expanded(
-            child: ListView(
-              key: const Key('desktop-navigation-list'),
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: _entries(context),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Container(
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: expanded
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
-                        const SizedBox(width: 8),
-                        const Flexible(
-                          child: Text(
-                            'Local-first & secure',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Icon(Icons.shield_outlined, size: 16, color: scheme.primary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class ResearchMobileDrawer extends StatelessWidget {
-  const ResearchMobileDrawer({
-    required this.selectedIndex,
-    required this.onSelected,
-    super.key,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-
-  List<Widget> _entries(BuildContext context) {
-    final widgets = <Widget>[];
-    String? section;
-    for (final item in researchNavigationItems) {
-      if (section != item.section) {
-        section = item.section;
-        widgets.add(_SectionLabel(section));
-      }
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-          child: ListTile(
-            key: Key('mobile-nav-${item.index}'),
-            selected: selectedIndex == item.index,
-            leading: Icon(item.icon),
-            title: Text(item.label),
-            onTap: () => onSelected(item.index),
-          ),
-        ),
-      );
-    }
-    return widgets;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Drawer(
-      child: SafeArea(
-        child: Column(
-          children: <Widget>[
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Row(
-                children: <Widget>[
-                  ResearchBrandMark(),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Research OS',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: _entries(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class ResearchBrandMark extends StatelessWidget {
-  const ResearchBrandMark({this.compact = false, super.key});
-
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: compact ? 30 : 36,
-      height: compact ? 30 : 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: Text(
-        'R',
-        style: TextStyle(
-          color: scheme.onPrimaryContainer,
-          fontWeight: FontWeight.w900,
-          fontSize: compact ? 15 : 18,
-        ),
-      ),
-    );
-  }
-}
-
-class ResearchStatusBar extends StatelessWidget {
-  const ResearchStatusBar({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      key: const Key('desktop-status-bar'),
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.circle, size: 8, color: scheme.primary),
-          const SizedBox(width: 6),
-          const Text('Research OS', style: TextStyle(fontSize: 12)),
-          const Spacer(),
-          const _StatusItem(Icons.smart_toy_outlined, 'Agents'),
-          const _StatusItem(Icons.memory_outlined, 'Memory'),
-          const _StatusItem(Icons.apps_outlined, 'Workspace'),
-          const _StatusItem(Icons.dns_outlined, 'Local API'),
+          Expanded(child: ListView(children: _entries(context))),
         ],
       ),
     );
@@ -293,21 +133,18 @@ class ResearchStatusBar extends StatelessWidget {
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.label);
   final String label;
-
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
-      child: Text(
-        label.toUpperCase(),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-              letterSpacing: .7,
-            ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 5),
+        child: Text(
+          label.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+                letterSpacing: .8,
+              ),
+        ),
+      );
 }
 
 class _SidebarDestination extends StatelessWidget {
@@ -317,49 +154,38 @@ class _SidebarDestination extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-
   final ResearchNavItem item;
   final bool expanded;
   final bool selected;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: expanded ? 10 : 8, vertical: 2),
-      child: Tooltip(
-        message: expanded ? '' : item.label,
-        child: Material(
-          color: selected ? scheme.secondaryContainer : Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Material(
+        color: selected ? scheme.secondaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            key: Key('desktop-nav-${item.index}'),
-            borderRadius: BorderRadius.circular(12),
-            onTap: onTap,
-            child: SizedBox(
-              height: 44,
-              child: Row(
-                mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
-                children: <Widget>[
-                  SizedBox(
-                    width: expanded ? 44 : 58,
-                    child: Icon(
-                      item.icon,
-                      color: selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
+          child: SizedBox(
+            height: 44,
+            child: Row(
+              children: <Widget>[
+                SizedBox(
+                  width: expanded ? 44 : 60,
+                  child: Icon(item.icon, color: selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant),
+                ),
+                if (expanded)
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
                     ),
                   ),
-                  if (expanded)
-                    Expanded(
-                      child: Text(
-                        item.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
           ),
         ),
@@ -368,23 +194,46 @@ class _SidebarDestination extends StatelessWidget {
   }
 }
 
-class _StatusItem extends StatelessWidget {
-  const _StatusItem(this.icon, this.label);
-  final IconData icon;
-  final String label;
-
+class ResearchBrandMark extends StatelessWidget {
+  const ResearchBrandMark({this.compact = false, super.key});
+  final bool compact;
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 16),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 15),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(fontSize: 11)),
-        ],
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: compact ? 30 : 38,
+      height: compact ? 30 : 38,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: <Color>[scheme.primaryContainer, scheme.secondaryContainer]),
+        borderRadius: BorderRadius.circular(compact ? 9 : 12),
       ),
+      child: Text('R', style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w900)),
     );
   }
+}
+
+class ResearchStatusBar extends StatelessWidget {
+  const ResearchStatusBar({super.key});
+  @override
+  Widget build(BuildContext context) => const SizedBox(height: 0);
+}
+
+class ResearchMobileDrawer extends StatelessWidget {
+  const ResearchMobileDrawer({required this.selectedIndex, required this.onSelected, super.key});
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  @override
+  Widget build(BuildContext context) => Drawer(
+        child: ListView(children: <Widget>[
+          const DrawerHeader(child: Text('Research OS')),
+          for (final item in researchNavigationItems)
+            ListTile(
+              selected: selectedIndex == item.index,
+              leading: Icon(item.icon),
+              title: Text(item.label),
+              onTap: () => onSelected(item.index),
+            ),
+        ]),
+      );
 }
