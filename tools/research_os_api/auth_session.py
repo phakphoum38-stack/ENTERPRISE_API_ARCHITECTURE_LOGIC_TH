@@ -124,7 +124,9 @@ def issue_session(account: dict[str, Any], *, ttl_seconds: int = DEFAULT_TTL_SEC
     email = str(account.get("email") or "").strip().lower()
     if not email:
         raise ValueError("identity email is required")
-    user_id = str(account.get("user_id") or account.get("sub") or account.get("id") or email).strip()
+    user_id = str(account.get("user_id") or account.get("sub") or account.get("id") or "").strip()
+    if not user_id:
+        user_id = "email:" + hashlib.sha256(email.encode("utf-8")).hexdigest()[:32]
     role = str(account.get("role") or "user").strip().lower()
     now = int(time.time())
     payload = {
