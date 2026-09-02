@@ -36,7 +36,7 @@ class ResearchOSAppShell extends StatefulWidget {
 
 class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
   int _selectedIndex = 0;
-  bool _sidebarExpanded = true;
+  bool _sidebarExpanded = false;
 
   List<Widget> get _pages => <Widget>[
         HomePage(apiClient: widget.apiClient),
@@ -92,6 +92,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
                   ),
                   Expanded(
                     child: Column(
+                      key: const Key('desktop-content-pane'),
                       children: <Widget>[
                         Expanded(
                           child: IndexedStack(
