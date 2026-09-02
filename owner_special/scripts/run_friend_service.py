@@ -8,8 +8,10 @@ from pathlib import Path
 # the certified V3 service entrypoint and does not depend on PYTHONPATH being
 # honored by a relocated/bundled Python runtime or by the Windows SCM process.
 OWNER_SPECIAL_ROOT = Path(__file__).resolve().parents[1]
-if str(OWNER_SPECIAL_ROOT) not in sys.path:
-    sys.path.insert(0, str(OWNER_SPECIAL_ROOT))
+REPOSITORY_ROOT = OWNER_SPECIAL_ROOT.parent
+for source_root in (OWNER_SPECIAL_ROOT, REPOSITORY_ROOT):
+    if str(source_root) not in sys.path:
+        sys.path.insert(0, str(source_root))
 
 from research_os_friend import OwnerFriendService
 
