@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api/research_os_api_client.dart';
+import 'runtime_models.dart';
 
 class AgentRuntimeBridge extends StatefulWidget {
   const AgentRuntimeBridge({required this.apiClient, super.key});
@@ -18,10 +19,10 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
   Timer? _evidenceTimer;
   bool _busy = false;
   bool _loadingEvidence = false;
-  String? _runId;
-  String? _status;
+  OrchestrationRun? _run;
+  RuntimeEvidence _evidence = const RuntimeEvidence(state: RuntimeState.idle);
+  String? _statusMessage;
   String? _error;
-  Map<String, dynamic> _evidence = const <String, dynamic>{};
 
   @override
   void dispose() {
@@ -37,45 +38,28 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
     setState(() {
       _busy = true;
       _error = null;
-      _evidence = const <String, dynamic>{};
-      _status = 'Creating an Agent Mesh plan…';
+      _run = null;
+      _evidence = const RuntimeEvidence(state: RuntimeState.idle);
+      _statusMessage = 'Creating an Agent Mesh plan…';
     });
     try {
       final response = await widget.apiClient.createOrchestration(
         objective: objective,
         steps: <Map<String, Object?>>[
-          <String, Object?>{
-            'step_id': 'understand',
-            'objective': 'Understand the request and available context.',
-            'requested_agent': 'auto',
-            'max_attempts': 2,
-          },
-          <String, Object?>{
-            'step_id': 'plan',
-            'objective': 'Plan the smallest evidence-backed implementation path.',
-            'requested_agent': 'auto',
-            'max_attempts': 2,
-          },
-          <String, Object?>{
-            'step_id': 'verify',
-            'objective': 'Verify the result and record runtime evidence.',
-            'requested_agent': 'auto',
-            'max_attempts': 2,
-          },
+          <String, Object?>{'step_id': 'understand', 'objective': 'Understand the request and available context.', 'requested_agent': 'auto', 'max_attempts': 2},
+          <String, Object?>{'step_id': 'plan', 'objective': 'Plan the smallest evidence-backed implementation path.', 'requested_agent': 'auto', 'max_attempts': 2},
+          <String, Object?>{'step_id': 'verify', 'objective': 'Verify the result and record runtime evidence.', 'requested_agent': 'auto', 'max_attempts': 2},
         ],
       );
-      final rawRun = response['run'];
-      final run = rawRun is Map ? Map<String, dynamic>.from(rawRun) : const <String, dynamic>{};
-      final runId = (response['run_id'] ?? response['id'] ?? run['run_id'] ?? run['id'] ?? '').toString();
-      final status = (response['status'] ?? run['status'] ?? 'planned').toString();
+      final run = OrchestrationRun.fromResponse(response);
       if (!mounted) return;
       setState(() {
-        _runId = runId.isEmpty ? null : runId;
-        _status = runId.isEmpty
-            ? 'Plan created; run id was not returned.'
-            : 'Run $status • waiting for explicit execution.';
+        _run = run;
+        _statusMessage = run.hasId
+            ? 'Run planned • waiting for explicit execution.'
+            : 'Plan created; run id was not returned.';
       });
-      if (runId.isNotEmpty) await _loadEvidence();
+      if (run.hasId) await _loadEvidence(preservePlannedState: true);
     } on Object catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -84,21 +68,29 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
   }
 
   Future<void> _execute() async {
-    final runId = _runId;
-    if (runId == null || _busy) return;
+    final run = _run;
+    if (run == null || !run.hasId || _busy) return;
     setState(() {
       _busy = true;
       _error = null;
-      _status = 'Executing approved Agent Mesh run…';
+      _statusMessage = 'Executing approved Agent Mesh run…';
     });
     try {
-      final response = await widget.apiClient.executeOrchestration(runId, confirmed: true);
-      final rawRun = response['run'];
-      final run = rawRun is Map ? Map<String, dynamic>.from(rawRun) : const <String, dynamic>{};
-      final status = (response['status'] ?? run['status'] ?? 'execution requested').toString();
-      if (mounted) setState(() => _status = 'Run $status • $runId');
+      final response = await widget.apiClient.executeOrchestration(run.id, confirmed: true);
+      final executedRun = OrchestrationRun.fromResponse(response);
+      if (mounted) {
+        setState(() {
+          _run = OrchestrationRun(
+            id: executedRun.id.isEmpty ? run.id : executedRun.id,
+            objective: executedRun.objective.isEmpty ? run.objective : executedRun.objective,
+            state: executedRun.state == RuntimeState.unknown ? RuntimeState.executing : executedRun.state,
+            steps: executedRun.steps.isEmpty ? run.steps : executedRun.steps,
+          );
+          _statusMessage = 'Run ${_run!.state.wireName} • ${_run!.id}';
+        });
+      }
       await _loadEvidence();
-      _startEvidencePolling(runId);
+      if (!mounted || !_evidence.state.isTerminal) _startEvidencePolling(run.id);
     } on Object catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -110,34 +102,37 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
     _evidenceTimer?.cancel();
     var attempts = 0;
     _evidenceTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
-      if (_runId != runId) {
+      if (_run?.id != runId) {
         timer.cancel();
         _evidenceTimer = null;
         return;
       }
       attempts += 1;
       await _loadEvidence();
-      if (attempts >= 20 || _isTerminal(_evidenceStatus())) {
+      if (attempts >= 20 || _evidence.state.isTerminal) {
         timer.cancel();
         _evidenceTimer = null;
       }
     });
   }
 
-  Future<void> _loadEvidence() async {
-    final runId = _runId;
-    if (runId == null || _loadingEvidence) return;
+  Future<void> _loadEvidence({bool preservePlannedState = false}) async {
+    final run = _run;
+    if (run == null || !run.hasId || _loadingEvidence) return;
     setState(() => _loadingEvidence = true);
     try {
-      final response = await widget.apiClient.getOrchestrationTimeline(runId);
+      final response = await widget.apiClient.getOrchestrationTimeline(run.id);
+      final evidence = RuntimeEvidence.fromResponse(response);
       if (!mounted) return;
       setState(() {
-        _evidence = response;
-        final status = _evidenceStatus();
-        if (status.isNotEmpty) {
-          _status = status.toLowerCase() == 'planned'
-              ? 'Run planned • waiting for explicit execution.'
-              : 'Run $status • $runId';
+        _evidence = evidence;
+        if (evidence.state != RuntimeState.unknown && !(preservePlannedState && evidence.state == RuntimeState.planned)) {
+          _run = OrchestrationRun(id: run.id, objective: run.objective, state: evidence.state, steps: run.steps);
+        }
+        if (preservePlannedState && run.state == RuntimeState.planned && evidence.state == RuntimeState.planned) {
+          _statusMessage = 'Run planned • waiting for explicit execution.';
+        } else if (evidence.state != RuntimeState.unknown) {
+          _statusMessage = 'Run ${evidence.state.wireName} • ${run.id}';
         }
       });
     } on Object catch (error) {
@@ -147,33 +142,7 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
     }
   }
 
-  String _evidenceStatus() {
-    for (final key in const <String>['status', 'run_status', 'state', 'conclusion']) {
-      final value = _evidence[key];
-      if (value != null && value.toString().trim().isNotEmpty) return value.toString();
-    }
-    for (final item in _timelineItems().reversed) {
-      final status = _itemValue(item, const <String>['status', 'run_status', 'state', 'conclusion']);
-      if (status.isNotEmpty) return status;
-    }
-    return '';
-  }
-
-  bool _isTerminal(String status) {
-    final normalized = status.toLowerCase();
-    return normalized == 'completed' || normalized == 'success' || normalized == 'succeeded' || normalized == 'failed' || normalized == 'cancelled' || normalized == 'canceled';
-  }
-
-  List<dynamic> _timelineItems() {
-    for (final key in const <String>['events', 'timeline', 'items', 'steps']) {
-      final value = _evidence[key];
-      if (value is List) return value;
-    }
-    return const <dynamic>[];
-  }
-
-  String _itemValue(dynamic item, List<String> keys) {
-    if (item is! Map) return item.toString();
+  String _eventValue(Map<String, dynamic> item, List<String> keys) {
     for (final key in keys) {
       final value = item[key];
       if (value != null && value.toString().trim().isNotEmpty) return value.toString();
@@ -182,8 +151,7 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
   }
 
   Widget _evidenceView() {
-    final status = _evidenceStatus();
-    final items = _timelineItems();
+    final events = _evidence.events;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -202,17 +170,19 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
             ),
           ],
         ),
-        if (status.isNotEmpty) Chip(avatar: const Icon(Icons.circle, size: 10), label: Text(status)),
-        if (_evidence.isEmpty) const Text('Execute a planned run to collect runtime evidence.'),
-        if (items.isEmpty && _evidence.isNotEmpty) const Padding(padding: EdgeInsets.only(top: 6), child: Text('Timeline is available; no event list was returned by the runtime.')),
-        if (items.isNotEmpty)
-          ...items.take(8).map(
+        if (_evidence.state != RuntimeState.idle && _evidence.state != RuntimeState.unknown)
+          Chip(avatar: const Icon(Icons.circle, size: 10), label: Text(_evidence.state.wireName)),
+        if (_evidence.raw.isEmpty) const Text('Execute a planned run to collect runtime evidence.'),
+        if (events.isEmpty && _evidence.raw.isNotEmpty)
+          const Padding(padding: EdgeInsets.only(top: 6), child: Text('Timeline is available; no event list was returned by the runtime.')),
+        if (events.isNotEmpty)
+          ...events.take(8).map(
                 (item) => ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.check_circle_outline, size: 18),
-                  title: Text(_itemValue(item, const <String>['title', 'name', 'step_id', 'event', 'event_type', 'type'])),
-                  subtitle: Text(_itemValue(item, const <String>['status', 'run_status', 'state', 'detail', 'message', 'objective'])),
+                  leading: Icon(_evidence.state.isTerminal ? Icons.check_circle_outline : Icons.radio_button_checked, size: 18),
+                  title: Text(_eventValue(item, const <String>['title', 'name', 'step_id', 'event', 'event_type', 'type'])),
+                  subtitle: Text(_eventValue(item, const <String>['status', 'run_status', 'state', 'detail', 'message', 'objective'])),
                 ),
               ),
         const SizedBox(height: 4),
@@ -223,6 +193,7 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
 
   @override
   Widget build(BuildContext context) {
+    final run = _run;
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -235,7 +206,11 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
                 const Icon(Icons.hub_outlined, size: 20),
                 const SizedBox(width: 8),
                 Expanded(child: Text('Agent Mesh Runtime', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800))),
-                if (_runId != null) Chip(avatar: const Icon(Icons.route_outlined, size: 16), label: Text(_runId!.length > 12 ? '${_runId!.substring(0, 12)}…' : _runId!)),
+                if (run != null && run.hasId)
+                  Chip(
+                    avatar: const Icon(Icons.route_outlined, size: 16),
+                    label: Text(run.id.length > 12 ? '${run.id.substring(0, 12)}…' : run.id),
+                  ),
               ],
             ),
             const SizedBox(height: 4),
@@ -256,12 +231,12 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
               runSpacing: 8,
               children: <Widget>[
                 FilledButton.icon(onPressed: _busy ? null : _plan, icon: const Icon(Icons.account_tree_outlined), label: const Text('Plan with Agent Mesh')),
-                OutlinedButton.icon(onPressed: _runId == null || _busy ? null : _execute, icon: const Icon(Icons.play_arrow_outlined), label: const Text('Explicit Execute')),
+                OutlinedButton.icon(onPressed: run == null || !run.hasId || _busy ? null : _execute, icon: const Icon(Icons.play_arrow_outlined), label: const Text('Explicit Execute')),
               ],
             ),
             if (_busy) ...<Widget>[const SizedBox(height: 10), const LinearProgressIndicator()],
-            if (_status != null) ...<Widget>[const SizedBox(height: 8), Text(_status!)],
-            if (_error != null) ...<Widget>[const SizedBox(height: 8), Text(_error!, style: TextStyle(color: Colors.red))],
+            if (_statusMessage != null) ...<Widget>[const SizedBox(height: 8), Text(_statusMessage!)],
+            if (_error != null) ...<Widget>[const SizedBox(height: 8), Text(_error!, style: const TextStyle(color: Colors.red))],
             _evidenceView(),
           ],
         ),
