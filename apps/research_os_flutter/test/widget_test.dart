@@ -158,10 +158,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await openDesktopDestination(tester, 1);
 
-    await tester.enterText(
-      find.byType(TextField).first,
-      'บ้านเรามีความรู้อะไรบ้าง',
+    final chatComposer = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          (widget.decoration?.hintText?.toString().contains('ถาม AI') ?? false),
     );
+    expect(chatComposer, findsOneWidget);
+    await tester.enterText(chatComposer, 'บ้านเรามีความรู้อะไรบ้าง');
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
