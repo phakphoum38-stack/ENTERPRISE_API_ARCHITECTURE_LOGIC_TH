@@ -149,6 +149,7 @@ class GoogleOAuthBroker:
         except Exception:
             return {}
         return {
+            "sub": payload.get("sub"),
             "email": payload.get("email"),
             "name": payload.get("name"),
             "picture": payload.get("picture"),
