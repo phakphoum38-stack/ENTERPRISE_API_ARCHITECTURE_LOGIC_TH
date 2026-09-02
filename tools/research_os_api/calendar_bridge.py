@@ -22,6 +22,7 @@ class CalendarJob:
     status: str
     created_at: float
     updated_at: float
+    remote_sync_id: str | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
 
@@ -35,8 +36,8 @@ class ResearchOSCalendarBridge:
 
     Research OS never receives or stores Google OAuth tokens. The calendar app
     owns provider credentials and exposes only the narrow bridge contract.
-    Long-running sync operations are represented by jobs so Friend does not
-    hold an HTTP request open until the provider finishes.
+    Long-running sync operations are represented by remote sync jobs so Friend
+    does not hold an HTTP request open until the provider finishes.
     """
 
     def __init__(self, base_url: str | None = None, timeout: float | None = None) -> None:
@@ -81,10 +82,36 @@ class ResearchOSCalendarBridge:
     def _run_sync(self, job_id: str, payload: dict[str, Any]) -> None:
         self._update(job_id, status="running")
         try:
-            result = self._request("POST", "/v1/research-os/sync", payload)
+            accepted = self._request("POST", "/v1/research-os/sync", payload)
+            remote_sync_id = accepted.get("sync_id") or accepted.get("job_id")
+            if not isinstance(remote_sync_id, str) or not remote_sync_id.strip():
+                # Backward-compatible contract: a bridge may complete inline.
+                self._update(job_id, status="completed", result=accepted)
+                return
+            self._update(job_id, status="running", remote_sync_id=remote_sync_id)
+            result = self._poll_remote_sync(remote_sync_id)
             self._update(job_id, status="completed", result=result)
         except Exception as exc:
             self._update(job_id, status="failed", error=str(exc))
+
+    def _poll_remote_sync(self, sync_id: str) -> dict[str, Any]:
+        deadline = time.monotonic() + self.timeout
+        path = f"/v1/research-os/sync/{sync_id}"
+        while True:
+            result = self._request("GET", path)
+            status = str(result.get("status", "")).lower()
+            if status in {"completed", "failed", "cancelled"}:
+                if status != "completed":
+                    raise CalendarBridgeError(
+                        f"calendar sync {sync_id} finished with status {status}: "
+                        f"{result.get('error', 'unknown error')}"
+                    )
+                return result
+            if time.monotonic() >= deadline:
+                raise CalendarBridgeError(
+                    f"calendar sync {sync_id} did not complete within {self.timeout:.1f}s"
+                )
+            time.sleep(min(0.5, max(0.05, deadline - time.monotonic())))
 
     def _update(self, job_id: str, **changes: Any) -> None:
         with self._lock:
