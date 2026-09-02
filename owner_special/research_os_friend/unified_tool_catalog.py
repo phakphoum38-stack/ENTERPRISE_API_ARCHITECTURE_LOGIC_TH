@@ -22,14 +22,10 @@ class ToolDescriptor:
     dependency: str | None = None
 
 
-# This is metadata only: execution remains owned by the existing registries.
 TOOL_CATALOG: tuple[ToolDescriptor, ...] = (
     ToolDescriptor("echo", "friend.echo", "friend", ToolState.READY),
     ToolDescriptor("summarize", "friend.summarize", "friend", ToolState.READY),
     ToolDescriptor("schedule.generate", "calendar.schedule.generate", "friend", ToolState.READY),
-    ToolDescriptor("calendar.health", "calendar.health", "friend", ToolState.READY, True, "phakphum-calendar"),
-    ToolDescriptor("calendar.sync", "calendar.sync", "friend", ToolState.READY, True, "phakphum-calendar"),
-    ToolDescriptor("calendar.sync.status", "calendar.sync.status", "friend", ToolState.READY, True, "phakphum-calendar"),
     ToolDescriptor("web", "web.fetch", "v3", ToolState.IMPLEMENTED_UNREGISTERED),
     ToolDescriptor("github", "github.repository", "v3", ToolState.IMPLEMENTED_UNREGISTERED),
     ToolDescriptor("file", "file.read", "v3", ToolState.IMPLEMENTED_UNREGISTERED),
@@ -41,8 +37,7 @@ TOOL_CATALOG: tuple[ToolDescriptor, ...] = (
     ToolDescriptor("python-validator", "validation.python", "repair", ToolState.READY),
     ToolDescriptor("git-branch", "git.branch", "repair", ToolState.READY),
     ToolDescriptor("pr-gate", "git.pull_request", "repair", ToolState.READY),
-    ToolDescriptor("google-workspace", "google.workspace", "external", ToolState.NEEDS_CONNECTION, True, "Google Workspace"),
-    ToolDescriptor("microsoft", "microsoft.oauth", "external", ToolState.NEEDS_CONNECTION, True, "Microsoft OAuth"),
+    ToolDescriptor("google-oauth", "google.oauth", "external", ToolState.NEEDS_CONNECTION, False, "Google OAuth"),
 )
 
 
