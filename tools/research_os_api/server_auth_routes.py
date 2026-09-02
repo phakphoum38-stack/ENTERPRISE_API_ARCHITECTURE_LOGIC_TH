@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from http.cookies import SimpleCookie
+from http.cookies import CookieError, SimpleCookie
 from urllib.parse import parse_qs, urlparse
 
 from auth_session import SESSION_COOKIE, clear_cookie_header, revoke_session, verify_session
