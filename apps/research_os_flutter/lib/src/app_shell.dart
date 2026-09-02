@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
+import 'features/auth/google_login_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
-import 'features/chat/friend_workspace_page.dart';
+import 'features/chat/voice_conversation_page.dart';
 import 'features/developer_access/developer_access_page.dart';
 import 'features/github/github_dashboard_page.dart';
 import 'features/google_workspace/google_workspace_page.dart';
@@ -14,6 +15,7 @@ import 'features/local_api/local_api_control_page.dart';
 import 'features/monitor/system_monitor_page.dart';
 import 'features/settings/settings_page.dart';
 import 'ui/enterprise_navigation.dart';
+import 'ui/research_os_sidebar_v2.dart';
 
 class ResearchOSAppShell extends StatefulWidget {
   const ResearchOSAppShell({
@@ -39,7 +41,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   List<Widget> get _pages => <Widget>[
         HomePage(apiClient: widget.apiClient),
-        FriendWorkspacePage(apiClient: widget.apiClient),
+        VoiceConversationPage(apiClient: widget.apiClient),
         AgentCenterPage(apiClient: widget.apiClient),
         LibraryPage(apiClient: widget.apiClient),
         KnowledgeGraphPage(apiClient: widget.apiClient),
@@ -56,6 +58,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         ),
         DeveloperAccessPage(),
         BrainSkillsPage(apiClient: widget.apiClient),
+        GoogleLoginPage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
@@ -81,50 +84,26 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         if (constraints.maxWidth >= 920) {
           return Scaffold(
             body: SafeArea(
-              child: Stack(
+              child: Row(
                 children: <Widget>[
-                  Positioned.fill(
-                    left: ResearchSidebar.compactWidth,
-                    child: SizedBox.expand(
-                      key: const Key('desktop-content-pane'),
-                      child: Column(
-                        children: <Widget>[
-                          Expanded(
-                            child: IndexedStack(
-                              index: _selectedIndex,
-                              children: _pages,
-                            ),
-                          ),
-                          const ResearchStatusBar(),
-                        ],
-                      ),
-                    ),
+                  ResearchOSSidebarV2(
+                    expanded: _sidebarExpanded,
+                    selectedIndex: _selectedIndex,
+                    onToggle: _toggleSidebar,
+                    onSelected: _selectFromSidebar,
                   ),
-                  if (_sidebarExpanded)
-                    Positioned.fill(
-                      left: ResearchSidebar.expandedWidth,
-                      child: GestureDetector(
-                        key: const Key('desktop-sidebar-dismiss'),
-                        behavior: HitTestBehavior.translucent,
-                        onTap: _toggleSidebar,
-                      ),
-                    ),
-                  Positioned(
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    child: Material(
-                      elevation: _sidebarExpanded ? 12 : 0,
-                      shadowColor: Theme.of(context).shadowColor,
-                      shape: Border(
-                        right: BorderSide(color: Theme.of(context).dividerColor),
-                      ),
-                      child: ResearchSidebar(
-                        expanded: _sidebarExpanded,
-                        selectedIndex: _selectedIndex,
-                        onToggle: _toggleSidebar,
-                        onSelected: _selectFromSidebar,
-                      ),
+                  Expanded(
+                    child: Column(
+                      key: const Key('desktop-content-pane'),
+                      children: <Widget>[
+                        Expanded(
+                          child: IndexedStack(
+                            index: _selectedIndex,
+                            children: _pages,
+                          ),
+                        ),
+                        const ResearchStatusBar(),
+                      ],
                     ),
                   ),
                 ],
