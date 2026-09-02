@@ -31,12 +31,11 @@ class GoogleIdentitySessionTests(unittest.TestCase):
             },
         ):
             result = GoogleIdentityBroker(data_dir).complete(code="test-code", state="test-state")
-
-        self.assertEqual(result["account"]["email"], "owner@example.com")
-        self.assertIn("session", result)
-        session = verify_session(result["session"])
-        self.assertEqual(session["email"], "owner@example.com")
-        self.assertEqual(session["role"], "USER".lower())
+            self.assertEqual(result["account"]["email"], "owner@example.com")
+            self.assertIn("session", result)
+            session = verify_session(result["session"])
+            self.assertEqual(session["email"], "owner@example.com")
+            self.assertEqual(session["role"], "user")
 
     def test_google_identity_scopes_are_identity_only(self):
         with tempfile.TemporaryDirectory() as data_dir:
