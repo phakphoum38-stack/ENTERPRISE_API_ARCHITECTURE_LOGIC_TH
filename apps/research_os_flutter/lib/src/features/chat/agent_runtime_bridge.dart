@@ -134,7 +134,11 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
       setState(() {
         _evidence = response;
         final status = _evidenceStatus();
-        if (status.isNotEmpty) _status = 'Run $status • $runId';
+        if (status.isNotEmpty) {
+          _status = status.toLowerCase() == 'planned'
+              ? 'Run planned • waiting for explicit execution.'
+              : 'Run $status • $runId';
+        }
       });
     } on Object catch (error) {
       if (mounted) setState(() => _error = 'Evidence refresh failed: $error');
