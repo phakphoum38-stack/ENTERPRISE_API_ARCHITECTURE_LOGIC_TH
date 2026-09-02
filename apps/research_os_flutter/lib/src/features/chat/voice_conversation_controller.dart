@@ -28,14 +28,14 @@ class VoiceConversationController {
 
   double get effectiveSpeechRate => switch (mood) {
         FriendVoiceMood.balanced => speechRate,
-        FriendVoiceMood.cheerful => (speechRate + .05).clamp(.1, 1.0),
-        FriendVoiceMood.serious => (speechRate - .04).clamp(.1, 1.0),
+        FriendVoiceMood.cheerful => (speechRate + .05).clamp(.1, 1.0).toDouble(),
+        FriendVoiceMood.serious => (speechRate - .04).clamp(.1, 1.0).toDouble(),
       };
 
   double get effectivePitch => switch (mood) {
         FriendVoiceMood.balanced => pitch,
-        FriendVoiceMood.cheerful => (pitch + .04).clamp(.5, 2.0),
-        FriendVoiceMood.serious => (pitch - .04).clamp(.5, 2.0),
+        FriendVoiceMood.cheerful => (pitch + .04).clamp(.5, 2.0).toDouble(),
+        FriendVoiceMood.serious => (pitch - .04).clamp(.5, 2.0).toDouble(),
       };
 
   Future<bool> initialize({
