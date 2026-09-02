@@ -102,8 +102,8 @@ void main() {
     expect(api.executed, isTrue);
     expect(api.confirmed, isTrue);
     expect(find.textContaining('Run completed • run-evidence-'), findsOneWidget);
-    expect(find.text('run.completed'), findsOneWidget);
     expect(find.text('completed'), findsWidgets);
+    expect(find.text('verify'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
