@@ -19,7 +19,7 @@ from typing import Any
 
 SESSION_COOKIE = "research_os_session"
 DEFAULT_TTL_SECONDS = 8 * 60 * 60
-_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
 def _secret() -> bytes:
@@ -123,8 +123,8 @@ def session_id(token: str) -> str:
 def issue_session(account: dict[str, Any], *, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> str:
     email = str(account.get("email") or "").strip().lower()
     if not email:
-        raise ValueError("Google identity email is required")
-    user_id = str(account.get("sub") or account.get("id") or email).strip()
+        raise ValueError("identity email is required")
+    user_id = str(account.get("user_id") or account.get("sub") or account.get("id") or email).strip()
     role = str(account.get("role") or "user").strip().lower()
     now = int(time.time())
     payload = {
