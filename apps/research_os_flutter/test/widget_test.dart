@@ -167,7 +167,7 @@ void main() {
     await tester.enterText(chatComposer, 'บ้านเรามีความรู้อะไรบ้าง');
     await tester.tap(find.byTooltip('ส่ง'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
 
     expect(find.text('คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
     expect(find.text('Memory 1 รายการ'), findsOneWidget);
