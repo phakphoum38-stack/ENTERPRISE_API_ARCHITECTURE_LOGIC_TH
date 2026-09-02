@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler
 from google_oauth import GoogleOAuthBroker, IDENTITY_SCOPES
 from rbac import RoleStore
 from auth_session import clear_cookie_header, cookie_header, issue_session, revoke_session
+from oauth_handoff import create_handoff
 
 
 _SIGNOUT_STATE = threading.local()
@@ -104,6 +105,10 @@ class GoogleIdentityBroker(GoogleOAuthBroker):
         result["account"] = account
         session = issue_session(account)
         result["session"] = session
+        redirect_uri = str(result.get("redirect_uri") or self.redirect_uri()).strip()
+        # Native clients use the OAuth state as a short-lived, single-use
+        # handoff code. The session itself never appears in the browser URL.
+        create_handoff(self.root, session, redirect_uri, code=state)
         handler = _current_http_handler()
         if handler is not None:
             _install_signout_cookie_hook()
