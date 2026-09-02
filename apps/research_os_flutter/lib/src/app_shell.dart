@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
+import 'features/auth/google_login_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
 import 'features/chat/chat_workspace_page.dart';
 import 'features/developer_access/developer_access_page.dart';
@@ -57,7 +58,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         ),
         DeveloperAccessPage(),
         BrainSkillsPage(apiClient: widget.apiClient),
-        const _GoogleLoginPlaceholderPage(),
+        GoogleLoginPage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
@@ -141,17 +142,6 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
           body: IndexedStack(index: _selectedIndex, children: _pages),
         );
       },
-    );
-  }
-}
-
-class _GoogleLoginPlaceholderPage extends StatelessWidget {
-  const _GoogleLoginPlaceholderPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Google Sign-in'),
     );
   }
 }
