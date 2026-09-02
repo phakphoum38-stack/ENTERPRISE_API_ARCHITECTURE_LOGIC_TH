@@ -19,6 +19,7 @@ from .schedule_generation.preview import SchedulePreviewStore
 from .reasoning import DecisionPlanner
 from .skills import SkillRegistry
 from .tools import ToolRegistry
+from .tool_health import ToolHealthMatrix
 from .unified_tool_catalog import UnifiedToolCatalog
 from .v3_bridge import V3Bridge
 from .v3_execution_adapter import V3ExecutionAdapter
@@ -73,6 +74,13 @@ class FriendRuntime:
             v3_tools=self.v3.names(),
         )
 
+    def tool_health(self) -> dict[str, object]:
+        """Return aggregate counts plus the same read-only catalog rows."""
+        return ToolHealthMatrix().snapshot(
+            friend_tools=self.orchestrator.tools.names(),
+            v3_tools=self.v3.names(),
+        )
+
     def execute_v3(
         self,
         request: FriendRequest,
@@ -103,6 +111,7 @@ class FriendRuntime:
             "skills": self.orchestrator.skills.names(),
             "tools": self.orchestrator.tools.names(),
             "tool_catalog": self.tool_catalog(),
+            "tool_health": self.tool_health(),
             "v3_execution": self.v3.snapshot(),
             "providers": self.orchestrator.providers.names(),
             "capabilities": self.capabilities.names(),
