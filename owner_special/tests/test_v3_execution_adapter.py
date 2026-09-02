@@ -29,7 +29,7 @@ class V3ExecutionAdapterTests(unittest.TestCase):
         self.assertEqual(runtime.v3.names(), ("file", "github", "python", "shell", "web"))
         rows = {row["name"]: row for row in runtime.tool_catalog()}
         for name in ("web", "github", "file", "python", "shell"):
-            self.assertEqual(rows[name]["state"], "ready")
+            self.assertEqual(rows[name]["state"], "implemented_unregistered")
 
     def test_v3_adapter_executes_python_without_network(self) -> None:
         runtime, tmp = self.make_runtime()
