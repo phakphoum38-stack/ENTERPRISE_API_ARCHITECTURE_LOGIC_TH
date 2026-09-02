@@ -11,6 +11,16 @@ from oauth_handoff import consume_handoff, create_handoff
 
 
 class OAuthHandoffTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._previous_session_secret = os.environ.get("RESEARCH_OS_SESSION_SECRET")
+        os.environ["RESEARCH_OS_SESSION_SECRET"] = "ci-oauth-handoff-test-secret"
+
+    def tearDown(self) -> None:
+        if self._previous_session_secret is None:
+            os.environ.pop("RESEARCH_OS_SESSION_SECRET", None)
+        else:
+            os.environ["RESEARCH_OS_SESSION_SECRET"] = self._previous_session_secret
+
     def test_handoff_is_single_use(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
