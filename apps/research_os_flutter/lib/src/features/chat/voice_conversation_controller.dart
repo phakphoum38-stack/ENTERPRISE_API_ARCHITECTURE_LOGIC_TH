@@ -17,6 +17,7 @@ class VoiceConversationController {
 
   bool _initialized = false;
   bool _speaking = false;
+  void Function(String text, bool isFinal)? _resultCallback;
 
   bool get isListening => _speech.isListening;
   bool get isSpeaking => _speaking;
@@ -34,19 +35,9 @@ class VoiceConversationController {
     );
     if (!available) return false;
 
-    _speech.statusListener = onStatus;
-    _speech.errorListener = (error) => onError(error.errorMsg);
-    _speech.listenFor = const Duration(seconds: 45);
-    _speech.pauseFor = const Duration(seconds: 3);
-
-    // Re-initialize with the result callback so platform-specific callbacks
-    // stay owned by this controller.
-    await _speech.initialize(
-      onStatus: onStatus,
-      onError: (error) => onError(error.errorMsg),
-    );
-
     _initialized = true;
+    _resultCallback = onResult;
+
     await _tts.setLanguage(localeId);
     await _tts.setSpeechRate(speechRate);
     await _tts.setPitch(pitch);
@@ -55,12 +46,8 @@ class VoiceConversationController {
     _tts.setCompletionHandler(() => _speaking = false);
     _tts.setCancelHandler(() => _speaking = false);
     _tts.setErrorHandler((_) => _speaking = false);
-
-    _resultCallback = onResult;
     return true;
   }
-
-  void Function(String text, bool isFinal)? _resultCallback;
 
   Future<bool> startListening({String? locale}) async {
     if (!_initialized) return false;
@@ -68,6 +55,8 @@ class VoiceConversationController {
     _speaking = false;
     await _speech.listen(
       localeId: locale ?? localeId,
+      listenFor: const Duration(seconds: 45),
+      pauseFor: const Duration(seconds: 3),
       listenOptions: stt.SpeechListenOptions(
         partialResults: true,
         cancelOnError: false,
