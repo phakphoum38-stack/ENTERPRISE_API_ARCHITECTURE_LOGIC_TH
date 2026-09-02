@@ -67,7 +67,7 @@ void main() {
     expect(find.byKey(const Key('v2-nav-conversation')), findsOneWidget);
     expect(find.byKey(const Key('v2-nav-settings')), findsOneWidget);
     expect(find.text('สนทนา AI'), findsOneWidget);
-    expect(find.text('SETTINGS'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
 
     final compactWidth =
         tester.getSize(find.byKey(const Key('research-os-sidebar-v2'))).width;
@@ -81,11 +81,11 @@ void main() {
         tester.getSize(find.byKey(const Key('research-os-sidebar-v2'))).width;
     expect(expandedWidth, 264);
     expect(expandedWidth, greaterThan(compactWidth));
-    expect(find.text('SEARCH'), findsOneWidget);
     expect(find.text('WORKSPACE'), findsOneWidget);
     expect(find.text('ACCOUNT'), findsOneWidget);
+    expect(find.text('Search'), findsOneWidget);
+    expect(find.text('New chat'), findsOneWidget);
     expect(find.text('AI Operating Workspace'), findsOneWidget);
-    expect(find.byKey(const Key('desktop-shell-title')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
