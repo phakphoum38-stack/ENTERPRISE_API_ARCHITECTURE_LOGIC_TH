@@ -19,7 +19,10 @@ from .schedule_generation.preview import SchedulePreviewStore
 from .reasoning import DecisionPlanner
 from .skills import SkillRegistry
 from .tools import ToolRegistry
+from .tool_health import ToolHealthMatrix
+from .unified_tool_catalog import UnifiedToolCatalog
 from .v3_bridge import V3Bridge
+from .v3_execution_adapter import V3ExecutionAdapter
 
 
 @dataclass
@@ -29,6 +32,7 @@ class FriendRuntime:
     capabilities: CapabilityRegistry
     bridge: V3Bridge
     helpers: HelperScheduler
+    v3: V3ExecutionAdapter
     data_root: Path | None = None
     previews: SchedulePreviewStore | None = None
 
@@ -46,6 +50,7 @@ class FriendRuntime:
         providers.register(MockProvider())
         capabilities = install_friend_complete_capabilities()
         bridge = V3Bridge(repo_root)
+        v3 = V3ExecutionAdapter()
         normalized_root = Path(data_root).resolve() if data_root is not None else None
         if normalized_root is None:
             memory: ScopedMemory = ScopedMemory()
@@ -57,10 +62,43 @@ class FriendRuntime:
             if evidence_path is None:
                 evidence_path = owner_root / "evidence" / "events.jsonl"
         orchestrator = FriendOrchestrator(owner=owner, brain=FriendBrain(bridge), planner=DecisionPlanner(), skills=skills, tools=tools, providers=providers, memory=memory, policy=OwnerPolicy(), evidence=EvidenceRecorder(evidence_path))
-        return cls(owner=owner, orchestrator=orchestrator, capabilities=capabilities, bridge=bridge, helpers=HelperScheduler(), data_root=normalized_root, previews=previews)
+        return cls(owner=owner, orchestrator=orchestrator, capabilities=capabilities, bridge=bridge, helpers=HelperScheduler(), v3=v3, data_root=normalized_root, previews=previews)
 
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
+
+    def tool_catalog(self) -> tuple[dict[str, object], ...]:
+        """Expose read-only tool discovery and health without changing execution ownership."""
+        return UnifiedToolCatalog().health_matrix(
+            friend_tools=self.orchestrator.tools.names(),
+            v3_tools=self.v3.names(),
+        )
+
+    def tool_health(self) -> dict[str, object]:
+        """Return aggregate counts plus the same read-only catalog rows."""
+        return ToolHealthMatrix().snapshot(
+            friend_tools=self.orchestrator.tools.names(),
+            v3_tools=self.v3.names(),
+        )
+
+    def execute_v3(
+        self,
+        request: FriendRequest,
+        *,
+        capability: str,
+        input: dict[str, object],
+        task_id: str | None = None,
+    ):
+        """Execute an explicitly requested V3 capability behind the owner boundary."""
+        self.orchestrator.policy.authorize_request(self.owner, request)
+        return self.v3.execute(
+            owner_id=self.owner.owner_id,
+            request_owner_id=request.owner_id,
+            requested_tools=request.requested_tools,
+            capability=capability,
+            input=input,
+            task_id=task_id,
+        )
 
     def architecture(self) -> dict[str, object]:
         persistence = "disk" if isinstance(self.orchestrator.memory, PersistentScopedMemory) else "memory"
@@ -72,6 +110,9 @@ class FriendRuntime:
             "helper_scheduler": {"max_logical_helpers": self.helpers.MAX_LOGICAL_HELPERS, "max_active_workers": self.helpers.MAX_ACTIVE_WORKERS, "activation": "bounded-adaptive"},
             "skills": self.orchestrator.skills.names(),
             "tools": self.orchestrator.tools.names(),
+            "tool_catalog": self.tool_catalog(),
+            "tool_health": self.tool_health(),
+            "v3_execution": self.v3.snapshot(),
             "providers": self.orchestrator.providers.names(),
             "capabilities": self.capabilities.names(),
             "capability_manifest": self.capabilities.snapshot(),
