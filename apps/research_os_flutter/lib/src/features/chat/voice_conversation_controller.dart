@@ -17,7 +17,7 @@ class VoiceConversationController {
   final FriendVoiceMood mood;
 
   final stt.SpeechToText _speech = stt.SpeechToText();
-  final FlutterTts _tts = FlutterTts();
+  FlutterTts? _tts;
 
   bool _initialized = false;
   bool _speaking = false;
@@ -51,23 +51,26 @@ class VoiceConversationController {
     );
     if (!available) return false;
 
+    _tts = FlutterTts();
     _initialized = true;
     _resultCallback = onResult;
 
-    await _tts.setLanguage(localeId);
-    await _tts.setSpeechRate(effectiveSpeechRate);
-    await _tts.setPitch(effectivePitch);
-    await _tts.setVolume(1.0);
-    _tts.setStartHandler(() => _speaking = true);
-    _tts.setCompletionHandler(() => _speaking = false);
-    _tts.setCancelHandler(() => _speaking = false);
-    _tts.setErrorHandler((_) => _speaking = false);
+    final tts = _tts!;
+    await tts.setLanguage(localeId);
+    await tts.setSpeechRate(effectiveSpeechRate);
+    await tts.setPitch(effectivePitch);
+    await tts.setVolume(1.0);
+    tts.setStartHandler(() => _speaking = true);
+    tts.setCompletionHandler(() => _speaking = false);
+    tts.setCancelHandler(() => _speaking = false);
+    tts.setErrorHandler((_) => _speaking = false);
     return true;
   }
 
   Future<bool> startListening({String? locale}) async {
     if (!_initialized) return false;
-    await _tts.stop();
+    final tts = _tts;
+    if (tts != null) await tts.stop();
     _speaking = false;
     await _speech.listen(
       listenOptions: stt.SpeechListenOptions(
@@ -102,21 +105,25 @@ class VoiceConversationController {
     final normalized = _prepareForSpeech(text);
     if (normalized.isEmpty) return;
     await _speech.stop();
-    await _tts.stop();
-    await _tts.setSpeechRate(effectiveSpeechRate);
-    await _tts.setPitch(effectivePitch);
+    final tts = _tts;
+    if (tts == null) return;
+    await tts.stop();
+    await tts.setSpeechRate(effectiveSpeechRate);
+    await tts.setPitch(effectivePitch);
     _speaking = true;
-    await _tts.speak(normalized);
+    await tts.speak(normalized);
   }
 
   Future<void> stopSpeaking() async {
-    await _tts.stop();
+    final tts = _tts;
+    if (tts != null) await tts.stop();
     _speaking = false;
   }
 
   Future<void> dispose() async {
     await _speech.cancel();
-    await _tts.stop();
+    final tts = _tts;
+    if (tts != null) await tts.stop();
     _speaking = false;
   }
 
