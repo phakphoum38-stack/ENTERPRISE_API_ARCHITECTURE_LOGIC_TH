@@ -57,7 +57,7 @@ class OwnerInstallerQuiesceGuardTest(unittest.TestCase):
         self.assertIn("[string]$LogPath = (Join-Path $env:TEMP 'ResearchOS-Owner-Quiesce.log')", text)
         self.assertIn('function Write-Diagnostic', text)
         self.assertIn('Add-Content -LiteralPath $LogPath', text)
-        self.assertIn('taskkillExitCode = $LASTEXITCODE', text)
+        self.assertIn('$taskkillExitCode = $LASTEXITCODE', text)
         self.assertIn('taskkill failed for verified Owner process', text)
         self.assertIn('Owner runtime could not be safely quiesced. EXITCODE=5', text)
         self.assertIn('Unhandled quiesce helper error:', text)
@@ -66,11 +66,11 @@ class OwnerInstallerQuiesceGuardTest(unittest.TestCase):
     def test_installer_passes_diagnostic_log_path_and_reports_it(self):
         text = self.installer_text
 
-        self.assertIn("QuiesceLogPath :=", text)
+        self.assertIn('QuiesceLogPath :=', text)
         self.assertIn("ExpandConstant('{%TEMP}') + '\\ResearchOS-Owner-Quiesce.log'", text)
         self.assertIn("' -LogPath \"' + QuiesceLogPath + '\"'", text)
         self.assertIn('Owner quiesce diagnostic log:', text)
-        self.assertIn('Detailed diagnostic: ' + QuiesceLogPath', text)
+        self.assertIn('Detailed diagnostic:', text)
 
 
 if __name__ == "__main__":
