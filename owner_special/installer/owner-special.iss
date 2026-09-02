@@ -67,6 +67,7 @@ var
   AppPath: String;
   ServiceHostPath: String;
   GuardPath: String;
+  QuiesceLogPath: String;
   Parameters: String;
 begin
   Result := False;
@@ -78,8 +79,11 @@ begin
 
   GuardPath :=
     ExpandConstant('{tmp}\research-os-owner-runtime-quiesce.ps1');
+  QuiesceLogPath :=
+    ExpandConstant('{%TEMP}') + '\ResearchOS-Owner-Quiesce.log';
 
   Log('Extracting Owner runtime quiesce helper.');
+  Log('Owner quiesce diagnostic log: ' + QuiesceLogPath);
 
   ExtractTemporaryFile('research-os-owner-runtime-quiesce.ps1');
 
@@ -99,7 +103,8 @@ begin
     ' -PythonTarget "' + PythonPath + '"' +
     ' -AppTarget "' + AppPath + '"' +
     ' -ServiceHostTarget "' + ServiceHostPath + '"' +
-    ' -Port 8790';
+    ' -Port 8790' +
+    ' -LogPath "' + QuiesceLogPath + '"';
 
   Log('Launching Owner runtime quiesce helper.');
 
@@ -117,6 +122,7 @@ begin
   end;
 
   Log('Owner runtime quiesce helper exit code: ' + IntToStr(ResultCode));
+  Log('Owner quiesce diagnostic log remains at: ' + QuiesceLogPath);
 
   if ResultCode = 0 then
   begin
@@ -128,11 +134,13 @@ begin
   Log(
     'Owner runtime quiesce helper failed with exit code ' +
     IntToStr(ResultCode) +
-    '.'
+    '. Detailed diagnostic: ' +
+    QuiesceLogPath
   );
 
   Result := False;
 end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ScExe: String;
@@ -191,7 +199,7 @@ begin
 
   if not QuiesceOwnerRuntime() then
   begin
-    Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log for the quiesce helper exit code.';
+    Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log and the detailed quiesce diagnostic log path recorded there.';
     Exit;
   end;
 end;
