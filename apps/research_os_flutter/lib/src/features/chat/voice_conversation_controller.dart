@@ -1,16 +1,20 @@
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+enum FriendVoiceMood { balanced, cheerful, serious }
+
 class VoiceConversationController {
   VoiceConversationController({
     this.localeId = 'th-TH',
     this.speechRate = 0.48,
     this.pitch = 1.05,
+    this.mood = FriendVoiceMood.balanced,
   });
 
   final String localeId;
   final double speechRate;
   final double pitch;
+  final FriendVoiceMood mood;
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   final FlutterTts _tts = FlutterTts();
@@ -21,6 +25,18 @@ class VoiceConversationController {
 
   bool get isListening => _speech.isListening;
   bool get isSpeaking => _speaking;
+
+  double get effectiveSpeechRate => switch (mood) {
+        FriendVoiceMood.balanced => speechRate,
+        FriendVoiceMood.cheerful => (speechRate + .05).clamp(.1, 1.0),
+        FriendVoiceMood.serious => (speechRate - .04).clamp(.1, 1.0),
+      };
+
+  double get effectivePitch => switch (mood) {
+        FriendVoiceMood.balanced => pitch,
+        FriendVoiceMood.cheerful => (pitch + .04).clamp(.5, 2.0),
+        FriendVoiceMood.serious => (pitch - .04).clamp(.5, 2.0),
+      };
 
   Future<bool> initialize({
     required void Function(String text, bool isFinal) onResult,
@@ -39,8 +55,8 @@ class VoiceConversationController {
     _resultCallback = onResult;
 
     await _tts.setLanguage(localeId);
-    await _tts.setSpeechRate(speechRate);
-    await _tts.setPitch(pitch);
+    await _tts.setSpeechRate(effectiveSpeechRate);
+    await _tts.setPitch(effectivePitch);
     await _tts.setVolume(1.0);
     _tts.setStartHandler(() => _speaking = true);
     _tts.setCompletionHandler(() => _speaking = false);
@@ -83,10 +99,12 @@ class VoiceConversationController {
   }
 
   Future<void> speak(String text) async {
-    final normalized = text.trim();
+    final normalized = _prepareForSpeech(text);
     if (normalized.isEmpty) return;
     await _speech.stop();
     await _tts.stop();
+    await _tts.setSpeechRate(effectiveSpeechRate);
+    await _tts.setPitch(effectivePitch);
     _speaking = true;
     await _tts.speak(normalized);
   }
@@ -100,5 +118,17 @@ class VoiceConversationController {
     await _speech.cancel();
     await _tts.stop();
     _speaking = false;
+  }
+
+  String _prepareForSpeech(String text) {
+    return text
+        .replaceAll(RegExp(r'```[\s\S]*?```'), ' ')
+        .replaceAll(RegExp(r'`([^`]*)`'), r'$1')
+        .replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'$1')
+        .replaceAll(RegExp(r'\*([^*]+)\*'), r'$1')
+        .replaceAll(RegExp(r'#{1,6}\s*'), '')
+        .replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
   }
 }
