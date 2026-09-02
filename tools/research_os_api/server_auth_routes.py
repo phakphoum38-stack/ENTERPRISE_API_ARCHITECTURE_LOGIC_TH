@@ -3,7 +3,7 @@ from __future__ import annotations
 from http.cookies import CookieError, SimpleCookie
 from urllib.parse import parse_qs, urlparse
 
-from auth_session import SESSION_COOKIE, clear_cookie_header, cookie_header, issue_session, revoke_session, verify_session
+from auth_session import SESSION_COOKIE, clear_cookie_header, cookie_header, revoke_session, verify_session
 from google_identity import GoogleIdentityBroker
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 
@@ -39,7 +39,7 @@ def auth_callback(provider: str, query: str) -> tuple[dict, str]:
 
 
 def google_auth_callback(query: str) -> tuple[dict, str]:
-    """Complete Google identity OAuth and bind it to a Research OS session."""
+    """Complete Google identity OAuth and return the canonical session cookie."""
     values = parse_qs(urlparse("?" + query).query)
     error = str(values.get("error", [""])[0]).strip()
     if error:
@@ -50,8 +50,10 @@ def google_auth_callback(query: str) -> tuple[dict, str]:
         raise MultiLoginRuntimeError("Google OAuth callback requires code and state")
 
     result = GoogleIdentityBroker().complete(code=code, state=state)
+    session = str(result.get("session") or "").strip()
+    if not session:
+        raise MultiLoginRuntimeError("Google OAuth completion did not produce a Research OS session")
     account = result.get("account") if isinstance(result.get("account"), dict) else {}
-    session = issue_session(account)
     return {"provider": "google", "account": account, "session": session}, cookie_header(session, secure=True)
 
 
