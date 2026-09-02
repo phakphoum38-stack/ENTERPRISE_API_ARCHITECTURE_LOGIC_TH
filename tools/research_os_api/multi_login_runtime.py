@@ -77,6 +77,14 @@ def _github_verified_email(token: str) -> str | None:
     return str(chosen.get("email")).strip() if chosen else None
 
 
+def _secure_cookie(redirect_uri: str) -> bool:
+    configured = os.getenv("RESEARCH_OS_COOKIE_SECURE")
+    if configured is not None:
+        return configured.strip().lower() not in {"0", "false", "no", "off"}
+    parsed = urllib.parse.urlparse(redirect_uri)
+    return not (parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"})
+
+
 def complete_runtime_login(code: str, state: str) -> dict[str, Any]:
     pending = _PENDING.pop(state, None)
     if pending is None or pending.created_at + STATE_TTL_SECONDS < int(time.time()):
@@ -93,4 +101,4 @@ def complete_runtime_login(code: str, state: str) -> dict[str, Any]:
     principal["role"] = "USER"
     principal["user_id"] = f"{provider.name}:{principal['sub']}"
     session = issue_session(principal)
-    return {"provider": provider.name, "principal": principal, "session": session, "set_cookie": cookie_header(session)}
+    return {"provider": provider.name, "principal": principal, "session": session, "set_cookie": cookie_header(session, secure=_secure_cookie(pending.redirect_uri))}
