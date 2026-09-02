@@ -50,7 +50,7 @@ def _post_form(url: str, data: dict[str, str]) -> dict[str, Any]:
         with urllib.request.urlopen(request, timeout=20) as response:
             raw = response.read().decode("utf-8")
     except (urllib.error.HTTPError, urllib.error.URLError) as exc:
-        raise MultiLoginRuntimeError(f"identity token exchange failed: {exc}") from exc
+        raise MultiLoginRuntimeError("identity token exchange failed") from exc
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -64,7 +64,7 @@ def _get_json(url: str, token: str) -> Any:
         with urllib.request.urlopen(request, timeout=20) as response:
             return json.loads(response.read().decode("utf-8"))
     except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError) as exc:
-        raise MultiLoginRuntimeError(f"identity profile request failed: {exc}") from exc
+        raise MultiLoginRuntimeError("identity profile request failed") from exc
 
 
 def _github_verified_email(token: str) -> str | None:
