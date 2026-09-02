@@ -9,8 +9,8 @@ class ToolHealthTests(unittest.TestCase):
         health = runtime.tool_health()
 
         self.assertEqual(health["total"], 15)
-        self.assertEqual(health["healthy"], 10)
-        self.assertEqual(health["counts"]["ready"], 10)
+        self.assertEqual(health["healthy"], 7)
+        self.assertEqual(health["counts"]["ready"], 7)
         self.assertEqual(health["counts"]["implemented_unregistered"], 5)
         self.assertEqual(health["counts"]["needs_connection"], 1)
         self.assertEqual(health["counts"]["external"], 2)
