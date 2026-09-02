@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+from http.cookies import SimpleCookie
 from urllib.parse import parse_qs, urlparse
 
-from auth_session import clear_cookie_header, verify_session
+from auth_session import SESSION_COOKIE, clear_cookie_header, revoke_session, verify_session
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
+
+
+def _session_token(cookie_header_value: str | None) -> str:
+    if not cookie_header_value:
+        return ""
+    cookie = SimpleCookie()
+    try:
+        cookie.load(cookie_header_value)
+    except (CookieError, ValueError):
+        return ""
+    morsel = cookie.get(SESSION_COOKIE)
+    return morsel.value if morsel is not None else ""
 
 
 def auth_provider_login(provider: str, redirect_uri: str) -> dict:
@@ -25,15 +38,21 @@ def auth_callback(provider: str, query: str) -> tuple[dict, str]:
 
 
 def auth_status(cookie_header_value: str | None) -> dict:
-    session = verify_session(cookie_header_value or "")
-    if not session:
+    token = _session_token(cookie_header_value)
+    if not token:
+        return {"connected": False, "account": None}
+    try:
+        session = verify_session(token)
+    except ValueError:
         return {"connected": False, "account": None}
     return {"connected": True, "account": {"user_id": session["user_id"], "email": session["email"], "role": session["role"]}}
 
 
 def auth_signout(cookie_header_value: str | None) -> str:
-    session = verify_session(cookie_header_value or "")
-    if session:
-        from auth_session import revoke_session
-        revoke_session(session["session_id"])
+    token = _session_token(cookie_header_value)
+    if token:
+        try:
+            revoke_session(token)
+        except ValueError:
+            pass
     return clear_cookie_header()
