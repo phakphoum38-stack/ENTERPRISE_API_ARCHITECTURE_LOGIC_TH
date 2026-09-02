@@ -210,11 +210,16 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(home: GitHubDashboardPage(apiClient: FakeResearchOSApiClient())),
+      MaterialApp(
+        home: Scaffold(
+          body: GitHubDashboardPage(apiClient: FakeResearchOSApiClient()),
+        ),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
 
+    expect(find.text('GitHub Control Center'), findsOneWidget);
     expect(find.text('Research OS Flutter'), findsOneWidget);
     expect(find.text('Add GitHub dashboard'), findsOneWidget);
     expect(tester.takeException(), isNull);
