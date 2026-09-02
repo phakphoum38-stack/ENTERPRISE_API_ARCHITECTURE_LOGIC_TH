@@ -90,7 +90,7 @@ class _AgentRuntimeBridgeState extends State<AgentRuntimeBridge> {
         });
       }
       await _loadEvidence();
-      if (!mounted || !_evidence.state.isTerminal) _startEvidencePolling(run.id);
+      if (mounted && !_evidence.state.isTerminal) _startEvidencePolling(run.id);
     } on Object catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
