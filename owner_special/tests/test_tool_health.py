@@ -4,14 +4,16 @@ from research_os_friend.runtime import FriendRuntime
 
 
 class ToolHealthTests(unittest.TestCase):
-    def test_runtime_health_reports_registered_v3_tools_as_ready(self) -> None:
+    def test_runtime_health_reports_canonical_ready_tools(self) -> None:
         runtime = FriendRuntime.create_owner_special("owner-test")
         health = runtime.tool_health()
 
         self.assertEqual(health["total"], 19)
-        self.assertEqual(health["healthy"], 15)
-        self.assertEqual(health["counts"]["ready"], 15)
+        self.assertEqual(health["healthy"], 10)
+        self.assertEqual(health["counts"]["ready"], 10)
+        self.assertEqual(health["counts"]["implemented_unregistered"], 5)
         self.assertEqual(health["counts"]["needs_connection"], 2)
+        self.assertEqual(health["counts"]["external"], 2)
 
     def test_health_rows_match_catalog(self) -> None:
         runtime = FriendRuntime.create_owner_special("owner-test")
