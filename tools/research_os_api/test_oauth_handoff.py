@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -22,32 +23,19 @@ class OAuthHandoffTests(unittest.TestCase):
 
     def test_auth_guard_resolves_native_oauth_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            session = issue_session({"sub": "google-sub", "email": "owner@example.com", "role": "owner"})
-            create_handoff(root, session, "https://research-os-api.example.com/v1/auth/google/callback", code="native-state")
-
-            # Patch the broker's data directory so extract_session_token exercises
-            # the same production path without contacting Google.
-            from google_identity import GoogleIdentityBroker
-
-            original = GoogleIdentityBroker
-            class TestBroker(original):
-                def __init__(self, data_dir=None):
-                    super().__init__(root)
-
-            import api_auth
-            previous = api_auth.GoogleIdentityBroker if hasattr(api_auth, "GoogleIdentityBroker") else None
-            api_auth.GoogleIdentityBroker = TestBroker
+            os.environ["RESEARCH_OS_DATA_DIR"] = directory
             try:
+                root = Path(directory) / "google_workspace"
+                root.mkdir(parents=True, exist_ok=True)
+                session = issue_session({"sub": "google-sub", "email": "owner@example.com", "role": "owner"})
+                create_handoff(root, session, "https://research-os-api.example.com/v1/auth/google/callback", code="native-state")
+
                 self.assertEqual(
                     extract_session_token({OAUTH_HANDOFF_HEADER: "native-state"}),
                     session,
                 )
             finally:
-                if previous is None:
-                    delattr(api_auth, "GoogleIdentityBroker")
-                else:
-                    api_auth.GoogleIdentityBroker = previous
+                os.environ.pop("RESEARCH_OS_DATA_DIR", None)
 
 
 if __name__ == "__main__":
