@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = ROOT.parent
+for source_root in (ROOT, REPOSITORY_ROOT):
+    if str(source_root) not in sys.path:
+        sys.path.insert(0, str(source_root))
 
 from research_os_friend import OwnerBundleBuilder
 
 
-ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 OUTPUT = DIST / "Research-OS-Owner-Special-Friend-Complete.zip"
 
