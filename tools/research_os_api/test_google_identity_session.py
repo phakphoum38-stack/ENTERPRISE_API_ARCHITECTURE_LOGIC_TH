@@ -13,7 +13,10 @@ class GoogleIdentitySessionTests(unittest.TestCase):
     def test_google_identity_complete_binds_unified_session(self):
         with tempfile.TemporaryDirectory() as data_dir, patch.dict(
             os.environ,
-            {"RESEARCH_OS_SESSION_SECRET": "test-google-session-secret"},
+            {
+                "RESEARCH_OS_SESSION_SECRET": "test-google-session-secret",
+                "RESEARCH_OS_V3_DATA_DIR": data_dir,
+            },
             clear=False,
         ), patch.object(
             GoogleIdentityBroker,
