@@ -21,8 +21,25 @@ class ResearchOSApiClient {
   final String baseUrl;
   final String? preferredProvider;
   final http.Client _client;
+  String? _sessionToken;
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
+
+  Map<String, String> _headers({Map<String, String>? extra}) => <String, String>{
+        'Content-Type': 'application/json',
+        if (_sessionToken != null && _sessionToken!.isNotEmpty)
+          'X-Research-OS-Session': _sessionToken!,
+        ...?extra,
+      };
+
+  void setSessionToken(String token) {
+    final value = token.trim();
+    _sessionToken = value.isEmpty ? null : value;
+  }
+
+  void clearSessionToken() => _sessionToken = null;
+
+  String? get sessionToken => _sessionToken;
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
@@ -40,6 +57,10 @@ class ResearchOSApiClient {
 
   Future<Map<String, dynamic>> getGoogleIdentityStatus() =>
       _getJson('/v1/auth/google/status');
+  Future<Map<String, dynamic>> getAuthStatusForOAuthState(String state) =>
+      _getJson('/v1/auth/status', extraHeaders: <String, String>{
+        'X-Research-OS-OAuth-State': state,
+      });
   Future<Map<String, dynamic>> startGoogleIdentitySignIn() =>
       _postJson('/v1/auth/google/start', const <String, Object?>{});
   Future<Map<String, dynamic>> signOutGoogleIdentity() =>
@@ -70,7 +91,7 @@ class ResearchOSApiClient {
     final uri = _uri('/v1/agents/discover').replace(
       queryParameters: <String, String>{'capability': value},
     );
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: _headers());
     return _decode(response);
   }
 
@@ -90,7 +111,7 @@ class ResearchOSApiClient {
     final uri = _uri(
       '/v2/workspaces/${Uri.encodeComponent(workspaceId)}/knowledge',
     ).replace(queryParameters: params);
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: _headers());
     return _decode(response);
   }
 
@@ -110,7 +131,7 @@ class ResearchOSApiClient {
     final uri = _uri('/v1/agents/orchestrations').replace(
       queryParameters: params.isEmpty ? null : params,
     );
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: _headers());
     return _decode(response);
   }
 
@@ -172,7 +193,7 @@ class ResearchOSApiClient {
     final uri = _uri('/v1/github/dashboard').replace(
       queryParameters: <String, String>{'repository': query},
     );
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: _headers());
     return _decode(response);
   }
 
@@ -180,7 +201,7 @@ class ResearchOSApiClient {
     final uri = _uri('/v1/memory/search').replace(
       queryParameters: <String, String>{'q': query, 'limit': '5'},
     );
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: _headers());
     return _decode(response);
   }
 
@@ -210,10 +231,7 @@ class ResearchOSApiClient {
   }) async {
     final response = await _client.post(
       _uri('/v1/memory/commit'),
-      headers: <String, String>{
-        'Content-Type': 'application/json',
-        'X-Research-OS-Sync-Key': syncKey,
-      },
+      headers: _headers(extra: <String, String>{'X-Research-OS-Sync-Key': syncKey}),
       body: jsonEncode(<String, Object?>{
         'title': title,
         'conversation': conversation,
@@ -229,7 +247,7 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> getCloudConversations(String syncKey) async {
     final response = await _client.get(
       _uri('/v1/conversations/cloud'),
-      headers: <String, String>{'X-Research-OS-Sync-Key': syncKey},
+      headers: _headers(extra: <String, String>{'X-Research-OS-Sync-Key': syncKey}),
     );
     return _decode(response);
   }
@@ -240,10 +258,7 @@ class ResearchOSApiClient {
   ) async {
     final response = await _client.post(
       _uri('/v1/conversations/cloud/sync'),
-      headers: <String, String>{
-        'Content-Type': 'application/json',
-        'X-Research-OS-Sync-Key': syncKey,
-      },
+      headers: _headers(extra: <String, String>{'X-Research-OS-Sync-Key': syncKey}),
       body: jsonEncode(<String, Object?>{'session': session}),
     );
     return _decode(response);
@@ -255,17 +270,20 @@ class ResearchOSApiClient {
   ) async {
     final response = await _client.post(
       _uri('/v1/conversations/cloud/delete'),
-      headers: <String, String>{
-        'Content-Type': 'application/json',
-        'X-Research-OS-Sync-Key': syncKey,
-      },
+      headers: _headers(extra: <String, String>{'X-Research-OS-Sync-Key': syncKey}),
       body: jsonEncode(<String, Object?>{'session_id': sessionId}),
     );
     return _decode(response);
   }
 
-  Future<Map<String, dynamic>> _getJson(String path) async {
-    final response = await _client.get(_uri(path));
+  Future<Map<String, dynamic>> _getJson(
+    String path, {
+    Map<String, String>? extraHeaders,
+  }) async {
+    final response = await _client.get(
+      _uri(path),
+      headers: _headers(extra: extraHeaders),
+    );
     return _decode(response);
   }
 
@@ -275,7 +293,7 @@ class ResearchOSApiClient {
   ) async {
     final response = await _client.post(
       _uri(path),
-      headers: const <String, String>{'Content-Type': 'application/json'},
+      headers: _headers(),
       body: jsonEncode(payload),
     );
     return _decode(response);
