@@ -108,7 +108,7 @@ class ResearchOSSidebarV2 extends StatelessWidget {
     const account = <_Entry>[
       _Entry('pinned', 'Pinned', Icons.push_pin_outlined, 1, available: false),
       _Entry('recents', 'Recents', Icons.history_outlined, 1),
-      _Entry('account', 'Account', Icons.account_circle_outlined, 9),
+      _Entry('account', 'Account', Icons.account_circle_outlined, 12),
       _Entry('settings', 'Settings', Icons.settings_outlined, 9),
     ];
 
