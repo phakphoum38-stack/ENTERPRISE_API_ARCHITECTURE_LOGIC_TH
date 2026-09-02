@@ -3,6 +3,8 @@ import unittest
 from unittest.mock import patch
 
 import multi_login_runtime
+from auth_session import clear_cookie_header, issue_session, verify_session
+from server_auth_routes import auth_status, auth_signout
 
 
 class MultiLoginRuntimeTests(unittest.TestCase):
@@ -29,6 +31,15 @@ class MultiLoginRuntimeTests(unittest.TestCase):
         pending.created_at -= multi_login_runtime.STATE_TTL_SECONDS + 1
         with self.assertRaises(multi_login_runtime.MultiLoginRuntimeError):
             multi_login_runtime.complete_runtime_login("code", state)
+
+    def test_unified_status_and_signout(self):
+        with patch.dict(os.environ, {"RESEARCH_OS_SESSION_SECRET": "test-secret"}, clear=False):
+            token = issue_session({"user_id": "google:123", "email": "user@example.com", "role": "USER"})
+            self.assertTrue(auth_status(f"research_os_session={token}")["connected"])
+            cookie = auth_signout(f"research_os_session={token}")
+            self.assertIn("Max-Age=0", cookie)
+            with self.assertRaises(ValueError):
+                verify_session(token)
 
 
 if __name__ == "__main__":
