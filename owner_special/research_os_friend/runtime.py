@@ -19,6 +19,7 @@ from .schedule_generation.preview import SchedulePreviewStore
 from .reasoning import DecisionPlanner
 from .skills import SkillRegistry
 from .tools import ToolRegistry
+from .unified_tool_catalog import UnifiedToolCatalog
 from .v3_bridge import V3Bridge
 
 
@@ -62,6 +63,12 @@ class FriendRuntime:
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
 
+    def tool_catalog(self) -> tuple[dict[str, object], ...]:
+        """Expose read-only tool discovery and health without changing execution ownership."""
+        return UnifiedToolCatalog().health_matrix(
+            friend_tools=self.orchestrator.tools.names(),
+        )
+
     def architecture(self) -> dict[str, object]:
         persistence = "disk" if isinstance(self.orchestrator.memory, PersistentScopedMemory) else "memory"
         return {
@@ -72,6 +79,7 @@ class FriendRuntime:
             "helper_scheduler": {"max_logical_helpers": self.helpers.MAX_LOGICAL_HELPERS, "max_active_workers": self.helpers.MAX_ACTIVE_WORKERS, "activation": "bounded-adaptive"},
             "skills": self.orchestrator.skills.names(),
             "tools": self.orchestrator.tools.names(),
+            "tool_catalog": self.tool_catalog(),
             "providers": self.orchestrator.providers.names(),
             "capabilities": self.capabilities.names(),
             "capability_manifest": self.capabilities.snapshot(),
