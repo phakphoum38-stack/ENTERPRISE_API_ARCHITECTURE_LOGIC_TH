@@ -92,6 +92,60 @@ class ResearchOSSidebarV2 extends StatelessWidget {
     );
   }
 
+  Widget _header(BuildContext context) {
+    if (expanded) {
+      return SizedBox(
+        height: 70,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            children: <Widget>[
+              const _ResearchMark(),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Research OS', style: TextStyle(fontWeight: FontWeight.w800)),
+                    Text('AI Operating Workspace', style: TextStyle(fontSize: 10.5)),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: const Key('toggle-desktop-sidebar-v2'),
+                tooltip: 'ย่อ Sidebar',
+                onPressed: onToggle,
+                icon: const Icon(Icons.chevron_left),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 70,
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          const _ResearchMark(size: 30),
+          Positioned(
+            right: 1,
+            child: IconButton(
+              key: const Key('toggle-desktop-sidebar-v2'),
+              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+              padding: EdgeInsets.zero,
+              tooltip: 'ขยาย Sidebar',
+              onPressed: onToggle,
+              icon: const Icon(Icons.chevron_right, size: 19),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -123,36 +177,7 @@ class ResearchOSSidebarV2 extends StatelessWidget {
       ),
       child: Column(
         children: <Widget>[
-          SizedBox(
-            height: 70,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: expanded ? 14 : 8),
-              child: Row(
-                children: <Widget>[
-                  const _ResearchMark(),
-                  if (expanded) ...<Widget>[
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text('Research OS', style: TextStyle(fontWeight: FontWeight.w800)),
-                          Text('AI Operating Workspace', style: TextStyle(fontSize: 10.5)),
-                        ],
-                      ),
-                    ),
-                  ],
-                  IconButton(
-                    key: const Key('toggle-desktop-sidebar-v2'),
-                    tooltip: expanded ? 'ย่อ Sidebar' : 'ขยาย Sidebar',
-                    onPressed: onToggle,
-                    icon: Icon(expanded ? Icons.chevron_left : Icons.chevron_right),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _header(context),
           const Divider(height: 1),
           Expanded(
             child: ListView(
@@ -205,24 +230,26 @@ class _Entry {
 }
 
 class _ResearchMark extends StatelessWidget {
-  const _ResearchMark();
+  const _ResearchMark({this.size = 36});
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      width: 36,
-      height: 36,
+      width: size,
+      height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: <Color>[scheme.primaryContainer, scheme.secondaryContainer]),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(size * .33),
       ),
       child: Text(
         'R',
         style: TextStyle(
           color: scheme.onPrimaryContainer,
-          fontSize: 18,
+          fontSize: size * .5,
           fontWeight: FontWeight.w900,
         ),
       ),
