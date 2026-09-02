@@ -66,8 +66,7 @@ void main() {
     expect(find.byKey(const Key('v2-nav-new-chat')), findsOneWidget);
     expect(find.byKey(const Key('v2-nav-conversation')), findsOneWidget);
     expect(find.byKey(const Key('v2-nav-settings')), findsOneWidget);
-    expect(find.text('สนทนา AI'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.byKey(const Key('v2-nav-account')), findsOneWidget);
 
     final compactWidth =
         tester.getSize(find.byKey(const Key('research-os-sidebar-v2'))).width;
@@ -85,7 +84,9 @@ void main() {
     expect(find.text('ACCOUNT'), findsOneWidget);
     expect(find.text('Search'), findsOneWidget);
     expect(find.text('New chat'), findsOneWidget);
+    expect(find.text('สนทนา AI'), findsOneWidget);
     expect(find.text('AI Operating Workspace'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('v2-nav-conversation')));
     await tester.pump();
