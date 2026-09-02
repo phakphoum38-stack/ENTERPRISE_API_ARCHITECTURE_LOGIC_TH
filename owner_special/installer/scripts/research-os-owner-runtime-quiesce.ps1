@@ -2,10 +2,26 @@
     [Parameter(Mandatory=$true)][string]$PythonTarget,
     [Parameter(Mandatory=$true)][string]$AppTarget,
     [Parameter(Mandatory=$true)][string]$ServiceHostTarget,
-    [int]$Port = 8790
+    [int]$Port = 8790,
+    [string]$LogPath = (Join-Path $env:TEMP 'ResearchOS-Owner-Quiesce.log')
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Write-Diagnostic([string]$Message) {
+    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff') $Message"
+    try {
+        $parent = Split-Path -Parent $LogPath
+        if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+            New-Item -ItemType Directory -Path $parent -Force | Out-Null
+        }
+        Add-Content -LiteralPath $LogPath -Value $line -Encoding UTF8
+    }
+    catch {
+        # Diagnostics must never change the quiesce decision.
+    }
+    Write-Host $Message
+}
 
 function Normalize-Path([string]$Path) {
     if ([string]::IsNullOrWhiteSpace($Path)) {
@@ -38,6 +54,7 @@ function Stop-OwnerProcess {
     )
 
     if ($ProcessId -le 0) {
+        Write-Diagnostic "Invalid PID=$ProcessId; refusing to terminate."
         return $false
     }
 
@@ -46,40 +63,43 @@ function Stop-OwnerProcess {
         -ErrorAction SilentlyContinue
 
     if (-not $process) {
-        Write-Host "PID=$ProcessId is already gone."
+        Write-Diagnostic "PID=$ProcessId is already gone."
         return $true
     }
 
     if (-not $process.ExecutablePath) {
-        Write-Host "PID=$ProcessId has no executable path; refusing to terminate."
+        Write-Diagnostic "PID=$ProcessId has no executable path; refusing to terminate."
         return $false
     }
 
     $full = Normalize-Path $process.ExecutablePath
 
     if (-not $full) {
-        Write-Host "PID=$ProcessId executable path could not be normalized; refusing to terminate."
+        Write-Diagnostic "PID=$ProcessId executable path could not be normalized; refusing to terminate."
         return $false
     }
 
     if (-not ($targets -icontains $full)) {
-        Write-Host "Refusing to terminate foreign process PID=$ProcessId PATH=$full"
+        Write-Diagnostic "Refusing to terminate foreign process PID=$ProcessId PATH=$full"
         return $false
     }
 
-    Write-Host "Terminating verified Owner process PID=$ProcessId PATH=$full"
+    Write-Diagnostic "Terminating verified Owner process PID=$ProcessId PATH=$full"
 
     $taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
     $output = & $taskkill /PID $ProcessId /T /F 2>&1
+    $taskkillExitCode = $LASTEXITCODE
 
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "taskkill failed for verified Owner process PID=$ProcessId"
-        if ($output) {
-            Write-Host ($output -join [Environment]::NewLine)
-        }
+    if ($output) {
+        Write-Diagnostic "taskkill output for PID=${ProcessId}: $($output -join [Environment]::NewLine)"
+    }
+
+    if ($taskkillExitCode -ne 0) {
+        Write-Diagnostic "taskkill failed for verified Owner process PID=$ProcessId EXITCODE=$taskkillExitCode"
         return $false
     }
 
+    Write-Diagnostic "taskkill succeeded for verified Owner process PID=$ProcessId"
     return $true
 }
 
@@ -108,84 +128,99 @@ function Get-OwnerListeners {
     )
 }
 
-Write-Host "=== OWNER QUIESCE ==="
-Write-Host "PythonTarget      = $PythonTarget"
-Write-Host "AppTarget         = $AppTarget"
-Write-Host "ServiceHostTarget = $ServiceHostTarget"
-Write-Host "Port              = $Port"
-Write-Host ""
+try {
+    Write-Diagnostic '=== OWNER QUIESCE ==='
+    Write-Diagnostic "PythonTarget      = $PythonTarget"
+    Write-Diagnostic "AppTarget         = $AppTarget"
+    Write-Diagnostic "ServiceHostTarget = $ServiceHostTarget"
+    Write-Diagnostic "Port              = $Port"
+    Write-Diagnostic "LogPath           = $LogPath"
+    Write-Diagnostic "Normalized targets = $($targets -join '; ')"
 
-$success = $true
+    $success = $true
 
-Write-Host "Checking Owner processes..."
-$running = @(Get-OwnerProcesses)
+    Write-Diagnostic 'Checking Owner processes...'
+    $running = @(Get-OwnerProcesses)
+    Write-Diagnostic "Verified Owner process count = $($running.Count)"
 
-foreach ($p in $running) {
-    if (-not (Stop-OwnerProcess -ProcessId ([int]$p.ProcessId))) {
-        $success = $false
-    }
-}
-
-Start-Sleep -Milliseconds 300
-
-Write-Host ""
-Write-Host "Checking listeners on port $Port..."
-
-$listeners = @(Get-OwnerListeners)
-
-foreach ($listener in $listeners) {
-    $listenerPid = [int]$listener.OwningProcess
-
-    $process = Get-CimInstance Win32_Process `
-        -Filter "ProcessId = $listenerPid" `
-        -ErrorAction SilentlyContinue
-
-    if (-not $process) {
-        continue
+    foreach ($p in $running) {
+        if (-not (Stop-OwnerProcess -ProcessId ([int]$p.ProcessId))) {
+            $success = $false
+        }
     }
 
-    if (-not $process.ExecutablePath) {
-        Write-Host "Port $Port is owned by PID=$listenerPid with no executable path; refusing to terminate."
-        $success = $false
-        continue
+    Start-Sleep -Milliseconds 300
+
+    Write-Diagnostic "Checking listeners on port $Port..."
+    $listeners = @(Get-OwnerListeners)
+    Write-Diagnostic "Listener count on port $Port = $($listeners.Count)"
+
+    foreach ($listener in $listeners) {
+        $listenerPid = [int]$listener.OwningProcess
+        Write-Diagnostic "Inspecting listener PID=$listenerPid on port $Port"
+
+        $process = Get-CimInstance Win32_Process `
+            -Filter "ProcessId = $listenerPid" `
+            -ErrorAction SilentlyContinue
+
+        if (-not $process) {
+            Write-Diagnostic "Listener PID=$listenerPid disappeared before ownership check."
+            continue
+        }
+
+        if (-not $process.ExecutablePath) {
+            Write-Diagnostic "Port $Port is owned by PID=$listenerPid with no executable path; refusing to terminate."
+            $success = $false
+            continue
+        }
+
+        $full = Normalize-Path $process.ExecutablePath
+
+        if (-not $full -or -not ($targets -icontains $full)) {
+            Write-Diagnostic "Port $Port is owned by foreign process PID=$listenerPid PATH=$full"
+            Write-Diagnostic 'Refusing to terminate foreign process.'
+            $success = $false
+            continue
+        }
+
+        if (-not (Stop-OwnerProcess -ProcessId $listenerPid)) {
+            $success = $false
+        }
     }
 
-    $full = Normalize-Path $process.ExecutablePath
+    Start-Sleep -Milliseconds 500
 
-    if (-not $full -or -not ($targets -icontains $full)) {
-        Write-Host "Port $Port is owned by foreign process PID=$listenerPid PATH=$full"
-        Write-Host "Refusing to terminate foreign process."
-        $success = $false
-        continue
+    $remainingProcesses = @(Get-OwnerProcesses)
+    $remainingListeners = @(Get-OwnerListeners)
+
+    Write-Diagnostic "Remaining verified Owner processes = $($remainingProcesses.Count)"
+    foreach ($p in $remainingProcesses) {
+        Write-Diagnostic "Remaining Owner PID=$($p.ProcessId) PATH=$($p.ExecutablePath)"
     }
 
-    if (-not (Stop-OwnerProcess -ProcessId $listenerPid)) {
-        $success = $false
-    }
-}
-
-Start-Sleep -Milliseconds 500
-
-$remainingProcesses = @(Get-OwnerProcesses)
-$remainingListeners = @(Get-OwnerListeners)
-
-if ($remainingProcesses.Count -gt 0) {
-    Write-Host "Owner processes still running: $($remainingProcesses.Count)"
-    $success = $false
-}
-
-if ($remainingListeners.Count -gt 0) {
-    Write-Host "Port $Port still has listener(s): $($remainingListeners.Count)"
+    Write-Diagnostic "Remaining listeners on port $Port = $($remainingListeners.Count)"
     foreach ($listener in $remainingListeners) {
-        Write-Host "Remaining listener PID=$($listener.OwningProcess)"
+        Write-Diagnostic "Remaining listener PID=$($listener.OwningProcess)"
     }
-    $success = $false
-}
 
-if (-not $success) {
-    Write-Host "Owner runtime could not be safely quiesced."
-    exit 5
-}
+    if ($remainingProcesses.Count -gt 0) {
+        $success = $false
+    }
 
-Write-Host "Owner runtime quiesced successfully."
-exit 0
+    if ($remainingListeners.Count -gt 0) {
+        $success = $false
+    }
+
+    if (-not $success) {
+        Write-Diagnostic 'Owner runtime could not be safely quiesced. EXITCODE=5'
+        exit 5
+    }
+
+    Write-Diagnostic 'Owner runtime quiesced successfully. EXITCODE=0'
+    exit 0
+}
+catch {
+    Write-Diagnostic "Unhandled quiesce helper error: $($_.Exception.GetType().FullName): $($_.Exception.Message)"
+    Write-Diagnostic 'Owner runtime quiesce helper aborted. EXITCODE=1'
+    exit 1
+}
