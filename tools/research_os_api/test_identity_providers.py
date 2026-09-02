@@ -28,6 +28,7 @@ class IdentityProviderTests(unittest.TestCase):
     def test_provider_becomes_available_when_configured(self) -> None:
         os.environ["RESEARCH_OS_MICROSOFT_CLIENT_ID"] = "test-client"
         os.environ["RESEARCH_OS_MICROSOFT_CLIENT_SECRET"] = "test-secret"
+        os.environ["RESEARCH_OS_LOGIN_MICROSOFT_ENABLED"] = "true"
         self.assertTrue(get_provider("microsoft").available)
 
     def test_github_identity_normalizes_to_common_principal(self) -> None:
