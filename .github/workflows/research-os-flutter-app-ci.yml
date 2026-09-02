@@ -1,0 +1,63 @@
+name: Research OS Flutter App CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/research_os_flutter/**"
+      - ".github/workflows/research-os-flutter-app-ci.yml"
+  push:
+    branches:
+      - feat/research-os-ui-v4-20260902
+    paths:
+      - "apps/research_os_flutter/**"
+      - ".github/workflows/research-os-flutter-app-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-flutter-app-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-app:
+    name: Flutter analyze test Windows build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Windows runner
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: flutter create --platforms=windows --project-name=research_os_flutter .
+
+      - name: Flutter dependencies
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: flutter analyze
+
+      - name: Flutter tests
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: flutter test --reporter expanded
+
+      - name: Windows release build
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: flutter build windows --release
