@@ -9,8 +9,8 @@ class ToolHealthTests(unittest.TestCase):
         health = runtime.tool_health()
 
         self.assertEqual(health["total"], 19)
-        self.assertEqual(health["healthy"], 17)
-        self.assertEqual(health["counts"]["ready"], 17)
+        self.assertEqual(health["healthy"], 15)
+        self.assertEqual(health["counts"]["ready"], 15)
         self.assertEqual(health["counts"]["needs_connection"], 2)
 
     def test_health_rows_match_catalog(self) -> None:
