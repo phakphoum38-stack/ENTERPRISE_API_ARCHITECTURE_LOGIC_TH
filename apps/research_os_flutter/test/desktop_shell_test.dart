@@ -45,7 +45,7 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 }
 
 void main() {
-  testWidgets('desktop shell shows organized enterprise sidebar', (tester) async {
+  testWidgets('desktop shell shows the futuristic Research OS sidebar', (tester) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -57,57 +57,35 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.byKey(const Key('enterprise-sidebar')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-navigation-list')), findsOneWidget);
+    expect(find.byKey(const Key('research-os-sidebar-v2')), findsOneWidget);
     expect(find.byKey(const Key('desktop-content-pane')), findsOneWidget);
     expect(find.byKey(const Key('desktop-status-bar')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
+    expect(find.byKey(const Key('v2-nav-search')), findsOneWidget);
+    expect(find.byKey(const Key('v2-nav-new-chat')), findsOneWidget);
+    expect(find.byKey(const Key('v2-nav-conversation')), findsOneWidget);
+    expect(find.byKey(const Key('v2-nav-settings')), findsOneWidget);
+    expect(find.text('สนทนา AI'), findsOneWidget);
+    expect(find.text('SETTINGS'), findsOneWidget);
 
     final compactWidth =
-        tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
-    final contentWidth =
-        tester.getSize(find.byKey(const Key('desktop-content-pane'))).width;
-
+        tester.getSize(find.byKey(const Key('research-os-sidebar-v2'))).width;
     expect(compactWidth, 76);
-    expect(find.byKey(const Key('desktop-shell-title')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
+    await tester.tap(find.byKey(const Key('toggle-desktop-sidebar-v2')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
     final expandedWidth =
-        tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
-    final contentWidthWhileExpanded =
-        tester.getSize(find.byKey(const Key('desktop-content-pane'))).width;
-
-    expect(expandedWidth, 244);
+        tester.getSize(find.byKey(const Key('research-os-sidebar-v2'))).width;
+    expect(expandedWidth, 264);
     expect(expandedWidth, greaterThan(compactWidth));
-    expect(contentWidthWhileExpanded, contentWidth);
-    expect(find.byKey(const Key('desktop-shell-title')), findsOneWidget);
-    expect(find.text('WORKSPACE'), findsWidgets);
-    expect(find.text('KNOWLEDGE'), findsWidgets);
-    expect(find.text('CONNECTIONS'), findsWidgets);
-    expect(find.text('SYSTEM'), findsWidgets);
-    expect(find.byKey(const Key('desktop-sidebar-dismiss')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('desktop-sidebar-dismiss')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
-
-    expect(
-      tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width,
-      compactWidth,
-    );
-    expect(
-      tester.getSize(find.byKey(const Key('desktop-content-pane'))).width,
-      contentWidth,
-    );
-    expect(find.byKey(const Key('desktop-sidebar-dismiss')), findsNothing);
-    expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
+    expect(find.text('SEARCH'), findsOneWidget);
+    expect(find.text('WORKSPACE'), findsOneWidget);
+    expect(find.text('ACCOUNT'), findsOneWidget);
+    expect(find.text('AI Operating Workspace'), findsOneWidget);
+    expect(find.byKey(const Key('desktop-shell-title')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
