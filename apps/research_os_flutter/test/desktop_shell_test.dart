@@ -86,6 +86,16 @@ void main() {
     expect(find.text('Search'), findsOneWidget);
     expect(find.text('New chat'), findsOneWidget);
     expect(find.text('AI Operating Workspace'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('v2-nav-conversation')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('สนทนา AI'), findsOneWidget);
+    expect(find.text('Voice Conversation • Friend AI • Local-first'), findsOneWidget);
+    expect(find.text('พูดกับ Research OS ได้เลย'), findsOneWidget);
+    expect(find.byIcon(Icons.mic), findsOneWidget);
+    expect(find.text('พร้อมสนทนา'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
