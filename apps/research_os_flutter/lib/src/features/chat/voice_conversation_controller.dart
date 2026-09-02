@@ -70,10 +70,10 @@ class VoiceConversationController {
     await _tts.stop();
     _speaking = false;
     await _speech.listen(
-      localeId: locale ?? localeId,
-      listenFor: const Duration(seconds: 45),
-      pauseFor: const Duration(seconds: 3),
       listenOptions: stt.SpeechListenOptions(
+        localeId: locale ?? localeId,
+        listenFor: const Duration(seconds: 45),
+        pauseFor: const Duration(seconds: 3),
         partialResults: true,
         cancelOnError: false,
         listenMode: stt.ListenMode.dictation,
