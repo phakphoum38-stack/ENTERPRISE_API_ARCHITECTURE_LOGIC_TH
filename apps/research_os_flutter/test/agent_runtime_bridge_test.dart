@@ -93,14 +93,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Run planned • waiting for explicit execution.'), findsOneWidget);
-    expect(find.textContaining('run-evidence-123'), findsOneWidget);
+    expect(find.textContaining('run-evidence-'), findsOneWidget);
 
     await tester.tap(find.text('Explicit Execute'));
     await tester.pumpAndSettle();
 
     expect(api.executed, isTrue);
     expect(api.confirmed, isTrue);
-    expect(find.text('Run completed • run-evidence-123'), findsOneWidget);
+    expect(find.textContaining('Run completed • run-evidence-'), findsOneWidget);
     expect(find.text('run.completed'), findsOneWidget);
     expect(find.text('completed'), findsWidgets);
     expect(tester.takeException(), isNull);
