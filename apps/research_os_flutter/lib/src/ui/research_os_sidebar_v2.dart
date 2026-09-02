@@ -93,56 +93,102 @@ class ResearchOSSidebarV2 extends StatelessWidget {
   }
 
   Widget _header(BuildContext context) {
-    if (expanded) {
-      return SizedBox(
-        height: 70,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Row(
-            children: <Widget>[
-              const _ResearchMark(),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text('Research OS', style: TextStyle(fontWeight: FontWeight.w800)),
-                    Text('AI Operating Workspace', style: TextStyle(fontSize: 10.5)),
-                  ],
-                ),
-              ),
-              IconButton(
-                key: const Key('toggle-desktop-sidebar-v2'),
-                tooltip: 'ย่อ Sidebar',
-                onPressed: onToggle,
-                icon: const Icon(Icons.chevron_left),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // AnimatedContainer briefly passes through intermediate widths while
+        // collapsing/expanding. Keep the header compact until there is enough
+        // horizontal space for the full identity row.
+        final canShowExpandedHeader = constraints.maxWidth >= 180;
 
-    return SizedBox(
-      height: 70,
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          const _ResearchMark(size: 30),
-          Positioned(
-            right: 1,
-            child: IconButton(
-              key: const Key('toggle-desktop-sidebar-v2'),
-              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-              padding: EdgeInsets.zero,
-              tooltip: 'ขยาย Sidebar',
-              onPressed: onToggle,
-              icon: const Icon(Icons.chevron_right, size: 19),
+        if (!canShowExpandedHeader) {
+          return SizedBox(
+            height: 70,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                const _ResearchMark(size: 30),
+                Positioned(
+                  right: 1,
+                  child: IconButton(
+                    key: const Key('toggle-desktop-sidebar-v2'),
+                    constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+                    padding: EdgeInsets.zero,
+                    tooltip: 'ขยาย Sidebar',
+                    onPressed: onToggle,
+                    icon: const Icon(Icons.chevron_right, size: 19),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return SizedBox(
+          height: 70,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: <Widget>[
+                const _ResearchMark(),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text('Research OS', style: TextStyle(fontWeight: FontWeight.w800)),
+                      Text('AI Operating Workspace', style: TextStyle(fontSize: 10.5)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  key: const Key('toggle-desktop-sidebar-v2'),
+                  tooltip: 'ย่อ Sidebar',
+                  onPressed: onToggle,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+
+  Widget _securityStatus(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final canShowLabel = expanded && constraints.maxWidth >= 180;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+          child: Container(
+            height: 42,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            alignment: Alignment.center,
+            child: canShowLabel
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Icon(Icons.shield_outlined, size: 17, color: scheme.primary),
+                      const SizedBox(width: 8),
+                      const Flexible(
+                        child: Text(
+                          'Local-first • secure',
+                          style: TextStyle(fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  )
+                : Icon(Icons.shield_outlined, size: 17, color: scheme.primary),
+          ),
+        );
+      },
     );
   }
 
@@ -192,27 +238,7 @@ class ResearchOSSidebarV2 extends StatelessWidget {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-            child: Container(
-              height: 42,
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(13),
-              ),
-              alignment: Alignment.center,
-              child: expanded
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Icon(Icons.shield_outlined, size: 17, color: scheme.primary),
-                        const SizedBox(width: 8),
-                        const Text('Local-first • secure', style: TextStyle(fontSize: 11)),
-                      ],
-                    )
-                  : Icon(Icons.shield_outlined, size: 17, color: scheme.primary),
-            ),
-          ),
+          _securityStatus(context),
         ],
       ),
     );
