@@ -45,7 +45,8 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 }
 
 void main() {
-  testWidgets('desktop shell shows the futuristic Research OS sidebar', (tester) async {
+  testWidgets('desktop shell shows the futuristic Research OS sidebar and chat',
+      (tester) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -92,11 +93,26 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.text('สนทนา AI'), findsOneWidget);
-    expect(find.text('Voice Conversation • Friend AI • Local-first'), findsOneWidget);
-    expect(find.text('พูดกับ Research OS ได้เลย'), findsOneWidget);
-    expect(find.byIcon(Icons.mic), findsOneWidget);
-    expect(find.text('พร้อมสนทนา'), findsOneWidget);
+    expect(find.text('AI Workspace'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byKey(const Key('chat-tools-button')), findsOneWidget);
+    expect(find.byKey(const Key('chat-voice-button')), findsOneWidget);
+    expect(find.text('New chat'), findsOneWidget);
+    expect(find.text('Memory'), findsOneWidget);
+    expect(find.text('Local history'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const Key('chat-tools-button')));
+    await tester.pump();
+    expect(find.text('Research OS Tools'), findsOneWidget);
+    expect(find.text('echo'), findsOneWidget);
+    expect(find.text('web'), findsOneWidget);
+    expect(find.text('github'), findsOneWidget);
+    expect(find.text('file'), findsOneWidget);
+    expect(find.text('python'), findsOneWidget);
+    expect(find.text('shell'), findsOneWidget);
+    expect(find.text('google-oauth'), findsOneWidget);
+    expect(find.text('15 tools'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
