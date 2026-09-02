@@ -6,6 +6,7 @@ import secrets
 import time
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -86,6 +87,24 @@ class GoogleOAuthBroker:
         except (OSError, ValueError, TypeError) as exc:
             raise GoogleOAuthError("OAuth state is invalid") from exc
 
+    @staticmethod
+    def _safe_google_error(exc: HTTPError) -> str:
+        """Return Google's OAuth error without exposing request secrets or auth codes."""
+        try:
+            raw = exc.read().decode("utf-8", errors="replace")
+            payload = json.loads(raw)
+        except (OSError, UnicodeDecodeError, ValueError, TypeError):
+            return f"http_{exc.code}"
+
+        if isinstance(payload, dict):
+            error = str(payload.get("error") or "").strip()
+            description = str(payload.get("error_description") or "").strip()
+            if error and description:
+                return f"{error}: {description[:240]}"
+            if error:
+                return error
+        return f"http_{exc.code}"
+
     def complete(self, *, code: str, state: str) -> dict[str, Any]:
         expected = self._read_state()
         created_at = int(expected.get("created_at", 0))
@@ -106,8 +125,11 @@ class GoogleOAuthBroker:
         try:
             with urlopen(request, timeout=20) as response:
                 token = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            detail = self._safe_google_error(exc)
+            raise GoogleOAuthError(f"Google token exchange failed: {detail}") from exc
         except Exception as exc:
-            raise GoogleOAuthError(f"Google token exchange failed: {exc}") from exc
+            raise GoogleOAuthError(f"Google token exchange failed: {type(exc).__name__}") from exc
         if not token.get("access_token"):
             raise GoogleOAuthError("Google token response did not include an access token")
         existing = self._read_token(silent=True)
