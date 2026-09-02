@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
-import 'features/chat/friend_workspace_page.dart';
 import 'features/chat/voice_conversation_page.dart';
 import 'features/developer_access/developer_access_page.dart';
 import 'features/github/github_dashboard_page.dart';
