@@ -91,7 +91,7 @@ function Stop-OwnerProcess {
     $taskkillExitCode = $LASTEXITCODE
 
     if ($output) {
-        Write-Diagnostic "taskkill output for PID=$ProcessId: $($output -join [Environment]::NewLine)"
+        Write-Diagnostic "taskkill output for PID=${ProcessId}: $($output -join [Environment]::NewLine)"
     }
 
     if ($taskkillExitCode -ne 0) {
