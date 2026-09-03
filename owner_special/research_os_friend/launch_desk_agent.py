@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Callable, Iterator
-from typing import Any
+from typing import Any, Callable
 
 from .launch_desk import build_deterministic_plan, launch_desk_tool_map
-
 
 INSTRUCTIONS = """You are Launch Desk, the Research OS launch-planning agent.
 Use all four available tools in this order: extract_tasks, check_launch_readiness,
@@ -22,19 +20,16 @@ def _sdk_tools():
     from agents import function_tool
 
     mapping = launch_desk_tool_map()
-    tools = []
-    for name in ("extract_tasks", "check_launch_readiness", "generate_owner_checklist", "draft_launch_copy"):
-        handler = mapping[name]
-        tool = function_tool(handler)
-        tool.name = name
-        tool.description = {
-            "extract_tasks": "Extract actionable launch tasks from the request.",
-            "check_launch_readiness": "Score the fixed nine-area launch readiness rubric.",
-            "generate_owner_checklist": "Generate owner actions for missing readiness evidence.",
-            "draft_launch_copy": "Draft concise launch communication copy.",
-        }[name]
-        tools.append(tool)
-    return tools
+    descriptions = {
+        "extract_tasks": "Extract actionable launch tasks from the request.",
+        "check_launch_readiness": "Score the fixed nine-area launch readiness rubric.",
+        "generate_owner_checklist": "Generate owner actions for missing readiness evidence.",
+        "draft_launch_copy": "Draft concise launch communication copy.",
+    }
+    return [
+        function_tool(mapping[name], name_override=name, description_override=descriptions[name])
+        for name in ("extract_tasks", "check_launch_readiness", "generate_owner_checklist", "draft_launch_copy")
+    ]
 
 
 def _event_payload(event: Any) -> dict[str, Any] | None:
@@ -58,14 +53,7 @@ def _event_payload(event: Any) -> dict[str, Any] | None:
     return None
 
 
-def stream_launch_desk(
-    *,
-    text: str,
-    api_key: str,
-    base_url: str,
-    model: str,
-    emit: Callable[[dict[str, Any]], None],
-) -> dict[str, Any]:
+def stream_launch_desk(*, text: str, api_key: str, base_url: str, model: str, emit: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
     """Run Launch Desk with the persisted provider credential and emit live events."""
     plan = build_deterministic_plan(text)
     emit({"type": "plan_ready", "plan": plan.to_dict()})
@@ -76,12 +64,7 @@ def stream_launch_desk(
         set_tracing_disabled(disabled=True)
         provider = OpenAIProvider(api_key=api_key, base_url=base_url, use_responses=True)
         agent = Agent(name="Launch Desk", instructions=INSTRUCTIONS, tools=_sdk_tools(), model=model)
-        result = Runner.run_streamed(
-            agent,
-            text,
-            run_config=RunConfig(model_provider=provider, model=model),
-            max_turns=8,
-        )
+        result = Runner.run_streamed(agent, text, run_config=RunConfig(model_provider=provider, model=model), max_turns=8)
         async for event in result.stream_events():
             payload = _event_payload(event)
             if payload is not None:
