@@ -1,0 +1,64 @@
+name: Canonical Source Lineage Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - fix/canonical-friend-lineage
+    paths:
+      - ".github/workflows/research-os-windows-artifact.yml"
+      - ".github/workflows/research-os-release-integration.yml"
+      - ".github/workflows/canonical-source-lineage-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify canonical Research OS + Friend lineage contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout canonical source
+        uses: actions/checkout@v4
+
+      - name: Verify Windows artifact workflow is not pinned to a stale Friend commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/research-os-windows-artifact.yml"
+          test -f "$workflow"
+
+          friend_ref="$(sed -n 's/^  FRIEND_REF: *//p' "$workflow" | head -n 1)"
+          if [[ -z "$friend_ref" ]]; then
+            echo "FRIEND_REF is missing from $workflow"
+            exit 1
+          fi
+
+          if [[ "$friend_ref" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Detected hard-coded Friend commit: $friend_ref"
+            echo "CANONICAL_LINEAGE_GATE=FAIL"
+            echo "Friend source must follow the canonical release SHA instead of a stale pinned commit."
+            exit 1
+          fi
+
+          if [[ "$friend_ref" != '${{ github.sha }}' ]]; then
+            echo "Unexpected FRIEND_REF expression: $friend_ref"
+            echo "Expected: \${{ github.sha }}"
+            echo "CANONICAL_LINEAGE_GATE=FAIL"
+            exit 1
+          fi
+
+          echo "FRIEND_REF=$friend_ref"
+          echo "CANONICAL_LINEAGE_GATE=PASS"
+
+      - name: Verify release integration requires exact source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/research-os-release-integration.yml"
+          test -f "$workflow"
+          grep -q 'source_sha' "$workflow"
+          grep -q 'Research-OS-Windows-x64-Friend-Complete-${source_sha}' "$workflow"
+          grep -q 'github.sha' "$workflow"
+          echo "RELEASE_SOURCE_SHA_GATE=PASS"
