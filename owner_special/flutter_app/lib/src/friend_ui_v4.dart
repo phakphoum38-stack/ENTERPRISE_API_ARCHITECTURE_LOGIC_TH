@@ -1,16 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import 'owner_api.dart';
 
 class OwnerFriendAppV4 extends StatefulWidget {
-  const OwnerFriendAppV4({
-    required this.api,
-    this.startup,
-    this.startupError,
-    super.key,
-  });
+  const OwnerFriendAppV4({required this.api, this.startup, this.startupError, super.key});
 
   final OwnerFriendApi api;
   final Map<String, dynamic>? startup;
@@ -32,11 +25,7 @@ class _OwnerFriendAppV4State extends State<OwnerFriendAppV4> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Research OS Owner Special',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF6558D9),
-        scaffoldBackgroundColor: const Color(0xFFF7F7FA),
-      ),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFF6558D9), scaffoldBackgroundColor: const Color(0xFFF7F7FA)),
       home: Scaffold(
         body: SafeArea(
           child: Row(
@@ -189,7 +178,6 @@ class _FriendChatV4State extends State<_FriendChatV4> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _busy) return;
-
     setState(() => _busy = true);
     try {
       final response = await widget.api.chat(
@@ -201,17 +189,13 @@ class _FriendChatV4State extends State<_FriendChatV4> {
         requestedSkills: _skillsForMode(),
         requestedTools: _selectedTools.toList()..sort(),
       );
-
       final decision = response['decision'];
       final tools = decision is Map ? (decision['tools']?.toString() ?? '') : '';
-      final answer = response['text']?.toString() ?? '';
-      final provider = response['provider']?.toString() ?? '-';
-
       if (!mounted) return;
       setState(() {
-        _turns.add({'user': text, 'answer': answer});
+        _turns.add({'user': text, 'answer': response['text']?.toString() ?? ''});
         _runtime = decision is Map ? (decision['scale']?.toString() ?? '-') : '-';
-        _provider = provider;
+        _provider = response['provider']?.toString() ?? '-';
         _toolStatus = tools.isEmpty ? 'Tools: none selected by runtime' : 'Runtime tools: $tools';
         _controller.clear();
       });
@@ -233,80 +217,67 @@ class _FriendChatV4State extends State<_FriendChatV4> {
     });
   }
 
-  void _showTools() {
-    setState(() => _toolsOpen = !_toolsOpen);
-  }
-
-  void _selectMode(String mode) {
-    setState(() {
-      _mode = mode;
-      if (mode == 'Web') _selectedTools.add('web');
-      if (mode == 'Deep Research') {
-        _selectedTools.addAll(['web', 'file', 'python']);
-      }
-      if (mode == 'Schedule') _selectedTools.add('schedule.generate');
-    });
-  }
-
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = (constraints.maxWidth - 40).clamp(0.0, 1100.0);
-        return Center(
-          child: SizedBox(
-            width: width,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
-              child: Column(
-                children: <Widget>[
-                  _RuntimeBar(runtime: _runtime, provider: _provider, turbo: _turbo, onTurbo: (value) => setState(() => _turbo = value)),
-                  const SizedBox(height: 10),
-                  if (_toolStatus.isNotEmpty)
-                    Align(alignment: Alignment.centerLeft, child: Text(_toolStatus, style: Theme.of(context).textTheme.bodySmall)),
-                  if (_toolStatus.isNotEmpty) const SizedBox(height: 6),
-                  Expanded(
-                    child: _turns.isEmpty
-                        ? _EmptyState(mode: _mode)
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            itemCount: _turns.length,
-                            itemBuilder: (context, index) {
-                              final turn = _turns[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: <Widget>[
-                                    Align(alignment: Alignment.centerRight, child: _Bubble(text: turn['user'] ?? '', user: true)),
-                                    const SizedBox(height: 8),
-                                    _Bubble(text: turn['answer'] ?? '', user: false),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                  _Composer(
-                    controller: _controller,
-                    busy: _busy,
-                    mode: _mode,
-                    toolsOpen: _toolsOpen,
-                    selectedTools: _selectedTools,
-                    onTools: _showTools,
-                    onSend: _send,
-                    onMode: _selectMode,
-                    onToggleTool: (name) => setState(() => _selectedTools.contains(name) ? _selectedTools.remove(name) : _selectedTools.add(name)),
-                  ),
-                ],
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final width = (constraints.maxWidth - 40).clamp(0.0, 1100.0);
+          return Center(
+            child: SizedBox(
+              width: width,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
+                child: Column(
+                  children: <Widget>[
+                    _RuntimeBar(runtime: _runtime, provider: _provider, turbo: _turbo, onTurbo: (value) => setState(() => _turbo = value)),
+                    const SizedBox(height: 10),
+                    if (_toolStatus.isNotEmpty) Align(alignment: Alignment.centerLeft, child: Text(_toolStatus, style: Theme.of(context).textTheme.bodySmall)),
+                    if (_toolStatus.isNotEmpty) const SizedBox(height: 6),
+                    Expanded(
+                      child: _turns.isEmpty
+                          ? _EmptyState(mode: _mode)
+                          : ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              itemCount: _turns.length,
+                              itemBuilder: (context, index) {
+                                final turn = _turns[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: <Widget>[
+                                      Align(alignment: Alignment.centerRight, child: _Bubble(text: turn['user'] ?? '', user: true)),
+                                      const SizedBox(height: 8),
+                                      _Bubble(text: turn['answer'] ?? '', user: false),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    _Composer(
+                      controller: _controller,
+                      busy: _busy,
+                      mode: _mode,
+                      toolsOpen: _toolsOpen,
+                      selectedTools: _selectedTools,
+                      onTools: () => setState(() => _toolsOpen = !_toolsOpen),
+                      onSend: _send,
+                      onMode: (mode) => setState(() {
+                        _mode = mode;
+                        if (mode == 'Web') _selectedTools.add('web');
+                        if (mode == 'Deep Research') _selectedTools.addAll(['web', 'file', 'python']);
+                        if (mode == 'Schedule') _selectedTools.add('schedule.generate');
+                      }),
+                      onToggleTool: (name) => setState(() => _selectedTools.contains(name) ? _selectedTools.remove(name) : _selectedTools.add(name)),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
 }
 
 class _RuntimeBar extends StatelessWidget {
@@ -321,16 +292,16 @@ class _RuntimeBar extends StatelessWidget {
         margin: EdgeInsets.zero,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
+          child: Wrap(
+            alignment: WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 4,
             children: <Widget>[
               const Icon(Icons.bolt_outlined, size: 20),
-              const SizedBox(width: 8),
               Text('Brain: $runtime'),
-              const SizedBox(width: 16),
               Text('Provider: $provider'),
-              const Spacer(),
-              const Text('Turbo 1M'),
-              Switch(value: turbo, onChanged: onTurbo),
+              Row(mainAxisSize: MainAxisSize.min, children: <Widget>[const Text('Turbo 1M'), Switch(value: turbo, onChanged: onTurbo)]),
             ],
           ),
         ),
@@ -417,15 +388,12 @@ class _Composer extends StatelessWidget {
                   child: Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: _tools.map((tool) {
-                      final active = selectedTools.contains(tool.name);
-                      return FilterChip(
-                        selected: active,
-                        avatar: Icon(tool.icon, size: 17),
-                        label: Text('${tool.label} · ${tool.state}'),
-                        onSelected: (_) => onToggleTool(tool.name),
-                      );
-                    }).toList(),
+                    children: _tools.map((tool) => FilterChip(
+                          selected: selectedTools.contains(tool.name),
+                          avatar: Icon(tool.icon, size: 17),
+                          label: Text('${tool.label} · ${tool.state}'),
+                          onSelected: (_) => onToggleTool(tool.name),
+                        )).toList(),
                   ),
                 ),
               ),
@@ -572,7 +540,14 @@ class _ProviderV4State extends State<_ProviderV4> {
           const SizedBox(height: 10),
           TextField(controller: _key, obscureText: true, decoration: const InputDecoration(labelText: 'API key (optional)', border: OutlineInputBorder())),
           const SizedBox(height: 12),
-          Row(children: <Widget>[FilledButton.icon(onPressed: _configure, icon: const Icon(Icons.save), label: const Text('Save Provider')), const SizedBox(width: 8), OutlinedButton.icon(onPressed: () async { final result = await widget.api.testProvider(); if (mounted) setState(() => _status = result.toString()); }, icon: const Icon(Icons.bolt), label: const Text('Test'))]),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              FilledButton.icon(onPressed: _configure, icon: const Icon(Icons.save), label: const Text('Save Provider')),
+              OutlinedButton.icon(onPressed: () async { final result = await widget.api.testProvider(); if (mounted) setState(() => _status = result.toString()); }, icon: const Icon(Icons.bolt), label: const Text('Test')),
+            ],
+          ),
           if (_status.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: SelectableText(_status)),
         ],
       );
