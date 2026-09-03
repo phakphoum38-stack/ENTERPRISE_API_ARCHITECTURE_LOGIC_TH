@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 GATE = ROOT / "scripts" / "verify-owner-build-identity.ps1"
 
@@ -27,7 +26,9 @@ def test_build_identity_gate_requires_owner_identity():
         assert token in text, f"missing identity-gate contract token: {token}"
 
 
-def test_owner_identity_is_not_the_flutter_project_name():
+def test_owner_identity_is_explicit_and_unique():
     text = GATE.read_text(encoding="utf-8")
-    assert "research_os_owner_special.exe" not in text
-    assert "Research OS Friend.exe" in text
+    assert "research_os_owner_special.exe" in text
+    assert "research_os_owner_special" in text
+    assert "owner-special" in text
+    assert "owner_only" in text
