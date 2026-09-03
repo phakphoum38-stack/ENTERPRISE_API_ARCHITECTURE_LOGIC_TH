@@ -257,8 +257,20 @@ class _ProviderPageState extends State<_ProviderPage> {
       final saved = await widget.api.configureProvider(baseUrl: _baseUrl.text.trim(), model: _model.text.trim(), apiKey: _apiKey.text.trim().isEmpty ? null : _apiKey.text.trim());
       _apiKey.clear();
       final tested = await widget.api.testProvider();
+      final refreshed = await widget.api.providerStatus();
       if (!mounted) return;
-      setState(() { _status = saved; _message = tested['connected'] == true ? 'Provider connected' : 'Provider test failed: ${tested['error'] ?? 'unknown'}'; });
+      setState(() {
+        _status = refreshed;
+        final connected = tested['connected'] == true;
+        final stored = refreshed['credential_present'] == true;
+        _message = connected && stored
+            ? 'Provider connected • API key stored securely'
+            : connected
+                ? 'Provider connected • credential status unavailable'
+                : 'Provider test failed: ${tested['error'] ?? 'unknown'}';
+      });
+      // Keep the local `saved` result consumed so the save request remains explicit.
+      assert(saved.isNotEmpty);
     } catch (error) { if (mounted) setState(() => _message = '$error'); }
     finally { if (mounted) setState(() => _busy = false); }
   }
@@ -275,9 +287,24 @@ class _ProviderPageState extends State<_ProviderPage> {
         const SizedBox(height: 12),
         TextField(key: const Key('provider-model'), controller: _model, decoration: const InputDecoration(labelText: 'Model')),
         const SizedBox(height: 12),
-        TextField(key: const Key('provider-api-key'), controller: _apiKey, obscureText: true, decoration: const InputDecoration(labelText: 'API key (leave blank to keep existing)')),
+        TextField(
+          key: const Key('provider-api-key'),
+          controller: _apiKey,
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: credentialPresent ? 'API key (stored securely — leave blank to keep it)' : 'API key (enter once to store securely)',
+            hintText: credentialPresent ? 'Stored securely; no need to enter it again' : null,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          credentialPresent
+              ? 'The key is intentionally cleared from the field after saving. Research OS keeps it in the secure ${_status?['secret_backend'] ?? 'credential'} backend.'
+              : 'Enter the key here only. It will be stored server-side and never displayed again.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
         const SizedBox(height: 16),
-        FilledButton.icon(key: const Key('provider-save-test'), onPressed: _busy ? null : _saveAndTest, icon: const Icon(Icons.link), label: const Text('Save & Test Connection')),
+        FilledButton.icon(key: const Key('provider-save-test'), onPressed: _busy ? null : _saveAndTest, icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.link), label: Text(_busy ? 'Testing...' : 'Save & Test Connection')),
         if (_message.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 16), child: SelectableText(_message, key: const Key('provider-message'))),
       ]),
     );
