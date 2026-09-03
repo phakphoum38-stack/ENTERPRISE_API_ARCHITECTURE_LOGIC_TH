@@ -30,6 +30,11 @@ if ($LASTEXITCODE -ne 0) { throw 'OpenAI Agents SDK installation failed' }
 $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim()
 Copy-Tree $pythonRoot (Join-Path $PackageDir 'runtime\python')
 if (-not (Test-Path (Join-Path $PackageDir 'runtime\python\python.exe'))) { throw 'Bundled Python runtime missing' }
-if (-not (Get-ChildItem (Join-Path $PackageDir 'app') -Filter 'research_os_owner_special.exe' -Recurse -File -ErrorAction SilentlyContinue)) { throw 'Owner Desktop EXE missing from package' }
+
+$ownerExe = Join-Path $PackageDir 'app\Research OS Friend.exe'
+if (-not (Test-Path $ownerExe -PathType Leaf)) { throw 'Canonical Owner Desktop EXE missing from package: Research OS Friend.exe' }
+& (Join-Path $ownerRoot 'scripts\verify-owner-build-identity.ps1') -ExePath $ownerExe -ExpectedManifestPath (Join-Path $PackageDir 'owner_special\OWNER_MANIFEST.json')
+if ($LASTEXITCODE -ne 0) { throw 'Owner Desktop Build Identity Gate failed during packaging' }
+
 if (-not (Test-Path (Join-Path $PackageDir 'service_host\ResearchOS.Owner.ServiceHost.exe'))) { throw 'Owner ServiceHost EXE missing from package' }
 Write-Host "Owner Special package staged at $PackageDir"
