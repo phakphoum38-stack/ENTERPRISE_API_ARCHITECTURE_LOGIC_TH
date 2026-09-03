@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from .orchestrator import FriendOrchestrator
 from .persistent_memory import PersistentScopedMemory
 from .policy import OwnerPolicy
 from .providers import MockProvider, ProviderRouter
+from .provider_settings import OpenAICompatibleProvider, UrllibJsonTransport
 from .schedule_generation.preview import SchedulePreviewStore
 from .reasoning import DecisionPlanner
 from .skills import SkillRegistry
@@ -47,7 +49,24 @@ class FriendRuntime:
         skills = install_builtin_skills(SkillRegistry())
         tools = install_builtin_tools(ToolRegistry())
         providers = ProviderRouter()
+
+        # Keep the deterministic mock as the safe offline fallback, but use a
+        # real OpenAI-compatible provider automatically when the host supplies
+        # OPENAI_API_KEY. The credential is never persisted by this path.
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if api_key:
+            base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
+            model = os.environ.get("OPENAI_MODEL", "gpt-5-mini").strip()
+            providers.register(
+                OpenAICompatibleProvider(
+                    base_url=base_url,
+                    model=model,
+                    api_key=api_key,
+                    transport=UrllibJsonTransport(),
+                )
+            )
         providers.register(MockProvider())
+
         capabilities = install_friend_complete_capabilities()
         bridge = V3Bridge(repo_root)
         v3 = V3ExecutionAdapter()
