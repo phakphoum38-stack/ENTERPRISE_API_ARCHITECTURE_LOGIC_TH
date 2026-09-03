@@ -3,6 +3,9 @@ name = "research-os-friend-owner"
 version = "1.0.0"
 description = "Research OS Owner Special Friend Complete runtime"
 requires-python = ">=3.11"
+dependencies = [
+  "openai-agents>=0.21.0,<1.0",
+]
 
 [tool.ruff]
 line-length = 100
