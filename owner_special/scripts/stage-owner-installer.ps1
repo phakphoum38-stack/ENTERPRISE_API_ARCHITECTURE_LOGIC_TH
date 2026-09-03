@@ -23,6 +23,10 @@ Copy-Tree (Join-Path $ownerRoot 'scripts') (Join-Path $PackageDir 'owner_special
 Copy-Tree (Join-Path $repoRoot 'v3\research_os_v3') (Join-Path $PackageDir 'v3\research_os_v3')
 Copy-Item (Join-Path $ownerRoot 'OWNER_MANIFEST.json') (Join-Path $PackageDir 'owner_special\OWNER_MANIFEST.json') -Force
 
+Write-Host 'Installing Owner runtime Python dependencies required by Launch Desk...'
+python -m pip install --disable-pip-version-check --quiet 'openai-agents>=0.21.0,<1.0'
+if ($LASTEXITCODE -ne 0) { throw 'OpenAI Agents SDK installation failed' }
+
 $pythonRoot = (python -c "import sys; print(sys.base_prefix)").Trim()
 Copy-Tree $pythonRoot (Join-Path $PackageDir 'runtime\python')
 if (-not (Test-Path (Join-Path $PackageDir 'runtime\python\python.exe'))) { throw 'Bundled Python runtime missing' }
