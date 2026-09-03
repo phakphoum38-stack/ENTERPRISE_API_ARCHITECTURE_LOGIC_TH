@@ -90,8 +90,10 @@ jobs:
         run: |
           $exe = Resolve-Path 'owner_special/flutter_app/build/windows/x64/runner/Release/research_os_owner_special.exe'
           & 'owner_special/scripts/verify-owner-build-identity.ps1' -ExePath $exe.Path -ExpectedManifestPath "$env:GITHUB_WORKSPACE\owner_special\OWNER_MANIFEST.json"
-          if ($LASTEXITCODE -ne 0) { throw 'Owner Special Build Identity Gate failed' }
-          if (-not (Test-Path "$($exe.DirectoryName)\OWNER_BUILD_IDENTITY.json")) { throw 'Identity evidence JSON missing' }
+          if (-not (Test-Path "$($exe.DirectoryName)\OWNER_BUILD_IDENTITY.json" -PathType Leaf)) { throw 'Identity evidence JSON missing' }
+          $identity = Get-Content "$($exe.DirectoryName)\OWNER_BUILD_IDENTITY.json" -Raw | ConvertFrom-Json
+          if ($identity.passed -ne $true) { throw 'Owner Special Build Identity Gate did not produce passed=true evidence' }
+          Write-Host 'BUILD_IDENTITY_EVIDENCE_GATE=PASS'
 
       - name: Publish Owner ServiceHost
         shell: pwsh
@@ -125,7 +127,9 @@ jobs:
         run: |
           $exe = Resolve-Path 'owner_special/installer/package/app/research_os_owner_special.exe'
           & 'owner_special/scripts/verify-owner-build-identity.ps1' -ExePath $exe.Path -ExpectedManifestPath "$env:GITHUB_WORKSPACE\owner_special\installer\package\owner_special\OWNER_MANIFEST.json"
-          if ($LASTEXITCODE -ne 0) { throw 'Packaged Owner EXE failed final identity audit' }
+          if (-not (Test-Path "$($exe.DirectoryName)\OWNER_BUILD_IDENTITY.json" -PathType Leaf)) { throw 'Packaged identity evidence JSON missing' }
+          $identity = Get-Content "$($exe.DirectoryName)\OWNER_BUILD_IDENTITY.json" -Raw | ConvertFrom-Json
+          if ($identity.passed -ne $true) { throw 'Packaged Owner EXE failed final identity audit' }
           $setup = Get-Item 'owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe'
           if ($setup.Length -lt 100000) { throw 'Installer is unexpectedly small' }
           Write-Host 'FINAL_PACKAGE_IDENTITY_GATE=PASS'
