@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - feat/chatgpt-style-desktop-shell
     paths:
       - "apps/research_os_flutter/**"
@@ -17,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FRIEND_REF: 092e02596e09baa4a2ff3cf1ed12496d02a6c6d7
+  FRIEND_REF: ${{ github.sha }}
 
 jobs:
   build:
@@ -26,6 +27,20 @@ jobs:
     timeout-minutes: 55
 
     steps:
+      - name: Canonical Research OS + Friend lineage gate
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) { throw "GITHUB_SHA is missing." }
+          if ([string]::IsNullOrWhiteSpace($env:FRIEND_REF)) { throw "FRIEND_REF is missing." }
+          if ($env:FRIEND_REF -ne $env:GITHUB_SHA) {
+            Write-Host "CANONICAL_LINEAGE_GATE=FAIL"
+            Write-Host "Research OS SHA: $env:GITHUB_SHA"
+            Write-Host "Friend SHA: $env:FRIEND_REF"
+            throw "Friend source must use the exact canonical Research OS commit SHA."
+          }
+          Write-Host "CANONICAL_LINEAGE_GATE=PASS"
+          Write-Host "Canonical source SHA: $env:GITHUB_SHA"
+
       - name: Checkout Research OS desktop
         uses: actions/checkout@v4
 
@@ -34,6 +49,20 @@ jobs:
         with:
           ref: ${{ env.FRIEND_REF }}
           path: friend_source
+
+      - name: Verify checked-out Friend source identity
+        shell: pwsh
+        run: |
+          $friendSha = (git -C "$env:GITHUB_WORKSPACE\friend_source" rev-parse HEAD).Trim()
+          if ($friendSha -ne $env:GITHUB_SHA) {
+            Write-Host "CANONICAL_LINEAGE_GATE=FAIL"
+            Write-Host "Expected Friend SHA: $env:GITHUB_SHA"
+            Write-Host "Checked-out Friend SHA: $friendSha"
+            throw "Checked-out Friend source does not match canonical Research OS SHA."
+          }
+          Write-Host "CANONICAL_LINEAGE_CHECKOUT=PASS"
+          Write-Host "Research OS SHA: $env:GITHUB_SHA"
+          Write-Host "Friend SHA: $friendSha"
 
       - uses: subosito/flutter-action@v2
         with:
@@ -132,6 +161,7 @@ jobs:
           Icon source: apps/research_os_flutter/assets/branding/research_os_master.webp
           Desktop commit: $env:GITHUB_SHA
           Friend Complete commit: $env:FRIEND_REF
+          Canonical lineage: $env:GITHUB_SHA
           UI gate: flutter analyze + full tests + desktop shell test + Windows launch smoke
           "@ | Set-Content -Path (Join-Path $stage "RESEARCH_OS_BUILD_INFO.txt") -Encoding utf8
 
@@ -281,6 +311,7 @@ jobs:
           @"
           Research OS Friend Complete Files
           Friend source commit: $env:FRIEND_REF
+          Canonical release SHA: $env:GITHUB_SHA
           Included source roots:
             owner_special/                 (ALL tracked Friend source, UI, tests, installer and scripts)
             v3/                            (Friend v3 bridge dependency)
@@ -292,6 +323,7 @@ jobs:
           Friend loopback endpoint: http://127.0.0.1:8790
           Team/Publisher: Research OS Team
           UI validation: Research OS shell + Friend widget tests + both Windows EXE launch smoke
+          Canonical lineage gate: PASS
           "@ | Set-Content "$stage\FRIEND_COMPLETE_MANIFEST.txt" -Encoding utf8
 
       - name: Prove packaged Friend runtime and file completeness
