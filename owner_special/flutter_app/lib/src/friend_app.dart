@@ -271,6 +271,7 @@ class _ProviderPageState extends State<_ProviderPage> {
                 ? 'Provider connected • credential status unavailable'
                 : 'Provider test failed: ${tested['error'] ?? 'unknown'}';
       });
+      // Keep the local `saved` result consumed so the save request remains explicit.
       assert(saved.isNotEmpty);
     } catch (error) { if (mounted) setState(() => _message = '$error'); }
     finally { if (mounted) setState(() => _busy = false); }
