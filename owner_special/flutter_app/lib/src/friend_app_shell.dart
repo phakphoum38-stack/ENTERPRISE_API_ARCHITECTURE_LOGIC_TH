@@ -10,6 +10,7 @@ class FriendAppShell extends StatelessWidget {
 
   static const items = <({IconData icon, String label})>[
     (icon: Icons.chat_bubble_outline, label: 'Friend'),
+    (icon: Icons.rocket_launch_outlined, label: 'Launch Desk'),
     (icon: Icons.auto_awesome_outlined, label: 'Capabilities'),
     (icon: Icons.memory_outlined, label: 'Memory'),
     (icon: Icons.tune_outlined, label: 'Provider'),
@@ -100,14 +101,7 @@ class _Sidebar extends StatelessWidget {
                           Icon(item.icon, color: selected ? Theme.of(context).colorScheme.primary : null),
                           if (!compact) ...[
                             const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                item.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
-                              ),
-                            ),
+                            Expanded(child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500))),
                           ],
                         ],
                       ),
