@@ -13,9 +13,9 @@ on:
         default: true
         type: boolean
       build_ios:
-        description: Build unsigned iOS IPA
+        description: Build unsigned iOS IPA (temporarily disabled by default)
         required: false
-        default: true
+        default: false
         type: boolean
       build_website:
         description: Build website bundle
