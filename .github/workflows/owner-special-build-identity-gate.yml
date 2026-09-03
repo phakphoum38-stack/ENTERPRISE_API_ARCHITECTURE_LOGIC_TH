@@ -84,7 +84,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Owner Python tests failed' }
           python owner_special/scripts/smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Friend runtime smoke failed' }
-
           Push-Location owner_special/flutter_app
           try {
             flutter analyze
@@ -92,9 +91,7 @@ jobs:
             flutter test
             if ($LASTEXITCODE -ne 0) { throw 'Owner Flutter tests failed' }
           }
-          finally {
-            Pop-Location
-          }
+          finally { Pop-Location }
           Write-Host 'TEST_GATE=PASS'
 
       - name: 6. EXE Gate — build only after all tests pass
@@ -103,13 +100,9 @@ jobs:
         run: |
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { throw 'Owner Windows EXE build failed' }
-          if (-not (Test-Path '..\..\$env:OWNER_EXE' -PathType Leaf)) {
-            # The relative path above is intentionally not used for validation;
-            # validate from the repository root below.
-          }
           $exe = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_EXE
           if (-not (Test-Path $exe -PathType Leaf)) { throw "Owner Special EXE missing: $exe" }
-          Write-Host "EXE_GATE=PASS"
+          Write-Host 'EXE_GATE=PASS'
           Write-Host "OWNER_EXE=$exe"
 
       - name: 7. Identity Gate — verify canonical Owner EXE
@@ -117,10 +110,7 @@ jobs:
         run: |
           $exe = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_EXE
           $evidence = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_IDENTITY
-          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" `
-            -ExePath $exe `
-            -ExpectedManifestPath "$env:GITHUB_WORKSPACE\owner_special\OWNER_MANIFEST.json" `
-            -EvidencePath $evidence
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath $exe -ExpectedManifestPath "$env:GITHUB_WORKSPACE\owner_special\OWNER_MANIFEST.json" -EvidencePath $evidence
           if (-not (Test-Path $evidence -PathType Leaf)) { throw "Identity evidence missing: $evidence" }
           $identity = Get-Content $evidence -Raw | ConvertFrom-Json
           if ($identity.passed -ne $true) { throw 'Owner Special identity evidence is not passed=true' }
@@ -135,9 +125,7 @@ jobs:
       - name: 9. Installer Gate — stage package
         shell: pwsh
         run: |
-          & "$env:GITHUB_WORKSPACE\owner_special\scripts\stage-owner-installer.ps1" `
-            -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\flutter_app\build\windows\x64\runner\Release" `
-            -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\stage-owner-installer.ps1" -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\flutter_app\build\windows\x64\runner\Release" -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
           if ($LASTEXITCODE -ne 0) { throw 'Owner installer staging failed' }
           Write-Host 'INSTALLER_STAGE_GATE=PASS'
 
@@ -163,10 +151,7 @@ jobs:
           $exe = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/app/research_os_owner_special.exe'
           $manifest = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/owner_special/OWNER_MANIFEST.json'
           $evidence = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/app/OWNER_BUILD_IDENTITY.json'
-          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" `
-            -ExePath $exe `
-            -ExpectedManifestPath $manifest `
-            -EvidencePath $evidence
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath $exe -ExpectedManifestPath $manifest -EvidencePath $evidence
           if (-not (Test-Path $evidence -PathType Leaf)) { throw "Packaged identity evidence missing: $evidence" }
           $identity = Get-Content $evidence -Raw | ConvertFrom-Json
           if ($identity.passed -ne $true) { throw 'Packaged Owner EXE failed final identity audit' }
@@ -177,9 +162,7 @@ jobs:
       - name: 13. E2E Gate — install + startup + uninstall
         shell: pwsh
         run: |
-          & "$env:GITHUB_WORKSPACE\owner_special\scripts\validate-owner-installer.ps1" `
-            -Phase full `
-            -SetupPath (Join-Path $env:GITHUB_WORKSPACE $env:OWNER_SETUP)
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\validate-owner-installer.ps1" -Phase full -SetupPath (Join-Path $env:GITHUB_WORKSPACE $env:OWNER_SETUP)
           if ($LASTEXITCODE -ne 0) { throw 'Owner install/startup/upgrade/uninstall E2E failed' }
           Write-Host 'E2E_GATE=PASS'
 
