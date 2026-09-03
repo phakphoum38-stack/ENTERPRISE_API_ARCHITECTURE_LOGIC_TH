@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'friend_app_shell.dart';
 import 'friend_module_shell.dart';
 import 'friend_theme.dart';
+import 'launch_desk_page.dart';
 import 'owner_api.dart';
 import 'team_center.dart';
 
@@ -26,6 +27,7 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
   Widget build(BuildContext context) {
     final pages = <Widget>[
       _FriendChatPage(api: widget.api, team: _currentTeam),
+      LaunchDeskPage(api: widget.api),
       _CapabilitiesPage(api: widget.api, startup: widget.startup),
       _MemoryPage(api: widget.api),
       _ProviderPage(api: widget.api),

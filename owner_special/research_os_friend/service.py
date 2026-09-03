@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+from .launch_desk_agent import stream_launch_desk
 from .models import FriendRequest
 from .provider_settings import ProviderManager
 from .runtime import FriendRuntime
@@ -102,6 +103,27 @@ class OwnerFriendService:
                     raise ValueError("request body must be a JSON object")
                 return decoded
 
+            def _send_launch_event(self, payload: dict[str, object]) -> None:
+                body = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                self.wfile.write(b"data: " + body + b"\n\n")
+                self.wfile.flush()
+
+            def _launch_desk(self, payload: dict[str, object]) -> None:
+                text = str(payload.get("text", "")).strip()
+                if not text:
+                    raise ValueError("text is required")
+                provider = service.provider_manager.provider()
+                if provider is None:
+                    raise RuntimeError("openai_provider_not_ready")
+                self._audit(200)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self._send_launch_event({"type": "started", "agent": "launch-desk"})
+                stream_launch_desk(text=text, api_key=provider.api_key, base_url=provider.base_url, model=provider.model, emit=self._send_launch_event)
+
             def do_GET(self) -> None:
                 path = urlparse(self.path).path
                 try:
@@ -150,6 +172,10 @@ class OwnerFriendService:
                 try:
                     owner_id, profile_id, session_id = self._scope()
                     payload = self._read_payload()
+
+                    if path == "/v1/launch-desk/run":
+                        self._launch_desk(payload)
+                        return
 
                     if path.startswith("/owner/schedule/previews/") and path.endswith("/confirm"):
                         preview_id = path[

@@ -10,6 +10,7 @@ class FriendAppShell extends StatelessWidget {
 
   static const items = <({IconData icon, String label})>[
     (icon: Icons.chat_bubble_outline, label: 'Friend'),
+    (icon: Icons.rocket_launch_outlined, label: 'Launch Desk'),
     (icon: Icons.auto_awesome_outlined, label: 'Capabilities'),
     (icon: Icons.memory_outlined, label: 'Memory'),
     (icon: Icons.tune_outlined, label: 'Provider'),

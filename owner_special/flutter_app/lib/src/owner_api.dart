@@ -35,6 +35,34 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) => _request('POST', '/owner/chat', timeoutOverride: chatTimeout, body: <String, dynamic>{'text': text, 'complexity': complexity, 'risk': risk, 'parallelism': parallelism, 'helper_budget': helperBudget, 'requested_skills': requestedSkills, 'requested_tools': requestedTools});
 
+  Stream<Map<String, dynamic>> launchDesk(String text) async* {
+    final client = HttpClient();
+    final uri = Uri.parse('$baseUrl/v1/launch-desk/run');
+    try {
+      final request = await client.postUrl(uri).timeout(chatTimeout);
+      request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
+      request.headers.set('X-Research-OS-Owner', ownerId);
+      request.headers.set('X-Research-OS-Profile', profileId);
+      request.headers.set('X-Research-OS-Session', sessionId);
+      final payload = utf8.encode(jsonEncode(<String, dynamic>{'text': text}));
+      request.contentLength = payload.length;
+      request.add(payload);
+      final response = await request.close().timeout(chatTimeout);
+      if (response.statusCode != HttpStatus.ok) {
+        final body = await utf8.decoder.bind(response).join().timeout(chatTimeout);
+        throw HttpException('Launch Desk returned HTTP ${response.statusCode}: $body', uri: uri);
+      }
+      await for (final line in utf8.decoder.bind(response).transform(const LineSplitter()).timeout(chatTimeout)) {
+        if (!line.startsWith('data: ')) continue;
+        final decoded = jsonDecode(line.substring(6));
+        if (decoded is Map) yield Map<String, dynamic>.from(decoded);
+      }
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   Future<Map<String, dynamic>> _request(String method, String path, {bool authenticated = true, Map<String, dynamic>? body, Duration? timeoutOverride}) async {
     final client = HttpClient();
     final requestTimeout = timeoutOverride ?? timeout;
