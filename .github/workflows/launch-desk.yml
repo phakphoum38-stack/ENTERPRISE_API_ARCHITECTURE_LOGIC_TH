@@ -22,14 +22,14 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Install Owner runtime dependencies
-        run: python -m pip install --disable-pip-version-check -e owner_special
+      - name: Install OpenAI Agents SDK
+        run: python -m pip install --disable-pip-version-check 'openai-agents>=0.21.0,<1.0'
       - name: Compile Launch Desk sources
         run: python -m compileall -q owner_special/research_os_friend owner_special/tests
       - name: Run Launch Desk tests
         env:
           PYTHONPATH: owner_special
-        run: python -m unittest owner_special.tests.test_launch_desk -v
+        run: python -m unittest owner_special.tests.test_launch_desk owner_special.tests.test_launch_desk_service_contract -v
       - name: Run deterministic Launch Desk smoke
         env:
           PYTHONPATH: owner_special
