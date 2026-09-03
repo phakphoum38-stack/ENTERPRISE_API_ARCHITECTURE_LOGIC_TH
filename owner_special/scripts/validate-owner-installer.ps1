@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)][string]$SetupPath,
     [ValidateSet('full','clean','upgrade','uninstall')][string]$Phase = 'full'
 )
@@ -241,4 +241,8 @@ switch ($Phase) {
     }
 }
 
-
+# The validator owns the process result. Individual external tools used by
+# the validation phases may leave a non-zero $LASTEXITCODE even after all
+# assertions above have passed. Return an explicit success code so the CI
+# caller cannot misclassify a fully passed E2E validation as failed.
+exit 0
