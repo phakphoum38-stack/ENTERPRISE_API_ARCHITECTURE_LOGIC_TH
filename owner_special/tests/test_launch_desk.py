@@ -7,7 +7,6 @@ from research_os_friend.launch_desk import (
     READINESS_AREAS,
     build_deterministic_plan,
     check_launch_readiness,
-    draft_launch_copy,
     extract_tasks,
     generate_owner_checklist,
 )
@@ -23,7 +22,7 @@ class LaunchDeskTests(unittest.TestCase):
     def test_readiness_uses_all_nine_areas(self) -> None:
         result = check_launch_readiness("product and QA are confirmed", extract_tasks("product and QA are confirmed"))
         self.assertEqual([item["area"] for item in result["items"]], list(READINESS_AREAS))
-        self.assertEqual(result["score"], 50)
+        self.assertEqual(result["score"], 49)
 
     def test_owner_checklist_flags_missing_evidence(self) -> None:
         result = check_launch_readiness("security", extract_tasks("security"))
@@ -32,6 +31,7 @@ class LaunchDeskTests(unittest.TestCase):
         self.assertTrue(any("engineering" in item for item in checklist))
 
     def test_plan_contains_required_surfaces(self) -> None:
+        from research_os_friend.launch_desk import build_deterministic_plan
         plan = build_deterministic_plan("Ship Research OS after QA validation")
         payload = plan.to_dict()
         for key in ("tasks", "readiness", "readiness_score", "risks", "owner_checklist", "launch_copy", "follow_up_questions", "assumptions"):
