@@ -71,7 +71,7 @@ begin
   ExtractTemporaryFile('research-os-owner-runtime-quiesce.ps1');
   if not FileExists(GuardPath) then begin Log('Could not extract Owner runtime quiesce helper; refusing file replacement.'); Exit; end;
   PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath + '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath + '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790 -LogPath "' + QuiesceLogPath + '"';
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath + '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath + '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790' + ' -LogPath "' + QuiesceLogPath + '"';
   Log('Launching Owner runtime quiesce helper.');
   if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then begin Log('Could not launch Owner runtime quiesce helper; refusing file replacement.'); Exit; end;
   Log('Owner runtime quiesce helper exit code: ' + IntToStr(ResultCode));
