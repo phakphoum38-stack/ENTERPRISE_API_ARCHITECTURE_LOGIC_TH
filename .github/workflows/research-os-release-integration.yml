@@ -1,0 +1,204 @@
+name: Research OS Unified Release Integration
+
+on:
+  workflow_run:
+    workflows:
+      - Research OS Windows Artifact
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Completed Research OS Windows Artifact run ID'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: research-os-unified-release-${{ github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: true
+
+env:
+  OWNER_SETUP: owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
+  OWNER_EXE: owner_special/flutter_app/build/windows/x64/runner/Release/research_os_owner_special.exe
+
+jobs:
+  integrate:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: windows-latest
+    timeout-minutes: 70
+    steps:
+      - name: Resolve source run
+        id: source
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $runId = '${{ inputs.run_id }}'
+            $sha = (gh api repos/${{ github.repository }}/actions/runs/$runId --jq '.head_sha')
+          } else {
+            $runId = '${{ github.event.workflow_run.id }}'
+            $sha = '${{ github.event.workflow_run.head_sha }}'
+          }
+          if (-not $runId -or -not $sha) { throw 'Could not resolve source workflow run.' }
+          "run_id=$runId" >> $env:GITHUB_OUTPUT
+          "sha=$sha" >> $env:GITHUB_OUTPUT
+          Write-Host "SOURCE_RUN=$runId"
+          Write-Host "SOURCE_SHA=$sha"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Checkout exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+
+      - name: Download validated Complete ZIP from source run
+        uses: actions/download-artifact@v5
+        with:
+          name: Research-OS-Windows-x64-Friend-Complete-${{ steps.source.outputs.sha }}
+          path: release_inputs
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.source.outputs.run_id }}
+
+      - name: Verify source lineage
+        shell: pwsh
+        run: |
+          $sha = '${{ steps.source.outputs.sha }}'
+          $files = Get-ChildItem release_inputs -File -Recurse
+          if (-not $files) { throw 'Complete ZIP artifact was not downloaded.' }
+          Write-Host "SOURCE_LINEAGE_SHA=$sha"
+          Write-Host "COMPLETE_ARTIFACT_FILES=$($files.Count)"
+
+      - name: Setup toolchains
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Owner source and test gate
+        shell: pwsh
+        run: |
+          python -m json.tool owner_special/OWNER_MANIFEST.json > $null
+          python -m compileall -q owner_special/research_os_friend owner_special/scripts owner_special/tests v3/research_os_v3
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Python compile gate failed.' }
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\owner_special"
+          python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Python tests failed.' }
+          python owner_special/scripts/smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'Owner smoke test failed.' }
+
+      - name: Build canonical Owner EXE
+        working-directory: owner_special/flutter_app
+        shell: pwsh
+        run: |
+          flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+          flutter pub get
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Flutter analyze failed.' }
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Flutter tests failed.' }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Windows build failed.' }
+          $exe = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_EXE
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "Owner EXE missing: $exe" }
+
+      - name: Owner identity gate
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_EXE
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'owner_special/flutter_app/build/windows/x64/runner/Release/OWNER_BUILD_IDENTITY.json'
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath $exe -ExpectedManifestPath "$env:GITHUB_WORKSPACE\owner_special\OWNER_MANIFEST.json" -EvidencePath $evidence
+          if (-not (Test-Path $evidence -PathType Leaf)) { throw 'Owner identity evidence missing.' }
+
+      - name: Publish Owner ServiceHost
+        shell: pwsh
+        run: |
+          dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish
+          if ($LASTEXITCODE -ne 0) { throw 'Owner ServiceHost publish failed.' }
+          if (-not (Test-Path 'owner_special/windows_service/publish/ResearchOS.Owner.ServiceHost.exe')) { throw 'Owner ServiceHost EXE missing.' }
+
+      - name: Stage Owner installer
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\stage-owner-installer.ps1" -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\flutter_app\build\windows\x64\runner\Release" -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner installer staging failed.' }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Owner Setup.exe
+        working-directory: owner_special/installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc '.\owner-special.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Setup build failed.' }
+          $setup = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_SETUP
+          if (-not (Test-Path $setup -PathType Leaf)) { throw "Setup.exe missing: $setup" }
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash
+          "SETUP_SHA256=$hash" >> $env:GITHUB_ENV
+
+      - name: Packaged identity gate
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/app/research_os_owner_special.exe'
+          $manifest = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/owner_special/OWNER_MANIFEST.json'
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/app/OWNER_BUILD_IDENTITY.json'
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath $exe -ExpectedManifestPath $manifest -EvidencePath $evidence
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged Owner identity gate failed.' }
+          if (-not (Test-Path $evidence -PathType Leaf)) { throw 'Packaged identity evidence missing.' }
+
+      - name: Full installer E2E gate
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\validate-owner-installer.ps1" -Phase full -SetupPath (Join-Path $env:GITHUB_WORKSPACE $env:OWNER_SETUP)
+          if ($LASTEXITCODE -ne 0) { throw 'Owner install/upgrade/uninstall E2E failed.' }
+
+      - name: Assemble unified release bundle
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'Research-OS-Unified-Release'
+          if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+          New-Item -ItemType Directory -Path "$out\complete" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$out\installer" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$out\evidence" -Force | Out-Null
+
+          Copy-Item 'release_inputs\*' "$out\complete" -Recurse -Force
+          Copy-Item $env:OWNER_SETUP "$out\installer\Research-OS-Owner-Special-Setup-1.3.1-x64.exe" -Force
+          Copy-Item 'owner_special/installer/output/owner-v1.3-validation.json' "$out\evidence\owner-v1.3-validation.json" -Force
+          Copy-Item 'owner_special/flutter_app/build/windows/x64/runner/Release/OWNER_BUILD_IDENTITY.json' "$out\evidence\OWNER_BUILD_IDENTITY.json" -Force
+          $sha = '${{ steps.source.outputs.sha }}'
+          @"
+          Research OS Unified Release
+          Source commit: $sha
+          Complete ZIP: Research-OS-Windows-x64-Friend-Complete-$sha
+          Owner Setup SHA256: $env:SETUP_SHA256
+          Complete artifact was produced by Research OS Windows Artifact and passed before integration.
+          Owner Setup passed identity, packaged identity, install, startup, upgrade, and uninstall E2E gates.
+          "@ | Set-Content "$out\RELEASE_MANIFEST.txt" -Encoding utf8
+
+          Compress-Archive -Path "$out\*" -DestinationPath "$env:RUNNER_TEMP\Research-OS-Unified-Release-$sha.zip" -Force
+
+      - name: Publish final unified validated release
+        uses: actions/upload-artifact@v6
+        with:
+          name: Research-OS-Unified-Release-${{ steps.source.outputs.sha }}
+          path: |
+            ${{ runner.temp }}/Research-OS-Unified-Release-${{ steps.source.outputs.sha }}.zip
+            owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
+            owner_special/installer/output/owner-v1.3-validation.json
+            owner_special/flutter_app/build/windows/x64/runner/Release/OWNER_BUILD_IDENTITY.json
+          if-no-files-found: error
+          retention-days: 30
