@@ -1,7 +1,7 @@
 #define MyAppName "Research OS Owner Special"
 #define MyAppVersion "1.3.1-owner"
 #define MyAppPublisher "Research OS Owner"
-#define MyAppExeName "research_os_owner_special.exe"
+#define MyAppExeName "Research OS Friend.exe"
 
 [Setup]
 AppId={{5C14D248-10A2-4F7B-A9A8-3AC5B0FCB217}
@@ -74,13 +74,10 @@ begin
 
   PythonPath := ExpandConstant('{app}\runtime\python\python.exe');
   AppPath := ExpandConstant('{app}\app\{#MyAppExeName}');
-  ServiceHostPath :=
-    ExpandConstant('{app}\service_host\ResearchOS.Owner.ServiceHost.exe');
+  ServiceHostPath := ExpandConstant('{app}\service_host\ResearchOS.Owner.ServiceHost.exe');
 
-  GuardPath :=
-    ExpandConstant('{tmp}\research-os-owner-runtime-quiesce.ps1');
-  QuiesceLogPath :=
-    ExpandConstant('{%TEMP}') + '\ResearchOS-Owner-Quiesce.log';
+  GuardPath := ExpandConstant('{tmp}\research-os-owner-runtime-quiesce.ps1');
+  QuiesceLogPath := ExpandConstant('{%TEMP}') + '\ResearchOS-Owner-Quiesce.log';
 
   Log('Extracting Owner runtime quiesce helper.');
   Log('Owner quiesce diagnostic log: ' + QuiesceLogPath);
@@ -90,32 +87,14 @@ begin
   if not FileExists(GuardPath) then
   begin
     Log('Could not extract Owner runtime quiesce helper; refusing file replacement.');
-    Result := False;
     Exit;
   end;
 
-  PowerShellExe :=
-    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-
-  Parameters :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass ' +
-    '-File "' + GuardPath + '"' +
-    ' -PythonTarget "' + PythonPath + '"' +
-    ' -AppTarget "' + AppPath + '"' +
-    ' -ServiceHostTarget "' + ServiceHostPath + '"' +
-    ' -Port 8790' +
-    ' -LogPath "' + QuiesceLogPath + '"';
+  PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass ' + '-File "' + GuardPath + '"' + ' -PythonTarget "' + PythonPath + '"' + ' -AppTarget "' + AppPath + '"' + ' -ServiceHostTarget "' + ServiceHostPath + '"' + ' -Port 8790' + ' -LogPath "' + QuiesceLogPath + '"';
 
   Log('Launching Owner runtime quiesce helper.');
-
-  if not Exec(
-    PowerShellExe,
-    Parameters,
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode
-  ) then
+  if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
     Log('Could not launch Owner runtime quiesce helper; refusing file replacement.');
     Exit;
@@ -131,14 +110,7 @@ begin
     Exit;
   end;
 
-  Log(
-    'Owner runtime quiesce helper failed with exit code ' +
-    IntToStr(ResultCode) +
-    '. Detailed diagnostic: ' +
-    QuiesceLogPath
-  );
-
-  Result := False;
+  Log('Owner runtime quiesce helper failed with exit code ' + IntToStr(ResultCode) + '. Detailed diagnostic: ' + QuiesceLogPath);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
