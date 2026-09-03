@@ -6,10 +6,12 @@ param(
   [string]$ExpectedInternalName = 'research_os_owner_special',
   [string]$ExpectedCompanyName = 'com.example',
   [string]$ExpectedOwnerEdition = 'owner-special',
-  [string]$ExpectedManifestPath = (Join-Path $PSScriptRoot '..\OWNER_MANIFEST.json')
+  [string]$ExpectedManifestPath = (Join-Path $PSScriptRoot '..\OWNER_MANIFEST.json'),
+  [string]$EvidencePath = ''
 )
 $ErrorActionPreference = 'Stop'
 function Fail([string]$Message) { Write-Error "BUILD_IDENTITY_GATE_FAILED: $Message"; exit 1 }
+
 if (-not (Test-Path $ExePath -PathType Leaf)) { Fail "EXE does not exist: $ExePath" }
 $file = Get-Item -LiteralPath $ExePath
 if ($file.Name -ne $ExpectedFileName) { Fail "Unexpected executable filename '$($file.Name)'; expected '$ExpectedFileName'." }
@@ -23,9 +25,35 @@ if (-not (Test-Path $ExpectedManifestPath -PathType Leaf)) { Fail "Owner manifes
 $manifest = Get-Content -LiteralPath $ExpectedManifestPath -Raw | ConvertFrom-Json
 if ($manifest.edition -ne $ExpectedOwnerEdition) { Fail "Manifest edition '$($manifest.edition)' != '$ExpectedOwnerEdition'." }
 if ($manifest.owner_only -ne $true) { Fail 'Owner manifest is not owner_only=true.' }
+
 $sha = (Get-FileHash -LiteralPath $ExePath -Algorithm SHA256).Hash
-$result = [ordered]@{ gate='owner-special-build-identity'; passed=$true; executable=$file.FullName; file_name=$file.Name; sha256=$sha; product_name=$vi.ProductName; internal_name=$vi.InternalName; original_filename=$vi.OriginalFilename; file_description=$vi.FileDescription; company_name=$vi.CompanyName; owner_edition=$manifest.edition; owner_only=[bool]$manifest.owner_only; manifest_version=$manifest.version; commit=$env:GITHUB_SHA }
-$resultPath = Join-Path $file.DirectoryName 'OWNER_BUILD_IDENTITY.json'
-$result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $resultPath -Encoding utf8
+$result = [ordered]@{
+  gate='owner-special-build-identity'
+  passed=$true
+  executable=$file.FullName
+  file_name=$file.Name
+  sha256=$sha
+  product_name=$vi.ProductName
+  internal_name=$vi.InternalName
+  original_filename=$vi.OriginalFilename
+  file_description=$vi.FileDescription
+  company_name=$vi.CompanyName
+  owner_edition=$manifest.edition
+  owner_only=[bool]$manifest.owner_only
+  manifest_version=$manifest.version
+  commit=$env:GITHUB_SHA
+}
+
+if ([string]::IsNullOrWhiteSpace($EvidencePath)) {
+  $EvidencePath = Join-Path $file.DirectoryName 'OWNER_BUILD_IDENTITY.json'
+}
+$evidenceDirectory = Split-Path -Parent $EvidencePath
+if (-not [string]::IsNullOrWhiteSpace($evidenceDirectory)) {
+  New-Item -ItemType Directory -Force -Path $evidenceDirectory | Out-Null
+}
+$result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $EvidencePath -Encoding utf8
+if (-not (Test-Path $EvidencePath -PathType Leaf)) { Fail "Identity evidence could not be written: $EvidencePath" }
+
 Write-Host 'BUILD_IDENTITY_GATE=PASS'
+Write-Host "BUILD_IDENTITY_EVIDENCE=$EvidencePath"
 $result | ConvertTo-Json -Depth 5
