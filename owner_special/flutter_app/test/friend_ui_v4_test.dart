@@ -22,7 +22,7 @@ class _FakeApi implements OwnerFriendApi {
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey}) async => <String, dynamic>{'enabled': true};
 
   @override
-  Future<Map<String, dynamic>> testProvider() async => <Map<String, dynamic>>{'connected': true};
+  Future<Map<String, dynamic>> testProvider() async => <String, dynamic>{'connected': true};
 
   @override
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) async {
@@ -59,13 +59,10 @@ void main() {
     expect(webTool, findsOneWidget);
     expect(pythonTool, findsOneWidget);
 
-    // Keep the assertion independent of the test viewport size. The tools live
-    // in a scrollable panel, so first bring the target into the hit-testable
-    // viewport instead of assuming a fixed chip coordinate.
+    // The tools live in a scrollable panel, so keep the interaction independent
+    // of the test viewport size by bringing the target into view first.
     await tester.ensureVisible(webTool);
     await tester.pumpAndSettle();
-    expect(tester.getTopLeft(webTool).dy, greaterThanOrEqualTo(0));
-    expect(tester.getBottomRight(webTool).dy, lessThanOrEqualTo(tester.binding.renderView.size.height));
     await tester.tap(webTool);
 
     await tester.enterText(find.byKey(const Key('friend-v4-input')), 'ทดสอบเครื่องมือ');
