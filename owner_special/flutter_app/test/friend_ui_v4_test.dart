@@ -26,8 +26,7 @@ class _FakeApi implements OwnerFriendApi {
 
   @override
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) async {
-    requestedTools = List<String>.from(requestedTools);
-    this.requestedTools = requestedTools;
+    this.requestedTools = List<String>.from(requestedTools);
     return <String, dynamic>{
       'text': 'friend:$text',
       'provider': 'test-provider',
@@ -54,10 +53,18 @@ void main() {
 
     await tester.tap(find.byKey(const Key('friend-v4-tools-menu')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Web · implemented'), findsOneWidget);
-    expect(find.textContaining('Python · implemented'), findsOneWidget);
 
-    await tester.tap(find.textContaining('Web · implemented'));
+    final webTool = find.textContaining('Web · implemented');
+    final pythonTool = find.textContaining('Python · implemented');
+    expect(webTool, findsOneWidget);
+    expect(pythonTool, findsOneWidget);
+
+    // The tools live in a scrollable panel, so keep the interaction independent
+    // of the test viewport size by bringing the target into view first.
+    await tester.ensureVisible(webTool);
+    await tester.pumpAndSettle();
+    await tester.tap(webTool);
+
     await tester.enterText(find.byKey(const Key('friend-v4-input')), 'ทดสอบเครื่องมือ');
     await tester.tap(find.byKey(const Key('friend-v4-send')));
     await tester.pumpAndSettle();

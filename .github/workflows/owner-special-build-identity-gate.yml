@@ -1,0 +1,178 @@
+name: Owner Special Build Identity Gate
+
+on:
+  pull_request:
+    paths:
+      - 'owner_special/**'
+      - 'v3/research_os_v3/**'
+      - '.github/workflows/owner-special-build-identity-gate.yml'
+  push:
+    branches:
+      - 'fix/owner-special-build-identity-gate'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  OWNER_EXE: 'owner_special/flutter_app/build/windows/x64/runner/Release/research_os_owner_special.exe'
+  OWNER_IDENTITY: 'owner_special/flutter_app/build/windows/x64/runner/Release/OWNER_BUILD_IDENTITY.json'
+  OWNER_SETUP: 'owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe'
+
+jobs:
+  owner-special-gate:
+    name: Source → Launch Desk → Test → EXE → Identity → Installer → E2E
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: 1. Checkout source
+        uses: actions/checkout@v5
+
+      - name: 2. Setup toolchains
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: 3. Source + Launch Desk Gate
+        shell: pwsh
+        run: |
+          $required = @(
+            'owner_special/flutter_app/lib/src/friend_app.dart',
+            'owner_special/flutter_app/lib/src/friend_app_shell.dart',
+            'owner_special/flutter_app/lib/src/launch_desk_page.dart',
+            'owner_special/research_os_friend/launch_desk_agent.py',
+            'owner_special/research_os_friend/launch_desk.py',
+            'owner_special/OWNER_MANIFEST.json'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path -PathType Leaf)) {
+              throw "Required Owner/Launch Desk source missing: $path"
+            }
+          }
+          $shell = Get-Content 'owner_special/flutter_app/lib/src/friend_app_shell.dart' -Raw
+          $app = Get-Content 'owner_special/flutter_app/lib/src/friend_app.dart' -Raw
+          if ($shell -notmatch 'Launch Desk') { throw 'Launch Desk navigation contract missing from Friend shell' }
+          if ($app -notmatch 'LaunchDeskPage') { throw 'LaunchDeskPage is not wired into Owner Desktop' }
+          Write-Host 'SOURCE_LAUNCH_DESK_GATE=PASS'
+
+      - name: 4. Prepare Flutter test/build project
+        working-directory: owner_special/flutter_app
+        shell: pwsh
+        run: |
+          flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter dependency preparation failed' }
+
+      - name: 5. Test Gate — Python + smoke + Flutter analyze/test
+        shell: pwsh
+        run: |
+          python -m json.tool owner_special/OWNER_MANIFEST.json > $null
+          python -m compileall -q owner_special/research_os_friend owner_special/scripts owner_special/tests v3/research_os_v3
+          if ($LASTEXITCODE -ne 0) { throw 'Python compile gate failed' }
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\owner_special"
+          python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Python tests failed' }
+          python owner_special/scripts/smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'Friend runtime smoke failed' }
+          Push-Location owner_special/flutter_app
+          try {
+            flutter analyze
+            if ($LASTEXITCODE -ne 0) { throw 'Owner Flutter analyze failed' }
+            flutter test
+            if ($LASTEXITCODE -ne 0) { throw 'Owner Flutter tests failed' }
+          }
+          finally { Pop-Location }
+          Write-Host 'TEST_GATE=PASS'
+
+      - name: 6. EXE Gate — build only after all tests pass
+        working-directory: owner_special/flutter_app
+        shell: pwsh
+        run: |
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Windows EXE build failed' }
+          $exe = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_EXE
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "Owner Special EXE missing: $exe" }
+          Write-Host 'EXE_GATE=PASS'
+          Write-Host "OWNER_EXE=$exe"
+
+      - name: 7. Identity Gate — verify canonical Owner EXE
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_EXE
+          $evidence = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_IDENTITY
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath $exe -ExpectedManifestPath "$env:GITHUB_WORKSPACE\owner_special\OWNER_MANIFEST.json" -EvidencePath $evidence
+          if (-not (Test-Path $evidence -PathType Leaf)) { throw "Identity evidence missing: $evidence" }
+          $identity = Get-Content $evidence -Raw | ConvertFrom-Json
+          if ($identity.passed -ne $true) { throw 'Owner Special identity evidence is not passed=true' }
+          Write-Host 'IDENTITY_GATE=PASS'
+
+      - name: 8. Publish Owner ServiceHost
+        shell: pwsh
+        run: |
+          dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o owner_special/windows_service/publish
+          if ($LASTEXITCODE -ne 0) { throw 'Owner ServiceHost publish failed' }
+
+      - name: 9. Installer Gate — stage package
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\stage-owner-installer.ps1" -FlutterReleaseDir "$env:GITHUB_WORKSPACE\owner_special\flutter_app\build\windows\x64\runner\Release" -ServiceHostDir "$env:GITHUB_WORKSPACE\owner_special\windows_service\publish"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner installer staging failed' }
+          Write-Host 'INSTALLER_STAGE_GATE=PASS'
+
+      - name: 10. Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: 11. Build Owner Special Installer
+        working-directory: owner_special/installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc '.\owner-special.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Installer build failed' }
+          $setup = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_SETUP
+          if (-not (Test-Path $setup -PathType Leaf)) { throw "Owner Setup.exe missing: $setup" }
+          Get-FileHash $setup -Algorithm SHA256 | Format-List | Out-Host
+          Write-Host 'INSTALLER_BUILD_GATE=PASS'
+
+      - name: 12. Final packaged Identity Gate
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/app/research_os_owner_special.exe'
+          $manifest = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/owner_special/OWNER_MANIFEST.json'
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/app/OWNER_BUILD_IDENTITY.json'
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath $exe -ExpectedManifestPath $manifest -EvidencePath $evidence
+          if (-not (Test-Path $evidence -PathType Leaf)) { throw "Packaged identity evidence missing: $evidence" }
+          $identity = Get-Content $evidence -Raw | ConvertFrom-Json
+          if ($identity.passed -ne $true) { throw 'Packaged Owner EXE failed final identity audit' }
+          $setup = Join-Path $env:GITHUB_WORKSPACE $env:OWNER_SETUP
+          if ((Get-Item $setup).Length -lt 100000) { throw 'Installer is unexpectedly small' }
+          Write-Host 'FINAL_PACKAGE_IDENTITY_GATE=PASS'
+
+      - name: 13. E2E Gate — install + startup + uninstall
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\validate-owner-installer.ps1" -Phase full -SetupPath (Join-Path $env:GITHUB_WORKSPACE $env:OWNER_SETUP)
+          if ($LASTEXITCODE -ne 0) { throw 'Owner install/startup/upgrade/uninstall E2E failed' }
+          Write-Host 'E2E_GATE=PASS'
+
+      - name: 14. Release artifact — only after every gate passes
+        uses: actions/upload-artifact@v6
+        with:
+          name: owner-special-validated-${{ github.sha }}
+          path: |
+            owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
+            owner_special/installer/output/owner-v1.3-validation.json
+            owner_special/flutter_app/build/windows/x64/runner/Release/OWNER_BUILD_IDENTITY.json
+          if-no-files-found: error
+          retention-days: 30

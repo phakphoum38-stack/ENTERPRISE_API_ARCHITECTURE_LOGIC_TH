@@ -51,166 +51,51 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPo
 
 [Code]
 function OwnerFriendServiceIsStopped(): Boolean;
-var
-  ResultCode: Integer;
-  CmdExe: String;
+var ResultCode: Integer; CmdExe: String;
 begin
   CmdExe := ExpandConstant('{cmd}');
   Result := Exec(CmdExe, '/C sc.exe query ResearchOSOwnerFriendService | findstr /C:"STOPPED" >nul', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
 function QuiesceOwnerRuntime(): Boolean;
-var
-  ResultCode: Integer;
-  PowerShellExe: String;
-  PythonPath: String;
-  AppPath: String;
-  ServiceHostPath: String;
-  GuardPath: String;
-  QuiesceLogPath: String;
-  Parameters: String;
+var ResultCode: Integer; PowerShellExe, PythonPath, AppPath, ServiceHostPath, GuardPath, QuiesceLogPath, Parameters: String;
 begin
   Result := False;
-
   PythonPath := ExpandConstant('{app}\runtime\python\python.exe');
   AppPath := ExpandConstant('{app}\app\{#MyAppExeName}');
-  ServiceHostPath :=
-    ExpandConstant('{app}\service_host\ResearchOS.Owner.ServiceHost.exe');
-
-  GuardPath :=
-    ExpandConstant('{tmp}\research-os-owner-runtime-quiesce.ps1');
-  QuiesceLogPath :=
-    ExpandConstant('{%TEMP}') + '\ResearchOS-Owner-Quiesce.log';
-
+  ServiceHostPath := ExpandConstant('{app}\service_host\ResearchOS.Owner.ServiceHost.exe');
+  GuardPath := ExpandConstant('{tmp}\research-os-owner-runtime-quiesce.ps1');
+  QuiesceLogPath := ExpandConstant('{%TEMP}') + '\ResearchOS-Owner-Quiesce.log';
   Log('Extracting Owner runtime quiesce helper.');
   Log('Owner quiesce diagnostic log: ' + QuiesceLogPath);
-
   ExtractTemporaryFile('research-os-owner-runtime-quiesce.ps1');
-
-  if not FileExists(GuardPath) then
-  begin
-    Log('Could not extract Owner runtime quiesce helper; refusing file replacement.');
-    Result := False;
-    Exit;
-  end;
-
-  PowerShellExe :=
-    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-
-  Parameters :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass ' +
-    '-File "' + GuardPath + '"' +
-    ' -PythonTarget "' + PythonPath + '"' +
-    ' -AppTarget "' + AppPath + '"' +
-    ' -ServiceHostTarget "' + ServiceHostPath + '"' +
-    ' -Port 8790' +
-    ' -LogPath "' + QuiesceLogPath + '"';
-
+  if not FileExists(GuardPath) then begin Log('Could not extract Owner runtime quiesce helper; refusing file replacement.'); Exit; end;
+  PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath + '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath + '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790' + ' -LogPath "' + QuiesceLogPath + '"';
   Log('Launching Owner runtime quiesce helper.');
-
-  if not Exec(
-    PowerShellExe,
-    Parameters,
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode
-  ) then
-  begin
-    Log('Could not launch Owner runtime quiesce helper; refusing file replacement.');
-    Exit;
-  end;
-
+  if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then begin Log('Could not launch Owner runtime quiesce helper; refusing file replacement.'); Exit; end;
   Log('Owner runtime quiesce helper exit code: ' + IntToStr(ResultCode));
-  Log('Owner quiesce diagnostic log remains at: ' + QuiesceLogPath);
-
-  if ResultCode = 0 then
-  begin
-    Log('Owner runtime quiesced: desktop app, service host, bundled Python, and port 8790 are released.');
-    Result := True;
-    Exit;
-  end;
-
-  Log(
-    'Owner runtime quiesce helper failed with exit code ' +
-    IntToStr(ResultCode) +
-    '. Detailed diagnostic: ' +
-    QuiesceLogPath
-  );
-
-  Result := False;
+  if ResultCode = 0 then begin Result := True; Exit; end;
+  Log('Owner runtime quiesce helper failed with exit code ' + IntToStr(ResultCode) + '. Detailed diagnostic: ' + QuiesceLogPath);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var
-  ScExe: String;
-  QueryCode: Integer;
-  StopCode: Integer;
-  I: Integer;
-  ServiceStopped: Boolean;
+var ScExe: String; QueryCode, StopCode, I: Integer; ServiceStopped: Boolean;
 begin
-  Result := '';
-  ScExe := ExpandConstant('{sys}\sc.exe');
-  ServiceStopped := False;
-
+  Result := ''; ScExe := ExpandConstant('{sys}\sc.exe'); ServiceStopped := False;
   Log('Checking Owner Friend Service before installer file replacement.');
-  if not Exec(ScExe, 'query ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, QueryCode) then
-  begin
-    Result := 'Failed to query ResearchOSOwnerFriendService before install/upgrade.';
-    Exit;
+  if not Exec(ScExe, 'query ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, QueryCode) then begin Result := 'Failed to query ResearchOSOwnerFriendService before install/upgrade.'; Exit; end;
+  if QueryCode <> 0 then ServiceStopped := True
+  else if OwnerFriendServiceIsStopped() then ServiceStopped := True
+  else begin
+    if not Exec(ScExe, 'stop ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, StopCode) then begin Result := 'Failed to launch service stop command for ResearchOSOwnerFriendService.'; Exit; end;
+    for I := 1 to 60 do begin if OwnerFriendServiceIsStopped() then begin ServiceStopped := True; Break; end; Sleep(500); end;
+    if not ServiceStopped then begin Result := 'ResearchOSOwnerFriendService did not reach STOPPED state within 30 seconds. sc.exe stop exit code: ' + IntToStr(StopCode); Exit; end;
   end;
-
-  if QueryCode <> 0 then
-  begin
-    Log('ResearchOSOwnerFriendService is not registered; checking for orphaned Owner runtime processes.');
-    ServiceStopped := True;
-  end
-  else if OwnerFriendServiceIsStopped() then
-  begin
-    Log('ResearchOSOwnerFriendService is already stopped; checking Owner runtime ownership.');
-    ServiceStopped := True;
-  end
-  else
-  begin
-    Log('Stopping ResearchOSOwnerFriendService before installer file replacement.');
-    if not Exec(ScExe, 'stop ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, StopCode) then
-    begin
-      Result := 'Failed to launch service stop command for ResearchOSOwnerFriendService.';
-      Exit;
-    end;
-
-    for I := 1 to 60 do
-    begin
-      if OwnerFriendServiceIsStopped() then
-      begin
-        Log('ResearchOSOwnerFriendService reached STOPPED state; quiescing bundled runtime.');
-        ServiceStopped := True;
-        Break;
-      end;
-      Sleep(500);
-    end;
-
-    if not ServiceStopped then
-    begin
-      Result := 'ResearchOSOwnerFriendService did not reach STOPPED state within 30 seconds. sc.exe stop exit code: ' + IntToStr(StopCode);
-      Exit;
-    end;
-  end;
-
-  if not QuiesceOwnerRuntime() then
-  begin
-    Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log and the detailed quiesce diagnostic log path recorded there.';
-    Exit;
-  end;
+  if not QuiesceOwnerRuntime() then begin Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log and detailed quiesce diagnostic.'; Exit; end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssInstall then Log('Owner Special install/upgrade preserves ProgramData\ResearchOSOwnerSpecial.');
-end;
-
+begin if CurStep = ssInstall then Log('Owner Special install/upgrade preserves ProgramData\ResearchOSOwnerSpecial.'); end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-begin
-  if (CurUninstallStep = usPostUninstall) and (not UninstallSilent) then
-    MsgBox('Research OS Owner Special was removed. Owner memory and provider configuration in ProgramData\ResearchOSOwnerSpecial were preserved.', mbInformation, MB_OK);
-end;
+begin if (CurUninstallStep = usPostUninstall) and (not UninstallSilent) then MsgBox('Research OS Owner Special was removed. Owner memory and provider configuration in ProgramData\ResearchOSOwnerSpecial were preserved.', mbInformation, MB_OK); end;
