@@ -1,0 +1,43 @@
+name: Launch Desk Agent
+
+on:
+  pull_request:
+    paths:
+      - 'owner_special/**'
+      - '.github/workflows/launch-desk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  launch-desk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Owner runtime dependencies
+        run: python -m pip install --disable-pip-version-check -e owner_special
+      - name: Compile Launch Desk sources
+        run: python -m compileall -q owner_special/research_os_friend owner_special/tests
+      - name: Run Launch Desk tests
+        env:
+          PYTHONPATH: owner_special
+        run: python -m unittest owner_special.tests.test_launch_desk -v
+      - name: Run deterministic Launch Desk smoke
+        env:
+          PYTHONPATH: owner_special
+        run: python - <<'PY'
+          from research_os_friend.launch_desk_agent import launch_desk_smoke_payload
+          result = launch_desk_smoke_payload('QA blocker: finish release validation')
+          assert result['status'] == 'ok'
+          assert len(result['plan']['readiness']) == 9
+          assert result['plan']['readiness_score'] < 100
+          print(result['plan']['readiness_score'])
+          PY
