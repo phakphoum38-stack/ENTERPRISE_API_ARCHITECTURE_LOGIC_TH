@@ -33,7 +33,8 @@ jobs:
       - name: Run deterministic Launch Desk smoke
         env:
           PYTHONPATH: owner_special
-        run: python - <<'PY'
+        run: |
+          python - <<'PY'
           from research_os_friend.launch_desk_agent import launch_desk_smoke_payload
           result = launch_desk_smoke_payload('QA blocker: finish release validation')
           assert result['status'] == 'ok'
