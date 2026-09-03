@@ -8,15 +8,7 @@ abstract interface class OwnerFriendApi {
   Future<Map<String, dynamic>> providerStatus();
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey});
   Future<Map<String, dynamic>> testProvider();
-  Future<Map<String, dynamic>> chat(
-    String text, {
-    int complexity = 4,
-    int risk = 2,
-    int parallelism = 2,
-    int helperBudget = 0,
-    List<String> requestedSkills = const <String>[],
-    List<String> requestedTools = const <String>[],
-  });
+  Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]});
 }
 
 final class HttpOwnerFriendApi implements OwnerFriendApi {
