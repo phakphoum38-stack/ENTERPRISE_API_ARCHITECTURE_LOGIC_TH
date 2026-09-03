@@ -14,11 +14,11 @@ covering product, engineering, QA, infrastructure, security, docs, support/comms
 rollback, and monitoring/observability. Include readiness score, top risks, owner
 checklist, launch copy, follow-up questions, and assumptions. Never execute a
 production change; this agent plans only."""
+REQUIRED_TOOLS = ("extract_tasks", "check_launch_readiness", "generate_owner_checklist", "draft_launch_copy")
 
 
 def _sdk_tools():
     from agents import function_tool
-
     mapping = launch_desk_tool_map()
     descriptions = {
         "extract_tasks": "Extract actionable launch tasks from the request.",
@@ -26,10 +26,7 @@ def _sdk_tools():
         "generate_owner_checklist": "Generate owner actions for missing readiness evidence.",
         "draft_launch_copy": "Draft concise launch communication copy.",
     }
-    return [
-        function_tool(mapping[name], name_override=name, description_override=descriptions[name])
-        for name in ("extract_tasks", "check_launch_readiness", "generate_owner_checklist", "draft_launch_copy")
-    ]
+    return [function_tool(mapping[name], name_override=name, description_override=descriptions[name]) for name in REQUIRED_TOOLS]
 
 
 def _event_payload(event: Any) -> dict[str, Any] | None:
@@ -60,17 +57,22 @@ def stream_launch_desk(*, text: str, api_key: str, base_url: str, model: str, em
 
     async def run() -> str:
         from agents import Agent, OpenAIProvider, RunConfig, Runner, set_tracing_disabled
-
         set_tracing_disabled(disabled=True)
         provider = OpenAIProvider(api_key=api_key, base_url=base_url, use_responses=True)
         agent = Agent(name="Launch Desk", instructions=INSTRUCTIONS, tools=_sdk_tools(), model=model)
         result = Runner.run_streamed(agent, text, run_config=RunConfig(model_provider=provider, model=model), max_turns=8)
+        called: set[str] = set()
         async for event in result.stream_events():
             payload = _event_payload(event)
             if payload is not None:
+                if payload.get("type") == "tool_event" and payload.get("phase") == "called":
+                    called.add(str(payload.get("tool")))
                 emit(payload)
         if result.run_loop_exception is not None:
             raise result.run_loop_exception
+        missing = [name for name in REQUIRED_TOOLS if name not in called]
+        if missing:
+            raise RuntimeError(f"launch_desk_required_tools_not_called: {','.join(missing)}")
         return str(result.final_output or "")
 
     model_text = asyncio.run(run())
