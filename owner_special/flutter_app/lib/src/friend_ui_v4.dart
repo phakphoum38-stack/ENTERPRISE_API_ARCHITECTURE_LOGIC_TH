@@ -379,10 +379,11 @@ class _Composer extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             if (toolsOpen)
               Container(
-                constraints: const BoxConstraints(maxHeight: 250),
+                constraints: const BoxConstraints(maxHeight: 180),
                 padding: const EdgeInsets.only(bottom: 8),
                 child: SingleChildScrollView(
                   child: Wrap(
@@ -483,72 +484,39 @@ class _MemoryV4 extends StatelessWidget {
         future: api.memory(),
         builder: (context, snapshot) {
           final data = snapshot.data ?? const <String, dynamic>{};
-          final items = data['items'];
           return ListView(
             padding: const EdgeInsets.all(24),
             children: <Widget>[
-              Text('Memory', style: Theme.of(context).textTheme.headlineSmall),
+              Text('Persistent Memory', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 12),
               Text('Items: ${data['count'] ?? 0}'),
               const SizedBox(height: 12),
-              if (items is List) ...items.map((item) => Card(child: Padding(padding: const EdgeInsets.all(12), child: SelectableText(item.toString())))),
+              ...(data['items'] is List ? (data['items'] as List).map((item) => Card(child: Padding(padding: const EdgeInsets.all(12), child: Text(item.toString())))) : const <Widget>[]),
             ],
           );
         },
       );
 }
 
-class _ProviderV4 extends StatefulWidget {
+class _ProviderV4 extends StatelessWidget {
   const _ProviderV4({required this.api});
   final OwnerFriendApi api;
 
   @override
-  State<_ProviderV4> createState() => _ProviderV4State();
-}
-
-class _ProviderV4State extends State<_ProviderV4> {
-  final _baseUrl = TextEditingController();
-  final _model = TextEditingController();
-  final _key = TextEditingController();
-  String _status = '';
-
-  @override
-  void dispose() {
-    _baseUrl.dispose();
-    _model.dispose();
-    _key.dispose();
-    super.dispose();
-  }
-
-  Future<void> _configure() async {
-    try {
-      final result = await widget.api.configureProvider(baseUrl: _baseUrl.text.trim(), model: _model.text.trim(), apiKey: _key.text.trim());
-      if (mounted) setState(() => _status = result.toString());
-    } catch (error) {
-      if (mounted) setState(() => _status = error.toString());
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.all(24),
-        children: <Widget>[
-          Text('Provider', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 12),
-          TextField(controller: _baseUrl, decoration: const InputDecoration(labelText: 'Base URL', border: OutlineInputBorder())),
-          const SizedBox(height: 10),
-          TextField(controller: _model, decoration: const InputDecoration(labelText: 'Model', border: OutlineInputBorder())),
-          const SizedBox(height: 10),
-          TextField(controller: _key, obscureText: true, decoration: const InputDecoration(labelText: 'API key (optional)', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+        future: api.providerStatus(),
+        builder: (context, snapshot) {
+          final data = snapshot.data ?? const <String, dynamic>{};
+          return ListView(
+            padding: const EdgeInsets.all(24),
             children: <Widget>[
-              FilledButton.icon(onPressed: _configure, icon: const Icon(Icons.save), label: const Text('Save Provider')),
-              OutlinedButton.icon(onPressed: () async { final result = await widget.api.testProvider(); if (mounted) setState(() => _status = result.toString()); }, icon: const Icon(Icons.bolt), label: const Text('Test')),
+              Text('Provider Boundary', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 12),
+              ListTile(title: const Text('Enabled'), subtitle: Text('${data['enabled'] ?? false}')),
+              const SizedBox(height: 12),
+              Text('Provider configuration is owner-scoped and remains behind the Friend service boundary.'),
             ],
-          ),
-          if (_status.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: SelectableText(_status)),
-        ],
+          );
+        },
       );
 }
