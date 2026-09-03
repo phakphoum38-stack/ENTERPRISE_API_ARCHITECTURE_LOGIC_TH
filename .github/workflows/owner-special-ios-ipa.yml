@@ -1,16 +1,7 @@
 name: Owner Special iOS IPA
 
+# Temporarily disabled. Run manually from Actions when iOS IPA work resumes.
 on:
-  pull_request:
-    paths:
-      - 'owner_special/flutter_app/**'
-      - '.github/workflows/owner-special-ios-ipa.yml'
-  push:
-    branches:
-      - 'copilot/fix-owner-installer-upgrade-check'
-    paths:
-      - 'owner_special/flutter_app/**'
-      - '.github/workflows/owner-special-ios-ipa.yml'
   workflow_dispatch:
 
 permissions:
@@ -40,8 +31,6 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
-
           project = Path('ios/Runner.xcodeproj/project.pbxproj')
           text = project.read_text(encoding='utf-8')
           out = []
@@ -58,8 +47,6 @@ jobs:
           PY
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Research OS" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleName Research OS" ios/Runner/Info.plist || true
-          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/Runner.xcodeproj/project.pbxproj
-          /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" ios/Runner/Info.plist
 
       - name: Flutter analyze and test
         working-directory: owner_special/flutter_app
@@ -80,8 +67,6 @@ jobs:
           test -d "$APP"
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
           DISPLAY_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist")
-          echo "Bundle ID: $BUNDLE_ID"
-          echo "Display name: $DISPLAY_NAME"
           test "$BUNDLE_ID" = "com.phakphoum38.researchos"
           test "$DISPLAY_NAME" = "Research OS"
 
