@@ -8,7 +8,15 @@ abstract interface class OwnerFriendApi {
   Future<Map<String, dynamic>> providerStatus();
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey});
   Future<Map<String, dynamic>> testProvider();
-  Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]});
+  Future<Map<String, dynamic>> chat(
+    String text, {
+    int complexity = 4,
+    int risk = 2,
+    int parallelism = 2,
+    int helperBudget = 0,
+    List<String> requestedSkills = const <String>[],
+    List<String> requestedTools = const <String>[],
+  });
 }
 
 final class HttpOwnerFriendApi implements OwnerFriendApi {
@@ -20,13 +28,20 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
   final Duration timeout;
   final Duration chatTimeout;
 
-  @override Future<Map<String, dynamic>> health() => _request('GET', '/owner/health', authenticated: false);
-  @override Future<Map<String, dynamic>> status() => _request('GET', '/owner/status');
-  @override Future<Map<String, dynamic>> memory() => _request('GET', '/owner/memory');
-  @override Future<Map<String, dynamic>> providerStatus() => _request('GET', '/owner/provider');
-  @override Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey}) => _request('POST', '/owner/provider/config', body: <String, dynamic>{'base_url': baseUrl, 'model': model, if (apiKey != null && apiKey.isNotEmpty) 'api_key': apiKey, 'enabled': true});
-  @override Future<Map<String, dynamic>> testProvider() => _request('POST', '/owner/provider/test', body: const <String, dynamic>{'test': true});
-  @override Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) => _request('POST', '/owner/chat', timeoutOverride: chatTimeout, body: <String, dynamic>{'text': text, 'complexity': complexity, 'risk': risk, 'parallelism': parallelism, 'helper_budget': helperBudget, 'requested_skills': requestedSkills, 'requested_tools': requestedTools});
+  @override
+  Future<Map<String, dynamic>> health() => _request('GET', '/owner/health', authenticated: false);
+  @override
+  Future<Map<String, dynamic>> status() => _request('GET', '/owner/status');
+  @override
+  Future<Map<String, dynamic>> memory() => _request('GET', '/owner/memory');
+  @override
+  Future<Map<String, dynamic>> providerStatus() => _request('GET', '/owner/provider');
+  @override
+  Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey}) => _request('POST', '/owner/provider/config', body: <String, dynamic>{'base_url': baseUrl, 'model': model, if (apiKey != null && apiKey.isNotEmpty) 'api_key': apiKey, 'enabled': true});
+  @override
+  Future<Map<String, dynamic>> testProvider() => _request('POST', '/owner/provider/test', body: const <String, dynamic>{'test': true});
+  @override
+  Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) => _request('POST', '/owner/chat', timeoutOverride: chatTimeout, body: <String, dynamic>{'text': text, 'complexity': complexity, 'risk': risk, 'parallelism': parallelism, 'helper_budget': helperBudget, 'requested_skills': requestedSkills, 'requested_tools': requestedTools});
 
   Stream<Map<String, dynamic>> launchDesk(String text) async* {
     final client = HttpClient();
