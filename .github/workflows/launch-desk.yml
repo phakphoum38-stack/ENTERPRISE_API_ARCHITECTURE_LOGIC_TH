@@ -1,6 +1,9 @@
 name: Launch Desk Agent
 
 on:
+  push:
+    branches:
+      - 'feat/issue-213-launch-desk'
   pull_request:
     paths:
       - 'owner_special/**'
