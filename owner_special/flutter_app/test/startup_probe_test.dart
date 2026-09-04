@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 import 'package:research_os_owner_special/src/startup_probe.dart';
 
-class FakeApi implements OwnerFriendApi {
+class FakeApi extends OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> health() async => <String, dynamic>{'status': 'ok'};
   @override
