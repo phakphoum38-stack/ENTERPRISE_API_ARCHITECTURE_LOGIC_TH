@@ -3,7 +3,7 @@ name: Research OS Windows Branding Gate
 on:
   pull_request:
     paths:
-      - "assets/branding/**"
+      - "apps/research_os_flutter/assets/branding/**"
       - "apps/research_os_flutter/windows/runner/resources/app_icon.ico"
       - "scripts/apply-research-os-branding.py"
       - "scripts/verify-research-os-windows-branding.ps1"
@@ -40,8 +40,16 @@ jobs:
       - name: Branding gate evidence
         shell: pwsh
         run: |
-          $master = (Get-FileHash "assets/branding/research_os_master.webp" -Algorithm SHA256).Hash
-          $icon = (Get-FileHash "apps/research_os_flutter/windows/runner/resources/app_icon.ico" -Algorithm SHA256).Hash
+          $master = (Get-FileHash "apps/research_os_flutter/assets/branding/research_os_master.webp" -Algorithm SHA256).Hash
           "canonical_master_sha256=$master" | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
-          "windows_icon_sha256=$icon" | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
+
+          $icon = "apps/research_os_flutter/windows/runner/resources/app_icon.ico"
+          if (Test-Path $icon) {
+            $iconHash = (Get-FileHash $icon -Algorithm SHA256).Hash
+            "windows_icon_sha256=$iconHash" | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
+          } else {
+            "windows_icon_sha256=skipped" | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
+            "windows_icon_reason=Research OS Flutter app has no Windows shell." | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
+          }
+
           "RESEARCH_OS_WINDOWS_BRANDING_GATE=PASS" | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
