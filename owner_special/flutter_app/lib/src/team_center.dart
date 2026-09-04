@@ -16,6 +16,25 @@ class TeamWorkspace {
 
 typedef TeamRecord = TeamWorkspace;
 
+class TeamVisual {
+  const TeamVisual({required this.primary, required this.secondary, required this.icon});
+  final Color primary;
+  final Color secondary;
+  final IconData icon;
+}
+
+TeamVisual teamVisual(String id) {
+  switch (id) {
+    case 'engineering':
+      return const TeamVisual(primary: Color(0xFF34D399), secondary: Color(0xFF06B6D4), icon: Icons.precision_manufacturing_outlined);
+    case 'ai':
+      return const TeamVisual(primary: Color(0xFFA78BFA), secondary: Color(0xFFF472B6), icon: Icons.auto_awesome_outlined);
+    case 'research':
+    default:
+      return const TeamVisual(primary: Color(0xFF38BDF8), secondary: Color(0xFF818CF8), icon: Icons.science_outlined);
+  }
+}
+
 class TeamCenter extends StatefulWidget {
   const TeamCenter({super.key, this.isOwner = true, this.onChanged});
   final bool isOwner;
@@ -77,37 +96,85 @@ class _TeamCenterState extends State<TeamCenter> {
   @override
   Widget build(BuildContext context) {
     final selected = _selected;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: <Widget>[
-            const Icon(Icons.groups_outlined),
-            const SizedBox(width: 8),
-            Expanded(
+    final visual = teamVisual(selected.id);
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: .72),
+        border: Border.all(color: visual.primary.withValues(alpha: .22)),
+        boxShadow: [BoxShadow(color: visual.secondary.withValues(alpha: .10), blurRadius: 20, spreadRadius: 1)],
+      ),
+      child: Row(
+        children: <Widget>[
+          _TeamOrb(visual: visual, size: 42),
+          const SizedBox(width: 10),
+          Expanded(
+            child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 key: const Key('team-switcher'),
                 value: _selectedId,
                 isExpanded: true,
                 onChanged: _selectTeam,
-                items: _teams
-                    .map((team) => DropdownMenuItem<String>(
-                          value: team.id,
-                          child: Text(team.name),
-                        ))
-                    .toList(),
+                dropdownColor: Theme.of(context).colorScheme.surface,
+                items: _teams.map((team) {
+                  final itemVisual = teamVisual(team.id);
+                  return DropdownMenuItem<String>(
+                    value: team.id,
+                    child: Row(children: [
+                      _TeamOrb(visual: itemVisual, size: 28),
+                      const SizedBox(width: 9),
+                      Expanded(child: Text(team.name, overflow: TextOverflow.ellipsis)),
+                    ]),
+                  );
+                }).toList(),
               ),
             ),
-            const SizedBox(width: 8),
-            Text('Members: ${selected.members.length}'),
-            if (widget.isOwner)
-              IconButton(
-                tooltip: 'Create Team',
-                onPressed: _createTeam,
-                icon: const Icon(Icons.add),
-              ),
-          ],
+          ),
+          const SizedBox(width: 10),
+          Text('${selected.members.length}', style: Theme.of(context).textTheme.labelMedium),
+          if (widget.isOwner)
+            IconButton(
+              tooltip: 'Create Team',
+              onPressed: _createTeam,
+              icon: const Icon(Icons.add),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamOrb extends StatelessWidget {
+  const _TeamOrb({required this.visual, required this.size});
+  final TeamVisual visual;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [visual.primary, visual.secondary],
         ),
+        boxShadow: [
+          BoxShadow(color: visual.primary.withValues(alpha: .34), blurRadius: size * .55, spreadRadius: 1),
+          BoxShadow(color: visual.secondary.withValues(alpha: .20), blurRadius: size * .8, spreadRadius: 2),
+        ],
+      ),
+      child: Container(
+        margin: EdgeInsets.all(size * .12),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: .22),
+          border: Border.all(color: Colors.white.withValues(alpha: .28)),
+        ),
+        child: Icon(visual.icon, size: size * .42, color: Colors.white),
       ),
     );
   }
