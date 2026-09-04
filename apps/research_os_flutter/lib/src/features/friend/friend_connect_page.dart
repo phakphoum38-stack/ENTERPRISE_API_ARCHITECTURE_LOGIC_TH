@@ -2,6 +2,34 @@ import 'package:flutter/material.dart';
 
 import '../../api/research_os_api_client.dart';
 
+const _advisors = <_Advisor>[
+  _Advisor(
+    'Architecture Advisor',
+    'ช่วยคิดโครงสร้างระบบและ trade-off ก่อนลงมือจริง',
+    Icons.account_tree_outlined,
+  ),
+  _Advisor(
+    'Code Advisor',
+    'ช่วยอ่านโค้ด หา bug และเสนอแนวทางแก้ที่ปลอดภัย',
+    Icons.code_outlined,
+  ),
+  _Advisor(
+    'Research Advisor',
+    'ช่วยแตกโจทย์ ตั้งสมมติฐาน และวางขั้นตอนการค้นคว้า',
+    Icons.science_outlined,
+  ),
+  _Advisor(
+    'Security Advisor',
+    'ช่วยตรวจ boundary, permission และข้อมูลที่ควรเข้าถึง',
+    Icons.security_outlined,
+  ),
+  _Advisor(
+    'System Advisor',
+    'ช่วยวิเคราะห์ Research OS, service และ runtime',
+    Icons.monitor_heart_outlined,
+  ),
+];
+
 class FriendConnectPage extends StatefulWidget {
   const FriendConnectPage({required this.apiClient, super.key});
 
@@ -12,34 +40,6 @@ class FriendConnectPage extends StatefulWidget {
 }
 
 class _FriendConnectPageState extends State<FriendConnectPage> {
-  static const _advisors = <_Advisor>[ 
-    _Advisor(
-      'Architecture Advisor',
-      'ช่วยคิดโครงสร้างระบบและ trade-off ก่อนลงมือจริง',
-      Icons.account_tree_outlined,
-    ),
-    _Advisor(
-      'Code Advisor',
-      'ช่วยอ่านโค้ด หา bug และเสนอแนวทางแก้ที่ปลอดภัย',
-      Icons.code_outlined,
-    ),
-    _Advisor(
-      'Research Advisor',
-      'ช่วยแตกโจทย์ ตั้งสมมติฐาน และวางขั้นตอนการค้นคว้า',
-      Icons.science_outlined,
-    ),
-    _Advisor(
-      'Security Advisor',
-      'ช่วยตรวจ boundary, permission และข้อมูลที่ควรเข้าถึง',
-      Icons.security_outlined,
-    ),
-    _Advisor(
-      'System Advisor',
-      'ช่วยวิเคราะห์ Research OS, service และ runtime',
-      Icons.monitor_heart_outlined,
-    ),
-  ];
-
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final List<_Turn> _turns = <_Turn>[];
