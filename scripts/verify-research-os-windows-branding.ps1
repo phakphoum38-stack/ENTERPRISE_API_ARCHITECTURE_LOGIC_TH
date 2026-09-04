@@ -13,7 +13,6 @@ $iconBytes = (Get-Item $icon).Length
 
 if ($iconBytes -lt 1000) { throw "Research OS Windows icon is unexpectedly small: $iconBytes bytes" }
 
-# The source Windows icon must be derived from the canonical branding asset.
 $python = Get-Command python -ErrorAction SilentlyContinue
 if ($null -eq $python) { throw 'Python is required for canonical branding verification.' }
 
@@ -24,7 +23,7 @@ $before = $iconHash
 & $python.Source $brandingScript --master $master --root $workspace
 if ($LASTEXITCODE -ne 0) { throw 'Canonical Research OS branding application failed.' }
 
-afterHash = (Get-FileHash $icon -Algorithm SHA256).Hash
+$afterHash = (Get-FileHash $icon -Algorithm SHA256).Hash
 if ($afterHash -ne $before) {
   throw 'Research OS Windows icon was not stable after canonical branding application.'
 }
