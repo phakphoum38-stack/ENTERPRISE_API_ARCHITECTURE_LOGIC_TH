@@ -62,7 +62,7 @@ class _GoogleIdentityPageState extends State<GoogleIdentityPage> {
         throw const FormatException('Google authorization response is incomplete');
       }
       if (!Platform.isWindows) {
-        throw const UnsupportedError('Native Google sign-in is currently enabled for Windows desktop.');
+        throw UnsupportedError('Native Google sign-in is currently enabled for Windows desktop.');
       }
       await Process.run('cmd', ['/c', 'start', '', url]);
       _poller?.cancel();
