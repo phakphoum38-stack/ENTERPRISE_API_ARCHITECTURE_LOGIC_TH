@@ -9,18 +9,21 @@ abstract interface class OwnerFriendApi {
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey});
   Future<Map<String, dynamic>> testProvider();
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]});
-  Future<Map<String, dynamic>> authStatus();
-  Future<Map<String, dynamic>> startGoogleIdentity();
-  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state);
-  Future<Map<String, dynamic>> signOut();
-  void setSession(String token);
-  void clearSession();
+
+  Future<Map<String, dynamic>> authStatus() => Future<Map<String, dynamic>>.error(const UnsupportedError('Research OS identity is not implemented by this API client'));
+  Future<Map<String, dynamic>> startGoogleIdentity() => Future<Map<String, dynamic>>.error(const UnsupportedError('Google Identity is not implemented by this API client'));
+  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) => Future<Map<String, dynamic>>.error(const UnsupportedError('Google Identity handoff is not implemented by this API client'));
+  Future<Map<String, dynamic>> signOut() => Future<Map<String, dynamic>>.error(const UnsupportedError('Research OS sign-out is not implemented by this API client'));
+  void setSession(String token) {}
+  void clearSession() {}
 }
 
+String _normalizeBaseUrl(String value) => value.endsWith('/') ? value.substring(0, value.length - 1) : value;
+
 final class HttpOwnerFriendApi implements OwnerFriendApi {
-  HttpOwnerFriendApi({required String baseUrl, required this.ownerId, this.profileId = 'default', this.sessionId = 'desktop', this.researchOsBaseUrl = 'http://127.0.0.1:8787', this.timeout = const Duration(seconds: 5), this.chatTimeout = const Duration(seconds: 30)})
-      : baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
-        researchOsBaseUrl = researchOsBaseUrl.endsWith('/') ? researchOsBaseUrl.substring(0, researchOsBaseUrl.length - 1) : researchOsBaseUrl;
+  HttpOwnerFriendApi({required String baseUrl, required this.ownerId, this.profileId = 'default', this.sessionId = 'desktop', String researchOsBaseUrl = 'http://127.0.0.1:8787', this.timeout = const Duration(seconds: 5), this.chatTimeout = const Duration(seconds: 30)})
+      : baseUrl = _normalizeBaseUrl(baseUrl),
+        researchOsBaseUrl = _normalizeBaseUrl(researchOsBaseUrl);
   final String baseUrl;
   final String ownerId;
   final String profileId;
