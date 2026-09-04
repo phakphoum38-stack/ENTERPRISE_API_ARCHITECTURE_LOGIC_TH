@@ -65,7 +65,15 @@ jobs:
           test -f "$workflow"
           grep -qF 'owner-bundle:' "$workflow"
           grep -qF 'python owner_special/scripts/build_bundle.py' "$workflow"
-          grep -qF 'owner-special-setup-${{ github.sha }}' "$workflow"
+
+          expected_setup='owner-special-setup-$'
+          expected_setup+='{{ github.sha }}'
+          if ! grep -qF "$expected_setup" "$workflow"; then
+            echo "OWNER_RELEASE_CONTROL_GATE=FAIL"
+            echo "Missing canonical dynamic Owner setup artifact reference: $expected_setup"
+            exit 1
+          fi
+
           echo "OWNER_RELEASE_CONTROL_GATE=PASS"
 
       - name: Verify final bundle is bound to the canonical source and validated installer
