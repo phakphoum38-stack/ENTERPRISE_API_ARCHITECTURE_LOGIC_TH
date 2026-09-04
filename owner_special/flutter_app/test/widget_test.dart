@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:research_os_owner_special/src/friend_app.dart';
+import 'package:research_os_owner_special/src/friend_ui_v4.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 
 class FakeOwnerFriendApi extends OwnerFriendApi {
@@ -67,23 +67,24 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    await tester.pumpWidget(OwnerFriendApp(api: FakeOwnerFriendApi()));
+    await tester.pumpWidget(
+      OwnerFriendAppV4(
+        api: FakeOwnerFriendApi(),
+        startup: <String, dynamic>{'status': 'ok'},
+      ),
+    );
     await tester.pump();
 
-    expect(find.byKey(const Key('turbo-million')), findsOneWidget);
-    expect(find.byKey(const Key('friend-input')), findsOneWidget);
-    expect(find.byKey(const Key('friend-send')), findsOneWidget);
+    expect(find.text('Turbo 1M'), findsOneWidget);
+    expect(find.byKey(const Key('friend-v4-input')), findsOneWidget);
+    expect(find.byKey(const Key('friend-v4-send')), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('friend-input')), 'hello');
-    await tester.tap(find.byKey(const Key('friend-send')));
+    await tester.enterText(find.byKey(const Key('friend-v4-input')), 'hello');
+    await tester.tap(find.byKey(const Key('friend-v4-send')));
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.text('friend:hello'), findsOneWidget);
-    expect(find.text('Brain scale: fast-1m'), findsOneWidget);
-    expect(find.text('Logical capacity: 1000000'), findsOneWidget);
-    expect(find.text('Active workers: 128'), findsOneWidget);
-    expect(find.text('Batches: 7813'), findsOneWidget);
-    expect(find.textContaining('master → factory → team → tests → release'), findsOneWidget);
+    expect(find.text('Brain: fast-1m'), findsOneWidget);
   });
 }
