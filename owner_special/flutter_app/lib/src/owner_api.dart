@@ -20,13 +20,12 @@ abstract interface class OwnerFriendApi {
 final class HttpOwnerFriendApi implements OwnerFriendApi {
   HttpOwnerFriendApi({required String baseUrl, required this.ownerId, this.profileId = 'default', this.sessionId = 'desktop', this.researchOsBaseUrl = 'http://127.0.0.1:8787', this.timeout = const Duration(seconds: 5), this.chatTimeout = const Duration(seconds: 30)})
       : baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
-        _researchOsBaseUrl = researchOsBaseUrl.endsWith('/') ? researchOsBaseUrl.substring(0, researchOsBaseUrl.length - 1) : researchOsBaseUrl;
+        researchOsBaseUrl = researchOsBaseUrl.endsWith('/') ? researchOsBaseUrl.substring(0, researchOsBaseUrl.length - 1) : researchOsBaseUrl;
   final String baseUrl;
   final String ownerId;
   final String profileId;
   final String sessionId;
   final String researchOsBaseUrl;
-  final String _researchOsBaseUrl;
   final Duration timeout;
   final Duration chatTimeout;
   String? _sessionToken;
@@ -53,12 +52,7 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
   Future<Map<String, dynamic>> startGoogleIdentity() => _researchRequest('POST', '/v1/auth/google/start', authenticated: false);
 
   @override
-  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) => _researchRequest(
-        'POST',
-        '/v1/auth/google/handoff',
-        authenticated: false,
-        headers: <String, String>{'X-Research-OS-OAuth-State': state},
-      );
+  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) => _researchRequest('POST', '/v1/auth/google/handoff', authenticated: false, headers: <String, String>{'X-Research-OS-OAuth-State': state});
 
   @override
   Future<Map<String, dynamic>> signOut() => _researchRequest('POST', '/v1/auth/signout', authenticated: _sessionToken != null);
@@ -128,13 +122,11 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
 
   Future<Map<String, dynamic>> _researchRequest(String method, String path, {bool authenticated = true, Map<String, String>? headers}) async {
     final client = HttpClient();
-    final uri = Uri.parse('$_researchOsBaseUrl$path');
+    final uri = Uri.parse('$researchOsBaseUrl$path');
     try {
       final request = method == 'POST' ? await client.postUrl(uri).timeout(timeout) : await client.getUrl(uri).timeout(timeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      if (authenticated && _sessionToken != null) {
-        request.headers.set('X-Research-OS-Session', _sessionToken!);
-      }
+      if (authenticated && _sessionToken != null) request.headers.set('X-Research-OS-Session', _sessionToken!);
       headers?.forEach(request.headers.set);
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
       request.contentLength = 2;
