@@ -1,0 +1,47 @@
+name: Research OS Windows Branding Gate
+
+on:
+  pull_request:
+    paths:
+      - "assets/branding/**"
+      - "apps/research_os_flutter/windows/runner/resources/app_icon.ico"
+      - "scripts/apply-research-os-branding.py"
+      - "scripts/verify-research-os-windows-branding.ps1"
+      - ".github/workflows/research-os-windows-branding-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  branding:
+    name: Verify canonical Research OS Windows branding
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install branding dependency
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check --quiet pillow
+
+      - name: Apply and verify canonical branding
+        shell: pwsh
+        run: |
+          & .\scripts\verify-research-os-windows-branding.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Research OS Windows branding gate failed." }
+
+      - name: Branding gate evidence
+        shell: pwsh
+        run: |
+          $master = (Get-FileHash "assets/branding/research_os_master.webp" -Algorithm SHA256).Hash
+          $icon = (Get-FileHash "apps/research_os_flutter/windows/runner/resources/app_icon.ico" -Algorithm SHA256).Hash
+          "canonical_master_sha256=$master" | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
+          "windows_icon_sha256=$icon" | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
+          "RESEARCH_OS_WINDOWS_BRANDING_GATE=PASS" | Out-File "$env:GITHUB_STEP_SUMMARY" -Append
