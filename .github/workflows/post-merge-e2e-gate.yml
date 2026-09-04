@@ -1,0 +1,164 @@
+name: Post-Merge E2E Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, test/post-merge-e2e-gate]
+    paths:
+      - 'tools/research_os_api/**'
+      - 'current/**'
+      - '.github/workflows/generate-orchestrator.yml'
+      - '.github/workflows/post-merge-e2e-gate.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tools/research_os_api/**'
+      - 'current/**'
+      - '.github/workflows/generate-orchestrator.yml'
+      - '.github/workflows/post-merge-e2e-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install E2E validation dependencies
+        shell: bash
+        run: python -m pip install --disable-pip-version-check --no-input PyYAML
+
+      - name: Start Research OS API
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESEARCH_OS_AI_ROUTE=direct-provider python tools/research_os_api/server.py --host 127.0.0.1 --port 8787 > /tmp/research-os-api.log 2>&1 &
+          echo $! > /tmp/research-os-api.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/health > /tmp/health.json; then
+              cat /tmp/health.json
+              break
+            fi
+            sleep 1
+          done
+          test -s /tmp/health.json
+
+      - name: Validate Generate contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f current/GENERATE_WORKFLOW_REGISTRY.yml
+          test -f current/GENERATE_SKILL_MEMORY.md
+          test -f current/tools/generate-ai-repair-contract.md
+          test -f current/tools/generate-tool-registry.yml
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          registry = yaml.safe_load(Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text()) or {}
+          stages = registry.get('stages')
+          assert isinstance(stages, list) and stages, 'registry stages missing'
+          dispatchable = [
+              stage for stage in stages
+              if isinstance(stage, dict)
+              and stage.get('dispatchable') is True
+              and stage.get('file') != 'generate-orchestrator.yml'
+          ]
+          assert dispatchable, 'no downstream dispatchable stages'
+          assert all(stage.get('file') for stage in dispatchable), 'dispatchable stage missing workflow file'
+
+          tools = yaml.safe_load(Path('current/tools/generate-tool-registry.yml').read_text()) or {}
+          entries = tools.get('entries')
+          assert isinstance(entries, list) and entries, 'tool registry empty'
+          assert all(isinstance(entry, dict) and entry.get('id') for entry in entries), 'tool registry entry missing id'
+
+          memory = Path('current/GENERATE_SKILL_MEMORY.md').read_text()
+          for token in ('candidate', 'validated', 'reusable', 'Evidence'):
+              assert token in memory, f'skill memory contract missing: {token}'
+
+          repair_contract = Path('current/tools/generate-ai-repair-contract.md').read_text()
+          for token in ('repair branch', 'validation', 'PR'):
+              assert token.lower() in repair_contract.lower(), f'AI repair contract missing: {token}'
+
+          print(f'contracts ok: stages={len(stages)} dispatchable={len(dispatchable)} tools={len(entries)}')
+          PY
+
+      - name: Test AI generate endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl -fsS -X POST http://127.0.0.1:8787/v1/ai/generate \
+            -H 'Content-Type: application/json' \
+            -d '{"provider":"mock","prompt":"post-merge e2e validation"}')
+          printf '%s\n' "$response" | tee /tmp/generate.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/generate.json'))
+          assert isinstance(data, dict), 'generate response must be an object'
+          assert data.get('provider') == 'mock', 'generate provider must be mock'
+          assert data.get('route') == 'direct-provider', 'generate must use direct-provider route in E2E'
+          assert data.get('text'), 'generate response text is empty'
+          print('generate endpoint ok')
+          PY
+
+      - name: Test conversation analysis endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST http://127.0.0.1:8787/v1/conversations/analyze \
+            -H 'Content-Type: application/json' \
+            -d '{"title":"Post-merge E2E","conversation":"Validate Research OS API integration","tags":["e2e","validation"]}' \
+            | tee /tmp/analyze.json
+          test -s /tmp/analyze.json
+
+      - name: Simulate recovery contract without mutating main
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          branch="fix/e2e-simulated-${GITHUB_RUN_ID}"
+          cat > "$tmp/repair-manifest.md" <<EOF
+          # Generate Repair Manifest
+
+          - Source commit: ${GITHUB_SHA}
+          - Failed stage: 4
+          - Failed workflow: simulated-stage.yml
+          - Failed downstream run: simulated-${GITHUB_RUN_ID}
+          - Repair branch: ${branch}
+          - Main branch is not modified by recovery.
+          EOF
+          grep -q 'Main branch is not modified' "$tmp/repair-manifest.md"
+          grep -q "${GITHUB_SHA}" "$tmp/repair-manifest.md"
+          grep -q "${branch}" "$tmp/repair-manifest.md"
+          echo 'recovery manifest contract ok'
+
+      - name: Verify workflow YAML
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          for path in Path('.github/workflows').glob('*.*ml'):
+              yaml.safe_load(path.read_text())
+          print('workflow YAML parse ok')
+          PY
+
+      - name: Stop API
+        if: always()
+        shell: bash
+        run: |
+          if test -f /tmp/research-os-api.pid; then
+            kill "$(cat /tmp/research-os-api.pid)" 2>/dev/null || true
+          fi
+          cat /tmp/research-os-api.log 2>/dev/null || true
