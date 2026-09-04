@@ -9,16 +9,27 @@ abstract interface class OwnerFriendApi {
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey});
   Future<Map<String, dynamic>> testProvider();
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]});
+  Future<Map<String, dynamic>> authStatus();
+  Future<Map<String, dynamic>> startGoogleIdentity();
+  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state);
+  Future<Map<String, dynamic>> signOut();
+  void setSession(String token);
+  void clearSession();
 }
 
 final class HttpOwnerFriendApi implements OwnerFriendApi {
-  HttpOwnerFriendApi({required String baseUrl, required this.ownerId, this.profileId = 'default', this.sessionId = 'desktop', this.timeout = const Duration(seconds: 5), this.chatTimeout = const Duration(seconds: 30)}) : baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+  HttpOwnerFriendApi({required String baseUrl, required this.ownerId, this.profileId = 'default', this.sessionId = 'desktop', this.researchOsBaseUrl = 'http://127.0.0.1:8787', this.timeout = const Duration(seconds: 5), this.chatTimeout = const Duration(seconds: 30)})
+      : baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
+        _researchOsBaseUrl = researchOsBaseUrl.endsWith('/') ? researchOsBaseUrl.substring(0, researchOsBaseUrl.length - 1) : researchOsBaseUrl;
   final String baseUrl;
   final String ownerId;
   final String profileId;
   final String sessionId;
+  final String researchOsBaseUrl;
+  final String _researchOsBaseUrl;
   final Duration timeout;
   final Duration chatTimeout;
+  String? _sessionToken;
 
   @override
   Future<Map<String, dynamic>> health() => _request('GET', '/owner/health', authenticated: false);
@@ -35,6 +46,32 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) => _request('POST', '/owner/chat', timeoutOverride: chatTimeout, body: <String, dynamic>{'text': text, 'complexity': complexity, 'risk': risk, 'parallelism': parallelism, 'helper_budget': helperBudget, 'requested_skills': requestedSkills, 'requested_tools': requestedTools});
 
+  @override
+  Future<Map<String, dynamic>> authStatus() => _researchRequest('GET', '/v1/auth/status', authenticated: _sessionToken != null);
+
+  @override
+  Future<Map<String, dynamic>> startGoogleIdentity() => _researchRequest('POST', '/v1/auth/google/start', authenticated: false);
+
+  @override
+  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) => _researchRequest(
+        'POST',
+        '/v1/auth/google/handoff',
+        authenticated: false,
+        headers: <String, String>{'X-Research-OS-OAuth-State': state},
+      );
+
+  @override
+  Future<Map<String, dynamic>> signOut() => _researchRequest('POST', '/v1/auth/signout', authenticated: _sessionToken != null);
+
+  @override
+  void setSession(String token) {
+    final value = token.trim();
+    _sessionToken = value.isEmpty ? null : value;
+  }
+
+  @override
+  void clearSession() => _sessionToken = null;
+
   Stream<Map<String, dynamic>> launchDesk(String text) async* {
     final client = HttpClient();
     final uri = Uri.parse('$baseUrl/v1/launch-desk/run');
@@ -44,14 +81,14 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
       request.headers.set('X-Research-OS-Owner', ownerId);
       request.headers.set('X-Research-OS-Profile', profileId);
-      request.headers.set('X-Research-OS-Session', sessionId);
+      request.headers.set('X-Research-OS-Session', _sessionToken ?? sessionId);
       final payload = utf8.encode(jsonEncode(<String, dynamic>{'text': text}));
       request.contentLength = payload.length;
       request.add(payload);
       final response = await request.close().timeout(chatTimeout);
       if (response.statusCode != HttpStatus.ok) {
-        final body = await utf8.decoder.bind(response).join().timeout(chatTimeout);
-        throw HttpException('Launch Desk returned HTTP ${response.statusCode}: $body', uri: uri);
+        final responseBody = await utf8.decoder.bind(response).join().timeout(chatTimeout);
+        throw HttpException('Launch Desk returned HTTP ${response.statusCode}: $responseBody', uri: uri);
       }
       await for (final line in utf8.decoder.bind(response).transform(const LineSplitter()).timeout(chatTimeout)) {
         if (!line.startsWith('data: ')) continue;
@@ -63,7 +100,7 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
     }
   }
 
-  Future<Map<String, dynamic>> _request(String method, String path, {bool authenticated = true, Map<String, dynamic>? body, Duration? timeoutOverride}) async {
+  Future<Map<String, dynamic>> _request(String method, String path, {bool authenticated = true, Map<String, dynamic>? body, Map<String, String>? headers, Duration? timeoutOverride}) async {
     final client = HttpClient();
     final requestTimeout = timeoutOverride ?? timeout;
     final uri = Uri.parse('$baseUrl$path');
@@ -73,8 +110,9 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
       if (authenticated) {
         request.headers.set('X-Research-OS-Owner', ownerId);
         request.headers.set('X-Research-OS-Profile', profileId);
-        request.headers.set('X-Research-OS-Session', sessionId);
+        request.headers.set('X-Research-OS-Session', _sessionToken ?? sessionId);
       }
+      headers?.forEach(request.headers.set);
       if (body != null) {
         final payload = utf8.encode(jsonEncode(body));
         request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
@@ -82,14 +120,38 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
         request.add(payload);
       }
       final response = await request.close().timeout(requestTimeout);
-      final responseBody = await utf8.decoder.bind(response).join().timeout(requestTimeout);
-      final decoded = jsonDecode(responseBody);
-      if (decoded is! Map) throw const FormatException('Owner Friend response must be a JSON object');
-      final result = Map<String, dynamic>.from(decoded);
-      if (response.statusCode != HttpStatus.ok) throw HttpException('Owner Friend returned HTTP ${response.statusCode}: ${result['error']}', uri: uri);
-      return result;
+      return _decodeResponse(response, uri, requestTimeout);
     } finally {
       client.close(force: true);
     }
+  }
+
+  Future<Map<String, dynamic>> _researchRequest(String method, String path, {bool authenticated = true, Map<String, String>? headers}) async {
+    final client = HttpClient();
+    final uri = Uri.parse('$_researchOsBaseUrl$path');
+    try {
+      final request = method == 'POST' ? await client.postUrl(uri).timeout(timeout) : await client.getUrl(uri).timeout(timeout);
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      if (authenticated && _sessionToken != null) {
+        request.headers.set('X-Research-OS-Session', _sessionToken!);
+      }
+      headers?.forEach(request.headers.set);
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
+      request.contentLength = 2;
+      request.add(const <int>[123, 125]);
+      final response = await request.close().timeout(timeout);
+      return _decodeResponse(response, uri, timeout);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _decodeResponse(HttpClientResponse response, Uri uri, Duration requestTimeout) async {
+    final responseBody = await utf8.decoder.bind(response).join().timeout(requestTimeout);
+    final decoded = jsonDecode(responseBody);
+    if (decoded is! Map) throw const FormatException('Research OS response must be a JSON object');
+    final result = Map<String, dynamic>.from(decoded);
+    if (response.statusCode != HttpStatus.ok) throw HttpException('Research OS returned HTTP ${response.statusCode}: ${result['error']}', uri: uri);
+    return result;
   }
 }
