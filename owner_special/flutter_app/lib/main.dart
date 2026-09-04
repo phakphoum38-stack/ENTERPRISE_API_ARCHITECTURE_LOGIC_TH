@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import 'src/friend_ui_v4.dart';
+import 'src/friend_app.dart';
 import 'src/owner_api.dart';
 import 'src/startup_probe.dart';
 
@@ -35,7 +35,7 @@ Future<void> main() async {
   }
 
   runApp(
-    OwnerFriendAppV4(
+    OwnerFriendApp(
       api: api,
       startup: startup,
       startupError: startupError,
