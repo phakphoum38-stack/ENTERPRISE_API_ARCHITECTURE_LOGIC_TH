@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-abstract interface class OwnerFriendApi {
+abstract class OwnerFriendApi {
   Future<Map<String, dynamic>> health();
   Future<Map<String, dynamic>> status();
   Future<Map<String, dynamic>> memory();
