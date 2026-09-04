@@ -5,10 +5,11 @@ on:
   push:
     branches:
       - main
-      - fix/canonical-friend-lineage
+      - fix/canonical-release-lineage-gate-current-main
     paths:
       - ".github/workflows/research-os-windows-artifact.yml"
-      - ".github/workflows/research-os-release-integration.yml"
+      - ".github/workflows/owner-special-friend.yml"
+      - "owner_special/scripts/build_bundle.py"
       - ".github/workflows/canonical-source-lineage-gate.yml"
 
 permissions:
@@ -16,13 +17,13 @@ permissions:
 
 jobs:
   verify:
-    name: Verify canonical Research OS + Friend lineage contract
+    name: Verify canonical Research OS + Friend release lineage
     runs-on: ubuntu-latest
     steps:
       - name: Checkout canonical source
         uses: actions/checkout@v4
 
-      - name: Verify Windows artifact workflow is not pinned to a stale Friend commit
+      - name: Verify Windows artifact follows the canonical SHA
         shell: bash
         run: |
           set -euo pipefail
@@ -30,35 +31,60 @@ jobs:
           test -f "$workflow"
 
           friend_ref="$(sed -n 's/^  FRIEND_REF: *//p' "$workflow" | head -n 1)"
-          if [[ -z "$friend_ref" ]]; then
-            echo "FRIEND_REF is missing from $workflow"
-            exit 1
-          fi
+          test -n "$friend_ref"
 
-          if [[ "$friend_ref" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Detected hard-coded Friend commit: $friend_ref"
+          expected_ref='$'
+          expected_ref+='{{ github.sha }}'
+
+          if [[ "$friend_ref" != "$expected_ref" ]]; then
             echo "CANONICAL_LINEAGE_GATE=FAIL"
-            echo "Friend source must follow the canonical release SHA instead of a stale pinned commit."
-            exit 1
-          fi
-
-          if [[ "$friend_ref" != '${{ github.sha }}' ]]; then
             echo "Unexpected FRIEND_REF expression: $friend_ref"
-            echo "Expected: \${{ github.sha }}"
-            echo "CANONICAL_LINEAGE_GATE=FAIL"
+            echo "Expected: $expected_ref"
             exit 1
           fi
 
-          echo "FRIEND_REF=$friend_ref"
           echo "CANONICAL_LINEAGE_GATE=PASS"
+          echo "Canonical source SHA: $GITHUB_SHA"
+          echo "FRIEND_REF=$friend_ref"
 
-      - name: Verify release integration requires exact source SHA
+      - name: Verify Windows artifact checks out Friend at the exact SHA
         shell: bash
         run: |
           set -euo pipefail
-          workflow=".github/workflows/research-os-release-integration.yml"
+          workflow=".github/workflows/research-os-windows-artifact.yml"
+          grep -qF 'ref: ${{ env.FRIEND_REF }}' "$workflow"
+          grep -qF 'rev-parse HEAD' "$workflow"
+          grep -qF 'friendSha -ne $env:GITHUB_SHA' "$workflow"
+          echo "CANONICAL_CHECKOUT_GATE=PASS"
+
+      - name: Verify canonical Owner release control pipeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/owner-special-friend.yml"
           test -f "$workflow"
-          grep -q 'source_sha' "$workflow"
-          grep -q 'Research-OS-Windows-x64-Friend-Complete-${source_sha}' "$workflow"
-          grep -q 'github.sha' "$workflow"
-          echo "RELEASE_SOURCE_SHA_GATE=PASS"
+          grep -qF 'owner-bundle:' "$workflow"
+          grep -qF 'python owner_special/scripts/build_bundle.py' "$workflow"
+
+          expected_setup='owner-special-setup-$'
+          expected_setup+='{{ github.sha }}'
+          if ! grep -qF "$expected_setup" "$workflow"; then
+            echo "OWNER_RELEASE_CONTROL_GATE=FAIL"
+            echo "Missing canonical dynamic Owner setup artifact reference: $expected_setup"
+            exit 1
+          fi
+
+          echo "OWNER_RELEASE_CONTROL_GATE=PASS"
+
+      - name: Verify final bundle is bound to the canonical source and validated installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="owner_special/scripts/build_bundle.py"
+          test -f "$script"
+          grep -qF 'GITHUB_SHA' "$script"
+          grep -qF 'Research-OS-Owner-Special-Setup-1.3.1-x64.exe' "$script"
+          grep -qF 'owner-v1.3-validation.json' "$script"
+          grep -qF 'RELEASE_MANIFEST.txt' "$script"
+          grep -qF 'BUNDLE_SHA256.txt' "$script"
+          echo "FINAL_RELEASE_LINEAGE_GATE=PASS"
