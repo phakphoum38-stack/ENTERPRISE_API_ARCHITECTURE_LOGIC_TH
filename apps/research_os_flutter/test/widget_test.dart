@@ -160,7 +160,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('AI voice conversation workspace opens', (tester) async {
+  testWidgets('AI conversation workspace provides text and voice', (tester) async {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -168,10 +168,22 @@ void main() {
     await openSidebarDestination(tester, 'conversation');
 
     expect(find.text('สนทนา AI'), findsOneWidget);
-    expect(find.text('Voice Conversation • Friend AI • Local-first'), findsOneWidget);
-    expect(find.text('พูดกับ Research OS ได้เลย'), findsOneWidget);
+    expect(find.text('Friend AI • Text + Voice • Local-first'), findsOneWidget);
+    expect(find.byKey(const Key('research-os-text-composer')), findsOneWidget);
+    expect(find.byKey(const Key('research-os-text-send')), findsOneWidget);
     expect(find.byIcon(Icons.mic), findsOneWidget);
     expect(find.text('พร้อมสนทนา'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Google Identity is visible in navigation', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await pumpShell(tester);
+
+    expect(find.text('Google Identity'), findsOneWidget);
+    expect(find.byKey(const Key('v2-nav-account')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
