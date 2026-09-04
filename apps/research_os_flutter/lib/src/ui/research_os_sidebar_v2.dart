@@ -95,9 +95,6 @@ class ResearchOSSidebarV2 extends StatelessWidget {
   Widget _header(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // AnimatedContainer briefly passes through intermediate widths while
-        // collapsing/expanding. Keep the header compact until there is enough
-        // horizontal space for the full identity row.
         final canShowExpandedHeader = constraints.maxWidth >= 180;
 
         if (!canShowExpandedHeader) {
@@ -199,6 +196,7 @@ class ResearchOSSidebarV2 extends StatelessWidget {
       _Entry('search', 'Search', Icons.search_outlined, 0),
       _Entry('new-chat', 'New chat', Icons.add_comment_outlined, 1),
       _Entry('conversation', 'สนทนา AI', Icons.chat_bubble_outline, 1),
+      _Entry('friend-connect', 'Friend Connect', Icons.support_agent_outlined, 13),
       _Entry('images', 'Images', Icons.image_outlined, 1, available: false),
       _Entry('library', 'Library', Icons.local_library_outlined, 3),
       _Entry('scheduled', 'Scheduled', Icons.schedule_outlined, 1, available: false),
