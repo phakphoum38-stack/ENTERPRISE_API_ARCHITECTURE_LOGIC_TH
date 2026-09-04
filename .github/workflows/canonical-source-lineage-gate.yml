@@ -33,10 +33,13 @@ jobs:
           friend_ref="$(sed -n 's/^  FRIEND_REF: *//p' "$workflow" | head -n 1)"
           test -n "$friend_ref"
 
-          if [[ "$friend_ref" != '${{ github.sha }}' ]]; then
+          expected_ref='$'
+          expected_ref+='{{ github.sha }}'
+
+          if [[ "$friend_ref" != "$expected_ref" ]]; then
             echo "CANONICAL_LINEAGE_GATE=FAIL"
             echo "Unexpected FRIEND_REF expression: $friend_ref"
-            echo "Expected: \${{ github.sha }}"
+            echo "Expected: $expected_ref"
             exit 1
           fi
 
