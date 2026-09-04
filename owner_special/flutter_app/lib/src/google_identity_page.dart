@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -72,7 +71,7 @@ class _GoogleIdentityPageState extends State<GoogleIdentityPage> {
         attempts++;
         if (attempts > 60) {
           timer.cancel();
-          if (mounted) setState(() => _message = 'Google sign-in timed out.');
+          if (mounted) setState(() { _busy = false; _message = 'Google sign-in timed out.'; });
           return;
         }
         try {
