@@ -117,7 +117,7 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
         request.add(payload);
       }
       final response = await request.close().timeout(requestTimeout);
-      return _decodeResponse(response, uri, requestTimeout);
+      return await _decodeResponse(response, uri, requestTimeout);
     } finally {
       client.close(force: true);
     }
@@ -135,7 +135,7 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
       request.contentLength = 2;
       request.add(const <int>[123, 125]);
       final response = await request.close().timeout(timeout);
-      return _decodeResponse(response, uri, timeout);
+      return await _decodeResponse(response, uri, timeout);
     } finally {
       client.close(force: true);
     }
