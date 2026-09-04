@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_owner_special/src/friend_ui_v3.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 
-class FakeOwnerFriendApiV3 implements OwnerFriendApi {
+class FakeOwnerFriendApiV3 extends OwnerFriendApi {
   int? lastHelperBudget;
   List<String> lastRequestedSkills = const <String>[];
 
@@ -39,12 +39,7 @@ class FakeOwnerFriendApiV3 implements OwnerFriendApi {
       };
 
   @override
-  Future<Map<String, dynamic>> configureProvider({
-    required String baseUrl,
-    required String model,
-    String? apiKey,
-  }) async =>
-      <String, dynamic>{
+  Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey}) async => <String, dynamic>{
         'enabled': true,
         'credential_present': true,
         'secret_backend': 'test',

@@ -34,6 +34,7 @@ from identity_providers import provider_catalog
 from memory import build_context, search_memory
 from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
+from oauth_handoff import consume_handoff
 from providers import ProviderError, build_provider
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -222,7 +223,6 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 return
             for provider in ("microsoft", "github"):
                 if path == f"/v1/auth/{provider}/callback":
-                    params = parse_qs(parsed.query)
                     result, cookie = __import__("server_auth_routes").auth_callback(provider, parsed.query)
                     self._redirect("/", cookie)
                     return
@@ -298,6 +298,18 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/auth/google/start":
                 self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
+                return
+            if path == "/v1/auth/google/handoff":
+                handoff_code = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()
+                if not handoff_code:
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "oauth_handoff_required", "detail": "A one-time Google OAuth handoff state is required."})
+                    return
+                session = consume_handoff(GoogleIdentityBroker().root, handoff_code)
+                if not session:
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "oauth_handoff_invalid", "detail": "The Google OAuth handoff is missing, expired, or already consumed."})
+                    return
+                principal = verify_session(session)
+                self._send(HTTPStatus.OK, {"connected": True, "session": session, "account": {"user_id": principal["user_id"], "email": principal["email"], "role": principal["role"]}, "token_type": "research_os_session"})
                 return
             if path in {"/v1/auth/signout", "/v1/auth/google/signout"}:
                 token = extract_session_token(self.headers)
