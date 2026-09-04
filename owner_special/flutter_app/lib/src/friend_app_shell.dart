@@ -15,6 +15,7 @@ class FriendAppShell extends StatelessWidget {
     (icon: Icons.memory_outlined, label: 'Memory'),
     (icon: Icons.tune_outlined, label: 'Provider'),
     (icon: Icons.groups_outlined, label: 'Team'),
+    (icon: Icons.account_circle_outlined, label: 'Google Identity'),
   ];
 
   @override
@@ -143,12 +144,12 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                Text('Friend', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w750)),
+                Text('Research OS', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                 if (!compact) ...[
                   const SizedBox(width: 10),
                   Container(width: 4, height: 4, decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle)),
                   const SizedBox(width: 8),
-                  Text('Research workspace', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  Text('Owner Special • AI workspace', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 ],
               ],
             ),
