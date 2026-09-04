@@ -45,8 +45,19 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey}) => _request('POST', '/owner/provider/config', body: <String, dynamic>{'base_url': baseUrl, 'model': model, if (apiKey != null && apiKey.isNotEmpty) 'api_key': apiKey, 'enabled': true});
   @override
   Future<Map<String, dynamic>> testProvider() => _request('POST', '/owner/provider/test', body: const <String, dynamic>{'test': true});
+
   @override
-  Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) => _request('POST', '/owner/chat', timeoutOverride: chatTimeout, body: <String, dynamic>{'text': text, 'complexity': complexity, 'risk': risk, 'parallelism': parallelism, 'helper_budget': helperBudget, 'requested_skills': requestedSkills, 'requested_tools': requestedTools});
+  Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) {
+    return _researchChat(
+      text,
+      complexity: complexity,
+      risk: risk,
+      parallelism: parallelism,
+      helperBudget: helperBudget,
+      requestedSkills: requestedSkills,
+      requestedTools: requestedTools,
+    );
+  }
 
   @override
   Future<Map<String, dynamic>> authStatus() => _researchRequest('GET', '/v1/auth/status', authenticated: _sessionToken != null);
@@ -92,6 +103,34 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
         final decoded = jsonDecode(line.substring(6));
         if (decoded is Map) yield Map<String, dynamic>.from(decoded);
       }
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _researchChat(String text, {required int complexity, required int risk, required int parallelism, required int helperBudget, required List<String> requestedSkills, required List<String> requestedTools}) async {
+    final client = HttpClient();
+    final requestTimeout = chatTimeout;
+    final uri = Uri.parse('$researchOsBaseUrl/v1/ai/generate');
+    try {
+      final request = await client.postUrl(uri).timeout(requestTimeout);
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
+      if (_sessionToken != null) request.headers.set('X-Research-OS-Session', _sessionToken!);
+      final payload = utf8.encode(jsonEncode(<String, dynamic>{
+        'prompt': text,
+        'complexity': complexity,
+        'risk': risk,
+        'parallelism': parallelism,
+        'helper_budget': helperBudget,
+        if (requestedSkills.isNotEmpty) 'requested_skills': requestedSkills,
+        if (requestedTools.isNotEmpty) 'requested_tools': requestedTools,
+        'session_id': sessionId,
+      }));
+      request.contentLength = payload.length;
+      request.add(payload);
+      final response = await request.close().timeout(requestTimeout);
+      return await _decodeResponse(response, uri, requestTimeout);
     } finally {
       client.close(force: true);
     }
