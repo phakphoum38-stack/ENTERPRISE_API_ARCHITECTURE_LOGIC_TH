@@ -18,6 +18,7 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('Knowledge', 'Knowledge Graph', Icons.hub_outlined, 4),
   ResearchNavItem('Connections', 'GitHub', Icons.account_tree_outlined, 5),
   ResearchNavItem('Connections', 'Google Workspace', Icons.apps_outlined, 6),
+  ResearchNavItem('Connections', 'Friend Connect', Icons.support_agent_outlined, 13),
   ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7),
   ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8),
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),

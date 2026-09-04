@@ -6,6 +6,7 @@ import 'features/auth/google_login_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
 import 'features/chat/voice_conversation_page.dart';
 import 'features/developer_access/developer_access_page.dart';
+import 'features/friend/friend_connect_page.dart';
 import 'features/github/github_dashboard_page.dart';
 import 'features/google_workspace/google_workspace_page.dart';
 import 'features/graph/knowledge_graph_page.dart';
@@ -59,6 +60,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         DeveloperAccessPage(),
         BrainSkillsPage(apiClient: widget.apiClient),
         GoogleLoginPage(apiClient: widget.apiClient),
+        FriendConnectPage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);

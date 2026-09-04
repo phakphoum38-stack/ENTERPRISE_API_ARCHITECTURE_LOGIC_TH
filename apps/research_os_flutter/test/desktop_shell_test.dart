@@ -65,6 +65,7 @@ void main() {
     expect(find.byKey(const Key('v2-nav-search')), findsOneWidget);
     expect(find.byKey(const Key('v2-nav-new-chat')), findsOneWidget);
     expect(find.byKey(const Key('v2-nav-conversation')), findsOneWidget);
+    expect(find.byKey(const Key('v2-nav-friend-connect')), findsOneWidget);
     expect(find.byKey(const Key('v2-nav-settings')), findsOneWidget);
     expect(find.byKey(const Key('v2-nav-account')), findsOneWidget);
 
@@ -85,18 +86,22 @@ void main() {
     expect(find.text('Search'), findsOneWidget);
     expect(find.text('New chat'), findsOneWidget);
     expect(find.text('สนทนา AI'), findsOneWidget);
+    expect(find.text('Friend Connect'), findsOneWidget);
     expect(find.text('AI Operating Workspace'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('v2-nav-conversation')));
+    await tester.tap(find.byKey(const Key('v2-nav-friend-connect')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.text('สนทนา AI'), findsOneWidget);
-    expect(find.text('Voice Conversation • Friend AI • Local-first'), findsOneWidget);
-    expect(find.text('พูดกับ Research OS ได้เลย'), findsOneWidget);
-    expect(find.byIcon(Icons.mic), findsOneWidget);
-    expect(find.text('พร้อมสนทนา'), findsOneWidget);
+    expect(find.text('Friend Connect'), findsWidgets);
+    expect(find.text('Architecture Advisor'), findsOneWidget);
+    expect(find.text('Code Advisor'), findsOneWidget);
+    expect(find.text('Research Advisor'), findsOneWidget);
+    expect(find.text('Security Advisor'), findsOneWidget);
+    expect(find.text('System Advisor'), findsOneWidget);
+    expect(find.byKey(const Key('friend-connect-send')), findsOneWidget);
+    expect(find.text('พร้อมให้คำปรึกษา'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
