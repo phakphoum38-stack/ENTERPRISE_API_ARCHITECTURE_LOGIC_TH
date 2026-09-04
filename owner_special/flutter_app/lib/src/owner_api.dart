@@ -10,10 +10,10 @@ abstract interface class OwnerFriendApi {
   Future<Map<String, dynamic>> testProvider();
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]});
 
-  Future<Map<String, dynamic>> authStatus() => Future<Map<String, dynamic>>.error(const UnsupportedError('Research OS identity is not implemented by this API client'));
-  Future<Map<String, dynamic>> startGoogleIdentity() => Future<Map<String, dynamic>>.error(const UnsupportedError('Google Identity is not implemented by this API client'));
-  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) => Future<Map<String, dynamic>>.error(const UnsupportedError('Google Identity handoff is not implemented by this API client'));
-  Future<Map<String, dynamic>> signOut() => Future<Map<String, dynamic>>.error(const UnsupportedError('Research OS sign-out is not implemented by this API client'));
+  Future<Map<String, dynamic>> authStatus() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS identity is not implemented by this API client'));
+  Future<Map<String, dynamic>> startGoogleIdentity() => Future<Map<String, dynamic>>.error(UnsupportedError('Google Identity is not implemented by this API client'));
+  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) => Future<Map<String, dynamic>>.error(UnsupportedError('Google Identity handoff is not implemented by this API client'));
+  Future<Map<String, dynamic>> signOut() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS sign-out is not implemented by this API client'));
   void setSession(String token) {}
   void clearSession() {}
 }
