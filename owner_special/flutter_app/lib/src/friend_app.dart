@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'friend_app_shell.dart';
 import 'friend_module_shell.dart';
 import 'friend_theme.dart';
+import 'google_identity_page.dart';
 import 'launch_desk_page.dart';
 import 'owner_api.dart';
 import 'team_center.dart';
@@ -32,11 +33,12 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
       _MemoryPage(api: widget.api),
       _ProviderPage(api: widget.api),
       _TeamPage(team: _currentTeam),
+      GoogleIdentityPage(api: widget.api),
     ];
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Friend',
+      title: 'Research OS',
       theme: FriendTheme.build(),
       home: FriendAppShell(
         index: _index,
@@ -102,8 +104,8 @@ class _FriendChatPageState extends State<_FriendChatPage> {
   final _scrollController = ScrollController();
   bool _busy = false;
   bool _turboMillion = true;
-  final List<_ChatMessage> _messages = const [
-    _ChatMessage(role: 'assistant', text: 'สวัสดีครับ ผม Friend\nพร้อมช่วยวางแผน วิเคราะห์ และเดินงานใน Research OS ให้ครับ'),
+  final List<_ChatMessage> _messages = <_ChatMessage>[
+    const _ChatMessage(role: 'assistant', text: 'สวัสดีครับ ผม Friend\nพร้อมช่วยวางแผน วิเคราะห์ และเดินงานใน Research OS ให้ครับ'),
   ];
   String _scale = '-';
   int _capacity = 0;
