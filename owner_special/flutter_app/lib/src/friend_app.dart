@@ -167,6 +167,7 @@ class _FriendChatPageState extends State<_FriendChatPage> {
             Text('Your research copilot for planning, analysis and execution', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ])),
           FilterChip(
+            key: const Key('turbo-million'),
             selected: _turboMillion,
             onSelected: (value) => setState(() => _turboMillion = value),
             avatar: Icon(Icons.bolt, size: 16, color: _turboMillion ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
@@ -202,11 +203,11 @@ class _FriendChatPageState extends State<_FriendChatPage> {
       ),
       const SizedBox(height: 8),
       SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
-        _Metric(label: 'Brain', value: _scale),
-        _Metric(label: 'Capacity', value: '$_capacity'),
-        _Metric(label: 'Workers', value: '$_activeWorkers'),
-        _Metric(label: 'Batches', value: '$_batches'),
-        _Metric(label: 'Factory', value: _factory),
+        _Metric(label: 'Brain scale:', value: _scale),
+        _Metric(label: 'Logical capacity:', value: '$_capacity'),
+        _Metric(label: 'Active workers:', value: '$_activeWorkers'),
+        _Metric(label: 'Batches:', value: '$_batches'),
+        _Metric(label: 'Factory:', value: _factory),
       ])),
     ]);
   }
@@ -259,12 +260,28 @@ class _ThinkingIndicator extends StatelessWidget {
 
 class _Metric extends StatelessWidget {
   const _Metric({required this.label, required this.value});
+
   final String label;
   final String value;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(padding: const EdgeInsets.only(right: 8), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(9)), child: RichText(text: TextSpan(style: theme.textTheme.labelSmall, children: [TextSpan(text: '$label  ', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)), TextSpan(text: value, style: const TextStyle(fontWeight: FontWeight.w700))]))));
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Text(
+          '$label $value',
+          style: theme.textTheme.labelSmall,
+        ),
+      ),
+    );
   }
 }
 
