@@ -143,7 +143,7 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                Text('Friend', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w750)),
+                Text('Friend', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                 if (!compact) ...[
                   const SizedBox(width: 10),
                   Container(width: 4, height: 4, decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle)),
