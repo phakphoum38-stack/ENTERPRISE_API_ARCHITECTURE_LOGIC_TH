@@ -30,12 +30,12 @@ class FriendAppShell extends StatelessWidget {
                 _Sidebar(index: index, onIndexChanged: onIndexChanged, compact: compact),
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.all(compact ? 12 : 20),
+                    padding: EdgeInsets.fromLTRB(compact ? 12 : 24, compact ? 12 : 20, compact ? 12 : 24, compact ? 12 : 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _Header(teamCenter: teamCenter, status: status),
-                        const SizedBox(height: 16),
+                        _Header(teamCenter: teamCenter, status: status, compact: compact),
+                        const SizedBox(height: 12),
                         Expanded(child: pages[index]),
                       ],
                     ),
@@ -58,25 +58,26 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      width: compact ? 76 : 220,
+      width: compact ? 64 : 204,
       margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: .08)),
+        color: theme.colorScheme.surface.withValues(alpha: .72),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: .10)),
       ),
       child: Column(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: .14), borderRadius: BorderRadius.circular(14)),
-            child: Icon(Icons.hub_outlined, color: Theme.of(context).colorScheme.primary),
+            decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: .12), borderRadius: BorderRadius.circular(12)),
+            child: Icon(Icons.auto_awesome, color: theme.colorScheme.primary, size: 20),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Expanded(
             child: ListView.builder(
               itemCount: FriendAppShell.items.length,
@@ -84,33 +85,29 @@ class _Sidebar extends StatelessWidget {
                 final item = FriendAppShell.items[i];
                 final selected = i == index;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => onIndexChanged(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 12, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: .13) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: compact ? MainAxisAlignment.center : MainAxisAlignment.start,
-                        children: [
-                          Icon(item.icon, color: selected ? Theme.of(context).colorScheme.primary : null),
-                          if (!compact) ...[
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                item.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
-                              ),
-                            ),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Tooltip(
+                    message: compact ? item.label : '',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => onIndexChanged(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 11, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: selected ? theme.colorScheme.primary.withValues(alpha: .12) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: compact ? MainAxisAlignment.center : MainAxisAlignment.start,
+                          children: [
+                            Icon(item.icon, size: 20, color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
+                            if (!compact) ...[
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: selected ? FontWeight.w700 : FontWeight.w500))),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -118,7 +115,7 @@ class _Sidebar extends StatelessWidget {
               },
             ),
           ),
-          const Icon(Icons.settings_outlined, size: 20),
+          Icon(Icons.settings_outlined, size: 19, color: theme.colorScheme.onSurfaceVariant),
         ],
       ),
     );
@@ -126,27 +123,37 @@ class _Sidebar extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.teamCenter, required this.status});
+  const _Header({required this.teamCenter, required this.status, required this.compact});
   final Widget teamCenter;
   final Widget status;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: .08)),
+        color: theme.colorScheme.surface.withValues(alpha: .52),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: .08)),
       ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 16,
-        runSpacing: 12,
+      child: Row(
         children: [
-          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Friend', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)), SizedBox(height: 3), Text('Adaptive application workspace')]),
-          teamCenter,
+          Expanded(
+            child: Row(
+              children: [
+                Text('Friend', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                if (!compact) ...[
+                  const SizedBox(width: 10),
+                  Container(width: 4, height: 4, decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle)),
+                  const SizedBox(width: 8),
+                  Text('Research workspace', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ],
+            ),
+          ),
+          if (!compact) ...[teamCenter, const SizedBox(width: 10)],
           status,
         ],
       ),
