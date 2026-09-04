@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_owner_special/src/friend_ui_v4.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 
-class _FakeApi implements OwnerFriendApi {
+class _FakeApi extends OwnerFriendApi {
   List<String> requestedTools = const <String>[];
 
   @override
