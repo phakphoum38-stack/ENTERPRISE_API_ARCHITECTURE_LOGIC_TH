@@ -14,6 +14,11 @@ on:
         required: false
         default: ''
         type: string
+      delay_seconds:
+        description: 'Generated delay value for the V3.5 integrity stage'
+        required: false
+        default: '0'
+        type: string
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -40,10 +45,32 @@ jobs:
   inventory-and-validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout requested source
+        uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref || github.head_ref || github.ref_name }}
+
+      - name: Resolve exact target SHA
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET_SHA="$(git rev-parse HEAD)"
+          test -n "$TARGET_SHA"
+          echo "TARGET_SHA=$TARGET_SHA" >> "$GITHUB_ENV"
+          echo "TARGET_SHA=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+          echo "Resolved TARGET_SHA=$TARGET_SHA"
+
+      - name: Verify source identity
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.TARGET_SHA }}
+        run: |
+          set -euo pipefail
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$ACTUAL_SHA"
+          echo "SHA_IDENTITY_GATE=PASS"
 
       - name: Inventory existing workflows
         shell: bash
@@ -70,9 +97,10 @@ jobs:
             echo "=== ISSUE #$issue ==="
             if gh api "repos/${GITHUB_REPOSITORY}/issues/$issue" > "evidence/generate/issue-$issue.json" 2>/dev/null; then
               python - "$issue" "evidence/generate/issue-$issue.json" <<'PY'
-          import json,sys
-          issue=sys.argv[1]; path=sys.argv[2]
-          data=json.load(open(path))
+          import json, sys
+          issue=sys.argv[1]
+          path=sys.argv[2]
+          data=json.load(open(path, encoding='utf-8'))
           print(f"#{issue}: {data.get('state')} | {data.get('title')}")
           PY
             else
@@ -80,7 +108,6 @@ jobs:
               echo "Issue is optional reference only; continuing."
             fi
           done
-          echo "Optional issue reference scan completed."
 
       - name: Validate branch-isolated repair path
         shell: bash
@@ -93,9 +120,237 @@ jobs:
           echo "Repair ref: ${repair_ref}"
           test "$repair_ref" = "refs/heads/${branch}"
 
-      - name: Validate registry against repository
+      - name: Validate registry, tools, and Skill Memory
         shell: bash
         run: |
           set -euo pipefail
-          echo "Recovery correlation: stage=${RECOVERY_STAGE} run_id=${RECOVERY_RUN_ID}"
           python tools/validate_generate_orchestrator.py
+          python - <<'PY'
+          import pathlib
+          import yaml
+          tools=yaml.safe_load(pathlib.Path('current/tools/generate-tool-registry.yml').read_text(encoding='utf-8')) or {}
+          entries=tools.get('entries') or []
+          if not entries:
+              raise SystemExit('Generate tool registry is empty.')
+          for e in entries:
+              if not e.get('id') or not e.get('capability') or not e.get('safe_boundary'):
+                  raise SystemExit(f'Invalid tool registry entry: {e!r}')
+          memory=pathlib.Path('current/GENERATE_SKILL_MEMORY.md').read_text(encoding='utf-8')
+          for required in ('candidate', 'validated', 'reusable', 'Evidence'):
+              if required not in memory:
+                  raise SystemExit(f'Skill memory contract missing: {required}')
+          print(f'AI tool registry validated: {len(entries)} tools.')
+          print('Skill Memory contract validated.')
+          PY
+
+      - name: Validate workflow YAML syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import yaml
+          errors=[]
+          for p in sorted(pathlib.Path('.github/workflows').glob('*.*ml')):
+              try:
+                  yaml.safe_load(p.read_text(encoding='utf-8'))
+              except Exception as e:
+                  errors.append(f'{p}: {e}')
+          if errors:
+              print('\n'.join(errors))
+              raise SystemExit(1)
+          print('Workflow YAML validation passed.')
+          PY
+
+      - name: Prepare AI repair evidence
+        if: ${{ inputs.mode == 'repair' || github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/generate
+          cat > evidence/generate/repair-context.md <<EOF
+          # Generate AI Repair Context
+
+          - Repository: ${GITHUB_REPOSITORY}
+          - Event: ${GITHUB_EVENT_NAME}
+          - Source ref: ${GITHUB_REF}
+          - Target SHA: ${TARGET_SHA}
+          - Source run: ${GITHUB_RUN_ID}
+          - Tool registry: ${TOOL_REGISTRY}
+          - Skill memory: ${SKILL_MEMORY}
+          - Repair boundary: branch-only
+          - Main mutation: forbidden
+          EOF
+          cat evidence/generate/repair-context.md
+
+      - name: Dispatch registered stages sequentially
+        if: ${{ inputs.mode == 'dispatch' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.target.outputs.TARGET_SHA }}
+          SOURCE_REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+          import time
+          import urllib.parse
+          import yaml
+
+          target_sha=os.environ['TARGET_SHA']
+          repo=os.environ['GITHUB_REPOSITORY']
+          run_id=os.environ['GITHUB_RUN_ID']
+          target_ref=f"generate-target-{run_id}"
+
+          data=yaml.safe_load(pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text(encoding='utf-8')) or {}
+          entries=[]
+          for e in data.get('stages') or []:
+              if not isinstance(e,dict):
+                  raise SystemExit(f'Invalid stage entry: {e!r}')
+              wf=e.get('file')
+              if e.get('dispatchable') is True and wf and wf != 'generate-orchestrator.yml':
+                  entries.append({'stage':int(e.get('stage',0)), 'file':wf})
+          entries.sort(key=lambda e:e['stage'])
+          if not entries:
+              raise SystemExit('No downstream dispatchable stages found; refusing to run.')
+
+          def api(path, method='GET', payload=None):
+              cmd=['gh','api',path,'--method',method]
+              if payload is not None:
+                  cmd += ['--input','-']
+                  return subprocess.run(cmd,input=json.dumps(payload).encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
+              return subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
+
+          def recovery(stage, workflow, downstream_run=''):
+              env_file=os.environ.get('GITHUB_ENV')
+              if env_file:
+                  with open(env_file,'a',encoding='utf-8') as f:
+                      f.write(f'RECOVERY_STAGE={stage}\n')
+                      f.write(f'RECOVERY_WORKFLOW={workflow}\n')
+                      f.write(f'RECOVERY_RUN_ID={downstream_run}\n')
+
+          print(f'TARGET_SHA={target_sha}')
+          print(f'TARGET_REF={target_ref}')
+          print('Sequential dispatch plan:')
+          for e in entries:
+              print(f"  stage {e['stage']}: {e['file']}")
+
+          # Create an immutable run-scoped branch at the resolved SHA. Downstream
+          # workflows that do not yet expose target_sha still receive the exact
+          # source through this immutable ref; compatible workflows also receive it.
+          api(f'repos/{repo}/git/refs','POST',{'ref':f'refs/heads/{target_ref}','sha':target_sha})
+
+          for e in entries:
+              wf=e['file']
+              encoded=urllib.parse.quote(wf,safe='')
+              started=time.time()
+              inputs={'target_sha':target_sha}
+              if wf == 'v3.5-pr-integrity.yml':
+                  inputs['expected_sha']=target_sha
+                  inputs['delay_seconds']=os.environ.get('DELAY_SECONDS','0')
+
+              print(f"\n=== DISPATCH stage {e['stage']}: {wf} ===")
+              api(f'repos/{repo}/actions/workflows/{encoded}/dispatches','POST',{'ref':target_ref,'inputs':inputs})
+
+              deadline=time.time()+3600
+              run=None
+              while time.time()<deadline:
+                  data=json.loads(api(f'repos/{repo}/actions/workflows/{encoded}/runs?event=workflow_dispatch&per_page=30'))
+                  candidates=[r for r in data.get('workflow_runs',[]) if r.get('head_sha')==target_sha and r.get('created_at')]
+                  if candidates:
+                      run=max(candidates,key=lambda r:r['id'])
+                      break
+                  time.sleep(3)
+
+              if not run:
+                  recovery(e['stage'],wf,'')
+                  raise RuntimeError(f'STAGE_DISCOVERY_FAILURE|stage={e["stage"]}|workflow={wf}|target_sha={target_sha}')
+
+              downstream_sha=run.get('head_sha','')
+              if downstream_sha != target_sha:
+                  recovery(e['stage'],wf,str(run['id']))
+                  raise RuntimeError(f'SHA_LINEAGE_FAILURE|stage={e["stage"]}|workflow={wf}|expected={target_sha}|actual={downstream_sha}')
+
+              downstream_run=str(run['id'])
+              print(f"Dispatched run {downstream_run}: {run.get('html_url','')}")
+              while time.time()<deadline:
+                  current=json.loads(api(f'repos/{repo}/actions/runs/{downstream_run}'))
+                  status=current.get('status')
+                  conclusion=current.get('conclusion')
+                  current_sha=current.get('head_sha')
+                  print(f'run {downstream_run}: status={status} conclusion={conclusion} head_sha={current_sha}')
+                  if current_sha and current_sha != target_sha:
+                      recovery(e['stage'],wf,downstream_run)
+                      raise RuntimeError(f'SHA_LINEAGE_FAILURE|stage={e["stage"]}|workflow={wf}|expected={target_sha}|actual={current_sha}')
+                  if status=='completed':
+                      if conclusion!='success':
+                          recovery(e['stage'],wf,downstream_run)
+                          raise RuntimeError(f'STAGE_FAILURE|stage={e["stage"]}|workflow={wf}|run_id={downstream_run}|conclusion={conclusion}|target_sha={target_sha}')
+                      print(f"Stage {e['stage']} completed successfully with TARGET_SHA={target_sha}.")
+                      break
+                  time.sleep(10)
+              else:
+                  recovery(e['stage'],wf,downstream_run)
+                  raise RuntimeError(f'STAGE_TIMEOUT|stage={e["stage"]}|workflow={wf}|run_id={downstream_run}|target_sha={target_sha}')
+
+          print('\nAll downstream dispatchable registry stages completed successfully.')
+          print(f'FINAL_TARGET_SHA={target_sha}')
+          PY
+        env:
+          DELAY_SECONDS: ${{ inputs.delay_seconds || '0' }}
+
+      - name: Create repair branch and recovery manifest
+        if: ${{ failure() && (inputs.mode == 'dispatch' || inputs.mode == 'repair') }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.target.outputs.TARGET_SHA }}
+        run: |
+          set -euo pipefail
+          branch="${REPAIR_BRANCH_PREFIX}-${GITHUB_RUN_ID}"
+          echo "Creating isolated repair branch: $branch at $TARGET_SHA"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+            gh api "repos/${GITHUB_REPOSITORY}/git/refs" --method POST --input - <<JSON
+          {"ref":"refs/heads/${branch}","sha":"${TARGET_SHA}"}
+          JSON
+          fi
+
+          mkdir -p evidence/generate
+          cat > evidence/generate/repair-manifest.md <<EOF
+          # Generate Repair Manifest
+
+          - Orchestrator run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          - Target commit: ${TARGET_SHA}
+          - Repair branch: ${branch}
+          - Failed stage: ${RECOVERY_STAGE:-unknown}
+          - Failed workflow: ${RECOVERY_WORKFLOW:-unknown}
+          - Failed downstream run: ${RECOVERY_RUN_ID:-unknown}
+          - Reason: downstream dispatch, SHA lineage, validation, or repair failure
+          - Main branch is not modified by recovery.
+
+          ## Recovery contract
+
+          1. Diagnose the failed stage from run evidence.
+          2. Apply fixes on this repair branch only.
+          3. Run preflight validation on this branch.
+          4. Open a PR to main after validation passes.
+          5. Resume from the failed stage; do not restart already-passed stages unless required.
+          6. Promote Skill Memory only after successful validation and merge.
+          EOF
+          cat evidence/generate/repair-manifest.md
+
+          echo "REPAIR_BRANCH=${branch}"
+          echo "TARGET_SHA=${TARGET_SHA}"
+          echo "Repair branch created/preserved. Main remains untouched."
+
+      - name: Emit safe result
+        shell: bash
+        run: |
+          echo "Generate Orchestrator connected to registry, Tool Registry, Skill Memory, exact-SHA identity, sequential dispatch, and branch-isolated recovery."
+          echo "TARGET_SHA=${TARGET_SHA}"
+          echo 'The orchestrator itself is never recursively dispatched.'
+          echo 'Main is never mutated directly by the repair path.'
