@@ -7,6 +7,7 @@ on:
       - main
       - fix/canonical-release-lineage-gate-current-main
       - fix/canonical-lineage-target-sha-hardening
+      - fix/canonical-lineage-runtime-expression-hardening
     paths:
       - ".github/workflows/research-os-windows-artifact.yml"
       - ".github/workflows/owner-special-friend.yml"
@@ -57,7 +58,10 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/research-os-windows-artifact.yml"
-          grep -qF 'ref: ${{ env.FRIEND_REF }}' "$workflow"
+
+          expected_friend_ref='$'
+          expected_friend_ref+='{{ env.FRIEND_REF }}'
+          grep -qF "ref: $expected_friend_ref" "$workflow"
           grep -qF 'rev-parse HEAD' "$workflow"
           grep -qF 'friendSha -ne $env:GITHUB_SHA' "$workflow"
           echo "CANONICAL_CHECKOUT_GATE=PASS"
@@ -68,11 +72,17 @@ jobs:
           set -euo pipefail
           workflow=".github/workflows/owner-special-friend.yml"
           test -f "$workflow"
-          grep -qF 'TARGET_SHA: ${{ inputs.target_sha || github.sha }}' "$workflow"
-          grep -qF 'ref: ${{ env.TARGET_SHA }}' "$workflow"
-          grep -qF 'owner-special-desktop-validated-${{ env.TARGET_SHA }}' "$workflow"
-          grep -qF 'owner-special-setup-validated-${{ env.TARGET_SHA }}' "$workflow"
-          grep -qF 'owner-special-setup-${{ env.TARGET_SHA }}' "$workflow"
+
+          expected_target_sha='$'
+          expected_target_sha+='{{ inputs.target_sha || github.sha }}'
+          expected_target_ref='$'
+          expected_target_ref+='{{ env.TARGET_SHA }}'
+
+          grep -qF "TARGET_SHA: $expected_target_sha" "$workflow"
+          grep -qF "ref: $expected_target_ref" "$workflow"
+          grep -qF "owner-special-desktop-validated-$expected_target_ref" "$workflow"
+          grep -qF "owner-special-setup-validated-$expected_target_ref" "$workflow"
+          grep -qF "owner-special-setup-$expected_target_ref" "$workflow"
           echo "OWNER_TARGET_SHA_CONTRACT=PASS"
 
       - name: Verify canonical Owner release control pipeline
@@ -81,9 +91,13 @@ jobs:
           set -euo pipefail
           workflow=".github/workflows/owner-special-friend.yml"
           test -f "$workflow"
+
+          expected_target_ref='$'
+          expected_target_ref+='{{ env.TARGET_SHA }}'
+
           grep -qF 'owner-bundle:' "$workflow"
           grep -qF 'python owner_special/scripts/build_bundle.py' "$workflow"
-          grep -qF 'owner-special-setup-${{ env.TARGET_SHA }}' "$workflow"
+          grep -qF "owner-special-setup-$expected_target_ref" "$workflow"
           echo "OWNER_RELEASE_CONTROL_GATE=PASS"
 
       - name: Verify final bundle is bound to the canonical source and validated installer
