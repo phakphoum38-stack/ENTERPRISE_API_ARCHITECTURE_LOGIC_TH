@@ -13,12 +13,19 @@ on:
       - 'v3/research_os_v3/**'
       - '.github/workflows/owner-special-friend.yml'
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to validate
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TARGET_SHA: ${{ inputs.target_sha || github.sha }}
 
 jobs:
   friend-complete:
@@ -29,6 +36,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_SHA }}
       - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - name: Compile Owner and V3 Python sources
@@ -61,6 +70,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_SHA }}
       - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - uses: subosito/flutter-action@v2
@@ -138,7 +149,7 @@ jobs:
       - name: Upload validated Owner desktop
         uses: actions/upload-artifact@v6
         with:
-          name: owner-special-desktop-validated-${{ github.sha }}
+          name: owner-special-desktop-validated-${{ env.TARGET_SHA }}
           path: owner_special/flutter_app/build/windows/x64/runner/Release/**
           if-no-files-found: error
           retention-days: 30
@@ -149,13 +160,15 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_SHA }}
       - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - uses: actions/setup-dotnet@v5
         with: {dotnet-version: '8.0.x'}
       - uses: actions/download-artifact@v7
         with:
-          name: owner-special-desktop-validated-${{ github.sha }}
+          name: owner-special-desktop-validated-${{ env.TARGET_SHA }}
           path: owner_special/installer/desktop
       - name: Publish Owner ServiceHost
         shell: pwsh
@@ -207,7 +220,7 @@ jobs:
       - name: Upload validated Owner Setup.exe and evidence
         uses: actions/upload-artifact@v6
         with:
-          name: owner-special-setup-validated-${{ github.sha }}
+          name: owner-special-setup-validated-${{ env.TARGET_SHA }}
           path: |
             owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
             owner_special/installer/output/owner-v1.3-validation.json
@@ -220,11 +233,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_SHA }}
       - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - uses: actions/download-artifact@v7
         with:
-          name: owner-special-setup-validated-${{ github.sha }}
+          name: owner-special-setup-validated-${{ env.TARGET_SHA }}
           path: owner_special/installer/output
       - name: Verify Setup.exe
         shell: pwsh
@@ -244,7 +259,7 @@ jobs:
       - name: Upload validated Setup.exe and evidence
         uses: actions/upload-artifact@v6
         with:
-          name: owner-special-setup-${{ github.sha }}
+          name: owner-special-setup-${{ env.TARGET_SHA }}
           path: |
             owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
             owner_special/installer/output/owner-v1.3-validation.json
@@ -257,11 +272,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_SHA }}
       - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - uses: actions/download-artifact@v7
         with:
-          name: owner-special-setup-${{ github.sha }}
+          name: owner-special-setup-${{ env.TARGET_SHA }}
           path: owner_special/dist/validated-installer
       - name: Build Owner Friend Complete source bundle
         shell: bash
@@ -320,7 +337,7 @@ jobs:
       - name: Upload final Owner Special release
         uses: actions/upload-artifact@v6
         with:
-          name: owner-special-friend-complete-${{ github.sha }}
+          name: owner-special-friend-complete-${{ env.TARGET_SHA }}
           path: |
             owner_special/dist/Research-OS-Owner-Special-Complete-Release.zip
             owner_special/dist/RELEASE_SHA256.txt

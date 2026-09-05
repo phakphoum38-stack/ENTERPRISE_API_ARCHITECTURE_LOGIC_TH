@@ -16,6 +16,7 @@ enum _VoiceState { idle, listening, thinking, speaking, error }
 
 class _VoiceConversationPageState extends State<VoiceConversationPage> {
   final VoiceConversationController _voice = VoiceConversationController();
+  final TextEditingController _textController = TextEditingController();
   final List<_VoiceTurn> _turns = <_VoiceTurn>[];
 
   _VoiceState _state = _VoiceState.idle;
@@ -27,7 +28,70 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
   @override
   void dispose() {
     _voice.dispose();
+    _textController.dispose();
     super.dispose();
+  }
+
+  Future<Map<String, dynamic>> _answer(String prompt) {
+    return _useMemory
+        ? widget.apiClient.answerWithMemory(prompt)
+        : widget.apiClient.generateText(prompt);
+  }
+
+  Future<void> _sendText() async {
+    if (_state == _VoiceState.thinking || _state == _VoiceState.speaking) {
+      return;
+    }
+    final prompt = _textController.text.trim();
+    if (prompt.isEmpty) return;
+
+    _textController.clear();
+    await _submitPrompt(prompt, speakAnswer: false);
+  }
+
+  Future<void> _submitPrompt(
+    String prompt, {
+    required bool speakAnswer,
+  }) async {
+    setState(() {
+      _turns.add(_VoiceTurn(role: 'user', text: prompt));
+      _transcript = '';
+      _state = _VoiceState.thinking;
+      _error = null;
+    });
+
+    try {
+      final response = await _answer(prompt);
+      final answer =
+          (response['text'] ?? response['answer'] ?? '').toString().trim();
+      final spoken =
+          answer.isEmpty ? 'ขอโทษครับ ผมไม่ได้รับคำตอบจากระบบ' : answer;
+      final memoryHits = response['memory_hits'];
+      if (!mounted) return;
+      setState(() {
+        _turns.add(
+          _VoiceTurn(
+            role: 'assistant',
+            text: spoken,
+            memoryCount: memoryHits is List ? memoryHits.length : null,
+          ),
+        );
+        _state = speakAnswer ? _VoiceState.speaking : _VoiceState.idle;
+      });
+
+      if (speakAnswer) {
+        await _voice.speak(spoken);
+        if (mounted && !_voice.isSpeaking) {
+          setState(() => _state = _VoiceState.idle);
+        }
+      }
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _state = _VoiceState.error;
+        _error = error.toString();
+      });
+    }
   }
 
   Future<bool> _ensureVoiceReady() async {
@@ -123,46 +187,7 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
     await _voice.stopListening();
     final prompt = text.trim();
     if (prompt.isEmpty) return;
-
-    setState(() {
-      _turns.add(_VoiceTurn(role: 'user', text: prompt));
-      _transcript = '';
-      _state = _VoiceState.thinking;
-      _error = null;
-    });
-
-    try {
-      final response = _useMemory
-          ? await widget.apiClient.answerWithMemory(prompt)
-          : await widget.apiClient.generateText(prompt);
-      final answer =
-          (response['text'] ?? response['answer'] ?? '').toString().trim();
-      final spoken = answer.isEmpty
-          ? 'ขอโทษครับ ผมไม่ได้รับคำตอบจากระบบ'
-          : answer;
-      final memoryHits = response['memory_hits'];
-      if (!mounted) return;
-      setState(() {
-        _turns.add(
-          _VoiceTurn(
-            role: 'assistant',
-            text: spoken,
-            memoryCount: memoryHits is List ? memoryHits.length : null,
-          ),
-        );
-        _state = _VoiceState.speaking;
-      });
-      await _voice.speak(spoken);
-      if (mounted && !_voice.isSpeaking) {
-        setState(() => _state = _VoiceState.idle);
-      }
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _state = _VoiceState.error;
-        _error = error.toString();
-      });
-    }
+    await _submitPrompt(prompt, speakAnswer: true);
   }
 
   String get _stateLabel => switch (_state) {
@@ -194,7 +219,7 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                         Text('สนทนา AI',
                             style: Theme.of(context).textTheme.headlineSmall),
                         const SizedBox(height: 4),
-                        Text('Voice Conversation • Friend AI • Local-first'),
+                        const Text('Friend AI • Text + Voice • Local-first'),
                       ],
                     ),
                   ),
@@ -224,17 +249,19 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                 child: _turns.isEmpty
                                     ? Center(
                                         child: ConstrainedBox(
-                                          constraints:
-                                              const BoxConstraints(maxWidth: 560),
+                                          constraints: const BoxConstraints(
+                                              maxWidth: 560),
                                           child: Column(
                                             mainAxisSize: MainAxisSize.min,
                                             children: <Widget>[
-                                              Icon(Icons.graphic_eq,
+                                              Icon(Icons.auto_awesome,
                                                   size: 72,
                                                   color: scheme.primary),
                                               const SizedBox(height: 20),
                                               Text(
-                                                'พูดกับ Research OS ได้เลย',
+                                                key: Key(
+                                                    'voice-conversation-empty-state-title'),
+                                                'คุยกับ Research OS Friend ได้เลย',
                                                 textAlign: TextAlign.center,
                                                 style: Theme.of(context)
                                                     .textTheme
@@ -242,7 +269,9 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                               ),
                                               const SizedBox(height: 10),
                                               const Text(
-                                                'เสียงของคุณจะถูกแปลงเป็นข้อความ ส่งให้ Friend AI แล้วอ่านคำตอบกลับด้วยเสียงที่เป็นธรรมชาติและมีพลัง',
+                                                key: Key(
+                                                    'voice-conversation-empty-state-description'),
+                                                'พิมพ์ข้อความหรือกดไมโครโฟนเพื่อคุยด้วยเสียง ระบบจะส่งให้ Friend AI และแสดงคำตอบในห้องสนทนา',
                                                 textAlign: TextAlign.center,
                                               ),
                                             ],
@@ -280,14 +309,15 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                                   Text(
                                                     isUser
                                                         ? 'คุณ'
-                                                        : 'Research OS AI',
+                                                        : 'Friend AI',
                                                     style: Theme.of(context)
                                                         .textTheme
                                                         .labelLarge,
                                                   ),
                                                   const SizedBox(height: 6),
                                                   Text(turn.text),
-                                                  if (turn.memoryCount != null) ...<Widget>[
+                                                  if (turn.memoryCount !=
+                                                      null) ...<Widget>[
                                                     const SizedBox(height: 8),
                                                     Text(
                                                       'Memory ${turn.memoryCount} รายการ',
@@ -303,15 +333,16 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                         },
                                       ),
                               ),
-                              if (_transcript.isNotEmpty)
+                              if (_transcript.isNotEmpty) ...<Widget>[
+                                const SizedBox(height: 10),
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: scheme.primary
-                                          .withValues(alpha: .28),
+                                      color:
+                                          scheme.primary.withValues(alpha: .28),
                                     ),
                                   ),
                                   child: Row(
@@ -323,6 +354,14 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                     ],
                                   ),
                                 ),
+                              ],
+                              const SizedBox(height: 12),
+                              _TextComposer(
+                                controller: _textController,
+                                enabled: _state != _VoiceState.thinking &&
+                                    _state != _VoiceState.speaking,
+                                onSend: _sendText,
+                              ),
                             ],
                           ),
                         ),
@@ -340,20 +379,19 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                               _VoiceOrb(active: active, state: _state),
                               const SizedBox(height: 22),
                               Text(_stateLabel,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge,
+                                  style: Theme.of(context).textTheme.titleLarge,
                                   textAlign: TextAlign.center),
                               const SizedBox(height: 8),
                               Text(
                                 _state == _VoiceState.error
                                     ? 'ตรวจสอบสิทธิ์ไมโครโฟนและ speech service'
-                                    : 'พูดสั้น ๆ แล้วหยุด ระบบจะส่งข้อความและอ่านคำตอบกลับให้อัตโนมัติ',
+                                    : 'พิมพ์ได้ทันที หรือพูดสั้น ๆ แล้วหยุดเพื่อให้ระบบตอบกลับด้วยเสียง',
                                 textAlign: TextAlign.center,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                               const SizedBox(height: 24),
                               IconButton.filled(
+                                key: const Key('voice-conversation-mic-button'),
                                 iconSize: 32,
                                 padding: const EdgeInsets.all(18),
                                 tooltip: _state == _VoiceState.listening
@@ -393,6 +431,44 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TextComposer extends StatelessWidget {
+  const _TextComposer({
+    required this.controller,
+    required this.enabled,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: const Key('research-os-text-composer'),
+      controller: controller,
+      enabled: enabled,
+      minLines: 1,
+      maxLines: 5,
+      textInputAction: TextInputAction.newline,
+      onSubmitted: (_) => onSend(),
+      decoration: InputDecoration(
+        hintText: 'พิมพ์ข้อความถึง Friend AI…',
+        prefixIcon: const Icon(Icons.chat_bubble_outline),
+        suffixIcon: IconButton(
+          key: const Key('research-os-text-send'),
+          tooltip: 'ส่งข้อความ',
+          onPressed: enabled ? onSend : null,
+          icon: const Icon(Icons.send_rounded),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
         ),
       ),
     );

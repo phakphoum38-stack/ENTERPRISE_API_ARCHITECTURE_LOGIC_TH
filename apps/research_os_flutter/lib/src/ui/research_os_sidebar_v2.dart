@@ -108,7 +108,8 @@ class ResearchOSSidebarV2 extends StatelessWidget {
                   right: 1,
                   child: IconButton(
                     key: const Key('toggle-desktop-sidebar-v2'),
-                    constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+                    constraints:
+                        const BoxConstraints.tightFor(width: 30, height: 30),
                     padding: EdgeInsets.zero,
                     tooltip: 'ขยาย Sidebar',
                     onPressed: onToggle,
@@ -133,8 +134,10 @@ class ResearchOSSidebarV2 extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text('Research OS', style: TextStyle(fontWeight: FontWeight.w800)),
-                      Text('AI Operating Workspace', style: TextStyle(fontSize: 10.5)),
+                      Text('Research OS',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      Text('AI Operating Workspace',
+                          style: TextStyle(fontSize: 10.5)),
                     ],
                   ),
                 ),
@@ -170,7 +173,8 @@ class ResearchOSSidebarV2 extends StatelessWidget {
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      Icon(Icons.shield_outlined, size: 17, color: scheme.primary),
+                      Icon(Icons.shield_outlined,
+                          size: 17, color: scheme.primary),
                       const SizedBox(width: 8),
                       const Flexible(
                         child: Text(
@@ -182,7 +186,8 @@ class ResearchOSSidebarV2 extends StatelessWidget {
                       ),
                     ],
                   )
-                : Icon(Icons.shield_outlined, size: 17, color: scheme.primary),
+                : Icon(Icons.shield_outlined,
+                    size: 17, color: scheme.primary),
           ),
         );
       },
@@ -199,14 +204,18 @@ class ResearchOSSidebarV2 extends StatelessWidget {
       _Entry('friend-connect', 'Friend Connect', Icons.support_agent_outlined, 13),
       _Entry('images', 'Images', Icons.image_outlined, 1, available: false),
       _Entry('library', 'Library', Icons.local_library_outlined, 3),
-      _Entry('scheduled', 'Scheduled', Icons.schedule_outlined, 1, available: false),
-      _Entry('plugins', 'Plugins', Icons.extension_outlined, 1, available: false),
-      _Entry('projects', 'Projects', Icons.folder_outlined, 1, available: false),
+      _Entry('scheduled', 'Scheduled', Icons.schedule_outlined, 1,
+          available: false),
+      _Entry('plugins', 'Plugins', Icons.extension_outlined, 1,
+          available: false),
+      _Entry('projects', 'Projects', Icons.folder_outlined, 1,
+          available: false),
     ];
     const account = <_Entry>[
-      _Entry('pinned', 'Pinned', Icons.push_pin_outlined, 1, available: false),
+      _Entry('pinned', 'Pinned', Icons.push_pin_outlined, 1,
+          available: false),
       _Entry('recents', 'Recents', Icons.history_outlined, 1),
-      _Entry('account', 'Account', Icons.account_circle_outlined, 12),
+      _Entry('account', 'Google Identity', Icons.account_circle_outlined, 12),
       _Entry('settings', 'Settings', Icons.settings_outlined, 9),
     ];
 
@@ -230,7 +239,15 @@ class ResearchOSSidebarV2 extends StatelessWidget {
                 _section(context, 'Workspace'),
                 for (final entry in workspace) _destination(context, entry),
                 _section(context, 'More'),
-                _destination(context, const _Entry('more', 'More', Icons.more_horiz_outlined, 2)),
+                _destination(
+                  context,
+                  const _Entry(
+                    'more',
+                    'More',
+                    Icons.more_horiz_outlined,
+                    2,
+                  ),
+                ),
                 _section(context, 'Account'),
                 for (final entry in account) _destination(context, entry),
               ],
@@ -244,7 +261,8 @@ class ResearchOSSidebarV2 extends StatelessWidget {
 }
 
 class _Entry {
-  const _Entry(this.keyName, this.label, this.icon, this.index, {this.available = true});
+  const _Entry(this.keyName, this.label, this.icon, this.index,
+      {this.available = true});
 
   final String keyName;
   final String label;
@@ -266,7 +284,12 @@ class _ResearchMark extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: <Color>[scheme.primaryContainer, scheme.secondaryContainer]),
+        gradient: LinearGradient(
+          colors: <Color>[
+            scheme.primaryContainer,
+            scheme.secondaryContainer,
+          ],
+        ),
         borderRadius: BorderRadius.circular(size * .33),
       ),
       child: Text(
