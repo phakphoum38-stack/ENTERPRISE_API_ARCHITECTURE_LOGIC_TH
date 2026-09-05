@@ -64,6 +64,16 @@ def install_builtin_skills(registry: SkillRegistry) -> SkillRegistry:
         ("memory", "context", "Use owner-scoped context without cross-profile leakage."),
         ("security", "assurance", "Apply permission, secret, and isolation boundaries."),
         ("quality", "assurance", "Validate outputs with tests and evidence."),
+        (
+            "codex",
+            "software-agent",
+            "Work with Codex-style software engineering workflows: inspect a workspace, plan changes, edit code, run tests, review diffs, and prepare commits without exposing secrets.",
+        ),
+        (
+            "vscode",
+            "developer-tools",
+            "Work with VS Code projects: understand workspace structure, settings, tasks, launch configurations, extensions, terminals, diagnostics, and reproducible developer workflows.",
+        ),
     )
     for name, domain, description in definitions:
         registry.register(Skill(name, domain, description, _tag(name)))
