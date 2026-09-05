@@ -22,6 +22,9 @@ concurrency:
   group: research-os-flutter-app-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  APP_EXE_NAME: research_os_flutter.exe
+
 jobs:
   flutter-app:
     name: Flutter analyze test Windows build
@@ -37,10 +40,24 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Windows runner
+      - name: Canonical Windows source gate
         working-directory: apps/research_os_flutter
         shell: pwsh
-        run: flutter create --platforms=windows --project-name=research_os_flutter .
+        run: |
+          $required = @(
+            'windows/CMakeLists.txt',
+            'windows/runner/CMakeLists.txt',
+            'windows/runner/main.cpp',
+            'windows/runner/Runner.rc'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path -PathType Leaf)) {
+              throw "Canonical Research OS Windows source missing: $path"
+            }
+          }
+          $runner = Get-Content 'windows/runner/Runner.rc' -Raw
+          if ($runner -match 'research_os_owner_special') { throw 'Owner Special identity leaked into Research OS Runner.rc' }
+          Write-Host 'CANONICAL_WINDOWS_SOURCE_GATE=PASS'
 
       - name: Flutter dependencies
         working-directory: apps/research_os_flutter
@@ -60,4 +77,14 @@ jobs:
       - name: Windows release build
         working-directory: apps/research_os_flutter
         shell: pwsh
-        run: flutter build windows --release
+        run: |
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows build failed' }
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'apps/research_os_flutter/build/windows/x64/runner/Release/research_os_flutter.exe'
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "Expected Research OS EXE missing: $exe" }
+          $info = (Get-Item $exe).VersionInfo
+          if ($info.InternalName -eq 'research_os_owner_special' -or $info.OriginalFilename -eq 'research_os_owner_special.exe') {
+            throw 'Owner Special EXE identity leaked into Research OS build'
+          }
+          Write-Host "RESEARCH_OS_EXE=$exe"
+          Write-Host 'RESEARCH_OS_BUILD_IDENTITY_GATE=PASS'
