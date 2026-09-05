@@ -99,13 +99,11 @@ jobs:
               python - "$issue" "evidence/generate/issue-$issue.json" <<'PY'
           import json, sys
           issue=sys.argv[1]
-          path=sys.argv[2]
-          data=json.load(open(path, encoding='utf-8'))
+          data=json.load(open(sys.argv[2], encoding='utf-8'))
           print(f"#{issue}: {data.get('state')} | {data.get('title')}")
           PY
             else
               echo "#${issue}: NOT_FOUND_OR_NOT_ACCESSIBLE"
-              echo "Issue is optional reference only; continuing."
             fi
           done
 
@@ -148,8 +146,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import pathlib
-          import yaml
+          import pathlib, yaml
           errors=[]
           for p in sorted(pathlib.Path('.github/workflows').glob('*.*ml')):
               try:
@@ -189,23 +186,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ steps.target.outputs.TARGET_SHA }}
-          SOURCE_REF: ${{ github.ref_name }}
+          DELAY_SECONDS: ${{ inputs.delay_seconds || '0' }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
-          import os
-          import pathlib
-          import subprocess
-          import time
-          import urllib.parse
-          import yaml
+          import json, os, pathlib, subprocess, time, urllib.parse, yaml
 
           target_sha=os.environ['TARGET_SHA']
           repo=os.environ['GITHUB_REPOSITORY']
           run_id=os.environ['GITHUB_RUN_ID']
           target_ref=f"generate-target-{run_id}"
-
           data=yaml.safe_load(pathlib.Path('current/GENERATE_WORKFLOW_REGISTRY.yml').read_text(encoding='utf-8')) or {}
           entries=[]
           for e in data.get('stages') or []:
@@ -229,9 +219,7 @@ jobs:
               env_file=os.environ.get('GITHUB_ENV')
               if env_file:
                   with open(env_file,'a',encoding='utf-8') as f:
-                      f.write(f'RECOVERY_STAGE={stage}\n')
-                      f.write(f'RECOVERY_WORKFLOW={workflow}\n')
-                      f.write(f'RECOVERY_RUN_ID={downstream_run}\n')
+                      f.write(f'RECOVERY_STAGE={stage}\nRECOVERY_WORKFLOW={workflow}\nRECOVERY_RUN_ID={downstream_run}\n')
 
           print(f'TARGET_SHA={target_sha}')
           print(f'TARGET_REF={target_ref}')
@@ -239,9 +227,6 @@ jobs:
           for e in entries:
               print(f"  stage {e['stage']}: {e['file']}")
 
-          # Create an immutable run-scoped branch at the resolved SHA. Downstream
-          # workflows that do not yet expose target_sha still receive the exact
-          # source through this immutable ref; compatible workflows also receive it.
           api(f'repos/{repo}/git/refs','POST',{'ref':f'refs/heads/{target_ref}','sha':target_sha})
 
           for e in entries:
@@ -251,8 +236,7 @@ jobs:
               inputs={'target_sha':target_sha}
               if wf == 'v3.5-pr-integrity.yml':
                   inputs['expected_sha']=target_sha
-                  inputs['delay_seconds']=os.environ.get('DELAY_SECONDS','0')
-
+                  inputs['delay_seconds']=os.environ['DELAY_SECONDS']
               print(f"\n=== DISPATCH stage {e['stage']}: {wf} ===")
               api(f'repos/{repo}/actions/workflows/{encoded}/dispatches','POST',{'ref':target_ref,'inputs':inputs})
 
@@ -265,17 +249,15 @@ jobs:
                       run=max(candidates,key=lambda r:r['id'])
                       break
                   time.sleep(3)
-
               if not run:
                   recovery(e['stage'],wf,'')
                   raise RuntimeError(f'STAGE_DISCOVERY_FAILURE|stage={e["stage"]}|workflow={wf}|target_sha={target_sha}')
 
-              downstream_sha=run.get('head_sha','')
-              if downstream_sha != target_sha:
-                  recovery(e['stage'],wf,str(run['id']))
-                  raise RuntimeError(f'SHA_LINEAGE_FAILURE|stage={e["stage"]}|workflow={wf}|expected={target_sha}|actual={downstream_sha}')
-
               downstream_run=str(run['id'])
+              if run.get('head_sha') != target_sha:
+                  recovery(e['stage'],wf,downstream_run)
+                  raise RuntimeError(f'SHA_LINEAGE_FAILURE|stage={e["stage"]}|workflow={wf}|expected={target_sha}|actual={run.get("head_sha")}')
+
               print(f"Dispatched run {downstream_run}: {run.get('html_url','')}")
               while time.time()<deadline:
                   current=json.loads(api(f'repos/{repo}/actions/runs/{downstream_run}'))
@@ -297,11 +279,9 @@ jobs:
                   recovery(e['stage'],wf,downstream_run)
                   raise RuntimeError(f'STAGE_TIMEOUT|stage={e["stage"]}|workflow={wf}|run_id={downstream_run}|target_sha={target_sha}')
 
-          print('\nAll downstream dispatchable registry stages completed successfully.')
+          print('All downstream dispatchable registry stages completed successfully.')
           print(f'FINAL_TARGET_SHA={target_sha}')
           PY
-        env:
-          DELAY_SECONDS: ${{ inputs.delay_seconds || '0' }}
 
       - name: Create repair branch and recovery manifest
         if: ${{ failure() && (inputs.mode == 'dispatch' || inputs.mode == 'repair') }}
@@ -318,7 +298,6 @@ jobs:
           {"ref":"refs/heads/${branch}","sha":"${TARGET_SHA}"}
           JSON
           fi
-
           mkdir -p evidence/generate
           cat > evidence/generate/repair-manifest.md <<EOF
           # Generate Repair Manifest
@@ -329,23 +308,19 @@ jobs:
           - Failed stage: ${RECOVERY_STAGE:-unknown}
           - Failed workflow: ${RECOVERY_WORKFLOW:-unknown}
           - Failed downstream run: ${RECOVERY_RUN_ID:-unknown}
-          - Reason: downstream dispatch, SHA lineage, validation, or repair failure
           - Main branch is not modified by recovery.
 
           ## Recovery contract
-
           1. Diagnose the failed stage from run evidence.
           2. Apply fixes on this repair branch only.
           3. Run preflight validation on this branch.
           4. Open a PR to main after validation passes.
-          5. Resume from the failed stage; do not restart already-passed stages unless required.
+          5. Resume from the failed stage.
           6. Promote Skill Memory only after successful validation and merge.
           EOF
           cat evidence/generate/repair-manifest.md
-
           echo "REPAIR_BRANCH=${branch}"
           echo "TARGET_SHA=${TARGET_SHA}"
-          echo "Repair branch created/preserved. Main remains untouched."
 
       - name: Emit safe result
         shell: bash
