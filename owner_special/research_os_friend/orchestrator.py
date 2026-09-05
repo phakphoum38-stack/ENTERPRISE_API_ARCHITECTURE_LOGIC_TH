@@ -27,10 +27,21 @@ class FriendOrchestrator:
         self.policy = policy
         self.evidence = evidence
 
+    def _route_tools(self, request: FriendRequest) -> tuple[str, ...]:
+        """Infer safe built-in tools only when the caller did not select tools explicitly."""
+        if request.requested_tools:
+            return request.requested_tools
+        text = request.text.lower()
+        github_markers = ("github", "repository", "repo", "pull request", "workflow", "artifact")
+        if any(marker in text for marker in github_markers) and "github.repository_status" in self.tools.names():
+            return ("github.repository_status",)
+        return ()
+
     def handle(self, request: FriendRequest) -> FriendResponse:
         self.policy.authorize_request(self.owner, request)
         selected_skills = self.skills.resolve(request.requested_skills)
-        selected_tools = self.tools.resolve(request.requested_tools)
+        selected_tool_names = self._route_tools(request)
+        selected_tools = self.tools.resolve(selected_tool_names)
         for tool in selected_tools:
             self.policy.authorize_tool(self.owner, request, tool.name)
         context = FriendContext.build(self.owner, request, self.memory)
