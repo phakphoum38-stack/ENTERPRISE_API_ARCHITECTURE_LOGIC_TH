@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import '../lib/src/api/research_os_api_client.dart';
-import '../lib/src/features/api_live/api_live_demo_page.dart';
+import 'package:research_os_flutter/src/api/research_os_api_client.dart';
+import 'package:research_os_flutter/src/features/api_live/api_live_demo_page.dart';
 
 class _ApiSpyClient extends http.BaseClient {
   String? method;
