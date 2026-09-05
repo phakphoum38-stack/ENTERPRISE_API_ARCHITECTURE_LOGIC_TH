@@ -64,9 +64,8 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
       final response = await _answer(prompt);
       final answer =
           (response['text'] ?? response['answer'] ?? '').toString().trim();
-      final spoken = answer.isEmpty
-          ? 'ขอโทษครับ ผมไม่ได้รับคำตอบจากระบบ'
-          : answer;
+      final spoken =
+          answer.isEmpty ? 'ขอโทษครับ ผมไม่ได้รับคำตอบจากระบบ' : answer;
       final memoryHits = response['memory_hits'];
       if (!mounted) return;
       setState(() {
@@ -250,8 +249,8 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                 child: _turns.isEmpty
                                     ? Center(
                                         child: ConstrainedBox(
-                                          constraints:
-                                              const BoxConstraints(maxWidth: 560),
+                                          constraints: const BoxConstraints(
+                                              maxWidth: 560),
                                           child: Column(
                                             mainAxisSize: MainAxisSize.min,
                                             children: <Widget>[
@@ -260,6 +259,8 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                                   color: scheme.primary),
                                               const SizedBox(height: 20),
                                               Text(
+                                                key: Key(
+                                                    'voice-conversation-empty-state-title'),
                                                 'คุยกับ Research OS Friend ได้เลย',
                                                 textAlign: TextAlign.center,
                                                 style: Theme.of(context)
@@ -268,6 +269,8 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                               ),
                                               const SizedBox(height: 10),
                                               const Text(
+                                                key: Key(
+                                                    'voice-conversation-empty-state-description'),
                                                 'พิมพ์ข้อความหรือกดไมโครโฟนเพื่อคุยด้วยเสียง ระบบจะส่งให้ Friend AI และแสดงคำตอบในห้องสนทนา',
                                                 textAlign: TextAlign.center,
                                               ),
@@ -304,14 +307,17 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                                     CrossAxisAlignment.start,
                                                 children: <Widget>[
                                                   Text(
-                                                    isUser ? 'คุณ' : 'Friend AI',
+                                                    isUser
+                                                        ? 'คุณ'
+                                                        : 'Friend AI',
                                                     style: Theme.of(context)
                                                         .textTheme
                                                         .labelLarge,
                                                   ),
                                                   const SizedBox(height: 6),
                                                   Text(turn.text),
-                                                  if (turn.memoryCount != null) ...<Widget>[
+                                                  if (turn.memoryCount !=
+                                                      null) ...<Widget>[
                                                     const SizedBox(height: 8),
                                                     Text(
                                                       'Memory ${turn.memoryCount} รายการ',
@@ -335,8 +341,8 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: scheme.primary
-                                          .withValues(alpha: .28),
+                                      color:
+                                          scheme.primary.withValues(alpha: .28),
                                     ),
                                   ),
                                   child: Row(
@@ -373,9 +379,7 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                               _VoiceOrb(active: active, state: _state),
                               const SizedBox(height: 22),
                               Text(_stateLabel,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge,
+                                  style: Theme.of(context).textTheme.titleLarge,
                                   textAlign: TextAlign.center),
                               const SizedBox(height: 8),
                               Text(
@@ -387,6 +391,7 @@ class _VoiceConversationPageState extends State<VoiceConversationPage> {
                               ),
                               const SizedBox(height: 24),
                               IconButton.filled(
+                                key: const Key('voice-conversation-mic-button'),
                                 iconSize: 32,
                                 padding: const EdgeInsets.all(18),
                                 tooltip: _state == _VoiceState.listening
