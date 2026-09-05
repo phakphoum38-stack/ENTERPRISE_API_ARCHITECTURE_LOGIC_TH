@@ -28,14 +28,22 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Windows runner if needed
+      - name: Canonical Windows source gate
         working-directory: v3/flutter_app
         shell: pwsh
         run: |
           flutter config --enable-windows-desktop
-          if (-not (Test-Path "windows")) {
-            flutter create --platforms=windows --project-name research_os_v3_flutter .
+          $required = @(
+            'windows/CMakeLists.txt',
+            'windows/runner/CMakeLists.txt',
+            'windows/runner/main.cpp'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path -PathType Leaf)) {
+              throw "Canonical V3 Windows source missing: $path"
+            }
           }
+          Write-Host 'CANONICAL_V3_WINDOWS_SOURCE_GATE=PASS'
 
       - name: Install dependencies
         working-directory: v3/flutter_app
