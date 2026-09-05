@@ -72,70 +72,52 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
 
-      // Desktop shell
+      // Desktop shell.
       expect(
-        find.byKey(
-          const Key('research-os-sidebar-v2'),
-        ),
+        find.byKey(const Key('research-os-sidebar-v2')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('desktop-content-pane')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('desktop-status-bar')),
         findsOneWidget,
       );
 
+      // Sidebar navigation.
       expect(
-        find.byKey(
-          const Key('desktop-content-pane'),
-        ),
+        find.byKey(const Key('v2-nav-search')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('v2-nav-conversation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('v2-nav-friend-connect')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('v2-nav-settings')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('v2-nav-account')),
         findsOneWidget,
       );
 
-      expect(
-        find.byKey(
-          const Key('desktop-status-bar'),
-        ),
-        findsOneWidget,
-      );
-
-      // Sidebar navigation
-      expect(
-        find.byKey(
-          const Key('v2-nav-search'),
-        ),
-        findsOneWidget,
-      );
-
-      expect(
-        find.byKey(
-          const Key('v2-nav-conversation'),
-        ),
-        findsOneWidget,
-      );
-
-      expect(
-        find.byKey(
-          const Key('v2-nav-settings'),
-        ),
-        findsOneWidget,
-      );
-
-      expect(
-        find.byKey(
-          const Key('v2-nav-account'),
-        ),
-        findsOneWidget,
-      );
-
-      // Initial compact state
+      // Initial compact state.
       final sidebar = find.byKey(
         const Key('research-os-sidebar-v2'),
       );
 
       final compactWidth = tester.getSize(sidebar).width;
 
-      expect(
-        compactWidth,
-        76,
-      );
+      expect(compactWidth, 76);
 
-      // Expand sidebar
+      // Expand sidebar.
       await tester.tap(
         find.byKey(
           const Key('toggle-desktop-sidebar-v2'),
@@ -149,48 +131,46 @@ void main() {
 
       final expandedWidth = tester.getSize(sidebar).width;
 
-      expect(
-        expandedWidth,
-        264,
+      expect(expandedWidth, 264);
+      expect(expandedWidth, greaterThan(compactWidth));
+
+      // Expanded sidebar labels.
+      expect(find.text('WORKSPACE'), findsOneWidget);
+      expect(find.text('ACCOUNT'), findsOneWidget);
+      expect(find.text('Search'), findsOneWidget);
+      expect(find.text('New chat'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('AI Operating Workspace'), findsOneWidget);
+      expect(find.text('Friend Connect'), findsAtLeastNWidgets(1));
+
+      // Friend Connect workspace.
+      await tester.tap(
+        find.byKey(
+          const Key('v2-nav-friend-connect'),
+        ),
       );
 
-      expect(
-        expandedWidth,
-        greaterThan(compactWidth),
+      await tester.pump();
+      await tester.pump(
+        const Duration(milliseconds: 250),
       );
 
-      // Expanded sidebar labels
+      expect(find.text('Friend Connect'), findsAtLeastNWidgets(1));
       expect(
-        find.text('WORKSPACE'),
+        find.text('Architecture Advisor'),
+        findsAtLeastNWidgets(1),
+      );
+      expect(find.text('Code Advisor'), findsOneWidget);
+      expect(find.text('Research Advisor'), findsOneWidget);
+      expect(find.text('Security Advisor'), findsOneWidget);
+      expect(find.text('System Advisor'), findsOneWidget);
+      expect(
+        find.byKey(const Key('friend-connect-send')),
         findsOneWidget,
       );
+      expect(find.text('พร้อมให้คำปรึกษา'), findsOneWidget);
 
-      expect(
-        find.text('ACCOUNT'),
-        findsOneWidget,
-      );
-
-      expect(
-        find.text('Search'),
-        findsOneWidget,
-      );
-
-      expect(
-        find.text('New chat'),
-        findsOneWidget,
-      );
-
-      expect(
-        find.text('Settings'),
-        findsOneWidget,
-      );
-
-      expect(
-        find.text('AI Operating Workspace'),
-        findsOneWidget,
-      );
-
-      // Open Conversation
+      // Open Conversation.
       await tester.tap(
         find.byKey(
           const Key('v2-nav-conversation'),
@@ -202,21 +182,19 @@ void main() {
         const Duration(milliseconds: 250),
       );
 
-      // Conversation contract
+      // Conversation contract.
       expect(
         find.byKey(
           const Key('voice-conversation-empty-state-title'),
         ),
         findsOneWidget,
       );
-
       expect(
         find.byKey(
           const Key('voice-conversation-empty-state-description'),
         ),
         findsOneWidget,
       );
-
       expect(
         find.byKey(
           const Key('voice-conversation-mic-button'),
@@ -224,7 +202,7 @@ void main() {
         findsOneWidget,
       );
 
-      // No Flutter exception
+      // No Flutter exception.
       expect(
         tester.takeException(),
         isNull,
