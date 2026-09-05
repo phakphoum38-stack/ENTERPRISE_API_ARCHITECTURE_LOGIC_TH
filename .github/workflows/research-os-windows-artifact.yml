@@ -18,51 +18,31 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FRIEND_REF: ${{ github.sha }}
+  APP_PROJECT_NAME: research_os_flutter
+  APP_EXE_NAME: research_os_flutter.exe
+  APP_PRODUCT_NAME: Research OS
+  APP_COMPANY_NAME: Research OS Team
 
 jobs:
   build:
-    name: Build branded Windows + complete Friend package + UI gate
+    name: Build canonical Research OS Windows artifact
     runs-on: windows-latest
-    timeout-minutes: 55
-
+    timeout-minutes: 45
     steps:
-      - name: Canonical Research OS + Friend lineage gate
-        shell: pwsh
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) { throw "GITHUB_SHA is missing." }
-          if ([string]::IsNullOrWhiteSpace($env:FRIEND_REF)) { throw "FRIEND_REF is missing." }
-          if ($env:FRIEND_REF -ne $env:GITHUB_SHA) {
-            Write-Host "CANONICAL_LINEAGE_GATE=FAIL"
-            Write-Host "Research OS SHA: $env:GITHUB_SHA"
-            Write-Host "Friend SHA: $env:FRIEND_REF"
-            throw "Friend source must use the exact canonical Research OS commit SHA."
-          }
-          Write-Host "CANONICAL_LINEAGE_GATE=PASS"
-          Write-Host "Canonical source SHA: $env:GITHUB_SHA"
-
-      - name: Checkout Research OS desktop
+      - name: Checkout Research OS desktop source
         uses: actions/checkout@v4
 
-      - name: Checkout exact Friend Complete source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.FRIEND_REF }}
-          path: friend_source
-
-      - name: Verify checked-out Friend source identity
+      - name: Assert this pipeline cannot build Owner Special
         shell: pwsh
         run: |
-          $friendSha = (git -C "$env:GITHUB_WORKSPACE\friend_source" rev-parse HEAD).Trim()
-          if ($friendSha -ne $env:GITHUB_SHA) {
-            Write-Host "CANONICAL_LINEAGE_GATE=FAIL"
-            Write-Host "Expected Friend SHA: $env:GITHUB_SHA"
-            Write-Host "Checked-out Friend SHA: $friendSha"
-            throw "Checked-out Friend source does not match canonical Research OS SHA."
+          $workflow = Get-Content "$env:GITHUB_WORKSPACE/.github/workflows/research-os-windows-artifact.yml" -Raw
+          if ($workflow -match 'owner_special/flutter_app|research_os_owner_special|Research-OS-Owner-Special-Setup') {
+            throw 'Research OS pipeline contains an Owner Special build/package path.'
           }
-          Write-Host "CANONICAL_LINEAGE_CHECKOUT=PASS"
-          Write-Host "Research OS SHA: $env:GITHUB_SHA"
-          Write-Host "Friend SHA: $friendSha"
+          if ($env:APP_PROJECT_NAME -eq 'research_os_owner_special' -or $env:APP_EXE_NAME -eq 'research_os_owner_special.exe') {
+            throw 'Research OS pipeline identity collided with Owner Special.'
+          }
+          Write-Host 'RESEARCH_OS_IDENTITY_ISOLATION_GATE=PASS'
 
       - uses: subosito/flutter-action@v2
         with:
@@ -73,353 +53,92 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Analyze and UI-test Research OS desktop
+      - name: Validate Research OS Flutter source
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: |
           flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS flutter pub get failed.' }
           flutter analyze
-          if ($LASTEXITCODE -ne 0) { throw "Research OS Flutter analyze failed." }
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Flutter analyze failed.' }
           flutter test
-          if ($LASTEXITCODE -ne 0) { throw "Research OS Flutter tests failed." }
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Flutter tests failed.' }
           flutter test test/desktop_shell_test.dart --reporter expanded
-          if ($LASTEXITCODE -ne 0) { throw "Research OS desktop shell UI test failed." }
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS desktop shell UI test failed.' }
 
-      - name: Build branded Research OS desktop
+      - name: Prepare canonical Research OS Windows project
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'windows/CMakeLists.txt')) { throw 'Canonical Research OS Windows project is missing.' }
+          if (-not (Test-Path 'windows/runner/main.cpp')) { throw 'Canonical Research OS Windows runner is missing.' }
+          if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Canonical Research OS Windows identity file is missing.' }
+          Write-Host 'RESEARCH_OS_CANONICAL_WINDOWS_SOURCE=PASS'
+
+      - name: Build canonical Research OS Windows release
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: |
           flutter config --enable-windows-desktop
-          if (-not (Test-Path "windows")) {
-            Write-Host "Generating runner-only Windows scaffold."
-            flutter create --platforms=windows --project-name research_os_flutter .
-          }
-
-          python -m pip install --disable-pip-version-check --quiet pillow
-          @'
-          from pathlib import Path
-          from PIL import Image
-
-          source = Path("assets/branding/research_os_master.webp")
-          target = Path("windows/runner/resources/app_icon.ico")
-          if not source.exists():
-              raise SystemExit(f"Missing Research OS master artwork: {source}")
-          image = Image.open(source).convert("RGBA")
-          side = max(image.size)
-          square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-          square.alpha_composite(image, ((side - image.width) // 2, (side - image.height) // 2))
-          target.parent.mkdir(parents=True, exist_ok=True)
-          square.save(target, format="ICO", sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])
-          print(f"WINDOWS_ICON={target}")
-          '@ | Set-Content -Path "$env:RUNNER_TEMP\make_research_os_icon.py" -Encoding utf8
-          python "$env:RUNNER_TEMP\make_research_os_icon.py"
-
-          $mainCpp = "windows\runner\main.cpp"
-          $mainText = Get-Content $mainCpp -Raw
-          $mainText = $mainText -replace 'Create\(L"research_os_flutter"', 'Create(L"Research OS"'
-          Set-Content -Path $mainCpp -Value $mainText -Encoding utf8
-
-          $runnerRc = "windows\runner\Runner.rc"
-          $rc = Get-Content $runnerRc -Raw
-          $rc = $rc -replace 'VALUE "CompanyName", ".*?"', 'VALUE "CompanyName", "Research OS Team"'
-          $rc = $rc -replace 'VALUE "FileDescription", ".*?"', 'VALUE "FileDescription", "Research OS"'
-          $rc = $rc -replace 'VALUE "InternalName", ".*?"', 'VALUE "InternalName", "ResearchOS"'
-          $rc = $rc -replace 'VALUE "OriginalFilename", ".*?"', 'VALUE "OriginalFilename", "Research OS.exe"'
-          $rc = $rc -replace 'VALUE "ProductName", ".*?"', 'VALUE "ProductName", "Research OS"'
-          $rc = $rc -replace 'VALUE "LegalCopyright", ".*?"', 'VALUE "LegalCopyright", "Copyright (C) 2026 Research OS Team"'
-          Set-Content -Path $runnerRc -Value $rc -Encoding utf8
-
-          if ((Get-Item "windows\runner\resources\app_icon.ico").Length -lt 1000) { throw "Research OS icon generation failed." }
           flutter build windows --release
-          if ($LASTEXITCODE -ne 0) { throw "Research OS Windows build failed." }
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows build failed.' }
 
-          $exe = Get-ChildItem -Path "build\windows" -Filter "research_os_flutter.exe" -File -Recurse | Select-Object -First 1
-          if (-not $exe) { throw "Research OS Windows executable was not produced." }
+          $exe = Get-ChildItem -Path 'build/windows' -Filter $env:APP_EXE_NAME -File -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Expected Research OS executable '$env:APP_EXE_NAME' was not produced." }
           $version = $exe.VersionInfo
-          if ($version.CompanyName -ne "Research OS Team") { throw "CompanyName missing: '$($version.CompanyName)'" }
-          if ($version.ProductName -ne "Research OS") { throw "ProductName missing: '$($version.ProductName)'" }
+          if ($version.ProductName -ne $env:APP_PRODUCT_NAME) { throw "Unexpected ProductName: '$($version.ProductName)'" }
+          if ($version.CompanyName -ne $env:APP_COMPANY_NAME) { throw "Unexpected CompanyName: '$($version.CompanyName)'" }
+          if ($version.InternalName -eq 'research_os_owner_special') { throw 'Owner Special InternalName leaked into Research OS artifact.' }
+          if ($version.OriginalFilename -match 'owner_special') { throw 'Owner Special OriginalFilename leaked into Research OS artifact.' }
 
-          $release = $exe.Directory
-          $brandedExe = Join-Path $release.FullName "Research OS.exe"
-          if (Test-Path $brandedExe) { Remove-Item $brandedExe -Force }
-          Rename-Item -Path $exe.FullName -NewName "Research OS.exe"
-
-          $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows"
+          $release = $exe.Directory.FullName
+          $stage = Join-Path $env:RUNNER_TEMP 'Research-OS-Windows'
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Path $stage | Out-Null
-          Copy-Item -Path (Join-Path $release.FullName "*") -Destination $stage -Recurse -Force
+          Copy-Item "$release/*" $stage -Recurse -Force
 
           @"
           Research OS Windows x64
           App: Research OS
-          Publisher/Team: Research OS Team
-          Executable: Research OS.exe
-          Icon source: apps/research_os_flutter/assets/branding/research_os_master.webp
+          Project: $env:APP_PROJECT_NAME
+          Executable: $env:APP_EXE_NAME
+          Publisher/Team: $env:APP_COMPANY_NAME
           Desktop commit: $env:GITHUB_SHA
-          Friend Complete commit: $env:FRIEND_REF
-          Canonical lineage: $env:GITHUB_SHA
-          UI gate: flutter analyze + full tests + desktop shell test + Windows launch smoke
-          "@ | Set-Content -Path (Join-Path $stage "RESEARCH_OS_BUILD_INFO.txt") -Encoding utf8
+          Identity isolation gate: PASS
+          UI gate: flutter analyze + full tests + desktop shell test
+          "@ | Set-Content (Join-Path $stage 'RESEARCH_OS_BUILD_INFO.txt') -Encoding utf8
 
-      - name: Test complete Friend source before packaging
+      - name: Launch smoke test
         shell: pwsh
         run: |
-          $friendRoot = Join-Path $env:GITHUB_WORKSPACE "friend_source"
-          $env:PYTHONPATH = Join-Path $friendRoot "owner_special"
-          Push-Location $friendRoot
+          $exe = Get-ChildItem -Path "$env:RUNNER_TEMP/Research-OS-Windows" -Filter $env:APP_EXE_NAME -File | Select-Object -First 1
+          if (-not $exe) { throw 'Research OS staged executable missing.' }
+          $app = Start-Process $exe.FullName -PassThru
+          Start-Sleep -Seconds 5
           try {
-            python -m unittest discover -s "owner_special\tests" -p "test_*.py" -v
-            if ($LASTEXITCODE -ne 0) { throw "Friend Complete Python tests failed." }
-            python "owner_special\scripts\smoke.py"
-            if ($LASTEXITCODE -ne 0) { throw "Friend Complete smoke failed." }
+            if ($app.HasExited) { throw "Research OS exited during launch smoke with code $($app.ExitCode)." }
           } finally {
-            Pop-Location
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
           }
+          Write-Host 'RESEARCH_OS_UI_LAUNCH=PASS'
 
-      - name: Build and UI-test branded Friend desktop and ServiceHost
+      - name: Package Research OS Windows artifact
         shell: pwsh
         run: |
-          $friendRoot = Join-Path $env:GITHUB_WORKSPACE "friend_source"
-          $friendApp = Join-Path $friendRoot "owner_special\flutter_app"
-          Push-Location $friendApp
-          try {
-            flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
-            flutter pub get
-
-            Copy-Item "$env:GITHUB_WORKSPACE\apps\research_os_flutter\windows\runner\resources\app_icon.ico" "windows\runner\resources\app_icon.ico" -Force
-            $mainCpp = "windows\runner\main.cpp"
-            $mainText = Get-Content $mainCpp -Raw
-            $mainText = $mainText -replace 'Create\(L"research_os_owner_special"', 'Create(L"Research OS Friend"'
-            Set-Content -Path $mainCpp -Value $mainText -Encoding utf8
-
-            $runnerRc = "windows\runner\Runner.rc"
-            $rc = Get-Content $runnerRc -Raw
-            $rc = $rc -replace 'VALUE "CompanyName", ".*?"', 'VALUE "CompanyName", "Research OS Team"'
-            $rc = $rc -replace 'VALUE "FileDescription", ".*?"', 'VALUE "FileDescription", "Research OS Friend"'
-            $rc = $rc -replace 'VALUE "InternalName", ".*?"', 'VALUE "InternalName", "ResearchOSFriend"'
-            $rc = $rc -replace 'VALUE "OriginalFilename", ".*?"', 'VALUE "OriginalFilename", "Research OS Friend.exe"'
-            $rc = $rc -replace 'VALUE "ProductName", ".*?"', 'VALUE "ProductName", "Research OS Friend"'
-            $rc = $rc -replace 'VALUE "LegalCopyright", ".*?"', 'VALUE "LegalCopyright", "Copyright (C) 2026 Research OS Team"'
-            Set-Content -Path $runnerRc -Value $rc -Encoding utf8
-
-            flutter analyze
-            if ($LASTEXITCODE -ne 0) { throw "Friend Flutter analyze failed." }
-            flutter test
-            if ($LASTEXITCODE -ne 0) { throw "Friend Flutter tests failed." }
-            flutter test test/widget_test.dart --reporter expanded
-            if ($LASTEXITCODE -ne 0) { throw "Friend UI widget test failed." }
-            flutter build windows --release
-            if ($LASTEXITCODE -ne 0) { throw "Friend Flutter Windows build failed." }
-
-            $friendExe = Get-ChildItem "build\windows" -Filter "research_os_owner_special.exe" -File -Recurse | Select-Object -First 1
-            if (-not $friendExe) { throw "Friend Desktop EXE missing." }
-            $friendVersion = $friendExe.VersionInfo
-            if ($friendVersion.CompanyName -ne "Research OS Team") { throw "Friend CompanyName missing." }
-            if ($friendVersion.ProductName -ne "Research OS Friend") { throw "Friend ProductName missing." }
-            Rename-Item $friendExe.FullName -NewName "Research OS Friend.exe"
-          } finally {
-            Pop-Location
-          }
-
-          $publish = Join-Path $env:RUNNER_TEMP "friend-service-host"
-          if (Test-Path $publish) { Remove-Item $publish -Recurse -Force }
-          dotnet publish "$friendRoot\owner_special\windows_service\ResearchOS.Owner.ServiceHost.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o $publish
-          if ($LASTEXITCODE -ne 0) { throw "Owner Friend ServiceHost publish failed." }
-          if (-not (Test-Path "$publish\ResearchOS.Owner.ServiceHost.exe")) { throw "Owner Friend ServiceHost EXE missing." }
-
-      - name: Assemble ALL Friend files and bundled runtime
-        shell: pwsh
-        run: |
-          $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows"
-          $friendRoot = Join-Path $env:GITHUB_WORKSPACE "friend_source"
-
-          foreach ($dir in @("owner_special", "v3", "tools\research_os_api")) {
-            $source = Join-Path $friendRoot $dir
-            $destination = Join-Path $stage $dir
-            if (-not (Test-Path $source)) { throw "Required Friend source directory missing: $dir" }
-            Copy-Item -Path $source -Destination $destination -Recurse -Force
-          }
-          New-Item -ItemType Directory -Path "$stage\.github\workflows" -Force | Out-Null
-          Copy-Item "$friendRoot\.github\workflows\owner-special-friend.yml" "$stage\.github\workflows\owner-special-friend.yml" -Force
-
-          Get-ChildItem "$stage\owner_special" -Directory -Recurse -Force |
-            Where-Object { $_.Name -in @("build", ".dart_tool") } |
-            Sort-Object FullName -Descending |
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-
-          $friendRelease = Get-ChildItem "$friendRoot\owner_special\flutter_app\build\windows" -Directory -Recurse |
-            Where-Object { Test-Path (Join-Path $_.FullName "Research OS Friend.exe") } |
-            Select-Object -First 1
-          if (-not $friendRelease) { throw "Friend release directory missing." }
-          New-Item -ItemType Directory -Path "$stage\friend_desktop" -Force | Out-Null
-          Copy-Item "$($friendRelease.FullName)\*" "$stage\friend_desktop" -Recurse -Force
-
-          New-Item -ItemType Directory -Path "$stage\service_host" -Force | Out-Null
-          Copy-Item "$env:RUNNER_TEMP\friend-service-host\*" "$stage\service_host" -Recurse -Force
-
-          $pythonExe = (Get-Command python).Source
-          $pythonRoot = Split-Path $pythonExe -Parent
-          $runtime = "$stage\runtime\python"
-          New-Item -ItemType Directory -Path $runtime -Force | Out-Null
-          Copy-Item "$pythonRoot\*" $runtime -Recurse -Force
-          if (-not (Test-Path "$runtime\python.exe")) { throw "Bundled Python runtime missing." }
-
-          @'
-          param([int]$Port = 8790)
-          $ErrorActionPreference = "Stop"
-          $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-          $python = Join-Path $root "runtime\python\python.exe"
-          $entry = Join-Path $root "owner_special\scripts\run_friend_service.py"
-          $friendExe = Join-Path $root "friend_desktop\Research OS Friend.exe"
-          $data = Join-Path $env:LOCALAPPDATA "ResearchOSOwnerSpecial"
-          $audit = Join-Path $data "friend-audit.jsonl"
-          New-Item -ItemType Directory -Path $data -Force | Out-Null
-          $env:PYTHONPATH = Join-Path $root "owner_special"
-          $service = Start-Process $python -ArgumentList @($entry,"--owner-id","owner","--host","127.0.0.1","--port","$Port","--data-root",$data,"--audit-path",$audit,"--repository-root",$root) -PassThru
-          $ready = $false
-          for ($i=0; $i -lt 60; $i++) {
-            try { $h = Invoke-RestMethod "http://127.0.0.1:$Port/owner/health" -TimeoutSec 2; if ($h.status -eq "ok") { $ready = $true; break } } catch {}
-            Start-Sleep -Milliseconds 500
-          }
-          if (-not $ready) { throw "Research OS Friend service did not become ready" }
-          if (-not (Test-Path $friendExe)) { throw "Research OS Friend.exe missing" }
-          Start-Process $friendExe
-          Write-Host "Research OS Friend ready on 127.0.0.1:$Port (PID $($service.Id))"
-          '@ | Set-Content "$stage\START_FRIEND.ps1" -Encoding utf8
-
-          @'
-          @echo off
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0START_FRIEND.ps1"
-          '@ | Set-Content "$stage\START_FRIEND.cmd" -Encoding ascii
-
-          @'
-          $ErrorActionPreference = "Stop"
-          $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-          & "$root\owner_special\scripts\install-owner-service.ps1" -Action install -Root $root
-          '@ | Set-Content "$stage\INSTALL_FRIEND_SERVICE_ADMIN.ps1" -Encoding utf8
-
-          @'
-          $ErrorActionPreference = "Stop"
-          $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-          & "$root\owner_special\scripts\install-owner-service.ps1" -Action uninstall -Root $root
-          '@ | Set-Content "$stage\UNINSTALL_FRIEND_SERVICE_ADMIN.ps1" -Encoding utf8
-
-          @"
-          Research OS Friend Complete Files
-          Friend source commit: $env:FRIEND_REF
-          Canonical release SHA: $env:GITHUB_SHA
-          Included source roots:
-            owner_special/                 (ALL tracked Friend source, UI, tests, installer and scripts)
-            v3/                            (Friend v3 bridge dependency)
-            tools/research_os_api/         (Research OS API/provider/memory integration)
-          Included runnable components:
-            friend_desktop/Research OS Friend.exe
-            service_host/ResearchOS.Owner.ServiceHost.exe
-            runtime/python/python.exe      (bundled Python 3.12 runtime)
-          Friend loopback endpoint: http://127.0.0.1:8790
-          Team/Publisher: Research OS Team
-          UI validation: Research OS shell + Friend widget tests + both Windows EXE launch smoke
-          Canonical lineage gate: PASS
-          "@ | Set-Content "$stage\FRIEND_COMPLETE_MANIFEST.txt" -Encoding utf8
-
-      - name: Prove packaged Friend runtime and file completeness
-        shell: pwsh
-        run: |
-          $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows"
-          $required = @(
-            "Research OS.exe",
-            "friend_desktop\Research OS Friend.exe",
-            "service_host\ResearchOS.Owner.ServiceHost.exe",
-            "runtime\python\python.exe",
-            "owner_special\OWNER_MANIFEST.json",
-            "owner_special\research_os_friend\brain.py",
-            "owner_special\research_os_friend\reasoning.py",
-            "owner_special\research_os_friend\memory.py",
-            "owner_special\research_os_friend\persistent_memory.py",
-            "owner_special\research_os_friend\orchestrator.py",
-            "owner_special\research_os_friend\provider_settings.py",
-            "owner_special\research_os_friend\providers.py",
-            "owner_special\research_os_friend\runtime.py",
-            "owner_special\research_os_friend\service.py",
-            "owner_special\research_os_friend\skills.py",
-            "owner_special\research_os_friend\tools.py",
-            "owner_special\research_os_friend\v3_bridge.py",
-            "owner_special\flutter_app\lib\src\friend_app.dart",
-            "owner_special\scripts\run_friend_service.py",
-            "owner_special\scripts\install-owner-service.ps1",
-            "owner_special\windows_service\Program.cs",
-            "owner_special\installer\owner-special.iss",
-            "v3\research_os_v3\brain.py",
-            "tools\research_os_api\providers.py",
-            "START_FRIEND.cmd",
-            "FRIEND_COMPLETE_MANIFEST.txt"
-          )
-          $missing = @($required | Where-Object { -not (Test-Path (Join-Path $stage $_) -PathType Leaf) })
-          if ($missing.Count -gt 0) { throw "Packaged Friend files missing: $($missing -join ', ')" }
-
-          $env:PYTHONPATH = Join-Path $stage "owner_special"
-          $data = Join-Path $env:RUNNER_TEMP "friend-package-smoke-data"
-          $audit = Join-Path $data "audit.jsonl"
-          New-Item -ItemType Directory -Path $data -Force | Out-Null
-          $python = Join-Path $stage "runtime\python\python.exe"
-          $entry = Join-Path $stage "owner_special\scripts\run_friend_service.py"
-          $proc = Start-Process $python -ArgumentList @($entry,"--owner-id","owner","--host","127.0.0.1","--port","8790","--data-root",$data,"--audit-path",$audit,"--repository-root",$stage) -PassThru
-          try {
-            $ready = $false
-            for ($i=0; $i -lt 80; $i++) {
-              try {
-                $health = Invoke-RestMethod "http://127.0.0.1:8790/owner/health" -TimeoutSec 2
-                $headers = @{
-                  "X-Research-OS-Owner" = "owner"
-                  "X-Research-OS-Profile" = "default"
-                  "X-Research-OS-Session" = "package-smoke"
-                }
-                $status = Invoke-RestMethod "http://127.0.0.1:8790/owner/status" -Headers $headers -TimeoutSec 2
-                $provider = Invoke-RestMethod "http://127.0.0.1:8790/owner/provider" -Headers $headers -TimeoutSec 2
-                if ($health.status -eq "ok" -and $status -and $provider) { $ready = $true; break }
-              } catch {}
-              Start-Sleep -Milliseconds 500
-            }
-            if (-not $ready) { throw "Packaged Friend runtime did not become ready." }
-
-            $mainApp = Start-Process (Join-Path $stage "Research OS.exe") -PassThru
-            Start-Sleep -Seconds 5
-            if ($mainApp.HasExited) { throw "Research OS.exe exited during UI launch smoke with code $($mainApp.ExitCode)." }
-            Stop-Process $mainApp.Id -Force -ErrorAction SilentlyContinue
-
-            $friendApp = Start-Process (Join-Path $stage "friend_desktop\Research OS Friend.exe") -PassThru
-            Start-Sleep -Seconds 5
-            if ($friendApp.HasExited) { throw "Research OS Friend.exe exited during UI launch smoke with code $($friendApp.ExitCode)." }
-            Stop-Process $friendApp.Id -Force -ErrorAction SilentlyContinue
-          } finally {
-            if (-not $proc.HasExited) { Stop-Process $proc.Id -Force -ErrorAction SilentlyContinue }
-          }
-          Write-Host "FRIEND_PACKAGE_SMOKE=PASS"
-          Write-Host "RESEARCH_OS_UI_LAUNCH=PASS"
-          Write-Host "FRIEND_UI_LAUNCH=PASS"
-
-      - name: Package Windows + Friend Complete ZIP
-        shell: pwsh
-        run: |
-          $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows"
-          $zip = Join-Path $env:RUNNER_TEMP "Research-OS-Windows-x64-Friend-Complete.zip"
+          $stage = Join-Path $env:RUNNER_TEMP 'Research-OS-Windows'
+          $zip = Join-Path $env:RUNNER_TEMP 'Research-OS-Windows-x64.zip'
           if (Test-Path $zip) { Remove-Item $zip -Force }
-          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -CompressionLevel Optimal
-          $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  Research-OS-Windows-x64-Friend-Complete.zip" | Set-Content -Path "$zip.sha256" -Encoding ascii
-          Write-Host "WINDOWS_FRIEND_ZIP=$zip"
-          Write-Host "WINDOWS_FRIEND_SHA256=$hash"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Research-OS-Windows-x64.zip" | Set-Content "$zip.sha256" -Encoding ascii
+          Write-Host "RESEARCH_OS_WINDOWS_SHA256=$hash"
 
-      - name: Upload Windows + Friend Complete ZIP
+      - name: Upload Research OS Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Research-OS-Windows-x64-Friend-Complete-${{ github.sha }}
+          name: Research-OS-Windows-x64-${{ github.sha }}
           path: |
-            ${{ runner.temp }}/Research-OS-Windows-x64-Friend-Complete.zip
-            ${{ runner.temp }}/Research-OS-Windows-x64-Friend-Complete.zip.sha256
+            ${{ runner.temp }}/Research-OS-Windows-x64.zip
+            ${{ runner.temp }}/Research-OS-Windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
