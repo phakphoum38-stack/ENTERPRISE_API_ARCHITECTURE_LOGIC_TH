@@ -74,6 +74,11 @@ def install_builtin_skills(registry: SkillRegistry) -> SkillRegistry:
             "developer-tools",
             "Work with VS Code projects: understand workspace structure, settings, tasks, launch configurations, extensions, terminals, diagnostics, and reproducible developer workflows.",
         ),
+        (
+            "self_learning",
+            "adaptive-learning",
+            "Propose reusable skills from evidence through a bounded validation and approval loop without mutating core skills automatically.",
+        ),
     )
     for name, domain, description in definitions:
         registry.register(Skill(name, domain, description, _tag(name)))
