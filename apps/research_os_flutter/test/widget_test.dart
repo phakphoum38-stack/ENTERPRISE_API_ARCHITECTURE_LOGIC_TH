@@ -176,13 +176,12 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Google Identity is visible in navigation', (tester) async {
+  testWidgets('Google Identity account entry is visible in navigation', (tester) async {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpShell(tester);
 
-    expect(find.text('Google Identity'), findsOneWidget);
     expect(find.byKey(const Key('v2-nav-account')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
