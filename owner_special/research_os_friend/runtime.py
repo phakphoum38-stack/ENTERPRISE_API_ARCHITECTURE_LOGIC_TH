@@ -22,6 +22,7 @@ from .reasoning import DecisionPlanner
 from .skills import SkillRegistry
 from .tools import ToolRegistry
 from .tool_health import ToolHealthMatrix
+from .tool_health_gate import ToolHealthGate
 from .unified_tool_catalog import UnifiedToolCatalog
 from .v3_bridge import V3Bridge
 from .v3_execution_adapter import V3ExecutionAdapter
@@ -94,8 +95,23 @@ class FriendRuntime:
         )
 
     def tool_health(self) -> dict[str, object]:
-        """Return aggregate counts plus the same read-only catalog rows."""
-        return ToolHealthMatrix().snapshot(
+        """Return aggregate catalog health plus the execution readiness gate."""
+        catalog_snapshot = ToolHealthMatrix().snapshot(
+            friend_tools=self.orchestrator.tools.names(),
+            v3_tools=self.v3.names(),
+        )
+        gate_snapshot = ToolHealthGate().snapshot(
+            friend_tools=self.orchestrator.tools.names(),
+            v3_tools=self.v3.names(),
+        )
+        return {
+            **catalog_snapshot,
+            "gate": gate_snapshot,
+        }
+
+    def tool_health_gate(self) -> dict[str, object]:
+        """Return the deterministic readiness gate used by the Friend runtime."""
+        return ToolHealthGate().snapshot(
             friend_tools=self.orchestrator.tools.names(),
             v3_tools=self.v3.names(),
         )
@@ -131,6 +147,7 @@ class FriendRuntime:
             "tools": self.orchestrator.tools.names(),
             "tool_catalog": self.tool_catalog(),
             "tool_health": self.tool_health(),
+            "tool_health_gate": self.tool_health_gate(),
             "v3_execution": self.v3.snapshot(),
             "providers": self.orchestrator.providers.names(),
             "capabilities": self.capabilities.names(),
