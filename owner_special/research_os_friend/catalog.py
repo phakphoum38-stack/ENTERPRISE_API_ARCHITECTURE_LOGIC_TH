@@ -6,6 +6,7 @@ import re
 from .skills import Skill, SkillRegistry
 from .tools import Tool, ToolRegistry
 from .schedule_generation.adapter import ScheduleGenerateTool
+from .web_tool import install_web_tool
 from tools.research_os_api.github_status import GitHubStatusError, dashboard as github_dashboard
 
 
@@ -88,5 +89,6 @@ def install_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
             _github_repository_status,
         )
     )
+    install_web_tool(registry)
 
     return registry
