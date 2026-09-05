@@ -46,8 +46,9 @@ class FriendOrchestrator:
         selected_skills = self.skills.resolve(request.requested_skills)
         selected_tool_names = self._route_tools(request)
         selected_tools = self.tools.resolve(selected_tool_names)
-        for tool in selected_tools:
-            self.policy.authorize_tool(self.owner, request, tool.name)
+        if request.requested_tools:
+            for tool in selected_tools:
+                self.policy.authorize_tool(self.owner, request, tool.name)
         context = FriendContext.build(self.owner, request, self.memory)
         scale = self.brain.select_scale(request)
         decision = self.planner.plan(request, scale=scale, skills=tuple(skill.name for skill in selected_skills), tools=tuple(tool.name for tool in selected_tools))
