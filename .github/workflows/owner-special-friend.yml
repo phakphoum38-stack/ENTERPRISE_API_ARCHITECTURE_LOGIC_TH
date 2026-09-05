@@ -2,7 +2,7 @@ name: Owner Special Friend Complete
 
 on:
   push:
-    branches: ['main', 'owner-special/**', 'debug/owner-installer-guard']
+    branches: ['main', 'owner-special/**', 'debug/owner-installer-guard', 'fix/friend-github-tool']
     paths:
       - 'owner_special/**'
       - 'v3/research_os_v3/**'
@@ -83,7 +83,6 @@ jobs:
           if (-not (Test-Path 'windows/CMakeLists.txt')) { throw 'Canonical Owner Windows project is missing: windows/CMakeLists.txt' }
           if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Canonical Owner Windows identity file is missing: windows/runner/Runner.rc' }
           if (-not (Test-Path 'windows/runner/main.cpp')) { throw 'Canonical Owner Windows runner is missing: windows/runner/main.cpp' }
-          if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Canonical Owner Windows runner identity is missing' }
           Write-Host 'OWNER_CANONICAL_WINDOWS_SOURCE=PASS'
       - name: Prepare Flutter dependencies
         working-directory: owner_special/flutter_app
