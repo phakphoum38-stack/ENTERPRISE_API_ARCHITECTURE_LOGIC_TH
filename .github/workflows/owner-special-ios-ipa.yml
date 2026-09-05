@@ -21,9 +21,19 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate iOS target
+      - name: Canonical iOS source gate
         working-directory: owner_special/flutter_app
-        run: flutter create . --platforms=ios --org com.phakphoum38 --project-name research_os_owner_special
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            ios/Runner.xcodeproj/project.pbxproj
+            ios/Runner/Info.plist
+          )
+          for path in "${required[@]}"; do
+            test -f "$path" || { echo "Canonical Owner iOS source missing: $path"; exit 1; }
+          done
+          echo "CANONICAL_OWNER_IOS_SOURCE_GATE=PASS"
 
       - name: Set Research OS iOS identity
         working-directory: owner_special/flutter_app
