@@ -9,6 +9,12 @@ from pathlib import Path
 
 
 STATES = ("candidate", "validated", "reusable", "rejected")
+_ALLOWED_TRANSITIONS = {
+    "candidate": {"validated", "rejected"},
+    "validated": {"reusable", "rejected"},
+    "reusable": {"rejected"},
+    "rejected": set(),
+}
 
 
 @dataclass(frozen=True)
@@ -37,6 +43,8 @@ class LearningRecord:
             raise ValueError("confidence must be between 0 and 1")
         if not self.skill_id or not self.source_commit:
             raise ValueError("skill_id and source_commit are required")
+        if self.version < 1:
+            raise ValueError("version must be >= 1")
 
     @property
     def fingerprint(self) -> str:
@@ -100,21 +108,39 @@ class PersistentLearningStore:
             raise ValueError(f"invalid learning state: {state}")
         with self._lock:
             for index, record in enumerate(self._records):
-                if record.record_id == record_id:
-                    if state == "reusable" and record.validation_result.lower() not in {"pass", "passed", "success", "validated"}:
-                        raise ValueError("only validated evidence can become reusable")
-                    updated = LearningRecord(
-                        **{**asdict(record), "tools_used": tuple(record.tools_used), "changed_files": tuple(record.changed_files), "evidence": tuple(evidence or record.evidence), "state": state, "version": record.version + 1}
+                if record.record_id != record_id:
+                    continue
+                if state not in _ALLOWED_TRANSITIONS[record.state]:
+                    raise ValueError(
+                        f"invalid learning transition: {record.state} -> {state}"
                     )
-                    self._records[index] = updated
-                    self._flush()
-                    return updated
+                if state == "reusable" and record.validation_result.lower() not in {
+                    "pass",
+                    "passed",
+                    "success",
+                    "validated",
+                }:
+                    raise ValueError("only validated evidence can become reusable")
+                updated = LearningRecord(
+                    **{
+                        **asdict(record),
+                        "tools_used": tuple(record.tools_used),
+                        "changed_files": tuple(record.changed_files),
+                        "evidence": tuple(evidence or record.evidence),
+                        "state": state,
+                        "version": record.version + 1,
+                    }
+                )
+                self._records[index] = updated
+                self._flush()
+                return updated
         raise KeyError(record_id)
 
     def reusable(self, *, owner_id: str, skill_id: str | None = None) -> tuple[LearningRecord, ...]:
         with self._lock:
             return tuple(
-                record for record in self._records
+                record
+                for record in self._records
                 if record.owner_id == owner_id
                 and record.state == "reusable"
                 and (skill_id is None or record.skill_id == skill_id)
