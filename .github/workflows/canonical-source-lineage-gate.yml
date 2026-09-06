@@ -46,7 +46,11 @@ jobs:
           # The artifact contract must remain dynamic. Never embed the current
           # commit SHA literally in the canonical workflow: that would make the
           # lineage gate fail again on the next commit.
-          grep -qF 'name: Research-OS-Windows-x64-${{ github.sha }}' "$workflow"
+          # GitHub Actions interpolates ${{ github.sha }} before Bash runs, so
+          # construct the literal expression from shell fragments instead.
+          expected_artifact='Research-OS-Windows-x64-$'
+          expected_artifact+='{{ github.sha }}'
+          grep -qF "name: $expected_artifact" "$workflow"
           grep -qF 'uses: actions/upload-artifact@v4' "$workflow"
 
           # Research OS owns the generic Windows artifact. Friend Complete is
