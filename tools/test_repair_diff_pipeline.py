@@ -1,6 +1,4 @@
-import tempfile
 import unittest
-from pathlib import Path
 
 from repair_diff_pipeline import validate_diff
 
@@ -40,6 +38,12 @@ class RepairDiffPipelineTests(unittest.TestCase):
 
     def test_parent_escape_is_rejected(self):
         diff = SAFE_DIFF.replace("tools/example.py", "../escape.py")
+        result = validate_diff(diff)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertTrue(any("unsafe diff path" in e for e in result["errors"]))
+
+    def test_absolute_path_is_rejected(self):
+        diff = SAFE_DIFF.replace("tools/example.py", "/tmp/escape.py")
         result = validate_diff(diff)
         self.assertEqual(result["status"], "FAIL")
         self.assertTrue(any("unsafe diff path" in e for e in result["errors"]))
