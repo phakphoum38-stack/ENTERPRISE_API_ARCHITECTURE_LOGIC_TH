@@ -26,6 +26,7 @@ def main() -> int:
     p.add_argument("--run-id", required=True)
     p.add_argument("--commit", required=True)
     p.add_argument("--input", action="append", default=[])
+    p.add_argument("--metadata", help="JSON object containing verified gate metadata")
     p.add_argument("--output", default=str(REPORTS / "IMMUTABLE_EVIDENCE.json"))
     args = p.parse_args()
 
@@ -40,6 +41,12 @@ def main() -> int:
             raise SystemExit(f"evidence file missing: {path}")
         files.append({"path": str(path), "sha256": sha256_file(path)})
 
+    metadata = {}
+    if args.metadata:
+        metadata = json.loads(Path(args.metadata).read_text(encoding="utf-8"))
+        if not isinstance(metadata, dict):
+            raise SystemExit("metadata must be a JSON object")
+
     manifest = {
         "version": 1,
         "immutable": True,
@@ -48,7 +55,9 @@ def main() -> int:
         "commit": commit,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "evidence": files,
+        **metadata,
     }
+    manifest.pop("manifest_sha256", None)
     payload = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
     manifest["manifest_sha256"] = hashlib.sha256(payload).hexdigest()
 
