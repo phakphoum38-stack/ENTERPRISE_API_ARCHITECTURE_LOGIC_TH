@@ -110,12 +110,14 @@ jobs:
       - name: Verify Owner Desktop build identity before artifact upload
         shell: pwsh
         run: |
+          $env:GITHUB_SHA = $env:TARGET_SHA
           $exe = Join-Path $env:GITHUB_WORKSPACE 'owner_special/flutter_app/build/windows/x64/runner/Release/research_os_owner_special.exe'
           $evidence = Join-Path $env:GITHUB_WORKSPACE 'owner_special/flutter_app/build/windows/x64/runner/Release/OWNER_BUILD_IDENTITY.json'
           & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath $exe -ExpectedManifestPath "$env:GITHUB_WORKSPACE\owner_special\OWNER_MANIFEST.json" -EvidencePath $evidence
           if (-not (Test-Path $evidence -PathType Leaf)) { throw 'Owner Desktop identity evidence missing' }
           $identity = Get-Content $evidence -Raw | ConvertFrom-Json
           if ($identity.passed -ne $true) { throw 'Owner Desktop identity gate failed' }
+          if ([string]$identity.commit -ne [string]$env:TARGET_SHA) { throw "Owner Desktop source commit mismatch: $($identity.commit) != $env:TARGET_SHA" }
           Write-Host 'OWNER_DESKTOP_IDENTITY_GATE=PASS'
       - name: Start Friend service and verify runtime
         shell: pwsh
@@ -201,16 +203,37 @@ jobs:
           & $iscc '.\owner-special.iss'
           if ($LASTEXITCODE -ne 0) { throw 'Owner Setup compilation failed' }
           if (-not (Test-Path '.\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe')) { throw 'Owner Setup EXE missing' }
-      - name: Validate complete installer E2E before setup artifact upload
+      - name: Clean install validation
         shell: pwsh
         run: |
-          .\owner_special\scripts\validate-owner-installer.ps1 -Phase full -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
-          if ($LASTEXITCODE -ne 0) { throw 'Owner install/startup/upgrade/uninstall E2E failed' }
+          .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner clean install E2E failed' }
+      - name: Verify installed Owner release provenance after clean install
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-installed-owner-provenance.ps1" -ExpectedCommit $env:TARGET_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Owner release provenance gate failed after clean install' }
+      - name: In-place upgrade validation
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner in-place upgrade E2E failed' }
+      - name: Verify installed Owner release provenance after upgrade
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-installed-owner-provenance.ps1" -ExpectedCommit $env:TARGET_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Owner release provenance gate failed after upgrade' }
+      - name: Uninstall and data preservation validation
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner uninstall/data preservation E2E failed' }
           if (-not (Test-Path 'owner_special/installer/output/owner-v1.3-validation.json' -PathType Leaf)) { throw 'Validated installer evidence missing' }
           Write-Host 'OWNER_INSTALLER_E2E_GATE=PASS'
       - name: Verify final packaged Owner EXE identity before setup artifact upload
         shell: pwsh
         run: |
+          $env:GITHUB_SHA = $env:TARGET_SHA
           $exe = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/app/research_os_owner_special.exe'
           $manifest = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/owner_special/OWNER_MANIFEST.json'
           $evidence = Join-Path $env:GITHUB_WORKSPACE 'owner_special/installer/package/app/OWNER_BUILD_IDENTITY.json'
@@ -218,6 +241,7 @@ jobs:
           if (-not (Test-Path $evidence -PathType Leaf)) { throw 'Packaged Owner identity evidence missing' }
           $identity = Get-Content $evidence -Raw | ConvertFrom-Json
           if ($identity.passed -ne $true) { throw 'Packaged Owner identity gate failed' }
+          if ([string]$identity.commit -ne [string]$env:TARGET_SHA) { throw "Packaged Owner source commit mismatch: $($identity.commit) != $env:TARGET_SHA" }
           Write-Host 'OWNER_PACKAGED_IDENTITY_GATE=PASS'
       - name: Upload validated Owner Setup.exe and evidence
         uses: actions/upload-artifact@v6
@@ -241,11 +265,31 @@ jobs:
         with:
           name: owner-special-setup-validated-${{ env.TARGET_SHA }}
           path: owner_special/installer/output
-      - name: Validate Owner Setup in clean/upgrade/uninstall phases
+      - name: Clean install validation
         shell: pwsh
         run: |
-          .\owner_special\scripts\validate-owner-installer.ps1 -Phase full -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
-          if ($LASTEXITCODE -ne 0) { throw 'Owner installer validation failed' }
+          .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner clean install E2E failed' }
+      - name: Verify installed Owner release provenance after clean install
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-installed-owner-provenance.ps1" -ExpectedCommit $env:TARGET_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Owner release provenance gate failed after clean install' }
+      - name: In-place upgrade validation
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner in-place upgrade E2E failed' }
+      - name: Verify installed Owner release provenance after upgrade
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-installed-owner-provenance.ps1" -ExpectedCommit $env:TARGET_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Owner release provenance gate failed after upgrade' }
+      - name: Uninstall and data preservation validation
+        shell: pwsh
+        run: |
+          .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner uninstall/data preservation E2E failed' }
       - name: Upload Owner validation evidence
         uses: actions/upload-artifact@v6
         with:
