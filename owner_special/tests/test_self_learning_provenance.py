@@ -3,6 +3,7 @@ import unittest
 from owner_special.research_os_friend.self_learning import (
     LearnedSkillCandidate,
     SkillProvenance,
+    SkillProvenanceLedger,
     SkillRollbackPlan,
     plan_rollback,
 )
@@ -32,6 +33,17 @@ class SelfLearningProvenanceTests(unittest.TestCase):
         self.assertEqual(provenance.evidence_refs, candidate.evidence)
         with self.assertRaises(AttributeError):
             provenance.version = 3
+
+    def test_ledger_is_append_only_and_exposes_latest(self):
+        ledger = SkillProvenanceLedger()
+        first = SkillProvenance("review", 1, None, "session", "engine")
+        second = SkillProvenance("review", 2, 1, "feedback", "engine")
+        ledger.record(first)
+        ledger.record(second)
+        self.assertEqual(tuple(item.version for item in ledger.history("review")), (1, 2))
+        self.assertEqual(ledger.latest("review"), second)
+        with self.assertRaises(ValueError):
+            ledger.record(second)
 
     def test_rollback_is_only_a_plan_until_approval(self):
         provenance = SkillProvenance(
