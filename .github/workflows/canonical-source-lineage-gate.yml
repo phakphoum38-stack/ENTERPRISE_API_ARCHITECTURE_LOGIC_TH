@@ -8,6 +8,7 @@ on:
       - fix/canonical-release-lineage-gate-current-main
       - fix/canonical-lineage-target-sha-hardening
       - fix/canonical-lineage-runtime-expression-hardening
+      - fix/release-contract-lineage
     paths:
       - ".github/workflows/research-os-windows-artifact.yml"
       - ".github/workflows/owner-special-friend.yml"
@@ -29,42 +30,37 @@ jobs:
       - name: Checkout canonical source
         uses: actions/checkout@v4
 
-      - name: Verify Windows artifact follows the canonical SHA
+      - name: Verify Research OS Windows artifact identity contract
         shell: bash
         run: |
           set -euo pipefail
           workflow=".github/workflows/research-os-windows-artifact.yml"
           test -f "$workflow"
 
-          friend_ref="$(sed -n 's/^  FRIEND_REF: *//p' "$workflow" | head -n 1)"
-          test -n "$friend_ref"
-
-          expected_ref='$'
-          expected_ref+='{{ github.sha }}'
-
-          if [[ "$friend_ref" != "$expected_ref" ]]; then
-            echo "CANONICAL_LINEAGE_GATE=FAIL"
-            echo "Unexpected FRIEND_REF expression: $friend_ref"
-            echo "Expected: $expected_ref"
+          grep -qF 'APP_PROJECT_NAME: research_os_flutter' "$workflow"
+          grep -qF 'APP_EXE_NAME: research_os_flutter.exe' "$workflow"
+          grep -qF 'APP_PRODUCT_NAME: Research OS' "$workflow"
+          grep -qF 'APP_COMPANY_NAME: Research OS Team' "$workflow"
+          grep -qF 'Research-OS-Windows-x64-${{ github.sha }}' "$workflow"
+          if grep -qF 'Research-OS-Windows-x64-Friend-Complete-${{ github.sha }}' "$workflow"; then
+            echo 'CANONICAL_LINEAGE_GATE=FAIL'
+            echo 'Research OS Windows workflow must not publish the Friend Complete artifact.'
             exit 1
           fi
 
-          echo "CANONICAL_LINEAGE_GATE=PASS"
+          echo 'CANONICAL_LINEAGE_GATE=PASS'
           echo "Canonical source SHA: $GITHUB_SHA"
-          echo "FRIEND_REF=$friend_ref"
+          echo 'Research OS artifact contract: Research-OS-Windows-x64-${{ github.sha }}'
 
-      - name: Verify Windows artifact checks out Friend at the exact SHA
+      - name: Verify Research OS workflow does not bootstrap canonical source
         shell: bash
         run: |
           set -euo pipefail
           workflow=".github/workflows/research-os-windows-artifact.yml"
-
-          expected_friend_ref='$'
-          expected_friend_ref+='{{ env.FRIEND_REF }}'
-          grep -qF "ref: $expected_friend_ref" "$workflow"
-          grep -qF 'rev-parse HEAD' "$workflow"
-          grep -qF 'friendSha -ne $env:GITHUB_SHA' "$workflow"
-          echo "CANONICAL_CHECKOUT_GATE=PASS"
+          grep -qF "RUNNER_TEMP" "$workflow"
+          grep -qF 'flutter create --platforms=windows --project-name=$env:APP_PROJECT_NAME .' "$workflow"
+          grep -qF 'research-os-flutter-windows' "$workflow"
+          echo 'RESEARCH_OS_BOOTSTRAP_ISOLATION_GATE=PASS'
 
       - name: Verify canonical Owner TARGET_SHA contract
         shell: bash
