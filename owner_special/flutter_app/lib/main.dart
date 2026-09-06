@@ -24,6 +24,7 @@ Future<void> main() async {
     profileId: profileId,
     sessionId: sessionId,
   );
+  registerOwnerFriendApi(api);
 
   Map<String, dynamic>? startup;
   String? startupError;

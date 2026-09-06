@@ -18,6 +18,14 @@ abstract class OwnerFriendApi {
   void clearSession() {}
 }
 
+OwnerFriendApi? _activeOwnerFriendApi;
+
+OwnerFriendApi? get activeOwnerFriendApi => _activeOwnerFriendApi;
+
+void registerOwnerFriendApi(OwnerFriendApi api) {
+  _activeOwnerFriendApi = api;
+}
+
 String _normalizeBaseUrl(String value) => value.endsWith('/') ? value.substring(0, value.length - 1) : value;
 
 final class HttpOwnerFriendApi implements OwnerFriendApi {
