@@ -56,16 +56,10 @@ jobs:
             echo 'Research OS Windows workflow must not publish the Friend Complete artifact.'
             exit 1
           fi
-          if grep -qF 'Research-OS-Windows-x64-Friend-Complete-${{ github.sha }}' "$workflow"; then
-            echo 'CANONICAL_LINEAGE_GATE=FAIL'
-            echo 'Research OS Windows workflow contains the obsolete Friend Complete SHA contract.'
-            exit 1
-          fi
 
-          expected_artifact="Research-OS-Windows-x64-${GITHUB_SHA}"
           echo 'CANONICAL_LINEAGE_GATE=PASS'
           echo "Canonical source SHA: $GITHUB_SHA"
-          echo "Research OS artifact contract: $expected_artifact"
+          echo "Research OS artifact contract: Research-OS-Windows-x64-${GITHUB_SHA}"
 
       - name: Verify Research OS workflow does not bootstrap canonical source
         shell: bash
