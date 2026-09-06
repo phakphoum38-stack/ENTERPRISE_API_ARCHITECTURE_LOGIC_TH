@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .agent_runtime import AgentRun, AgentRuntime
 from .agent_trace_store import PersistentAgentTraceStore
-from .approval import ApprovalRecord, ApprovalState
+from .approval import ApprovalGate, ApprovalRecord, ApprovalState
 from .approval_store import PersistentApprovalStore
 from .brain import FriendBrain
 from .capabilities import CapabilityRegistry, install_friend_complete_capabilities
@@ -129,7 +129,7 @@ class FriendRuntime:
             memory=memory,
             policy=OwnerPolicy(),
             evidence=EvidenceRecorder(evidence_path),
-            approval_gate=__import__("owner_special.research_os_friend.approval", fromlist=["ApprovalGate"]).ApprovalGate(store=approval_store),
+            approval_gate=ApprovalGate(store=approval_store),
         )
         return cls(
             owner=owner,
