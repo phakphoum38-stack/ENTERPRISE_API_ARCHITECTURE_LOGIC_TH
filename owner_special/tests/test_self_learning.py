@@ -76,7 +76,7 @@ class SelfLearningTests(unittest.TestCase):
                 name="review",
                 goal="repeat verified review",
                 procedure=("inspect", "validate"),
-                evidence=("pass",),
+                evidence=("pass", "ci-pass", "reviewed-diff", "verified-result"),
                 confidence=0.95,
             )
         )
