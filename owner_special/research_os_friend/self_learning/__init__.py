@@ -14,6 +14,7 @@ from .provenance import (
     plan_rollback,
 )
 from .registry import LearnedSkillRegistry
+from .revision_cycle import SkillRevisionProposal, bind_revision_evaluation, propose_revision
 from .versioning import SkillVersionProposal, propose_next_version
 
 __all__ = [
@@ -33,4 +34,7 @@ __all__ = [
     "PromotionEvidenceBundle",
     "SkillPromotionRecord",
     "SkillPromotionLedger",
+    "SkillRevisionProposal",
+    "propose_revision",
+    "bind_revision_evaluation",
 ]
