@@ -24,7 +24,7 @@ class WebResponseGatewayTests(unittest.TestCase):
             text="อ่านโครงสร้างเว็บไซต์ https://example.com ให้หน่อย",
         )
         with patch("owner_special.research_os_friend.web_tool.urlopen") as mocked:
-            response = mocked.return_value
+            response = mocked.return_value.__enter__.return_value
             response.headers.get.return_value = "text/html"
             response.read.return_value = b"<html><head><title>Example</title></head><body><h1>Hello</h1><a href='/docs'>Docs</a></body></html>"
             result = runtime.ask(request)
