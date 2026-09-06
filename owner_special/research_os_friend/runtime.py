@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .agent_runtime import AgentRun, AgentRuntime
+from .agent_trace_store import PersistentAgentTraceStore
 from .brain import FriendBrain
 from .capabilities import CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
@@ -47,6 +48,7 @@ class FriendRuntime:
     self_learning: SelfLearningEngine | None = None
     learning_store: PersistentLearningStore | None = None
     agent_runtime: AgentRuntime | None = None
+    agent_trace_store: PersistentAgentTraceStore | None = None
     source_commit: str = ""
 
     @staticmethod
@@ -81,9 +83,6 @@ class FriendRuntime:
         tools = install_builtin_tools(ToolRegistry())
         providers = ProviderRouter()
 
-        # Keep the deterministic mock as the safe offline fallback, but use a
-        # real OpenAI-compatible provider automatically when the host supplies
-        # OPENAI_API_KEY. The credential is never persisted by this path.
         api_key = os.environ.get("OPENAI_API_KEY", "").strip()
         if api_key:
             base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
@@ -106,6 +105,7 @@ class FriendRuntime:
             memory: ScopedMemory = ScopedMemory()
             previews = SchedulePreviewStore(Path.cwd() / ".research_os_previews")
             learning_store = None
+            agent_trace_store = None
         else:
             owner_root = normalized_root / "owners" / owner.owner_id
             memory = PersistentScopedMemory(owner_root / "memory" / "memory.json")
@@ -113,6 +113,7 @@ class FriendRuntime:
             if evidence_path is None:
                 evidence_path = owner_root / "evidence" / "events.jsonl"
             learning_store = PersistentLearningStore(owner_root / "learning" / "learning.json")
+            agent_trace_store = PersistentAgentTraceStore(owner_root / "agent" / "traces.json")
         orchestrator = FriendOrchestrator(owner=owner, brain=FriendBrain(bridge), planner=DecisionPlanner(), skills=skills, tools=tools, providers=providers, memory=memory, policy=OwnerPolicy(), evidence=EvidenceRecorder(evidence_path))
         return cls(
             owner=owner,
@@ -125,7 +126,8 @@ class FriendRuntime:
             previews=previews,
             self_learning=SelfLearningEngine(),
             learning_store=learning_store,
-            agent_runtime=AgentRuntime(orchestrator),
+            agent_runtime=AgentRuntime(orchestrator, trace_store=agent_trace_store),
+            agent_trace_store=agent_trace_store,
             source_commit=cls._source_commit(repo_root),
         )
 
@@ -135,17 +137,17 @@ class FriendRuntime:
     def run_agent(self, request: FriendRequest) -> AgentRun:
         """Run through the agent-runtime lifecycle while preserving orchestrator ownership."""
         if self.agent_runtime is None:
-            self.agent_runtime = AgentRuntime(self.orchestrator)
+            self.agent_runtime = AgentRuntime(self.orchestrator, trace_store=self.agent_trace_store)
         return self.agent_runtime.run(request)
 
     def get_agent_run(self, run_id: str) -> AgentRun | None:
         if self.agent_runtime is None:
-            self.agent_runtime = AgentRuntime(self.orchestrator)
+            self.agent_runtime = AgentRuntime(self.orchestrator, trace_store=self.agent_trace_store)
         return self.agent_runtime.get(run_id)
 
     def agent_runs(self) -> tuple[AgentRun, ...]:
         if self.agent_runtime is None:
-            self.agent_runtime = AgentRuntime(self.orchestrator)
+            self.agent_runtime = AgentRuntime(self.orchestrator, trace_store=self.agent_trace_store)
         return self.agent_runtime.list_runs(owner_id=self.owner.owner_id)
 
     def tool_catalog(self) -> tuple[dict[str, object], ...]:
@@ -284,7 +286,8 @@ class FriendRuntime:
             "self_learning": self.self_learning_snapshot(),
             "agent_runtime": {
                 "enabled": self.agent_runtime is not None,
-                "trace": "in-process immutable events",
+                "trace": "owner-scoped durable immutable events" if self.agent_trace_store is not None else "in-process immutable events",
+                "persistence": "owner-scoped-disk" if self.agent_trace_store is not None else "disabled",
                 "orchestrator_authority": "FriendOrchestrator",
                 "runs": len(self.agent_runs()),
             },

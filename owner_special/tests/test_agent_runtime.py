@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from owner_special.research_os_friend import AgentRunStatus, FriendRequest, FriendRuntime
 
@@ -44,6 +46,24 @@ class AgentRuntimeTests(unittest.TestCase):
         self.assertTrue(architecture["agent_runtime"]["enabled"])
         self.assertEqual(architecture["agent_runtime"]["trace"], "in-process immutable events")
         self.assertEqual(runtime.orchestrator.skills.names(), core_before)
+
+    def test_agent_trace_survives_runtime_restart_and_remains_owner_scoped(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = FriendRuntime.create_owner_special("owner-a", data_root=root)
+            run = runtime.run_agent(FriendRequest(owner_id="owner-a", text="persist this run"))
+
+            restarted = FriendRuntime.create_owner_special("owner-a", data_root=root)
+            recovered = restarted.get_agent_run(run.run_id)
+            self.assertIsNotNone(recovered)
+            self.assertEqual(recovered.status, AgentRunStatus.COMPLETED)
+            self.assertEqual(recovered.response, None)
+            self.assertEqual(restarted.agent_runs(), (recovered,))
+            self.assertTrue((root / "owners" / "owner-a" / "agent" / "traces.json").is_file())
+
+            other_owner = FriendRuntime.create_owner_special("owner-b", data_root=root)
+            self.assertIsNone(other_owner.get_agent_run(run.run_id))
+            self.assertEqual(other_owner.agent_runs(), ())
 
 
 if __name__ == "__main__":
