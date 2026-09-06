@@ -29,7 +29,8 @@ class AgentTraceQueryTests(unittest.TestCase):
 
             completed = runtime.agent_runs(status=AgentRunStatus.COMPLETED)
             self.assertEqual(len(completed), 3)
-            self.assertEqual(runtime.agent_runs(limit=0), ())
+            with self.assertRaises(ValueError):
+                runtime.agent_runs(limit=0)
 
     def test_in_process_runtime_keeps_query_semantics(self):
         runtime = FriendRuntime.create_owner_special("owner-trace-query")
