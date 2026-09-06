@@ -9,6 +9,7 @@ on:
       - fix/canonical-lineage-target-sha-hardening
       - fix/canonical-lineage-runtime-expression-hardening
       - fix/release-contract-lineage
+      - fix/canonical-lineage-dynamic-artifact-contract
     paths:
       - ".github/workflows/research-os-windows-artifact.yml"
       - ".github/workflows/owner-special-friend.yml"
@@ -41,8 +42,20 @@ jobs:
           grep -qF 'APP_EXE_NAME: research_os_flutter.exe' "$workflow"
           grep -qF 'APP_PRODUCT_NAME: Research OS' "$workflow"
           grep -qF 'APP_COMPANY_NAME: Research OS Team' "$workflow"
-          grep -qF 'Research-OS-Windows-x64-${{ github.sha }}' "$workflow"
-          if grep -qF 'Research-OS-Windows-x64-Friend-Complete-${{ github.sha }}' "$workflow"; then
+
+          # The artifact contract must remain dynamic. Never embed the current
+          # commit SHA literally in the canonical workflow: that would make the
+          # lineage gate fail again on the next commit.
+          # GitHub Actions interpolates ${{ github.sha }} before Bash runs, so
+          # construct the literal expression from shell fragments instead.
+          expected_artifact='Research-OS-Windows-x64-$'
+          expected_artifact+='{{ github.sha }}'
+          grep -qF "name: $expected_artifact" "$workflow"
+          grep -qF 'uses: actions/upload-artifact@v4' "$workflow"
+
+          # Research OS owns the generic Windows artifact. Friend Complete is
+          # produced only by the Owner Special release-control pipeline.
+          if grep -qF 'Research-OS-Windows-x64-Friend-Complete-' "$workflow"; then
             echo 'CANONICAL_LINEAGE_GATE=FAIL'
             echo 'Research OS Windows workflow must not publish the Friend Complete artifact.'
             exit 1
@@ -50,7 +63,7 @@ jobs:
 
           echo 'CANONICAL_LINEAGE_GATE=PASS'
           echo "Canonical source SHA: $GITHUB_SHA"
-          echo 'Research OS artifact contract: Research-OS-Windows-x64-${{ github.sha }}'
+          echo "Research OS artifact contract: Research-OS-Windows-x64-${GITHUB_SHA}"
 
       - name: Verify Research OS workflow does not bootstrap canonical source
         shell: bash
@@ -78,7 +91,7 @@ jobs:
           grep -qF "ref: $expected_target_ref" "$workflow"
           grep -qF "owner-special-desktop-validated-$expected_target_ref" "$workflow"
           grep -qF "owner-special-setup-validated-$expected_target_ref" "$workflow"
-          grep -qF "owner-special-setup-$expected_target_ref" "$workflow"
+          grep -qF "owner-special-friend-complete-$expected_target_ref" "$workflow"
           echo "OWNER_TARGET_SHA_CONTRACT=PASS"
 
       - name: Verify canonical Owner release control pipeline
@@ -93,7 +106,7 @@ jobs:
 
           grep -qF 'owner-bundle:' "$workflow"
           grep -qF 'python owner_special/scripts/build_bundle.py' "$workflow"
-          grep -qF "owner-special-setup-$expected_target_ref" "$workflow"
+          grep -qF "owner-special-friend-complete-$expected_target_ref" "$workflow"
           echo "OWNER_RELEASE_CONTROL_GATE=PASS"
 
       - name: Verify final bundle is bound to the canonical source and validated installer
