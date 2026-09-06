@@ -1,5 +1,6 @@
 import unittest
 
+from repair_diff_evidence import build_evidence
 from repair_diff_pipeline import validate_diff
 
 
@@ -52,6 +53,62 @@ class RepairDiffPipelineTests(unittest.TestCase):
         result = validate_diff(SAFE_DIFF)
         self.assertEqual(len(result["sha256"]), 64)
         self.assertEqual(result["bytes"], len(SAFE_DIFF.encode("utf-8")))
+
+    def test_evidence_binds_hash_lineage_and_safety(self):
+        validation = validate_diff(SAFE_DIFF)
+        evidence = build_evidence(
+            diff=SAFE_DIFF,
+            validation=validation,
+            base_ref="main",
+            base_sha="a" * 40,
+            head_ref="HEAD",
+            head_sha="b" * 40,
+        )
+        self.assertEqual(evidence["schema"], "autobot-repair-diff-evidence/v1")
+        self.assertEqual(evidence["diff"]["sha256"], validation["sha256"])
+        self.assertEqual(evidence["lineage"]["base_sha"], "a" * 40)
+        self.assertEqual(evidence["lineage"]["head_sha"], "b" * 40)
+        self.assertEqual(evidence["verification"]["status"], "NOT_RUN")
+        self.assertFalse(evidence["application"]["apply_to_main"])
+        self.assertFalse(evidence["application"]["auto_merge"])
+
+    def test_evidence_rejects_hash_mismatch(self):
+        validation = validate_diff(SAFE_DIFF)
+        validation["sha256"] = "0" * 64
+        with self.assertRaises(ValueError):
+            build_evidence(
+                diff=SAFE_DIFF,
+                validation=validation,
+                base_ref="main",
+                base_sha="a" * 40,
+                head_ref="HEAD",
+                head_sha="b" * 40,
+            )
+
+    def test_evidence_rejects_invalid_lineage_sha(self):
+        validation = validate_diff(SAFE_DIFF)
+        with self.assertRaises(ValueError):
+            build_evidence(
+                diff=SAFE_DIFF,
+                validation=validation,
+                base_ref="main",
+                base_sha="not-a-sha",
+                head_ref="HEAD",
+                head_sha="b" * 40,
+            )
+
+    def test_evidence_does_not_claim_unrun_verification(self):
+        validation = validate_diff(SAFE_DIFF)
+        with self.assertRaises(ValueError):
+            build_evidence(
+                diff=SAFE_DIFF,
+                validation=validation,
+                base_ref="main",
+                base_sha="a" * 40,
+                head_ref="HEAD",
+                head_sha="b" * 40,
+                verification_ref="run-123",
+            )
 
 
 if __name__ == "__main__":
