@@ -70,6 +70,29 @@ model hidden reasoning, credentials, or full provider response bodies.
 `MissionControl.run(run_id)` returns one owner-validated run projection or
 `None` when it cannot be safely projected.
 
+## Phase 4B timeline contract
+
+`MissionControl.timeline(run_id)` provides a separate, bounded presentation
+projection for a single owner-validated run. It maps the existing trace events
+to deterministic UI-neutral categories:
+
+| Trace event | Timeline category |
+| --- | --- |
+| `run-created` | `goal` |
+| `planning` | `plan` |
+| `executing` | `action` |
+| `verifying` | `result` |
+| `completed` | `evidence` |
+| `failed` | `decision` |
+
+The timeline preserves sequence, event name, status, timestamp, and existing
+trace data. Unknown event names are represented as `unknown` rather than being
+silently reclassified. The same 250-event bound applies and truncation is
+reported explicitly.
+
+The timeline is presentation-only and does not create execution, policy,
+approval, MCP, Computer Use, or persistence authority.
+
 ## Explicit non-goals
 
 This phase does not add:
@@ -86,7 +109,6 @@ This phase does not add:
 ## Next increments
 
 1. Connect this projection to the desktop shell as a read-only timeline.
-2. Add structured step categories for goal/plan/tool/result/evidence/decision.
-3. Add capability and tool-health panels using existing read-only catalog data.
-4. Add safe UI-schema validation before dynamic panels are rendered.
-5. Keep every action behind the existing orchestrator/policy/approval gates.
+2. Add capability and tool-health panels using existing read-only catalog data.
+3. Add safe UI-schema validation before dynamic panels are rendered.
+4. Keep every action behind the existing orchestrator/policy/approval gates.
