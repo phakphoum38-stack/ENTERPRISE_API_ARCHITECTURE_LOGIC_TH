@@ -85,6 +85,32 @@ jobs:
           if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Isolated Windows identity file was not generated.' }
           Write-Host 'RESEARCH_OS_ISOLATED_WINDOWS_BOOTSTRAP=PASS'
 
+      - name: Apply Research OS Windows branding in isolated workspace
+        shell: pwsh
+        run: |
+          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
+          Set-Location $workspace
+          $mainCpp = 'windows\runner\main.cpp'
+          $mainText = Get-Content $mainCpp -Raw
+          $mainText = $mainText -replace 'Create\(L"research_os_flutter"', 'Create(L"Research OS"'
+          Set-Content -Path $mainCpp -Value $mainText -Encoding utf8
+
+          $runnerRc = 'windows\runner\Runner.rc'
+          $rc = Get-Content $runnerRc -Raw
+          $rc = $rc -replace 'VALUE "CompanyName", ".*?"', 'VALUE "CompanyName", "Research OS Team"'
+          $rc = $rc -replace 'VALUE "FileDescription", ".*?"', 'VALUE "FileDescription", "Research OS"'
+          $rc = $rc -replace 'VALUE "InternalName", ".*?"', 'VALUE "InternalName", "ResearchOS"'
+          $rc = $rc -replace 'VALUE "OriginalFilename", ".*?"', 'VALUE "OriginalFilename", "research_os_flutter.exe"'
+          $rc = $rc -replace 'VALUE "ProductName", ".*?"', 'VALUE "ProductName", "Research OS"'
+          $rc = $rc -replace 'VALUE "LegalCopyright", ".*?"', 'VALUE "LegalCopyright", "Copyright (C) 2026 Research OS Team"'
+          Set-Content -Path $runnerRc -Value $rc -Encoding utf8
+
+          $verifyRc = Get-Content $runnerRc -Raw
+          if ($verifyRc -notmatch 'VALUE "ProductName", "Research OS"') { throw 'Research OS ProductName branding was not applied.' }
+          if ($verifyRc -notmatch 'VALUE "CompanyName", "Research OS Team"') { throw 'Research OS CompanyName branding was not applied.' }
+          if ($verifyRc -match 'research_os_owner_special') { throw 'Owner Special identity leaked into isolated Research OS Runner.rc.' }
+          Write-Host 'RESEARCH_OS_WINDOWS_BRANDING=PASS'
+
       - name: Build isolated Research OS Windows release
         shell: pwsh
         run: |
@@ -119,6 +145,7 @@ jobs:
           Identity isolation gate: PASS
           UI gate: flutter analyze + full tests + desktop shell test
           Windows bootstrap: isolated temporary workspace only
+          Windows branding: Research OS / Research OS Team
           "@ | Set-Content (Join-Path $stage 'RESEARCH_OS_BUILD_INFO.txt') -Encoding utf8
 
       - name: Launch smoke test
