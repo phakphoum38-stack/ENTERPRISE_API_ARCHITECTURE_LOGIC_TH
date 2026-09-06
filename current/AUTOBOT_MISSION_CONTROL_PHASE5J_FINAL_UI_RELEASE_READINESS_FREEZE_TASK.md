@@ -64,7 +64,7 @@ Check:
 - 5B state is derived from validated source metadata;
 - 5E refresh accepts only validated replacements;
 - 5F navigation does not execute work;
-- 5G diagnostics contain no secret/executable content;
+- 5G diagnostics contain no secret-like or executable content;
 - 5H E2E coverage proves the complete boundary;
 - 5I identity presentation uses canonical evidence only.
 
@@ -83,7 +83,7 @@ Search for and reject any Mission Control path that introduces:
 - policy/permission/approval mutation;
 - skill registration/promotion mutation;
 - provider mutation;
-- credentials/API keys/bearer tokens/passwords/private keys/signing secrets;
+- credential-bearing material or authentication secrets;
 - provider response bodies;
 - hidden background timers/listeners that perform work.
 
