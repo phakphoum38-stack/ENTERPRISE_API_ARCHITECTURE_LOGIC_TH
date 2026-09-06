@@ -56,6 +56,11 @@ if ($actualSha -ne $recordedSha) {
   Fail "Installed Owner EXE SHA256 '$actualSha' != recorded '$recordedSha'."
 }
 
+# A successful PowerShell script invocation does not necessarily reset the caller's
+# $LASTEXITCODE. Explicitly clear the global value so workflow steps that inspect it
+# do not mistake a previous native command's exit code for this gate's result.
+$global:LASTEXITCODE = 0
+
 Write-Host 'RELEASE_PROVENANCE_GATE=PASS'
 Write-Host "Expected release commit: $ExpectedCommit"
 Write-Host "Installed Owner commit: $installedCommit"
