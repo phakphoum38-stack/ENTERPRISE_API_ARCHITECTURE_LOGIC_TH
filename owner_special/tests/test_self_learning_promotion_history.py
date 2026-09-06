@@ -43,6 +43,23 @@ class SkillPromotionHistoryTests(unittest.TestCase):
         self.assertEqual(bundle.evidence_refs, ("trace:42", "eval:42"))
         self.assertEqual(bundle.promotion_authority, "OwnerPolicy")
 
+    def test_build_rejects_conflicting_confidence(self) -> None:
+        provenance, evaluation = self._evidence()
+        wrong = SkillEvaluationRecord(
+            skill_name=evaluation.skill_name,
+            version=evaluation.version,
+            score=evaluation.score,
+            confidence=0.8,
+            evidence_refs=evaluation.evidence_refs,
+        )
+        with self.assertRaises(ValueError):
+            PromotionEvidenceBundle.build(
+                provenance,
+                wrong,
+                provenance_ref="prov:bounded-research:v2",
+                promotion_authority="OwnerPolicy",
+            )
+
     def test_mismatched_evaluation_cannot_be_attached(self) -> None:
         provenance, evaluation = self._evidence()
         wrong = SkillEvaluationRecord(
@@ -103,6 +120,47 @@ class SkillPromotionHistoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ledger.record(
                 SkillPromotionRecord("bounded-research", 1, "approved", bundle)
+            )
+
+    def test_ledger_rejects_invalid_decision(self) -> None:
+        provenance, evaluation = self._evidence()
+        bundle = PromotionEvidenceBundle.build(
+            provenance,
+            evaluation,
+            provenance_ref="prov:bounded-research:v2",
+            promotion_authority="OwnerPolicy",
+        )
+        with self.assertRaises(ValueError):
+            SkillPromotionLedger().record(
+                SkillPromotionRecord("bounded-research", 2, "pending", bundle)
+            )
+
+    def test_ledger_rejects_low_score_approval(self) -> None:
+        candidate = LearnedSkillCandidate(
+            name="bounded-research",
+            goal="research safely",
+            procedure=("observe",),
+            evidence=("trace:low",),
+            confidence=0.9,
+            version=2,
+        )
+        evaluation = SkillEvaluationRecord.from_candidate(candidate, score=0.7)
+        provenance = SkillProvenance.from_candidate(
+            candidate,
+            source="owner-feedback",
+            generated_by="self-learning-v2",
+            parent_version=1,
+            evaluation_score=0.7,
+        )
+        bundle = PromotionEvidenceBundle.build(
+            provenance,
+            evaluation,
+            provenance_ref="prov:bounded-research:v2-low",
+            promotion_authority="OwnerPolicy",
+        )
+        with self.assertRaises(ValueError):
+            SkillPromotionLedger().record(
+                SkillPromotionRecord("bounded-research", 2, "approved", bundle)
             )
 
 
