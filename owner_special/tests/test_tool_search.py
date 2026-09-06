@@ -28,7 +28,7 @@ class ToolSearchTests(unittest.TestCase):
 
     def test_empty_query_returns_bounded_catalog_without_execution(self):
         results = self.search.search("", limit=3)
-        self.assertEqual(tuple(item.name for item in results), ("echo", "file", "github"))
+        self.assertEqual(tuple(item.name for item in results), ("echo", "file", "git-branch"))
 
     def test_invalid_limit_fails_fast(self):
         with self.assertRaises(ValueError):
