@@ -91,7 +91,7 @@ jobs:
           grep -qF "ref: $expected_target_ref" "$workflow"
           grep -qF "owner-special-desktop-validated-$expected_target_ref" "$workflow"
           grep -qF "owner-special-setup-validated-$expected_target_ref" "$workflow"
-          grep -qF "owner-special-setup-$expected_target_ref" "$workflow"
+          grep -qF "owner-special-friend-complete-$expected_target_ref" "$workflow"
           echo "OWNER_TARGET_SHA_CONTRACT=PASS"
 
       - name: Verify canonical Owner release control pipeline
@@ -106,7 +106,7 @@ jobs:
 
           grep -qF 'owner-bundle:' "$workflow"
           grep -qF 'python owner_special/scripts/build_bundle.py' "$workflow"
-          grep -qF "owner-special-setup-$expected_target_ref" "$workflow"
+          grep -qF "owner-special-friend-complete-$expected_target_ref" "$workflow"
           echo "OWNER_RELEASE_CONTROL_GATE=PASS"
 
       - name: Verify final bundle is bound to the canonical source and validated installer
