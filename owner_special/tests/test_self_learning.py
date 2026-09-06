@@ -4,7 +4,13 @@ import unittest
 
 from owner_special.research_os_friend.models import FriendRequest
 from owner_special.research_os_friend.runtime import FriendRuntime
-from owner_special.research_os_friend.self_learning import LearnedSkillCandidate, LearnedSkillRegistry, SelfLearningEngine
+from owner_special.research_os_friend.self_learning import (
+    LearnedSkillCandidate,
+    LearnedSkillRegistry,
+    SelfLearningEngine,
+    SkillFeedback,
+    propose_next_version,
+)
 
 
 class SelfLearningTests(unittest.TestCase):
@@ -62,6 +68,52 @@ class SelfLearningTests(unittest.TestCase):
             )
         )
         self.assertEqual(response.decision.selected_skills, ("self_learning",))
+
+    def test_skill_version_proposal_preserves_parent_lineage(self):
+        registry = LearnedSkillRegistry()
+        first = SelfLearningEngine(registry=registry).learn(
+            LearnedSkillCandidate(
+                name="review",
+                goal="repeat verified review",
+                procedure=("inspect", "validate"),
+                evidence=("pass",),
+                confidence=0.95,
+            )
+        )
+        self.assertIsNotNone(first)
+        proposal = propose_next_version(
+            LearnedSkillCandidate(
+                name="review",
+                goal="improve verified review",
+                procedure=("inspect", "validate", "record"),
+                evidence=("pass", "feedback"),
+                confidence=0.95,
+                version=1,
+            ),
+            first,
+            change_reason="feedback-improved-procedure",
+        )
+        self.assertEqual(proposal.version, 2)
+        self.assertEqual(proposal.parent_version, 1)
+        self.assertEqual(proposal.skill_name, "review")
+
+    def test_feedback_is_evidence_not_automatic_promotion(self):
+        positive = SkillFeedback(
+            skill_name="review",
+            version=1,
+            outcome="passed",
+            evidence=("ci-pass",),
+        )
+        negative = SkillFeedback(
+            skill_name="review",
+            version=1,
+            outcome="failed",
+            evidence=("regression",),
+        )
+        self.assertTrue(positive.is_positive())
+        self.assertFalse(positive.is_negative())
+        self.assertTrue(negative.is_negative())
+        self.assertFalse(negative.is_positive())
 
 
 if __name__ == "__main__":
