@@ -67,11 +67,11 @@ TEXT_SUFFIXES = {
     ".yml",
 }
 
-# Match actual Git conflict-marker lines, not decorative separators such as
+# Match actual Git conflict-marker blocks, not decorative separators such as
 # "================================" commonly used in plain-text documents.
-MERGE_MARKER_RE = re.compile(
-    r"^(?:<<<<<<<(?:\s.*)?|=======$|>>>>>>>(?:\s.*)?)$", re.MULTILINE
-)
+MERGE_START_RE = re.compile(r"^<<<<<<<(?:\s.*)?$")
+MERGE_SEPARATOR_RE = re.compile(r"^=======$")
+MERGE_END_RE = re.compile(r"^>>>>>>>(?:\s.*)?$")
 SECRET_PATTERNS = (
     ("openai-key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
     ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
@@ -146,6 +146,20 @@ def _read_text(path: Path) -> str | None:
         return raw.decode("utf-8", errors="replace")
 
 
+def _has_unresolved_merge_markers(text: str) -> bool:
+    """Return True only for Git conflict markers, not standalone separators."""
+    in_conflict = False
+    for line in text.splitlines():
+        if MERGE_START_RE.fullmatch(line):
+            in_conflict = True
+            continue
+        if MERGE_END_RE.fullmatch(line):
+            return True
+        if in_conflict and MERGE_SEPARATOR_RE.fullmatch(line):
+            continue
+    return in_conflict
+
+
 def audit_file(path: Path, root: Path) -> FileResult:
     rel = path.resolve().relative_to(root.resolve()).as_posix()
     findings: list[Finding] = []
@@ -170,7 +184,7 @@ def audit_file(path: Path, root: Path) -> FileResult:
             Finding(rel, "warning", "utf8-replacement", "File contains invalid UTF-8 bytes.")
         )
 
-    if MERGE_MARKER_RE.search(text):
+    if _has_unresolved_merge_markers(text):
         findings.append(
             Finding(rel, "error", "merge-marker", "Unresolved Git merge marker found.")
         )
