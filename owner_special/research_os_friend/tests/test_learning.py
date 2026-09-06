@@ -32,6 +32,7 @@ class PersistentLearningStoreTests(unittest.TestCase):
             self.assertEqual(promoted.state, "validated")
             promoted = store.promote("lr-001", "reusable", evidence=("evidence://run-1",))
             self.assertEqual(promoted.state, "reusable")
+            self.assertEqual(promoted.version, 3)
             reloaded = PersistentLearningStore(Path(tmp) / "learning.json")
             self.assertEqual(len(reloaded.reusable(owner_id="owner", skill_id="repair.flutter.windows")), 1)
 
@@ -46,8 +47,24 @@ class PersistentLearningStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = PersistentLearningStore(Path(tmp) / "learning.json")
             store.add(self._record(owner_id="owner"))
+            store.promote("lr-001", "validated")
             store.promote("lr-001", "reusable")
             self.assertEqual(store.reusable(owner_id="other"), ())
+
+    def test_lifecycle_cannot_skip_validated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = PersistentLearningStore(Path(tmp) / "learning.json")
+            store.add(self._record())
+            with self.assertRaises(ValueError):
+                store.promote("lr-001", "reusable")
+
+    def test_rejected_is_terminal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = PersistentLearningStore(Path(tmp) / "learning.json")
+            store.add(self._record())
+            store.promote("lr-001", "rejected")
+            with self.assertRaises(ValueError):
+                store.promote("lr-001", "validated")
 
     def test_core_record_is_versioned_and_fingerprinted(self):
         record = self._record()
