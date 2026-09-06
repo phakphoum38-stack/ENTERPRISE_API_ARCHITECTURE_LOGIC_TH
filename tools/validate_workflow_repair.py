@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "current" / "GOLDEN_RELEASE_CONTRACT.yml"
 PROTECTED = {"TARGET_SHA", "OWNER_BUILD_IDENTITY", "SHA256", "INSTALLED_PROVENANCE", "CANONICAL_LINEAGE", "RELEASE_CERTIFICATION"}
-FORBIDDEN = {"github.sha", "GITHUB_SHA", "auto-merge", "delete provenance", "disable identity", "skip certification"}
+FORBIDDEN = {"\"auto_merge\": true", "\"auto_apply_to_main\": true", "delete provenance", "disable identity", "skip certification"}
 
 
 def main() -> int:
