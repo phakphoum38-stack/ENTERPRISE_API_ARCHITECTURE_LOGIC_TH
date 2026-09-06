@@ -19,6 +19,10 @@ Copy-Tree $ServiceHostDir (Join-Path $PackageDir 'service_host')
 Copy-Tree (Join-Path $ownerRoot 'research_os_friend') (Join-Path $PackageDir 'owner_special\research_os_friend')
 Copy-Tree (Join-Path $ownerRoot 'scripts') (Join-Path $PackageDir 'owner_special\scripts')
 Copy-Tree (Join-Path $repoRoot 'v3\research_os_v3') (Join-Path $PackageDir 'v3\research_os_v3')
+# catalog.py imports the read-only GitHub dashboard adapter from tools.research_os_api.
+# Bundle that dependency inside the relocated installer so the Windows SCM process
+# does not depend on a repository checkout or an external PYTHONPATH.
+Copy-Tree (Join-Path $repoRoot 'tools\research_os_api') (Join-Path $PackageDir 'tools\research_os_api')
 Copy-Item (Join-Path $ownerRoot 'OWNER_MANIFEST.json') (Join-Path $PackageDir 'owner_special\OWNER_MANIFEST.json') -Force
 Write-Host 'Installing Owner runtime Python dependencies required by Launch Desk...'
 python -m pip install --disable-pip-version-check --quiet 'openai-agents>=0.21.0,<1.0'
