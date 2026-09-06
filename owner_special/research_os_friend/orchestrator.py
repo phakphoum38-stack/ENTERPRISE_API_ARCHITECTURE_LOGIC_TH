@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from .approval import ApprovalGate
 from .brain import FriendBrain
 from .context import FriendContext
 from .evidence import EvidenceRecorder
@@ -17,7 +18,7 @@ from .tools import ToolRegistry
 
 
 class FriendOrchestrator:
-    def __init__(self, *, owner: OwnerIdentity, brain: FriendBrain, planner: DecisionPlanner, skills: SkillRegistry, tools: ToolRegistry, providers: ProviderRouter, memory: ScopedMemory, policy: OwnerPolicy, evidence: EvidenceRecorder) -> None:
+    def __init__(self, *, owner: OwnerIdentity, brain: FriendBrain, planner: DecisionPlanner, skills: SkillRegistry, tools: ToolRegistry, providers: ProviderRouter, memory: ScopedMemory, policy: OwnerPolicy, evidence: EvidenceRecorder, approval_gate: ApprovalGate | None = None) -> None:
         self.owner = owner
         self.brain = brain
         self.planner = planner
@@ -27,6 +28,7 @@ class FriendOrchestrator:
         self.memory = memory
         self.policy = policy
         self.evidence = evidence
+        self.approval_gate = approval_gate or ApprovalGate()
         self.responses = ResponseComposer()
 
     def _route_tools(self, request: FriendRequest) -> tuple[str, ...]:
@@ -49,6 +51,7 @@ class FriendOrchestrator:
         if request.requested_tools:
             for tool in selected_tools:
                 self.policy.authorize_tool(self.owner, request, tool.name)
+                self.approval_gate.enforce(self.owner, request, tool.name)
         context = FriendContext.build(self.owner, request, self.memory)
         scale = self.brain.select_scale(request)
         decision = self.planner.plan(request, scale=scale, skills=tuple(skill.name for skill in selected_skills), tools=tuple(tool.name for tool in selected_tools))
