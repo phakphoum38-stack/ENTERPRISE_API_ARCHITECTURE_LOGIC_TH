@@ -14,6 +14,7 @@ on:
       - ".github/workflows/research-os-windows-artifact.yml"
       - ".github/workflows/owner-special-friend.yml"
       - "owner_special/scripts/build_bundle.py"
+      - "owner_special/scripts/verify-installed-owner-provenance.ps1"
       - ".github/workflows/canonical-source-lineage-gate.yml"
 
 permissions:
@@ -107,7 +108,24 @@ jobs:
           grep -qF 'owner-bundle:' "$workflow"
           grep -qF 'python owner_special/scripts/build_bundle.py' "$workflow"
           grep -qF "owner-special-friend-complete-$expected_target_ref" "$workflow"
+          grep -qF 'verify-installed-owner-provenance.ps1' "$workflow"
+          grep -qF '-ExpectedCommit $env:TARGET_SHA' "$workflow"
+          grep -qF '$env:GITHUB_SHA = $env:TARGET_SHA' "$workflow"
           echo "OWNER_RELEASE_CONTROL_GATE=PASS"
+
+      - name: Verify installed provenance gate implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="owner_special/scripts/verify-installed-owner-provenance.ps1"
+          test -f "$script"
+          grep -qF "OWNER_BUILD_IDENTITY.json" "$script"
+          grep -qF "research_os_owner_special.exe" "$script"
+          grep -qF "ExpectedCommit" "$script"
+          grep -qF "identity.commit" "$script"
+          grep -qF "Get-FileHash" "$script"
+          grep -qF "RELEASE_PROVENANCE_GATE=PASS" "$script"
+          echo "INSTALLED_RELEASE_PROVENANCE_CONTRACT=PASS"
 
       - name: Verify final bundle is bound to the canonical source and validated installer
         shell: bash
