@@ -2,6 +2,7 @@ from .agent_runtime import AgentRun, AgentRuntime, AgentRunStatus, AgentTraceEve
 from .agent_trace_store import PersistentAgentTraceStore
 from .agents_sdk_adapter import AgentsSdkAdapter, AgentsSdkContract, AgentsSdkToolContract
 from .approval import ApprovalGate, ApprovalRecord, ApprovalState, SIDE_EFFECT_TOOLS
+from .approval_store import PersistentApprovalStore
 from .brain import FriendBrain
 from .bundle import OwnerBundleBuilder
 from .capabilities import Capability, CapabilityRegistry, install_friend_complete_capabilities
@@ -15,90 +16,24 @@ from .models import FriendDecision, FriendRequest, FriendResponse, ScaleProfile
 from .orchestrator import FriendOrchestrator
 from .persistent_memory import PersistentScopedMemory
 from .policy import OwnerPolicy
-from .provider_settings import (
-    MemorySecretStore,
-    OpenAICompatibleProvider,
-    ProviderManager,
-    WindowsDpapiSecretStore,
-)
+from .provider_settings import MemorySecretStore, OpenAICompatibleProvider, ProviderManager, WindowsDpapiSecretStore
 from .providers import MockProvider, ProviderRouter
 from .reasoning import DecisionPlanner
 from .runtime import FriendRuntime
-from .service import (
-    OWNER_HEADER,
-    PROFILE_HEADER,
-    SESSION_HEADER,
-    OwnerFriendService,
-    default_owner_data_root,
-)
+from .service import OWNER_HEADER, PROFILE_HEADER, SESSION_HEADER, OwnerFriendService, default_owner_data_root
 from .skills import Skill, SkillRegistry
 from .tool_search import ToolSearch, ToolSearchResult
 from .tools import Tool, ToolRegistry
-from .unified_tool_catalog import (
-    TOOL_CATALOG,
-    ToolDescriptor,
-    ToolState,
-    UnifiedToolCatalog,
-)
+from .unified_tool_catalog import TOOL_CATALOG, ToolDescriptor, ToolState, UnifiedToolCatalog
 from .v3_bridge import V3Bridge, V3BridgeStatus
 
-
 __all__ = [
-    "AgentRun",
-    "AgentRuntime",
-    "AgentRunStatus",
-    "AgentTraceEvent",
-    "PersistentAgentTraceStore",
-    "AgentsSdkAdapter",
-    "AgentsSdkContract",
-    "AgentsSdkToolContract",
-    "ApprovalGate",
-    "ApprovalRecord",
-    "ApprovalState",
-    "SIDE_EFFECT_TOOLS",
-    "Capability",
-    "CapabilityRegistry",
-    "DecisionPlanner",
-    "EvidenceRecorder",
-    "FriendBrain",
-    "FriendContext",
-    "FriendDecision",
-    "FriendOrchestrator",
-    "FriendRequest",
-    "FriendResponse",
-    "FriendRuntime",
-    "HelperAllocation",
-    "HelperScheduler",
-    "MemorySecretStore",
-    "MockProvider",
-    "OpenAICompatibleProvider",
-    "OWNER_HEADER",
-    "OwnerBundleBuilder",
-    "OwnerFriendService",
-    "OwnerIdentity",
-    "OwnerPolicy",
-    "PROFILE_HEADER",
-    "PersistentScopedMemory",
-    "ProviderManager",
-    "ProviderRouter",
-    "SESSION_HEADER",
-    "ScaleProfile",
-    "ScopedMemory",
-    "Skill",
-    "SkillRegistry",
-    "Tool",
-    "ToolRegistry",
-    "ToolSearch",
-    "ToolSearchResult",
-    "TOOL_CATALOG",
-    "ToolDescriptor",
-    "ToolState",
-    "UnifiedToolCatalog",
-    "V3Bridge",
-    "V3BridgeStatus",
-    "WindowsDpapiSecretStore",
-    "default_owner_data_root",
-    "install_builtin_skills",
-    "install_builtin_tools",
+    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
+    "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "HelperAllocation",
+    "HelperScheduler", "MemorySecretStore", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
+    "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
+    "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
+    "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
+    "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
     "install_friend_complete_capabilities",
 ]

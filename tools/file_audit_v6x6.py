@@ -67,9 +67,6 @@ TEXT_SUFFIXES = {
     ".yml",
 }
 
-# Git conflict separators are only meaningful when enclosed by a conflict
-# block. A standalone "=======" is common in plain-text/Markdown headings and
-# must not be treated as an unresolved merge marker.
 MERGE_START_RE = re.compile(r"^<<<<<<<(?:\s.*)?$")
 MERGE_SEPARATOR_RE = re.compile(r"^=======$")
 MERGE_END_RE = re.compile(r"^>>>>>>>(?:\s.*)?$")
@@ -157,7 +154,6 @@ def _has_unresolved_merge_markers(text: str) -> bool:
         if MERGE_END_RE.fullmatch(line):
             return True
         if in_conflict and MERGE_SEPARATOR_RE.fullmatch(line):
-            # The separator is meaningful because a conflict block is open.
             continue
     return in_conflict
 

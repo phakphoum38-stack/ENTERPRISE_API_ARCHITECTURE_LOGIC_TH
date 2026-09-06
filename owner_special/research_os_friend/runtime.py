@@ -9,6 +9,8 @@ from pathlib import Path
 
 from .agent_runtime import AgentRun, AgentRuntime
 from .agent_trace_store import PersistentAgentTraceStore
+from .approval import ApprovalGate, ApprovalRecord, ApprovalState
+from .approval_store import PersistentApprovalStore
 from .brain import FriendBrain
 from .capabilities import CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
@@ -49,6 +51,7 @@ class FriendRuntime:
     learning_store: PersistentLearningStore | None = None
     agent_runtime: AgentRuntime | None = None
     agent_trace_store: PersistentAgentTraceStore | None = None
+    approval_store: PersistentApprovalStore | None = None
     source_commit: str = ""
 
     @staticmethod
@@ -106,6 +109,7 @@ class FriendRuntime:
             previews = SchedulePreviewStore(Path.cwd() / ".research_os_previews")
             learning_store = None
             agent_trace_store = None
+            approval_store = None
         else:
             owner_root = normalized_root / "owners" / owner.owner_id
             memory = PersistentScopedMemory(owner_root / "memory" / "memory.json")
@@ -114,7 +118,19 @@ class FriendRuntime:
                 evidence_path = owner_root / "evidence" / "events.jsonl"
             learning_store = PersistentLearningStore(owner_root / "learning" / "learning.json")
             agent_trace_store = PersistentAgentTraceStore(owner_root / "agent" / "traces.json")
-        orchestrator = FriendOrchestrator(owner=owner, brain=FriendBrain(bridge), planner=DecisionPlanner(), skills=skills, tools=tools, providers=providers, memory=memory, policy=OwnerPolicy(), evidence=EvidenceRecorder(evidence_path))
+            approval_store = PersistentApprovalStore(owner_root / "agent" / "approvals.json")
+        orchestrator = FriendOrchestrator(
+            owner=owner,
+            brain=FriendBrain(bridge),
+            planner=DecisionPlanner(),
+            skills=skills,
+            tools=tools,
+            providers=providers,
+            memory=memory,
+            policy=OwnerPolicy(),
+            evidence=EvidenceRecorder(evidence_path),
+            approval_gate=ApprovalGate(store=approval_store),
+        )
         return cls(
             owner=owner,
             orchestrator=orchestrator,
@@ -128,6 +144,7 @@ class FriendRuntime:
             learning_store=learning_store,
             agent_runtime=AgentRuntime(orchestrator, trace_store=agent_trace_store),
             agent_trace_store=agent_trace_store,
+            approval_store=approval_store,
             source_commit=cls._source_commit(repo_root),
         )
 
@@ -149,6 +166,18 @@ class FriendRuntime:
         if self.agent_runtime is None:
             self.agent_runtime = AgentRuntime(self.orchestrator, trace_store=self.agent_trace_store)
         return self.agent_runtime.list_runs(owner_id=self.owner.owner_id)
+
+    def inspect_tool_approval(self, request: FriendRequest, tool_name: str) -> ApprovalRecord:
+        return self.orchestrator.approval_gate.inspect(self.owner, request, tool_name)
+
+    def approve_tool(self, request: FriendRequest, tool_name: str, reason: str = "") -> ApprovalRecord:
+        return self.orchestrator.approval_gate.approve(self.owner, request, tool_name, reason=reason)
+
+    def deny_tool(self, request: FriendRequest, tool_name: str, reason: str = "") -> ApprovalRecord:
+        return self.orchestrator.approval_gate.deny(self.owner, request, tool_name, reason=reason)
+
+    def tool_approvals(self) -> tuple[ApprovalRecord, ...]:
+        return self.orchestrator.approval_gate.list(owner_id=self.owner.owner_id)
 
     def tool_catalog(self) -> tuple[dict[str, object], ...]:
         """Expose read-only tool discovery and health without changing execution ownership."""
@@ -272,6 +301,7 @@ class FriendRuntime:
 
     def architecture(self) -> dict[str, object]:
         persistence = "disk" if isinstance(self.orchestrator.memory, PersistentScopedMemory) else "memory"
+        approvals = self.tool_approvals()
         return {
             "edition": self.owner.edition,
             "owner_id": self.owner.owner_id,
@@ -283,6 +313,12 @@ class FriendRuntime:
             "tool_catalog": self.tool_catalog(),
             "tool_health": self.tool_health(),
             "tool_health_gate": self.tool_health_gate(),
+            "tool_approvals": {
+                "states": {state.value: sum(1 for item in approvals if item.state is state) for state in ApprovalState},
+                "owner_scoped": True,
+                "persistence": "owner-scoped-disk" if self.approval_store is not None else "in-process",
+                "side_effect_gate": "ApprovalGate",
+            },
             "self_learning": self.self_learning_snapshot(),
             "agent_runtime": {
                 "enabled": self.agent_runtime is not None,
