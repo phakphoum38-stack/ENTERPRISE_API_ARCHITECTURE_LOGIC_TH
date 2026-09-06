@@ -26,6 +26,16 @@ def _load_auditor():
 
 
 class CandidateFileAuditV6x6GateTests(unittest.TestCase):
+    def test_decorative_equals_separator_is_not_a_merge_marker(self) -> None:
+        auditor = _load_auditor()
+        text = "Purpose\n=======\nDocument content\n"
+        self.assertFalse(auditor._has_unresolved_merge_markers(text))
+
+    def test_actual_conflict_block_is_a_merge_marker(self) -> None:
+        auditor = _load_auditor()
+        text = "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> feature\n"
+        self.assertTrue(auditor._has_unresolved_merge_markers(text))
+
     def test_candidate_repository_passes_adaptive_6x6_file_audit(self) -> None:
         auditor = _load_auditor()
         report = auditor.audit_repository(REPO_ROOT)
