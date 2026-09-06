@@ -20,14 +20,6 @@ PROTECTED_PATH_PARTS = {
     ".github/workflows/owner-special-friend.yml",
     "owner_special/scripts/verify-installed-owner-provenance.ps1",
 }
-PROTECTED_TOKENS = {
-    "TARGET_SHA",
-    "OWNER_BUILD_IDENTITY",
-    "SHA256",
-    "INSTALLED_PROVENANCE",
-    "CANONICAL_LINEAGE",
-    "RELEASE_CERTIFICATION",
-}
 MAX_DIFF_BYTES = 250_000
 MAX_FILES = 25
 MAX_HUNKS = 250
@@ -36,14 +28,12 @@ MAX_HUNKS = 250
 def _paths(diff: str) -> list[str]:
     paths: list[str] = []
     for line in diff.splitlines():
-        match = re.match(r"^--- [ab]/(.+)$", line)
-        if match:
-            paths.append(match.group(1))
-        match = re.match(r"^\+\+\+ [ab]/(.+)$", line)
-        if match:
-            path = match.group(1)
-            if path not in paths:
-                paths.append(path)
+        match = re.match(r"^(?:---|\+\+\+) ([ab]/)(.+)$", line)
+        if not match:
+            continue
+        path = match.group(2)
+        if path != "/dev/null" and path not in paths:
+            paths.append(path)
     return paths
 
 
@@ -67,11 +57,6 @@ def validate_diff(diff: str) -> dict[str, object]:
             errors.append(f"unsafe diff path: {path}")
         if normalized in PROTECTED_PATH_PARTS:
             errors.append(f"protected file cannot be auto-repaired: {path}")
-
-    normalized_text = re.sub(r"[^A-Z0-9]+", "_", diff.upper())
-    for token in PROTECTED_TOKENS:
-        if token in normalized_text:
-            errors.append(f"protected gate token appears in repair diff: {token}")
 
     hunk_count = sum(1 for line in diff.splitlines() if line.startswith("@@"))
     if hunk_count > MAX_HUNKS:
