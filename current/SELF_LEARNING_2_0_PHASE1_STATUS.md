@@ -25,7 +25,10 @@ Base: `main` at `ee3b822073eaa092ccba3e19405dd2c3993903bc`.
 15. Lifecycle integrity validation across every present stage and exact skill/version/evidence binding.
 16. Forward-only stage locks: downstream lifecycle stages prevent rewriting upstream evidence.
 17. Readiness predicates for evaluation, provenance, promotion evidence, and complete lifecycle state.
-18. Regression tests for provenance, rollback, evaluation history, feedback aggregation, promotion history, revision lineage, lifecycle assembly, integrity, readiness, and stage locks.
+18. Provenance lineage hardening: v1 has no parent; vN requires parent vN-1.
+19. Rollback target integrity can require an existing provenance version through the provenance ledger.
+20. Structural lifecycle certification produces an immutable certificate without authorizing promotion.
+21. Regression tests cover provenance lineage, rollback targets, lifecycle certification, malformed snapshots, readiness, and stage locks.
 
 ## Safety boundary
 
@@ -35,7 +38,7 @@ Normal evaluation records remain exact-version bound. Revision evaluation is the
 
 The lifecycle assembler only composes immutable evidence. It does not mutate the learned-skill registry, execute tools, or authorize promotion.
 
-Lifecycle integrity is validation-only. A valid lifecycle snapshot means the evidence chain is internally consistent; it does not mean promotion is authorized.
+Lifecycle integrity and certification are structural checks only. A valid lifecycle or certificate means the evidence chain is internally consistent and complete; it does not mean promotion is authorized.
 
 Stage locks are forward-only within an immutable snapshot: evaluation cannot be replaced after provenance exists, provenance cannot be replaced after promotion evidence exists, promotion evidence cannot be replaced after a decision exists, and a decision cannot be replaced once recorded.
 
@@ -43,19 +46,19 @@ Readiness is also non-authorizing: `is_promotion_ready()` means required evidenc
 
 Promotion remains a separate authorization decision. Evaluation, feedback, provenance, and promotion history provide evidence and auditability; they do not grant authority by themselves.
 
-Rollback remains a plan until an explicit approval/execution boundary exists.
+Rollback remains a plan until an explicit approval/execution boundary exists. When a provenance ledger is supplied, a rollback target must also exist in that history.
 
 ## Phase 1 completion criteria
 
 Phase 1 is structurally complete when a learned skill can be represented as an immutable lineage:
 
-`v1 -> feedback(v1) -> revision proposal(v2,parent=v1) -> candidate(v2) -> evaluation(v2) -> provenance(v2) -> promotion evidence(v2) -> promotion record(v2)`
+`v1 -> feedback(v1) -> revision proposal(v2,parent=v1) -> candidate(v2) -> evaluation(v2) -> provenance(v2,parent=v1) -> promotion evidence(v2) -> promotion record(v2) -> lifecycle certificate`
 
-The lifecycle assembler now provides bounded assembly, integrity validation, readiness inspection, and forward-only stage locking for these evidence stages while intentionally keeping promotion execution outside the lifecycle module.
+The lifecycle assembler now provides bounded assembly, integrity validation, readiness inspection, forward-only stage locking, and structural certification while intentionally keeping promotion execution outside the lifecycle module.
 
 ## Verification state
 
-The revision-cycle implementation has been statically corrected so parent feedback can be used as v2 evaluation evidence without weakening normal exact-version evaluation rules. Lifecycle regression coverage now includes evidence preservation, wrong-parent-version rejection, score bounds, no-auto-promotion behavior, stage-lock enforcement, readiness transitions, and malformed-snapshot integrity detection.
+Implementation has been statically hardened for immediate-parent provenance lineage and optional rollback-target existence checks. Lifecycle regression coverage includes evidence preservation, wrong-parent-version rejection, score bounds, no-auto-promotion behavior, stage-lock enforcement, readiness transitions, malformed-snapshot detection, and certificate generation/rejection.
 
 This branch has not had GitHub Actions intentionally executed during development. CI/release verification remains a separate explicit action.
 
