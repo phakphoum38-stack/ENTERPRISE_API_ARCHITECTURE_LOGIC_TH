@@ -22,7 +22,7 @@ This document defines architectural rules that must remain true across Friend Se
 ## Generation and Validation
 
 - **INV-010 — Generated artifacts:** Generated artifacts must be produced from their declared source/template and generator; generated output must not become an undocumented manual source of truth.
-- **INV-011 — Deterministic generation:** Identical source, generator, and configuration inputs must produce equivalent generated output.
+- **INV-011 — Deterministic generation:** Identical source, generator, and configuration inputs must produce equivalent generated output. The current gate enforces deterministic generation inputs/canonicalization; generated-output equivalence remains a follow-up regression gate until a concrete generator/output pair is wired to it.
 - **INV-012 — Validation after generation:** Generated output must pass its applicable validator/audit before it is promoted downstream.
 - **INV-013 — Evidence over assumption:** Documentation may guide validation, but workflow/commit/artifact evidence is authoritative for release decisions.
 
