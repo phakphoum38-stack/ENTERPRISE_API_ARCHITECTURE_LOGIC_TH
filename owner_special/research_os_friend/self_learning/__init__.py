@@ -36,7 +36,6 @@ __all__ = [
     "SkillPromotionRecord",
     "SkillPromotionLedger",
     "SkillRevisionProposal",
-    "SkillRevisionProposal",
     "propose_revision",
     "bind_revision_evaluation",
     "SkillLifecycleSnapshot",
