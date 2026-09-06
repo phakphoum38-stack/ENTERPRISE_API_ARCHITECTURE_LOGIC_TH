@@ -1,6 +1,7 @@
 from .feedback import SkillFeedback
 from .evaluation_history import SkillEvaluationLedger, SkillEvaluationRecord, aggregate_feedback
 from .learner import SelfLearningEngine
+from .lifecycle import SkillLifecycleAssembler, SkillLifecycleSnapshot
 from .models import LearnedSkillCandidate
 from .promotion_history import (
     PromotionEvidenceBundle,
@@ -35,6 +36,9 @@ __all__ = [
     "SkillPromotionRecord",
     "SkillPromotionLedger",
     "SkillRevisionProposal",
+    "SkillRevisionProposal",
     "propose_revision",
     "bind_revision_evaluation",
+    "SkillLifecycleSnapshot",
+    "SkillLifecycleAssembler",
 ]
