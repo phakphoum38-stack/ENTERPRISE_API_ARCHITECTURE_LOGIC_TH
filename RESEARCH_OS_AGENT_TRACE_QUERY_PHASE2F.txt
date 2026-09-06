@@ -1,0 +1,35 @@
+Research OS Friend — Agent Trace Query Phase 2F
+
+Purpose
+=======
+Make persisted high-level Agent Runtime traces inspectable at bounded scale without exposing hidden reasoning or response bodies.
+
+Query contract
+==============
+FriendRuntime.agent_runs supports:
+- session_id filter
+- AgentRunStatus filter
+- bounded limit
+- non-negative offset
+- deterministic newest-first ordering
+
+Persistence boundary
+====================
+The query layer reads the same owner-scoped trace store used by Agent Runtime persistence. No additional trace data is written by query operations.
+
+Safety
+======
+- owner scope is always enforced
+- pagination is bounded by caller-selected limit
+- invalid limit/offset values fail fast
+- no hidden reasoning persistence
+- no credentials
+- response bodies remain non-persistent after restart
+- FriendOrchestrator remains execution authority
+
+Future candidates
+=================
+- cursor pagination for large histories
+- Mission Control timeline projections
+- trace-to-evidence linking
+- retention / compaction policies
