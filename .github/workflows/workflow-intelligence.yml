@@ -9,6 +9,8 @@ on:
       - Research OS Gate
       - Research OS Final Gate
       - Research OS Unified 10x10 Exact SHA Gate
+      - Research OS Candidate
+      - Research OS Release
       - CI Lite
       - Assistant Mesh 30
       - Generate Orchestrator
@@ -143,11 +145,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          STATUS=$(python - <<'PY'
-          import json
-          print(json.load(open('reports/WORKFLOW_FAILURE_ANALYSIS.json', encoding='utf-8'))['status'])
-          PY
-          )
           CLASSIFICATION=$(python - <<'PY'
           import json
           print(json.load(open('reports/WORKFLOW_FAILURE_ANALYSIS.json', encoding='utf-8'))['classification'])
@@ -165,7 +162,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
@@ -180,7 +176,5 @@ jobs:
           print(json.load(open('reports/WORKFLOW_FAILURE_GUARD.json', encoding='utf-8'))['issue_title'])
           PY
           )
-            gh issue create --repo "$REPO" \
-              --title "$TITLE" \
-              --body "Automated analysis completed for run $RUN_ID. AUTO HEAL != AUTO TRUST. Safe auto-merge is disabled; protected gates are never modified automatically. Immutable evidence is attached to the workflow run artifact."
+            gh issue create --repo "$REPO" --title "$TITLE" --body "Automated analysis completed for run $RUN_ID. AUTO HEAL != AUTO TRUST. Safe auto-merge is disabled; protected gates are never modified automatically. Immutable evidence is attached to the workflow run artifact."
           fi
