@@ -46,6 +46,27 @@ class SkillProvenance:
         )
 
 
+class SkillProvenanceLedger:
+    """Append-only in-memory provenance history; it never mutates skill state."""
+
+    def __init__(self) -> None:
+        self._records: dict[str, tuple[SkillProvenance, ...]] = {}
+
+    def record(self, provenance: SkillProvenance) -> SkillProvenance:
+        records = self._records.setdefault(provenance.skill_name, ())
+        if records and provenance.version <= records[-1].version:
+            raise ValueError("provenance versions must increase monotonically")
+        self._records[provenance.skill_name] = (*records, provenance)
+        return provenance
+
+    def history(self, skill_name: str) -> tuple[SkillProvenance, ...]:
+        return self._records.get(skill_name, ())
+
+    def latest(self, skill_name: str) -> SkillProvenance | None:
+        records = self.history(skill_name)
+        return records[-1] if records else None
+
+
 @dataclass(frozen=True)
 class SkillRollbackPlan:
     """Explicit rollback intent; planning never changes the active registry."""
