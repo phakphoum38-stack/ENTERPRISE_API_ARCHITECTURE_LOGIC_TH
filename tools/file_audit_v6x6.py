@@ -67,7 +67,11 @@ TEXT_SUFFIXES = {
     ".yml",
 }
 
-MERGE_MARKER_RE = re.compile(r"^(<<<<<<<|=======|>>>>>>>)", re.MULTILINE)
+# Match actual Git conflict-marker lines, not decorative separators such as
+# "================================" commonly used in plain-text documents.
+MERGE_MARKER_RE = re.compile(
+    r"^(?:<<<<<<<(?:\s.*)?|=======$|>>>>>>>(?:\s.*)?)$", re.MULTILINE
+)
 SECRET_PATTERNS = (
     ("openai-key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
     ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
