@@ -49,7 +49,9 @@ def propose_revision(
         version=version_proposal.version,
         parent_version=current.version,
         change_reason=version_proposal.change_reason,
-        feedback_refs=tuple(item.evidence[0] for item in feedback if item.evidence),
+        feedback_refs=tuple(
+            ref for item in feedback for ref in item.evidence
+        ),
     )
 
 
@@ -60,7 +62,12 @@ def bind_revision_evaluation(
     score: float,
     feedback: tuple[SkillFeedback, ...] = (),
 ) -> SkillEvaluationRecord:
-    """Bind an evaluation to the proposed revision without promoting it."""
+    """Bind an evaluation to the proposed revision without promoting it.
+
+    Revision feedback is intentionally allowed to reference the parent version:
+    it is evidence explaining why v2 is being evaluated, while the resulting
+    evaluation record remains bound to candidate v2.
+    """
     if candidate.name != proposal.skill_name or candidate.version != proposal.version:
         raise ValueError("candidate must match revision proposal")
     if candidate.metadata.get("parent_version") != str(proposal.parent_version):
@@ -68,4 +75,13 @@ def bind_revision_evaluation(
     for item in feedback:
         if item.skill_name != proposal.skill_name or item.version != proposal.parent_version:
             raise ValueError("revision feedback must refer to the parent skill version")
-    return SkillEvaluationRecord.from_candidate(candidate, score=score, feedback=feedback)
+    if score < 0.0 or score > 1.0:
+        raise ValueError("score must be between 0 and 1")
+    return SkillEvaluationRecord(
+        skill_name=candidate.name,
+        version=candidate.version,
+        score=round(float(score), 3),
+        confidence=candidate.normalized_confidence(),
+        evidence_refs=tuple(candidate.evidence),
+        feedback_outcomes=tuple(item.normalized_outcome() for item in feedback),
+    )
