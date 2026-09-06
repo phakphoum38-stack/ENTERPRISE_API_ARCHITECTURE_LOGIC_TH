@@ -27,26 +27,49 @@ concurrency:
 
 env:
   PYTHONUTF8: "1"
+  TRUSTED_REPAIR_REF: main
+  MAX_INVESTIGATION_ISSUES_PER_HOUR: "3"
 
 jobs:
   audit:
     name: Workflow Intelligence Audit
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact workflow source
+      - name: Checkout trusted intelligence tooling
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.TRUSTED_REPAIR_REF }}
           fetch-depth: 1
+
+      - name: Record immutable trigger identity
+        run: |
+          set -euo pipefail
+          echo "SOURCE_WORKFLOW=${{ github.event.workflow_run.name || 'manual' }}" >> "$GITHUB_ENV"
+          echo "SOURCE_RUN_ID=${{ github.event.workflow_run.id || github.run_id }}" >> "$GITHUB_ENV"
+          echo "SOURCE_HEAD_SHA=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_ENV"
+          test -n "${{ github.event.workflow_run.head_sha || github.sha }}"
 
       - name: Install audit dependency
         run: python -m pip install --disable-pip-version-check pyyaml
 
-      - name: Run unit tests
+      - name: Run unit and negative tests
         run: python -m unittest discover -s tools -p 'test_workflow_intelligence.py' -v
 
-      - name: Run workflow architecture audit
+      - name: Validate failure memory policy
+        run: python tools/validate_failure_memory.py
+
+      - name: Run workflow architecture audit against trusted tooling
         run: python tools/audit_workflow_order.py --ref "${{ github.event.workflow_run.head_sha || github.sha }}"
+
+      - name: Build immutable audit evidence
+        run: |
+          python tools/immutable_workflow_evidence.py \
+            --workflow "$SOURCE_WORKFLOW" \
+            --run-id "$SOURCE_RUN_ID" \
+            --commit "$SOURCE_HEAD_SHA" \
+            --input reports/WORKFLOW_DEPENDENCY_GRAPH.json \
+            --input reports/WORKFLOW_BUILD_ORDER_AUDIT.txt \
+            --input current/GOLDEN_RELEASE_CONTRACT.yml
 
       - name: Upload audit reports
         uses: actions/upload-artifact@v4
@@ -61,20 +84,21 @@ jobs:
     needs: audit
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact failed source
+      - name: Checkout trusted intelligence tooling
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ env.TRUSTED_REPAIR_REF }}
           fetch-depth: 1
 
       - name: Install dependencies
         run: python -m pip install --disable-pip-version-check pyyaml
 
-      - name: Download failed workflow logs
+      - name: Download failed workflow logs as untrusted data
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
+          set -euo pipefail
           mkdir -p reports
           gh run view "$RUN_ID" --repo "${{ github.repository }}" --log-failed > reports/FAILED_WORKFLOW.log || true
           test -s reports/FAILED_WORKFLOW.log
@@ -92,6 +116,20 @@ jobs:
       - name: Validate repair safety
         run: python tools/validate_workflow_repair.py
 
+      - name: Validate failure memory
+        run: python tools/validate_failure_memory.py
+
+      - name: Build immutable failure evidence
+        run: |
+          python tools/immutable_workflow_evidence.py \
+            --workflow "${{ github.event.workflow_run.name }}" \
+            --run-id "${{ github.event.workflow_run.id }}" \
+            --commit "${{ github.event.workflow_run.head_sha }}" \
+            --input reports/FAILED_WORKFLOW.log \
+            --input reports/WORKFLOW_FAILURE_ANALYSIS.json \
+            --input reports/WORKFLOW_REPAIR_PLAN.json \
+            --input reports/WORKFLOW_REPAIR_VALIDATION.json
+
       - name: Publish failure analysis artifact
         uses: actions/upload-artifact@v4
         with:
@@ -99,21 +137,50 @@ jobs:
           path: reports/
           if-no-files-found: error
 
-      - name: Create investigation issue for non-safe repair
-        if: ${{ always() && hashFiles('reports/WORKFLOW_REPAIR_PLAN.json') != '' }}
+      - name: Compute failure fingerprint and rate limit
+        id: guard
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STATUS=$(python - <<'PY'
+          import json
+          print(json.load(open('reports/WORKFLOW_FAILURE_ANALYSIS.json', encoding='utf-8'))['status'])
+          PY
+          )
+          CLASSIFICATION=$(python - <<'PY'
+          import json
+          print(json.load(open('reports/WORKFLOW_FAILURE_ANALYSIS.json', encoding='utf-8'))['classification'])
+          PY
+          )
+          python tools/workflow_failure_guard.py \
+            --workflow "${{ github.event.workflow_run.name }}" \
+            --run-id "${{ github.event.workflow_run.id }}" \
+            --classification "$CLASSIFICATION" \
+            --limit "$MAX_INVESTIGATION_ISSUES_PER_HOUR" > reports/WORKFLOW_FAILURE_GUARD.json
+          cat reports/WORKFLOW_FAILURE_GUARD.json
+
+      - name: Create deduplicated investigation issue
+        if: ${{ always() && hashFiles('reports/WORKFLOW_REPAIR_PLAN.json') != '' && steps.guard.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
+          set -euo pipefail
           STATUS=$(python - <<'PY'
           import json
           print(json.load(open('reports/WORKFLOW_REPAIR_PLAN.json', encoding='utf-8'))['status'])
           PY
           )
           if [ "$STATUS" = "BLOCKED" ] || [ "$STATUS" = "ANALYSIS_REQUIRED" ] || [ "$STATUS" = "HUMAN_APPROVAL_REQUIRED" ]; then
+            TITLE=$(python - <<'PY'
+          import json
+          print(json.load(open('reports/WORKFLOW_FAILURE_GUARD.json', encoding='utf-8'))['issue_title'])
+          PY
+          )
             gh issue create --repo "$REPO" \
-              --title "Workflow Intelligence: repair required for $WORKFLOW_NAME run $RUN_ID" \
-              --body "Automated analysis completed. Safe auto-merge is disabled. See workflow artifacts for WORKFLOW_FAILURE_ANALYSIS.json and WORKFLOW_REPAIR_PLAN.json. Protected gates are never modified automatically."
+              --title "$TITLE" \
+              --body "Automated analysis completed for run $RUN_ID. AUTO HEAL != AUTO TRUST. Safe auto-merge is disabled; protected gates are never modified automatically. Immutable evidence is attached to the workflow run artifact."
           fi
