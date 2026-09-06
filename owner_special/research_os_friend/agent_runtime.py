@@ -182,11 +182,35 @@ class AgentRuntime:
             return self.trace_store.get(run_id, owner_id=self.orchestrator.owner.owner_id)
         return self._runs.get(run_id)
 
-    def list_runs(self, *, owner_id: str | None = None) -> tuple[AgentRun, ...]:
+    def list_runs(
+        self,
+        *,
+        owner_id: str | None = None,
+        session_id: str | None = None,
+        status: AgentRunStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[AgentRun, ...]:
         effective_owner = owner_id or self.orchestrator.owner.owner_id
         if self.trace_store is not None:
-            return self.trace_store.list_runs(owner_id=effective_owner)
-        runs = tuple(self._runs.values())
-        if owner_id is None:
-            return tuple(run for run in runs if run.owner_id == self.orchestrator.owner.owner_id)
-        return tuple(run for run in runs if run.owner_id == owner_id)
+            return self.trace_store.list_runs(
+                owner_id=effective_owner,
+                session_id=session_id,
+                status=status,
+                limit=limit,
+                offset=offset,
+            )
+        if offset < 0:
+            raise ValueError("offset must be >= 0")
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be >= 1")
+        runs = tuple(
+            run for run in self._runs.values()
+            if run.owner_id == effective_owner
+            and (session_id is None or run.session_id == session_id)
+            and (status is None or run.status is status)
+        )
+        runs = tuple(sorted(runs, key=lambda item: (item.events[0].timestamp if item.events else "", item.run_id), reverse=True))
+        if limit is None:
+            return runs[offset:]
+        return runs[offset : offset + limit]

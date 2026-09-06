@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 import os
 import threading
-from dataclasses import asdict
-from pathlib import Path
 from typing import Any
+from pathlib import Path
 
 from .agent_runtime import AgentRun, AgentRunStatus, AgentTraceEvent
 
@@ -113,12 +112,30 @@ class PersistentAgentTraceStore:
                 return None
             return run
 
-    def list_runs(self, *, owner_id: str) -> tuple[AgentRun, ...]:
+    def list_runs(
+        self,
+        *,
+        owner_id: str,
+        session_id: str | None = None,
+        status: AgentRunStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[AgentRun, ...]:
+        if offset < 0:
+            raise ValueError("offset must be >= 0")
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be >= 1")
         with self._lock:
-            return tuple(
+            runs = tuple(
                 run for run in self._runs.values()
                 if run.owner_id == owner_id
+                and (session_id is None or run.session_id == session_id)
+                and (status is None or run.status is status)
             )
+        runs = tuple(sorted(runs, key=lambda item: (item.events[0].timestamp if item.events else "", item.run_id), reverse=True))
+        if limit is None:
+            return runs[offset:]
+        return runs[offset : offset + limit]
 
     def count(self, *, owner_id: str | None = None) -> int:
         with self._lock:

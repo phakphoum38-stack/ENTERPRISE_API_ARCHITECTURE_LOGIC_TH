@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agent_runtime import AgentRun, AgentRuntime
+from .agent_runtime import AgentRun, AgentRunStatus, AgentRuntime
 from .agent_trace_store import PersistentAgentTraceStore
 from .approval import ApprovalGate, ApprovalRecord, ApprovalState
 from .approval_store import PersistentApprovalStore
@@ -162,10 +162,23 @@ class FriendRuntime:
             self.agent_runtime = AgentRuntime(self.orchestrator, trace_store=self.agent_trace_store)
         return self.agent_runtime.get(run_id)
 
-    def agent_runs(self) -> tuple[AgentRun, ...]:
+    def agent_runs(
+        self,
+        *,
+        session_id: str | None = None,
+        status: AgentRunStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[AgentRun, ...]:
         if self.agent_runtime is None:
             self.agent_runtime = AgentRuntime(self.orchestrator, trace_store=self.agent_trace_store)
-        return self.agent_runtime.list_runs(owner_id=self.owner.owner_id)
+        return self.agent_runtime.list_runs(
+            owner_id=self.owner.owner_id,
+            session_id=session_id,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
 
     def inspect_tool_approval(self, request: FriendRequest, tool_name: str) -> ApprovalRecord:
         return self.orchestrator.approval_gate.inspect(self.owner, request, tool_name)
@@ -324,6 +337,7 @@ class FriendRuntime:
                 "enabled": self.agent_runtime is not None,
                 "trace": "owner-scoped durable immutable events" if self.agent_trace_store is not None else "in-process immutable events",
                 "persistence": "owner-scoped-disk" if self.agent_trace_store is not None else "disabled",
+                "query": "session/status/limit/offset",
                 "orchestrator_authority": "FriendOrchestrator",
                 "runs": len(self.agent_runs()),
             },
