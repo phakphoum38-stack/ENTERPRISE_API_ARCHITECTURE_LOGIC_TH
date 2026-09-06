@@ -41,7 +41,7 @@ jobs:
             "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "windows_workflow": "research-os-windows-artifact.yml",
             "release_policy": "build-from-current-main",
-            "artifact_policy": "complete-windows-friend-package-required"
+            "artifact_policy": "research-os-windows-artifact-required"
           }
           EOF
           cat build/manifest/build-info.json
@@ -97,7 +97,7 @@ jobs:
           echo "Timed out waiting for Windows artifact workflow."
           exit 1
 
-      - name: Verify complete Windows artifact exists
+      - name: Verify Research OS Windows artifact exists
         env:
           GH_TOKEN: ${{ github.token }}
           WINDOWS_RUN_ID: ${{ steps.wait_windows.outputs.windows_run_id }}
@@ -114,10 +114,10 @@ jobs:
           artifacts="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$WINDOWS_RUN_ID/artifacts" --jq '.artifacts[]' | jq -s '.')"
           echo "$artifacts" | jq -r '.[] | [.name, .size_in_bytes, .expired] | @tsv'
 
-          expected="Research-OS-Windows-x64-Friend-Complete-${GITHUB_SHA}"
+          expected="Research-OS-Windows-x64-${GITHUB_SHA}"
           match="$(jq -r --arg expected "$expected" 'map(select(.name == $expected and .expired == false)) | length' <<< "$artifacts")"
           if [[ "$match" != "1" ]]; then
-            echo "Required complete Windows artifact not found: $expected"
+            echo "Required Research OS Windows artifact not found: $expected"
             echo "Artifacts returned by Windows run:"
             echo "$artifacts" | jq -r '.[].name'
             exit 1
@@ -125,10 +125,10 @@ jobs:
 
           size="$(jq -r --arg expected "$expected" '.[] | select(.name == $expected) | .size_in_bytes' <<< "$artifacts")"
           if [[ "$size" -le 0 ]]; then
-            echo "Required Windows artifact is empty: $expected"
+            echo "Required Research OS Windows artifact is empty: $expected"
             exit 1
           fi
-          echo "COMPLETE_WINDOWS_ARTIFACT=PASS"
+          echo "RESEARCH_OS_WINDOWS_ARTIFACT=PASS"
           echo "artifact=$expected"
           echo "size_bytes=$size"
 
