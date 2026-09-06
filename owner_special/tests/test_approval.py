@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from owner_special.research_os_friend import (
     ApprovalGate,
@@ -52,9 +54,12 @@ class ApprovalGateTests(unittest.TestCase):
 
     def test_safe_tool_does_not_require_approval(self):
         request = self.request(tool="echo")
-        record = self.gate.inspect(self.owner, request, "echo")
-        self.assertEqual(record.state, ApprovalState.NOT_REQUIRED)
-        self.assertEqual(self.gate.enforce(self.owner, request, "echo"), record)
+        inspected = self.gate.inspect(self.owner, request, "echo")
+        enforced = self.gate.enforce(self.owner, request, "echo")
+        self.assertEqual(inspected.state, ApprovalState.NOT_REQUIRED)
+        self.assertEqual(enforced.state, ApprovalState.NOT_REQUIRED)
+        self.assertEqual(enforced.approval_id, inspected.approval_id)
+        self.assertEqual(enforced.request_fingerprint, inspected.request_fingerprint)
 
     def test_owner_boundary_is_enforced(self):
         request = self.request(owner_id="other-owner")
@@ -85,6 +90,19 @@ class ApprovalGateTests(unittest.TestCase):
         )
         runtime.ask(request)
         self.assertEqual(calls, ["run command"])
+
+    def test_persistent_approval_survives_runtime_restart(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            request = self.request()
+            runtime = FriendRuntime.create_owner_special("owner-approval", data_root=root)
+            approved = runtime.approve_tool(request, "shell.run", reason="persisted approval")
+            self.assertEqual(approved.state, ApprovalState.APPROVED)
+            self.assertTrue((root / "owners" / "owner-approval" / "agent" / "approvals.json").is_file())
+
+            restarted = FriendRuntime.create_owner_special("owner-approval", data_root=root)
+            self.assertEqual(restarted.inspect_tool_approval(request, "shell.run"), approved)
+            self.assertEqual(restarted.tool_approvals(), (approved,))
 
 
 if __name__ == "__main__":
