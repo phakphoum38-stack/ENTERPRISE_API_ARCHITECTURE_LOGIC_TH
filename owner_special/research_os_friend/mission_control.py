@@ -15,15 +15,24 @@ class MissionControl:
     VERSION = 1
     MAX_RUNS = 100
     MAX_EVENTS_PER_RUN = 250
+    EVENT_CATEGORIES = {
+        "run-created": "goal",
+        "planning": "plan",
+        "executing": "action",
+        "verifying": "result",
+        "completed": "evidence",
+        "failed": "decision",
+    }
 
     def __init__(self, agent_runtime: Any) -> None:
         self.agent_runtime = agent_runtime
 
-    @staticmethod
-    def _event_view(event: Any) -> dict[str, object]:
+    @classmethod
+    def _event_view(cls, event: Any) -> dict[str, object]:
         return {
             "sequence": event.sequence,
             "event": event.event,
+            "category": cls.EVENT_CATEGORIES.get(event.event, "unknown"),
             "status": event.status.value if isinstance(event.status, AgentRunStatus) else str(event.status),
             "timestamp": event.timestamp,
             "data": dict(event.data),
@@ -45,6 +54,30 @@ class MissionControl:
             "evidence_id": getattr(run.response, "evidence_id", None) if run.response else None,
             "provider": getattr(run.response, "provider", None) if run.response else None,
             "error": run.error,
+        }
+
+    @classmethod
+    def _timeline_view(cls, run: AgentRun) -> dict[str, object]:
+        events = tuple(run.events[: cls.MAX_EVENTS_PER_RUN])
+        steps = [
+            {
+                "sequence": event.sequence,
+                "category": cls.EVENT_CATEGORIES.get(event.event, "unknown"),
+                "event": event.event,
+                "status": event.status.value,
+                "timestamp": event.timestamp,
+                "data": dict(event.data),
+            }
+            for event in events
+        ]
+        return {
+            "schema": "research-os-mission-control-timeline/v1",
+            "run_id": run.run_id,
+            "owner_id": run.owner_id,
+            "read_only": True,
+            "steps": steps,
+            "step_count": len(steps),
+            "truncated": len(run.events) > len(steps),
         }
 
     def snapshot(self, *, owner_id: str | None = None, limit: int = 25) -> dict[str, object]:
@@ -76,3 +109,11 @@ class MissionControl:
         if run is None or run.owner_id != effective_owner:
             return None
         return self._run_view(run)
+
+    def timeline(self, run_id: str, *, owner_id: str | None = None) -> dict[str, object] | None:
+        """Return a bounded, owner-validated timeline projection for one run."""
+        effective_owner = owner_id or self.agent_runtime.orchestrator.owner.owner_id
+        run = self.agent_runtime.get(run_id)
+        if run is None or run.owner_id != effective_owner:
+            return None
+        return self._timeline_view(run)
