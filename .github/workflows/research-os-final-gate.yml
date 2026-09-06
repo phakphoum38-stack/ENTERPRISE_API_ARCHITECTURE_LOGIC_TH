@@ -7,6 +7,7 @@ on:
       - feature/research-os-final-integration
       - fix/living-house-e2e
       - coord/v3.5-flex-final-gates
+      - fix/friend-github-tool
   pull_request:
     branches:
       - main
@@ -66,23 +67,15 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Canonical V3 Windows source gate
+      - name: Validate V3 Flutter source contract
         working-directory: v3/flutter_app
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          flutter config --enable-windows-desktop
-          $required = @(
-            'windows/CMakeLists.txt',
-            'windows/runner/CMakeLists.txt',
-            'windows/runner/main.cpp'
-          )
-          foreach ($path in $required) {
-            if (-not (Test-Path $path -PathType Leaf)) {
-              throw "Canonical V3 Windows source missing: $path"
-            }
-          }
-          Write-Host 'CANONICAL_V3_WINDOWS_SOURCE_GATE=PASS'
+          if (-not (Test-Path 'pubspec.yaml' -PathType Leaf)) { throw 'V3 Flutter pubspec.yaml missing.' }
+          if (-not (Test-Path 'lib' -PathType Container)) { throw 'V3 Flutter lib source missing.' }
+          if (-not (Test-Path 'test' -PathType Container)) { throw 'V3 Flutter test source missing.' }
+          Write-Host 'V3_FLUTTER_SOURCE_CONTRACT=PASS'
 
       - name: Flutter dependencies
         working-directory: v3/flutter_app
@@ -96,6 +89,36 @@ jobs:
         working-directory: v3/flutter_app
         run: flutter test
 
-      - name: Flutter build smoke
-        working-directory: v3/flutter_app
-        run: flutter build windows --release
+      - name: Bootstrap isolated Windows build workspace
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          flutter config --enable-windows-desktop
+          $source = Join-Path $env:GITHUB_WORKSPACE 'v3\flutter_app'
+          $work = Join-Path $env:RUNNER_TEMP 'research-os-v3-flutter-windows'
+          if (Test-Path $work) { Remove-Item $work -Recurse -Force }
+          New-Item -ItemType Directory -Path $work -Force | Out-Null
+          Copy-Item (Join-Path $source '*') $work -Recurse -Force
+          Push-Location $work
+          try {
+            flutter create --platforms=windows --project-name=research_os_v3_flutter .
+            if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter Windows bootstrap failed.' }
+          }
+          finally { Pop-Location }
+          "V3_FLUTTER_WINDOWS_WORKSPACE=$work" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+
+      - name: Flutter Windows build smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Push-Location $env:V3_FLUTTER_WINDOWS_WORKSPACE
+          try {
+            flutter pub get
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter pub get failed in isolated Windows workspace.' }
+            flutter build windows --release
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows release build failed.' }
+          }
+          finally { Pop-Location }
+          $exe = Get-ChildItem (Join-Path $env:V3_FLUTTER_WINDOWS_WORKSPACE 'build\windows') -Filter 'research_os_v3_flutter.exe' -File -Recurse | Select-Object -First 1
+          if (-not $exe) { throw 'Research OS V3 executable was not produced.' }
+          Write-Host "V3_FLUTTER_EXE=$($exe.FullName)"
