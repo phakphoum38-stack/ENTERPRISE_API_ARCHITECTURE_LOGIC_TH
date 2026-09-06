@@ -25,7 +25,7 @@ class ApprovalGateTests(unittest.TestCase):
         )
 
     def test_side_effect_tool_starts_pending(self):
-        record = self.gate.inspect(self.owner, self.request())
+        record = self.gate.inspect(self.owner, self.request(), "shell.run")
         self.assertEqual(record.state, ApprovalState.PENDING)
         self.assertEqual(self.gate.get(record.approval_id), record)
 
