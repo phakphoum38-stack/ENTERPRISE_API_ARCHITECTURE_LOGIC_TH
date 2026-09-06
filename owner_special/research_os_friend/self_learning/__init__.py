@@ -1,7 +1,12 @@
 from .feedback import SkillFeedback
 from .learner import SelfLearningEngine
 from .models import LearnedSkillCandidate
-from .provenance import SkillProvenance, SkillRollbackPlan, plan_rollback
+from .provenance import (
+    SkillProvenance,
+    SkillProvenanceLedger,
+    SkillRollbackPlan,
+    plan_rollback,
+)
 from .registry import LearnedSkillRegistry
 from .versioning import SkillVersionProposal, propose_next_version
 
@@ -13,6 +18,7 @@ __all__ = [
     "SkillVersionProposal",
     "propose_next_version",
     "SkillProvenance",
+    "SkillProvenanceLedger",
     "SkillRollbackPlan",
     "plan_rollback",
 ]
