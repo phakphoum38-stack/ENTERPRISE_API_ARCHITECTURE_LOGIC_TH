@@ -7,7 +7,7 @@ from .models import LearnedSkillCandidate
 
 @dataclass(frozen=True)
 class SkillProvenance:
-    """Immutable provenance record for a promoted learned-skill version."""
+    """Immutable provenance record for one learned-skill version."""
 
     skill_name: str
     version: int
@@ -32,6 +32,16 @@ class SkillProvenance:
         promoted_by: str | None = None,
         rollback_target: int | None = None,
     ) -> "SkillProvenance":
+        if not source.strip():
+            raise ValueError("provenance source is required")
+        if not generated_by.strip():
+            raise ValueError("provenance generator is required")
+        if evaluation_score < 0.0 or evaluation_score > 1.0:
+            raise ValueError("evaluation score must be between 0 and 1")
+        if parent_version is not None and parent_version >= candidate.version:
+            raise ValueError("parent version must be older than candidate version")
+        if rollback_target is not None and rollback_target >= candidate.version:
+            raise ValueError("rollback target must be older than candidate version")
         return cls(
             skill_name=candidate.name,
             version=candidate.version,
@@ -39,7 +49,7 @@ class SkillProvenance:
             source=source.strip(),
             generated_by=generated_by.strip(),
             evidence_refs=tuple(candidate.evidence),
-            evaluation_score=max(0.0, min(1.0, float(evaluation_score))),
+            evaluation_score=round(float(evaluation_score), 3),
             confidence=candidate.normalized_confidence(),
             promoted_by=promoted_by.strip() if promoted_by else None,
             rollback_target=rollback_target,
@@ -54,8 +64,11 @@ class SkillProvenanceLedger:
 
     def record(self, provenance: SkillProvenance) -> SkillProvenance:
         records = self._records.setdefault(provenance.skill_name, ())
-        if records and provenance.version <= records[-1].version:
-            raise ValueError("provenance versions must increase monotonically")
+        if records:
+            if provenance.version <= records[-1].version:
+                raise ValueError("provenance versions must increase monotonically")
+            if provenance.parent_version != records[-1].version:
+                raise ValueError("provenance parent_version must match the previous version")
         self._records[provenance.skill_name] = (*records, provenance)
         return provenance
 
