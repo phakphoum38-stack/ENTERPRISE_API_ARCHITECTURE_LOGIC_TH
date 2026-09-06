@@ -9,6 +9,7 @@ on:
       - fix/canonical-lineage-target-sha-hardening
       - fix/canonical-lineage-runtime-expression-hardening
       - fix/release-contract-lineage
+      - fix/canonical-lineage-dynamic-artifact-contract
     paths:
       - ".github/workflows/research-os-windows-artifact.yml"
       - ".github/workflows/owner-special-friend.yml"
@@ -41,16 +42,30 @@ jobs:
           grep -qF 'APP_EXE_NAME: research_os_flutter.exe' "$workflow"
           grep -qF 'APP_PRODUCT_NAME: Research OS' "$workflow"
           grep -qF 'APP_COMPANY_NAME: Research OS Team' "$workflow"
-          grep -qF 'Research-OS-Windows-x64-${{ github.sha }}' "$workflow"
-          if grep -qF 'Research-OS-Windows-x64-Friend-Complete-${{ github.sha }}' "$workflow"; then
+
+          # The artifact contract must remain dynamic. Never embed the current
+          # commit SHA literally in the canonical workflow: that would make the
+          # lineage gate fail again on the next commit.
+          grep -qF 'name: Research-OS-Windows-x64-${{ github.sha }}' "$workflow"
+          grep -qF 'uses: actions/upload-artifact@v4' "$workflow"
+
+          # Research OS owns the generic Windows artifact. Friend Complete is
+          # produced only by the Owner Special release-control pipeline.
+          if grep -qF 'Research-OS-Windows-x64-Friend-Complete-' "$workflow"; then
             echo 'CANONICAL_LINEAGE_GATE=FAIL'
             echo 'Research OS Windows workflow must not publish the Friend Complete artifact.'
             exit 1
           fi
+          if grep -qF 'Research-OS-Windows-x64-Friend-Complete-${{ github.sha }}' "$workflow"; then
+            echo 'CANONICAL_LINEAGE_GATE=FAIL'
+            echo 'Research OS Windows workflow contains the obsolete Friend Complete SHA contract.'
+            exit 1
+          fi
 
+          expected_artifact="Research-OS-Windows-x64-${GITHUB_SHA}"
           echo 'CANONICAL_LINEAGE_GATE=PASS'
           echo "Canonical source SHA: $GITHUB_SHA"
-          echo 'Research OS artifact contract: Research-OS-Windows-x64-${{ github.sha }}'
+          echo "Research OS artifact contract: $expected_artifact"
 
       - name: Verify Research OS workflow does not bootstrap canonical source
         shell: bash
