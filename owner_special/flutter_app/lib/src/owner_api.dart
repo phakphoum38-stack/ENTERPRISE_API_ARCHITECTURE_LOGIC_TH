@@ -18,12 +18,22 @@ abstract class OwnerFriendApi {
   void clearSession() {}
 }
 
+OwnerFriendApi? _activeOwnerFriendApi;
+
+OwnerFriendApi? get activeOwnerFriendApi => _activeOwnerFriendApi;
+
+void registerOwnerFriendApi(OwnerFriendApi api) {
+  _activeOwnerFriendApi = api;
+}
+
 String _normalizeBaseUrl(String value) => value.endsWith('/') ? value.substring(0, value.length - 1) : value;
 
 final class HttpOwnerFriendApi implements OwnerFriendApi {
   HttpOwnerFriendApi({required String baseUrl, required this.ownerId, this.profileId = 'default', this.sessionId = 'desktop', String researchOsBaseUrl = 'http://127.0.0.1:8787', this.timeout = const Duration(seconds: 5), this.chatTimeout = const Duration(seconds: 30)})
       : baseUrl = _normalizeBaseUrl(baseUrl),
-        researchOsBaseUrl = _normalizeBaseUrl(researchOsBaseUrl);
+        researchOsBaseUrl = _normalizeBaseUrl(researchOsBaseUrl) {
+    registerOwnerFriendApi(this);
+  }
   final String baseUrl;
   final String ownerId;
   final String profileId;
