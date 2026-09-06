@@ -6,9 +6,13 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
 from threading import RLock
+from typing import TYPE_CHECKING
 
 from .identity import OwnerIdentity
 from .models import FriendRequest
+
+if TYPE_CHECKING:
+    from .approval_store import PersistentApprovalStore
 
 
 class ApprovalState(str, Enum):
@@ -53,9 +57,16 @@ class ApprovalRecord:
 class ApprovalGate:
     """Owner-scoped approval state for explicitly side-effecting tools."""
 
-    def __init__(self, required_tools: frozenset[str] = SIDE_EFFECT_TOOLS) -> None:
+    def __init__(
+        self,
+        required_tools: frozenset[str] = SIDE_EFFECT_TOOLS,
+        store: PersistentApprovalStore | None = None,
+    ) -> None:
         self._required_tools = frozenset(required_tools)
-        self._records: dict[str, ApprovalRecord] = {}
+        self._store = store
+        self._records: dict[str, ApprovalRecord] = {
+            record.approval_id: record for record in (store.load() if store is not None else ())
+        }
         self._lock = RLock()
 
     @staticmethod
@@ -70,6 +81,11 @@ class ApprovalGate:
         return hashlib.sha256(
             json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()
+
+    def _persist(self) -> None:
+        if self._store is None:
+            return
+        self._store.save(self._records.values())
 
     def requires_approval(self, tool_name: str) -> bool:
         return tool_name in self._required_tools
@@ -107,6 +123,7 @@ class ApprovalGate:
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
             self._records[approval_id] = record
+            self._persist()
             return record
 
     def decide(
@@ -135,6 +152,7 @@ class ApprovalGate:
         )
         with self._lock:
             self._records[current.approval_id] = updated
+            self._persist()
         return updated
 
     def approve(self, owner: OwnerIdentity, request: FriendRequest, tool_name: str, reason: str = "") -> ApprovalRecord:
