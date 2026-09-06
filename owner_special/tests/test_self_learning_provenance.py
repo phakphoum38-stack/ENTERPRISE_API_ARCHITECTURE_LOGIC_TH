@@ -34,6 +34,36 @@ class SelfLearningProvenanceTests(unittest.TestCase):
         with self.assertRaises(AttributeError):
             provenance.version = 3
 
+    def test_provenance_rejects_invalid_lineage_or_score(self):
+        candidate = LearnedSkillCandidate(
+            name="review",
+            goal="repeat verified review",
+            procedure=("inspect",),
+            confidence=0.9,
+            version=2,
+        )
+        with self.assertRaises(ValueError):
+            SkillProvenance.from_candidate(
+                candidate,
+                source="session",
+                generated_by="engine",
+                parent_version=2,
+            )
+        with self.assertRaises(ValueError):
+            SkillProvenance.from_candidate(
+                candidate,
+                source="session",
+                generated_by="engine",
+                evaluation_score=1.1,
+            )
+        with self.assertRaises(ValueError):
+            SkillProvenance.from_candidate(
+                candidate,
+                source="session",
+                generated_by="engine",
+                rollback_target=2,
+            )
+
     def test_ledger_is_append_only_and_exposes_latest(self):
         ledger = SkillProvenanceLedger()
         first = SkillProvenance("review", 1, None, "session", "engine")
@@ -44,6 +74,12 @@ class SelfLearningProvenanceTests(unittest.TestCase):
         self.assertEqual(ledger.latest("review"), second)
         with self.assertRaises(ValueError):
             ledger.record(second)
+
+    def test_ledger_rejects_broken_parent_lineage(self):
+        ledger = SkillProvenanceLedger()
+        ledger.record(SkillProvenance("review", 1, None, "session", "engine"))
+        with self.assertRaises(ValueError):
+            ledger.record(SkillProvenance("review", 3, 1, "feedback", "engine"))
 
     def test_rollback_is_only_a_plan_until_approval(self):
         provenance = SkillProvenance(
