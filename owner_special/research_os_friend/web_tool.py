@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -10,6 +11,7 @@ from .tools import Tool, ToolRegistry
 
 MAX_BYTES = 1_000_000
 DEFAULT_TIMEOUT = 10.0
+_URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 
 
 class _TitleParser(HTMLParser):
@@ -35,8 +37,17 @@ class _TitleParser(HTMLParser):
         return " ".join("".join(self.parts).split())
 
 
+def _extract_url(text: str) -> str:
+    """Accept either a bare URL or a natural-language request containing one."""
+    value = (text or "").strip()
+    match = _URL_RE.search(value)
+    if match:
+        return match.group(0).rstrip(".,;:!?)]}")
+    return value
+
+
 def _web_fetch(text: str) -> str:
-    url = (text or "").strip()
+    url = _extract_url(text)
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return json.dumps({"error": "InvalidUrl"}, ensure_ascii=False)
