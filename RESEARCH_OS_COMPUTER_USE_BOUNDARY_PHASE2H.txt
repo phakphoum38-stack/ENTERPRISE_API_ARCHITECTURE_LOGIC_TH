@@ -1,0 +1,28 @@
+Research OS Friend — Computer Use Safety Boundary Phase 2H
+
+Purpose
+=======
+Prepare an explicit safety boundary for future Responses API computer-use execution without allowing desktop control to bypass local policy.
+
+Current phase
+=============
+- represent computer actions as immutable intent objects
+- require explicit approval state for computer-use plans
+- validate the owner boundary before a plan is produced
+- keep OS input, screenshots, and API execution disabled
+
+Safety model
+============
+Computer use is treated as side-effecting by default. A future execution adapter must enter FriendOrchestrator and ApprovalGate rather than executing directly from model output.
+
+OpenAI integration note
+=======================
+OpenAI's current Responses API exposes computer-use tool call structures and computer-use models. This repository phase intentionally stops before making those calls so credentials and real desktop control remain separately gated.
+
+Future implementation
+=====================
+- dedicated credential gate for live Responses API calls
+- sandboxed computer target instead of the host desktop by default
+- screenshot redaction policy
+- per-action approval / confirmation policy
+- tool-call trace linkage into Agent Runtime

@@ -35,6 +35,8 @@ TEXT_SUFFIXES = {
     ".rs", ".sh", ".toml", ".ts", ".tsx", ".txt", ".xml", ".yaml", ".yml",
 }
 
+# Match actual Git conflict-marker blocks, not decorative separators such as
+# "================================" commonly used in plain-text documents.
 MERGE_START_RE = re.compile(r"^<<<<<<<(?:\s.*)?$")
 MERGE_SEPARATOR_RE = re.compile(r"^=======$")
 MERGE_END_RE = re.compile(r"^>>>>>>>(?:\s.*)?$")
