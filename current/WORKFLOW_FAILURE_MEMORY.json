@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "policy": {
+    "only_verified": true,
+    "auto_trust": false,
+    "required_fields": ["fingerprint", "classification", "root_cause", "verified_fix", "verified_commit"]
+  },
+  "entries": []
+}
