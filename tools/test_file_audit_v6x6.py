@@ -33,6 +33,18 @@ class FileAuditV6x6Tests(unittest.TestCase):
         self.assertEqual(report["contract"], "adaptive-file-audit-v6x6")
         self.assertEqual(report["capacity"]["max_leaf_capacity"], 46656)
 
+    def test_decorative_separator_is_not_a_merge_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "generated.txt").write_text(
+                "Purpose\n=======\nGenerated document\n\nSafety\n===============\n",
+                encoding="utf-8",
+            )
+            report = audit_repository(root, workers=1)
+
+        self.assertEqual(report["errors"], 0)
+        self.assertEqual(report["findings"], [])
+
     def test_clean_tree_has_no_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
