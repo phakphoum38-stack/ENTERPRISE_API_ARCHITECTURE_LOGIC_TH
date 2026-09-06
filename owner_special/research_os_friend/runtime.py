@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .agent_runtime import AgentRun, AgentRuntime
 from .brain import FriendBrain
 from .capabilities import CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
@@ -45,6 +46,7 @@ class FriendRuntime:
     previews: SchedulePreviewStore | None = None
     self_learning: SelfLearningEngine | None = None
     learning_store: PersistentLearningStore | None = None
+    agent_runtime: AgentRuntime | None = None
     source_commit: str = ""
 
     @staticmethod
@@ -123,11 +125,28 @@ class FriendRuntime:
             previews=previews,
             self_learning=SelfLearningEngine(),
             learning_store=learning_store,
+            agent_runtime=AgentRuntime(orchestrator),
             source_commit=cls._source_commit(repo_root),
         )
 
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
+
+    def run_agent(self, request: FriendRequest) -> AgentRun:
+        """Run through the agent-runtime lifecycle while preserving orchestrator ownership."""
+        if self.agent_runtime is None:
+            self.agent_runtime = AgentRuntime(self.orchestrator)
+        return self.agent_runtime.run(request)
+
+    def get_agent_run(self, run_id: str) -> AgentRun | None:
+        if self.agent_runtime is None:
+            self.agent_runtime = AgentRuntime(self.orchestrator)
+        return self.agent_runtime.get(run_id)
+
+    def agent_runs(self) -> tuple[AgentRun, ...]:
+        if self.agent_runtime is None:
+            self.agent_runtime = AgentRuntime(self.orchestrator)
+        return self.agent_runtime.list_runs(owner_id=self.owner.owner_id)
 
     def tool_catalog(self) -> tuple[dict[str, object], ...]:
         """Expose read-only tool discovery and health without changing execution ownership."""
@@ -263,6 +282,12 @@ class FriendRuntime:
             "tool_health": self.tool_health(),
             "tool_health_gate": self.tool_health_gate(),
             "self_learning": self.self_learning_snapshot(),
+            "agent_runtime": {
+                "enabled": self.agent_runtime is not None,
+                "trace": "in-process immutable events",
+                "orchestrator_authority": "FriendOrchestrator",
+                "runs": len(self.agent_runs()),
+            },
             "v3_execution": self.v3.snapshot(),
             "providers": self.orchestrator.providers.names(),
             "capabilities": self.capabilities.names(),
