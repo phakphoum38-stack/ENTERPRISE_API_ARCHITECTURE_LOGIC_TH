@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'owner_api.dart';
+import 'runtime_status_pill.dart';
+
 class FriendAppShell extends StatelessWidget {
   const FriendAppShell({required this.index, required this.onIndexChanged, required this.pages, required this.teamCenter, required this.status, super.key});
   final int index;
@@ -20,6 +23,9 @@ class FriendAppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final liveApi = activeOwnerFriendApi;
+    final headerStatus = liveApi == null ? status : RuntimeStatusPill(api: liveApi, fallback: status);
+
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
@@ -35,7 +41,7 @@ class FriendAppShell extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _Header(teamCenter: teamCenter, status: status, compact: compact),
+                        _Header(teamCenter: teamCenter, status: headerStatus, compact: compact),
                         const SizedBox(height: 12),
                         Expanded(child: pages[index]),
                       ],
