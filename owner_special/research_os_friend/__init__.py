@@ -7,6 +7,7 @@ from .brain import FriendBrain
 from .bundle import OwnerBundleBuilder
 from .capabilities import Capability, CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
+from .computer_use_boundary import ComputerActionIntent, ComputerActionType, ComputerUseBoundary, ComputerUsePlan
 from .context import FriendContext
 from .evidence import EvidenceRecorder
 from .helpers import HelperAllocation, HelperScheduler
@@ -35,6 +36,6 @@ __all__ = [
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
     "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
     "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
-    "McpDiscoveryBoundary", "McpDiscoveryResult", "McpToolDescriptor", "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
+    "McpDiscoveryBoundary", "McpDiscoveryResult", "McpToolDescriptor", "ComputerActionIntent", "ComputerActionType", "ComputerUseBoundary", "ComputerUsePlan", "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
     "install_friend_complete_capabilities",
 ]
