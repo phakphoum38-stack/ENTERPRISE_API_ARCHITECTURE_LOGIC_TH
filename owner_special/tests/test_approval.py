@@ -1,6 +1,13 @@
 import unittest
 
-from owner_special.research_os_friend import ApprovalGate, ApprovalState, FriendRequest, OwnerIdentity
+from owner_special.research_os_friend import (
+    ApprovalGate,
+    ApprovalState,
+    FriendRequest,
+    FriendRuntime,
+    OwnerIdentity,
+    Tool,
+)
 
 
 class ApprovalGateTests(unittest.TestCase):
@@ -53,6 +60,31 @@ class ApprovalGateTests(unittest.TestCase):
         request = self.request(owner_id="other-owner")
         with self.assertRaises(PermissionError):
             self.gate.inspect(self.owner, request, "shell.run")
+
+    def test_orchestrator_blocks_side_effect_before_handler_and_allows_after_approval(self):
+        runtime = FriendRuntime.create_owner_special("owner-approval")
+        calls = []
+
+        runtime.orchestrator.tools.register(
+            Tool(
+                name="shell.run",
+                description="test side-effect tool",
+                handler=lambda text: calls.append(text) or '{"ok":true}',
+            )
+        )
+        request = self.request()
+        with self.assertRaisesRegex(PermissionError, "approval required"):
+            runtime.ask(request)
+        self.assertEqual(calls, [])
+
+        runtime.orchestrator.approval_gate.approve(
+            runtime.owner,
+            request,
+            "shell.run",
+            reason="test approval",
+        )
+        runtime.ask(request)
+        self.assertEqual(calls, ["run command"])
 
 
 if __name__ == "__main__":
