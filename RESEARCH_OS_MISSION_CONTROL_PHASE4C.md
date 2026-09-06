@@ -11,7 +11,7 @@ contract.
 The implementation deliberately reuses existing runtime health surfaces.
 `UnifiedToolCatalog` is already the read-only catalog over Friend, V3, and
 repair tool surfaces, while `ToolHealthMatrix` already derives aggregate
-health from that catalog. fileciteturn117file0 fileciteturn116file0
+health from that catalog.
 
 Mission Control adds no registration, execution, authorization, or approval
 behavior.
@@ -43,9 +43,9 @@ This panel is observational only. It does not:
 - mutate the unified catalog
 - invoke MCP or Computer Use
 
-The source catalog already models readiness, external dependencies, and
-connection requirements as data; the panel presents that data without changing
-those states. fileciteturn117file0
+The source catalog models readiness, external dependencies, and connection
+requirements as data; the panel presents that data without changing those
+states.
 
 ## Next increment
 
