@@ -38,6 +38,10 @@ class SkillProvenance:
             raise ValueError("provenance generator is required")
         if evaluation_score < 0.0 or evaluation_score > 1.0:
             raise ValueError("evaluation score must be between 0 and 1")
+        if candidate.version == 1 and parent_version is not None:
+            raise ValueError("version 1 provenance cannot have a parent version")
+        if candidate.version > 1 and parent_version != candidate.version - 1:
+            raise ValueError("provenance parent_version must be the immediately previous version")
         if parent_version is not None and parent_version >= candidate.version:
             raise ValueError("parent version must be older than candidate version")
         if rollback_target is not None and rollback_target >= candidate.version:
@@ -69,6 +73,8 @@ class SkillProvenanceLedger:
                 raise ValueError("provenance versions must increase monotonically")
             if provenance.parent_version != records[-1].version:
                 raise ValueError("provenance parent_version must match the previous version")
+        elif provenance.version == 1 and provenance.parent_version is not None:
+            raise ValueError("version 1 provenance cannot have a parent version")
         self._records[provenance.skill_name] = (*records, provenance)
         return provenance
 
@@ -78,6 +84,9 @@ class SkillProvenanceLedger:
     def latest(self, skill_name: str) -> SkillProvenance | None:
         records = self.history(skill_name)
         return records[-1] if records else None
+
+    def contains_version(self, skill_name: str, version: int) -> bool:
+        return any(item.version == version for item in self.history(skill_name))
 
 
 @dataclass(frozen=True)
@@ -96,12 +105,15 @@ def plan_rollback(
     *,
     target_version: int | None = None,
     reason: str = "regression-feedback",
+    ledger: SkillProvenanceLedger | None = None,
 ) -> SkillRollbackPlan:
     target = provenance.rollback_target if target_version is None else target_version
     if target is None:
         raise ValueError("rollback target is required")
     if target >= provenance.version:
         raise ValueError("rollback target must be older than active version")
+    if ledger is not None and not ledger.contains_version(provenance.skill_name, target):
+        raise ValueError("rollback target must exist in provenance history")
     return SkillRollbackPlan(
         skill_name=provenance.skill_name,
         from_version=provenance.version,
