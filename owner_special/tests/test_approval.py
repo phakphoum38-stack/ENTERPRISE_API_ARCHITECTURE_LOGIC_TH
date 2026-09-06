@@ -54,9 +54,12 @@ class ApprovalGateTests(unittest.TestCase):
 
     def test_safe_tool_does_not_require_approval(self):
         request = self.request(tool="echo")
-        record = self.gate.inspect(self.owner, request, "echo")
-        self.assertEqual(record.state, ApprovalState.NOT_REQUIRED)
-        self.assertEqual(self.gate.enforce(self.owner, request, "echo"), record)
+        inspected = self.gate.inspect(self.owner, request, "echo")
+        enforced = self.gate.enforce(self.owner, request, "echo")
+        self.assertEqual(inspected.state, ApprovalState.NOT_REQUIRED)
+        self.assertEqual(enforced.state, ApprovalState.NOT_REQUIRED)
+        self.assertEqual(enforced.approval_id, inspected.approval_id)
+        self.assertEqual(enforced.request_fingerprint, inspected.request_fingerprint)
 
     def test_owner_boundary_is_enforced(self):
         request = self.request(owner_id="other-owner")
