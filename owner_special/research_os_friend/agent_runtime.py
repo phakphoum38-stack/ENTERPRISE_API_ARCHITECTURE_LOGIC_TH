@@ -45,13 +45,18 @@ class AgentRuntime:
 
     The runtime owns execution state and trace shape, while the orchestrator
     remains the authority for policy, skills, tools, memory, and providers.
-    This keeps Phase 2 additive and makes a future Agents SDK adapter possible
-    without replacing the current deterministic Friend path.
+    Optional persistence stores only high-level lifecycle evidence so runs can
+    be recovered after process restart without persisting model reasoning or
+    credentials.
     """
 
-    def __init__(self, orchestrator: FriendOrchestrator) -> None:
+    def __init__(self, orchestrator: FriendOrchestrator, trace_store: Any | None = None) -> None:
         self.orchestrator = orchestrator
+        self.trace_store = trace_store
         self._runs: dict[str, AgentRun] = {}
+        if self.trace_store is not None:
+            for run in self.trace_store.list_runs(owner_id=self.orchestrator.owner.owner_id):
+                self._runs[run.run_id] = run
 
     @staticmethod
     def _timestamp() -> str:
@@ -79,6 +84,11 @@ class AgentRuntime:
             timestamp=self._timestamp(),
             data=data,
         )
+
+    def _save(self, run: AgentRun) -> None:
+        self._runs[run.run_id] = run
+        if self.trace_store is not None:
+            self.trace_store.save(run)
 
     def run(self, request: FriendRequest) -> AgentRun:
         run_id = self._run_id(request)
@@ -164,14 +174,19 @@ class AgentRuntime:
                 events=tuple(events),
                 error=str(exc),
             )
-        self._runs[run_id] = run
+        self._save(run)
         return run
 
     def get(self, run_id: str) -> AgentRun | None:
+        if self.trace_store is not None:
+            return self.trace_store.get(run_id, owner_id=self.orchestrator.owner.owner_id)
         return self._runs.get(run_id)
 
     def list_runs(self, *, owner_id: str | None = None) -> tuple[AgentRun, ...]:
+        effective_owner = owner_id or self.orchestrator.owner.owner_id
+        if self.trace_store is not None:
+            return self.trace_store.list_runs(owner_id=effective_owner)
         runs = tuple(self._runs.values())
         if owner_id is None:
-            return runs
+            return tuple(run for run in runs if run.owner_id == self.orchestrator.owner.owner_id)
         return tuple(run for run in runs if run.owner_id == owner_id)
