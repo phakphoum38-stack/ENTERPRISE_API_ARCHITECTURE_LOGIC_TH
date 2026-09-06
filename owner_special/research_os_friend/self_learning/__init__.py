@@ -2,6 +2,11 @@ from .feedback import SkillFeedback
 from .evaluation_history import SkillEvaluationLedger, SkillEvaluationRecord, aggregate_feedback
 from .learner import SelfLearningEngine
 from .models import LearnedSkillCandidate
+from .promotion_history import (
+    PromotionEvidenceBundle,
+    SkillPromotionLedger,
+    SkillPromotionRecord,
+)
 from .provenance import (
     SkillProvenance,
     SkillProvenanceLedger,
@@ -25,4 +30,7 @@ __all__ = [
     "SkillEvaluationRecord",
     "SkillEvaluationLedger",
     "aggregate_feedback",
+    "PromotionEvidenceBundle",
+    "SkillPromotionRecord",
+    "SkillPromotionLedger",
 ]
