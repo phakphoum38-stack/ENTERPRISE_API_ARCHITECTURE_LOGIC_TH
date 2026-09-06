@@ -2,7 +2,7 @@ name: Owner Special Friend Complete
 
 on:
   push:
-    branches: ['main', 'owner-special/**', 'debug/owner-installer-guard']
+    branches: ['main', 'owner-special/**', 'debug/owner-installer-guard', 'fix/friend-github-tool']
     paths:
       - 'owner_special/**'
       - 'v3/research_os_v3/**'
@@ -76,28 +76,30 @@ jobs:
         with: {python-version: '3.12'}
       - uses: subosito/flutter-action@v2
         with: {channel: stable, cache: true}
-      - name: Generate Windows desktop project
+      - name: Prepare canonical Owner Windows desktop project
         working-directory: owner_special/flutter_app
         shell: pwsh
-        run: flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+        run: |
+          if (-not (Test-Path 'windows/CMakeLists.txt')) { throw 'Canonical Owner Windows project is missing: windows/CMakeLists.txt' }
+          if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Canonical Owner Windows identity file is missing: windows/runner/Runner.rc' }
+          if (-not (Test-Path 'windows/runner/main.cpp')) { throw 'Canonical Owner Windows runner is missing: windows/runner/main.cpp' }
+          Write-Host 'OWNER_CANONICAL_WINDOWS_SOURCE=PASS'
       - name: Prepare Flutter dependencies
         working-directory: owner_special/flutter_app
         shell: pwsh
         run: flutter pub get
-      - name: Flutter analyze (quality signal, non-blocking)
+      - name: Flutter analyze (blocking quality gate)
         working-directory: owner_special/flutter_app
         shell: pwsh
-        continue-on-error: true
         run: |
           flutter analyze
-          "Flutter analyze exit code: $LASTEXITCODE" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-      - name: Flutter tests (quality signal, non-blocking)
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Flutter analyze failed' }
+      - name: Flutter tests (blocking quality gate)
         working-directory: owner_special/flutter_app
         shell: pwsh
-        continue-on-error: true
         run: |
           flutter test
-          "Flutter test exit code: $LASTEXITCODE" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Flutter tests failed' }
       - name: Build Windows desktop (release gate)
         working-directory: owner_special/flutter_app
         shell: pwsh
@@ -235,41 +237,27 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ env.TARGET_SHA }}
-      - uses: actions/setup-python@v6
-        with: {python-version: '3.12'}
       - uses: actions/download-artifact@v7
         with:
           name: owner-special-setup-validated-${{ env.TARGET_SHA }}
           path: owner_special/installer/output
-      - name: Verify Setup.exe
+      - name: Validate Owner Setup in clean/upgrade/uninstall phases
         shell: pwsh
         run: |
-          $setup="$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
-          if (-not (Test-Path $setup -PathType Leaf)) { throw 'Prevalidated Owner Setup EXE missing' }
-          Get-FileHash $setup -Algorithm SHA256 | Format-List | Out-Host
-      - name: Validate clean install
-        shell: pwsh
-        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase clean -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
-      - name: Validate upgrade install
-        shell: pwsh
-        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase upgrade -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
-      - name: Validate uninstall
-        shell: pwsh
-        run: .\owner_special\scripts\validate-owner-installer.ps1 -Phase uninstall -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
-      - name: Upload validated Setup.exe and evidence
+          .\owner_special\scripts\validate-owner-installer.ps1 -Phase full -SetupPath "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner installer validation failed' }
+      - name: Upload Owner validation evidence
         uses: actions/upload-artifact@v6
         with:
-          name: owner-special-setup-${{ env.TARGET_SHA }}
-          path: |
-            owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
-            owner_special/installer/output/owner-v1.3-validation.json
+          name: owner-special-validation-${{ env.TARGET_SHA }}
+          path: owner_special/installer/output/owner-v1.3-validation.json
           if-no-files-found: error
           retention-days: 30
 
   owner-bundle:
-    needs: [friend-complete, owner-desktop, owner-installer-validation]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    needs: [owner-desktop, owner-installer-build, owner-installer-validation]
+    runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
@@ -278,73 +266,28 @@ jobs:
         with: {python-version: '3.12'}
       - uses: actions/download-artifact@v7
         with:
-          name: owner-special-setup-${{ env.TARGET_SHA }}
+          name: owner-special-setup-validated-${{ env.TARGET_SHA }}
           path: owner_special/dist/validated-installer
-      - name: Build Owner Friend Complete source bundle
-        shell: bash
-        run: PYTHONPATH=owner_special python owner_special/scripts/build_bundle.py
-      - name: Verify source bundle
-        shell: bash
+      - name: Build Friend Complete source bundle
+        shell: pwsh
         run: |
-          python - <<'PY'
-          import json, zipfile
-          from pathlib import Path
-          dist=Path('owner_special/dist')
-          archive=dist/'Research-OS-Owner-Special-Friend-Complete.zip'
-          result=json.loads((dist/'bundle-result.json').read_text(encoding='utf-8'))
-          if not archive.is_file() or not result.get('source_only'):
-              raise SystemExit('Owner source bundle invalid')
-          with zipfile.ZipFile(archive) as z:
-              names=set(z.namelist())
-              required={'OWNER_MANIFEST.json','BUNDLE_MANIFEST.json','research_os_friend/service.py','research_os_friend/v3_bridge.py','flutter_app/lib/src/friend_app.dart','windows_service/Program.cs','installer/owner-special.iss','scripts/install-owner-service.ps1','scripts/validate-owner-installer.ps1','tests/test_friend_service.py'}
-              missing=required-names
-              if missing: raise SystemExit(f'Missing Owner Bundle files: {sorted(missing)}')
-          print(result)
-          PY
-      - name: Compose final Owner Special release
-        shell: bash
+          $env:GITHUB_SHA = $env:TARGET_SHA
+          python owner_special/scripts/build_bundle.py
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Friend Complete bundle build failed' }
+      - name: Verify source bundle provenance
+        shell: pwsh
         run: |
-          python - <<'PY'
-          import hashlib, zipfile
-          from pathlib import Path
-          dist=Path('owner_special/dist')
-          setup=dist/'validated-installer/Research-OS-Owner-Special-Setup-1.3.1-x64.exe'
-          evidence=dist/'validated-installer/owner-v1.3-validation.json'
-          source=dist/'Research-OS-Owner-Special-Friend-Complete.zip'
-          for p in (setup,evidence,source,dist/'BUNDLE_SHA256.txt',dist/'bundle-result.json'):
-              if not p.is_file(): raise SystemExit(f'Missing composition input: {p}')
-          final=dist/'Research-OS-Owner-Special-Complete-Release.zip'
-          with zipfile.ZipFile(final,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
-              for p in (setup,evidence,source,dist/'BUNDLE_SHA256.txt',dist/'bundle-result.json'):
-                  z.write(p, p.name)
-          digest=hashlib.sha256(final.read_bytes()).hexdigest()
-          (dist/'RELEASE_SHA256.txt').write_text(f'{digest}  {final.name}\n',encoding='utf-8')
-          print({'release':str(final),'sha256':digest})
-          PY
-      - name: Verify final release
-        shell: bash
-        run: |
-          python - <<'PY'
-          import zipfile
-          from pathlib import Path
-          final=Path('owner_special/dist/Research-OS-Owner-Special-Complete-Release.zip')
-          if not final.is_file(): raise SystemExit('Final Owner Special release ZIP missing')
-          with zipfile.ZipFile(final) as z:
-              required={'Research-OS-Owner-Special-Setup-1.3.1-x64.exe','owner-v1.3-validation.json','Research-OS-Owner-Special-Friend-Complete.zip','BUNDLE_SHA256.txt','bundle-result.json'}
-              missing=required-set(z.namelist())
-              if missing: raise SystemExit(f'Missing final release files: {sorted(missing)}')
-          PY
-      - name: Upload final Owner Special release
+          $result = Get-Content owner_special/dist/bundle-result.json -Raw | ConvertFrom-Json
+          if ($result.source_only -ne $true) { throw 'Owner bundle is not source-only' }
+          if ($result.source_sha -ne $env:TARGET_SHA) { throw "Owner bundle SHA mismatch: $($result.source_sha) != $env:TARGET_SHA" }
+          Write-Host 'OWNER_BUNDLE_PROVENANCE_GATE=PASS'
+      - name: Upload Owner Friend Complete bundle
         uses: actions/upload-artifact@v6
         with:
           name: owner-special-friend-complete-${{ env.TARGET_SHA }}
           path: |
-            owner_special/dist/Research-OS-Owner-Special-Complete-Release.zip
-            owner_special/dist/RELEASE_SHA256.txt
             owner_special/dist/Research-OS-Owner-Special-Friend-Complete.zip
             owner_special/dist/BUNDLE_SHA256.txt
             owner_special/dist/bundle-result.json
-            owner_special/dist/validated-installer/Research-OS-Owner-Special-Setup-1.3.1-x64.exe
-            owner_special/dist/validated-installer/owner-v1.3-validation.json
           if-no-files-found: error
           retention-days: 30

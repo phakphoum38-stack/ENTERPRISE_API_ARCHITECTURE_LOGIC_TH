@@ -50,13 +50,17 @@ jobs:
             'owner_special/flutter_app/lib/src/friend_app.dart',
             'owner_special/flutter_app/lib/src/friend_app_shell.dart',
             'owner_special/flutter_app/lib/src/launch_desk_page.dart',
+            'owner_special/flutter_app/windows/CMakeLists.txt',
+            'owner_special/flutter_app/windows/runner/CMakeLists.txt',
+            'owner_special/flutter_app/windows/runner/main.cpp',
+            'owner_special/flutter_app/windows/runner/Runner.rc',
             'owner_special/research_os_friend/launch_desk_agent.py',
             'owner_special/research_os_friend/launch_desk.py',
             'owner_special/OWNER_MANIFEST.json'
           )
           foreach ($path in $required) {
             if (-not (Test-Path $path -PathType Leaf)) {
-              throw "Required Owner/Launch Desk source missing: $path"
+              throw "Required canonical Owner/Launch Desk source missing: $path"
             }
           }
           $shell = Get-Content 'owner_special/flutter_app/lib/src/friend_app_shell.dart' -Raw
@@ -65,11 +69,15 @@ jobs:
           if ($app -notmatch 'LaunchDeskPage') { throw 'LaunchDeskPage is not wired into Owner Desktop' }
           Write-Host 'SOURCE_LAUNCH_DESK_GATE=PASS'
 
-      - name: 4. Prepare Flutter test/build project
+      - name: 4. Prepare canonical Flutter project
         working-directory: owner_special/flutter_app
         shell: pwsh
         run: |
-          flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+          if (-not (Test-Path 'windows/CMakeLists.txt' -PathType Leaf)) { throw 'Canonical Windows project missing' }
+          if (-not (Test-Path 'windows/runner/Runner.rc' -PathType Leaf)) { throw 'Canonical Windows runner identity missing' }
+          $runner = Get-Content 'windows/runner/Runner.rc' -Raw
+          if ($runner -notmatch 'research_os_owner_special') { throw 'Canonical Owner Windows identity is missing from Runner.rc' }
+          if ($runner -match 'research_os_flutter') { throw 'Research OS generic identity leaked into Owner Runner.rc' }
           flutter pub get
           if ($LASTEXITCODE -ne 0) { throw 'Flutter dependency preparation failed' }
 

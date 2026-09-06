@@ -28,48 +28,73 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Windows runner if needed
+      - name: Validate V3 Flutter source contract
         working-directory: v3/flutter_app
         shell: pwsh
         run: |
-          flutter config --enable-windows-desktop
-          if (-not (Test-Path "windows")) {
-            flutter create --platforms=windows --project-name research_os_v3_flutter .
-          }
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'pubspec.yaml' -PathType Leaf)) { throw 'V3 Flutter pubspec.yaml missing.' }
+          if (-not (Test-Path 'lib' -PathType Container)) { throw 'V3 Flutter lib source missing.' }
+          if (-not (Test-Path 'test' -PathType Container)) { throw 'V3 Flutter test source missing.' }
+          Write-Host 'V3_FLUTTER_SOURCE_CONTRACT=PASS'
 
       - name: Install dependencies
         working-directory: v3/flutter_app
         run: flutter pub get
 
-      - name: Analyze
+      - name: Analyze source
         working-directory: v3/flutter_app
         run: flutter analyze
 
-      - name: Test
+      - name: Test source
         working-directory: v3/flutter_app
         run: flutter test
 
-      - name: Build Windows release
-        working-directory: v3/flutter_app
+      - name: Bootstrap isolated Windows build workspace
         shell: pwsh
         run: |
-          flutter build windows --release
-          if ($LASTEXITCODE -ne 0) { throw "Flutter Windows build failed." }
-          $exe = Get-ChildItem "build\windows" -Filter "research_os_v3_flutter.exe" -File -Recurse | Select-Object -First 1
-          if (-not $exe) { throw "Research OS V3 executable was not produced." }
+          $ErrorActionPreference = 'Stop'
+          flutter config --enable-windows-desktop
+          $source = Join-Path $env:GITHUB_WORKSPACE 'v3\flutter_app'
+          $work = Join-Path $env:RUNNER_TEMP 'research-os-v3-flutter-windows'
+          if (Test-Path $work) { Remove-Item $work -Recurse -Force }
+          New-Item -ItemType Directory -Path $work -Force | Out-Null
+          Copy-Item (Join-Path $source '*') $work -Recurse -Force
+          Push-Location $work
+          try {
+            flutter create --platforms=windows --project-name=research_os_v3_flutter .
+            if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter Windows bootstrap failed.' }
+          }
+          finally { Pop-Location }
+          Write-Host "ISOLATED_WINDOWS_WORKSPACE=$work"
+          "V3_FLUTTER_WINDOWS_WORKSPACE=$work" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build Windows release from isolated workspace
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Push-Location $env:V3_FLUTTER_WINDOWS_WORKSPACE
+          try {
+            flutter pub get
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter pub get failed in isolated Windows workspace.' }
+            flutter build windows --release
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows build failed.' }
+          }
+          finally { Pop-Location }
+          $exe = Get-ChildItem (Join-Path $env:V3_FLUTTER_WINDOWS_WORKSPACE 'build\windows') -Filter 'research_os_v3_flutter.exe' -File -Recurse | Select-Object -First 1
+          if (-not $exe) { throw 'Research OS V3 executable was not produced.' }
           Write-Host "EXE=$($exe.FullName)"
 
       - name: Package Windows release
-        working-directory: v3/flutter_app
         shell: pwsh
         run: |
-          $release = Get-ChildItem "build\windows" -Directory -Recurse |
-            Where-Object { Test-Path (Join-Path $_.FullName "research_os_v3_flutter.exe") } |
+          $release = Get-ChildItem (Join-Path $env:V3_FLUTTER_WINDOWS_WORKSPACE 'build\windows') -Directory -Recurse |
+            Where-Object { Test-Path (Join-Path $_.FullName 'research_os_v3_flutter.exe') } |
             Select-Object -First 1
-          if (-not $release) { throw "Windows release directory was not found." }
-          $zip = Join-Path $env:RUNNER_TEMP "Research-OS-V3-Windows-x64.zip"
+          if (-not $release) { throw 'Windows release directory was not found.' }
+          $zip = Join-Path $env:RUNNER_TEMP 'Research-OS-V3-Windows-x64.zip'
           if (Test-Path $zip) { Remove-Item $zip -Force }
-          Compress-Archive -Path (Join-Path $release.FullName "*") -DestinationPath $zip -CompressionLevel Optimal
+          Compress-Archive -Path (Join-Path $release.FullName '*') -DestinationPath $zip -CompressionLevel Optimal
           $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$sha  Research-OS-V3-Windows-x64.zip" | Set-Content "$zip.sha256" -Encoding ascii
           Write-Host "SHA256=$sha"

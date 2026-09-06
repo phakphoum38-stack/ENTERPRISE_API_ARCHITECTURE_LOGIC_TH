@@ -30,9 +30,29 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Validate committed canonical Windows source
+        working-directory: apps/research_os_flutter
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          flutter config --enable-windows-desktop
+          $required = @(
+            'windows/CMakeLists.txt',
+            'windows/runner/CMakeLists.txt',
+            'windows/runner/main.cpp',
+            'windows/runner/Runner.rc'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path -PathType Leaf)) {
+              throw "Canonical Research OS Windows source missing: $path"
+            }
+          }
+          Write-Host 'CANONICAL_RESEARCH_OS_WINDOWS_SOURCE_GATE=PASS'
+
       - name: Prepare reproducible Windows source tree
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $root = $env:GITHUB_WORKSPACE
           $stage = Join-Path $env:RUNNER_TEMP "Research-OS-Windows-Source"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
@@ -49,10 +69,6 @@ jobs:
 
           Push-Location (Join-Path $stage "apps\research_os_flutter")
           flutter pub get
-          flutter config --enable-windows-desktop
-          if (-not (Test-Path "windows")) {
-            flutter create --platforms=windows --project-name research_os_flutter .
-          }
           Pop-Location
 
           @'
@@ -64,13 +80,11 @@ jobs:
           LOCAL_API_SOURCE=tools/research_os_api
           WINDOWS_WORKFLOW=.github/workflows/research-os-windows-artifact.yml
 
-          The windows/ scaffold is included in this bundle. It was generated with
-          Flutter 3.44.9 using the same command used by the verified Windows CI:
-            flutter create --platforms=windows --project-name research_os_flutter .
+          The windows/ source tree is committed and validated before packaging.
+          Release automation must not regenerate the canonical Windows runner.
 
           Build from apps/research_os_flutter with:
             flutter pub get
-            flutter config --enable-windows-desktop
             flutter build windows --release
           '@ | Set-Content -Path (Join-Path $stage "SOURCE_MANIFEST.txt") -Encoding utf8
 
@@ -78,10 +92,6 @@ jobs:
           $ErrorActionPreference = "Stop"
           Set-Location "$PSScriptRoot\apps\research_os_flutter"
           flutter pub get
-          flutter config --enable-windows-desktop
-          if (-not (Test-Path "windows")) {
-            flutter create --platforms=windows --project-name research_os_flutter .
-          }
           flutter build windows --release
           Write-Host "Built: build\windows\x64\runner\Release\research_os_flutter.exe"
           '@ | Set-Content -Path (Join-Path $stage "BUILD_WINDOWS.ps1") -Encoding utf8

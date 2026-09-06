@@ -1,0 +1,122 @@
+RESEARCH OS — NEXT PHASE PLAN
+================================
+Status: PLANNED / NOT EXECUTED
+Branch: fix/friend-github-tool
+Canonical base: 4b12d56554e75fa903755499df93dc5bf0473bf2
+
+IMPORTANT RELEASE RULE
+----------------------
+Do NOT run GitHub Actions workflows as part of this plan.
+Do NOT modify main directly.
+Do NOT reinstall the Friend Service unless a verified gate requires it.
+Do NOT claim a gate is PASS until an actual run reports success.
+
+CURRENT GATE STATE (2026-09-06)
+--------------------------------
+PASS:
+- Assistant Mesh 30 Gate
+- Research OS CI Lite
+- Generate Orchestrator
+- Research OS Gate
+- Research OS Final Gate
+
+FAILING:
+- Research OS Unified 10x10 Exact SHA Gate
+- Launch Desk Agent
+- Owner Special Friend Complete
+- Owner Special Build Identity Gate
+
+PR #236
+-------
+Title: feat(friend): wire GitHub repository tool
+State: OPEN
+Draft: YES
+Merged: NO
+Head: fix/friend-github-tool
+Head SHA at planning checkpoint: 84d04629798c20e86462fcc60bda5f4129e3f8a4
+
+NEXT ARCHITECTURE ROADMAP
+-------------------------
+PHASE 1 — PERSISTENT SELF-LEARNING
+- Persist learned skills separately from Core Skills.
+- Skill versioning and immutable evidence.
+- Observation -> pattern -> candidate -> sandbox -> test -> evidence -> confidence -> promotion gate.
+- Low-confidence candidates must be rejected.
+- Learned skills must never directly mutate Core Skills.
+- Preserve rollback and audit history.
+
+PHASE 2 — AGENT RUNTIME
+- Add stronger state management and compaction.
+- Preserve completed actions, active assumptions, tool outcomes, unresolved blockers, and next goal.
+- Add Tool Search for large tool catalogs when appropriate.
+- Add MCP integration where it materially improves tool connectivity.
+- Add traceable tool lifecycle and structured execution evidence.
+
+PHASE 3 — COMPUTER USE
+- Browser automation.
+- VS Code workflow automation.
+- Windows desktop automation.
+- Keep actions policy-gated, bounded, observable, and reversible where possible.
+
+PHASE 4 — AGENT-NATIVE GUI / UX
+- Mission Control.
+- Live execution timeline.
+- Goal -> plan -> tool -> input -> action -> result -> evidence -> decision.
+- Dynamic panels generated from a safe UI schema.
+- Capability/health dashboard.
+- Clear distinction between Core Skills, Learned Skills, Tools, and External Connections.
+
+PHASE 5 — MULTIMODAL FRIEND
+- Voice interaction.
+- Vision-aware workspace.
+- Image generation / visual artifacts.
+- Multimodal research workspace.
+
+PHASE 6 — RESEARCH OS AI OPERATING ENVIRONMENT
+- Unified skill registry.
+- Unified tool catalog.
+- Persistent memory.
+- Self-learning with promotion gates.
+- Agent runtime and trace.
+- Computer use.
+- Agent-native GUI.
+- Voice / vision / multimodal interaction.
+
+IMMEDIATE PRIORITY ORDER
+------------------------
+1. Fix and verify all currently failing release gates.
+2. Verify Friend Complete integrity and Build Identity Gate.
+3. Verify Launch Desk.
+4. Verify Unified 10x10 Exact SHA Gate.
+5. Only after all required gates are green, begin the next feature phase.
+6. First feature phase: Persistent Self-Learning + Skill Versioning + Evidence + Promotion Gate.
+7. Then Agent Trace / Mission Control.
+8. Then Agent-native GUI / UX and Tool Search / MCP.
+
+DESIGN PRINCIPLES
+-----------------
+- Core Skills are immutable by self-learning.
+- Learned Skills are versioned and promoted only with evidence.
+- Tools are explicit, capability-gated, and health-checked.
+- External credentials are never embedded in Friend binaries/source.
+- GitHub integration remains read-only unless a separate explicit write capability is designed and approved.
+- Web access must eventually include SSRF-aware URL policy and unsafe redirect protection.
+- Every important autonomous action should produce inspectable evidence.
+- Release gates are authoritative; planning notes are not evidence of success.
+
+OPENAI / DEVELOPER DIRECTION
+----------------------------
+Potential capabilities to evaluate during implementation:
+- Agents SDK patterns for orchestration, state, tracing, and handoffs.
+- Tool Search for large tool catalogs.
+- MCP for external tool connectivity.
+- Computer Use for browser/desktop workflows.
+- Realtime voice interaction.
+- Multimodal / image capabilities.
+- Agent-generated or dynamic GUI patterns.
+
+NO-WORKFLOW EXECUTION CHECKPOINT
+--------------------------------
+This file records architecture and implementation intent only.
+Creating/updating this TXT does NOT authorize running GitHub Actions.
+Workflows must be started separately after the code is ready and the user explicitly authorizes execution.

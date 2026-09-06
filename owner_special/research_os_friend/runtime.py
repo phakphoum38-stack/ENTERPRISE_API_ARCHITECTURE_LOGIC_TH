@@ -19,9 +19,11 @@ from .providers import MockProvider, ProviderRouter
 from .provider_settings import OpenAICompatibleProvider, UrllibJsonTransport
 from .schedule_generation.preview import SchedulePreviewStore
 from .reasoning import DecisionPlanner
+from .self_learning import SelfLearningEngine
 from .skills import SkillRegistry
 from .tools import ToolRegistry
 from .tool_health import ToolHealthMatrix
+from .tool_health_gate import ToolHealthGate
 from .unified_tool_catalog import UnifiedToolCatalog
 from .v3_bridge import V3Bridge
 from .v3_execution_adapter import V3ExecutionAdapter
@@ -37,6 +39,7 @@ class FriendRuntime:
     v3: V3ExecutionAdapter
     data_root: Path | None = None
     previews: SchedulePreviewStore | None = None
+    self_learning: SelfLearningEngine | None = None
 
     @classmethod
     def create_owner_special(cls, owner_id: str, *, display_name: str = "Owner", evidence_path: Path | None = None, data_root: Path | None = None, repository_root: Path | None = None) -> "FriendRuntime":
@@ -81,7 +84,7 @@ class FriendRuntime:
             if evidence_path is None:
                 evidence_path = owner_root / "evidence" / "events.jsonl"
         orchestrator = FriendOrchestrator(owner=owner, brain=FriendBrain(bridge), planner=DecisionPlanner(), skills=skills, tools=tools, providers=providers, memory=memory, policy=OwnerPolicy(), evidence=EvidenceRecorder(evidence_path))
-        return cls(owner=owner, orchestrator=orchestrator, capabilities=capabilities, bridge=bridge, helpers=HelperScheduler(), v3=v3, data_root=normalized_root, previews=previews)
+        return cls(owner=owner, orchestrator=orchestrator, capabilities=capabilities, bridge=bridge, helpers=HelperScheduler(), v3=v3, data_root=normalized_root, previews=previews, self_learning=SelfLearningEngine())
 
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
@@ -94,11 +97,45 @@ class FriendRuntime:
         )
 
     def tool_health(self) -> dict[str, object]:
-        """Return aggregate counts plus the same read-only catalog rows."""
-        return ToolHealthMatrix().snapshot(
+        """Return aggregate catalog health plus the execution readiness gate."""
+        catalog_snapshot = ToolHealthMatrix().snapshot(
             friend_tools=self.orchestrator.tools.names(),
             v3_tools=self.v3.names(),
         )
+        gate_snapshot = ToolHealthGate().snapshot(
+            friend_tools=self.orchestrator.tools.names(),
+            v3_tools=self.v3.names(),
+        )
+        return {
+            **catalog_snapshot,
+            "gate": gate_snapshot,
+        }
+
+    def tool_health_gate(self) -> dict[str, object]:
+        """Return the deterministic readiness gate used by the Friend runtime."""
+        return ToolHealthGate().snapshot(
+            friend_tools=self.orchestrator.tools.names(),
+            v3_tools=self.v3.names(),
+        )
+
+    def learn_skill(self, *, name: str, goal: str, procedure: tuple[str, ...], evidence: tuple[str, ...] = (), confidence: float = 0.0):
+        """Propose and promote a learned skill through the bounded approval gate."""
+        if self.self_learning is None:
+            self.self_learning = SelfLearningEngine()
+        candidate = self.self_learning.propose(
+            name=name,
+            goal=goal,
+            procedure=procedure,
+            evidence=evidence,
+            confidence=confidence,
+        )
+        return self.self_learning.learn(candidate)
+
+    def self_learning_snapshot(self) -> dict[str, object]:
+        """Expose learning state without exposing or mutating the core skill registry."""
+        if self.self_learning is None:
+            self.self_learning = SelfLearningEngine()
+        return self.self_learning.snapshot()
 
     def execute_v3(
         self,
@@ -131,6 +168,8 @@ class FriendRuntime:
             "tools": self.orchestrator.tools.names(),
             "tool_catalog": self.tool_catalog(),
             "tool_health": self.tool_health(),
+            "tool_health_gate": self.tool_health_gate(),
+            "self_learning": self.self_learning_snapshot(),
             "v3_execution": self.v3.snapshot(),
             "providers": self.orchestrator.providers.names(),
             "capabilities": self.capabilities.names(),

@@ -48,18 +48,28 @@ flutter analyze
 flutter test
 ```
 
-### Windows
+### Windows — canonical release source
+
+The Windows runner is committed as canonical source. **Do not run `flutter create` in release/CI pipelines.** Regenerating the project can overwrite the reviewed runner identity and platform files.
 
 ```bash
+cd apps/research_os_flutter
 flutter config --enable-windows-desktop
-flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_flutter
+flutter pub get
 flutter build windows --release
 ```
 
+If a brand-new developer checkout genuinely needs platform bootstrap, do that outside the release pipeline and review the generated diff before committing it.
+
 ### iPhone / iOS unsigned build
 
+The iOS runner must likewise be treated as canonical once committed. For the currently disabled Owner iOS workflow, platform bootstrap remains a manual/development operation only; it is **not** an Owner release gate.
+
+For the Research OS iOS target, use the committed iOS project when present:
+
 ```bash
-flutter create . --platforms=ios --org com.phakphoum38 --project-name research_os_flutter
+cd apps/research_os_flutter
+flutter pub get
 flutter build ios --release --no-codesign \
   --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
 ```
@@ -67,6 +77,22 @@ flutter build ios --release --no-codesign \
 Bundle ID used by the Research OS iPhone workflow:
 
 `com.phakphoum38.researchos`
+
+## Owner Special Windows release
+
+Owner Special has its own canonical Windows runner and its own identity/installer pipeline. Do not regenerate `owner_special/flutter_app/windows` with `flutter create` during release.
+
+Use the dedicated workflow:
+
+`.github/workflows/owner-special-friend.yml`
+
+and the additional identity/installer gate:
+
+`.github/workflows/owner-special-build-identity-gate.yml`
+
+The expected Owner executable identity is:
+
+`research_os_owner_special.exe`
 
 ## API tests
 
