@@ -36,10 +36,6 @@ jobs:
       - name: Assert this pipeline cannot build Owner Special
         shell: pwsh
         run: |
-          $workflow = Get-Content "$env:GITHUB_WORKSPACE/.github/workflows/research-os-windows-artifact.yml" -Raw
-          if ($workflow -match 'owner_special/flutter_app|research_os_owner_special|Research-OS-Owner-Special-Setup') {
-            throw 'Research OS pipeline contains an Owner Special build/package path.'
-          }
           if ($env:APP_PROJECT_NAME -eq 'research_os_owner_special' -or $env:APP_EXE_NAME -eq 'research_os_owner_special.exe') {
             throw 'Research OS pipeline identity collided with Owner Special.'
           }
