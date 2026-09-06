@@ -1,0 +1,38 @@
+Research OS Friend — Approval State Phase 2C
+
+Purpose
+=======
+Introduce an explicit owner-scoped approval state for side-effecting tools so discovery cannot become an execution bypass.
+
+States
+======
+NOT_REQUIRED -> tool is classified safe by the current approval policy.
+PENDING      -> side-effecting tool request exists but has no approval.
+APPROVED     -> the exact owner/profile/session/request/tool tuple was approved.
+DENIED       -> the exact tuple was denied; it cannot execute without a new request fingerprint.
+
+Safety boundary
+===============
+- FriendOrchestrator remains the execution authority.
+- OwnerPolicy remains the owner and explicit-tool authorization authority.
+- Tool Search remains read-only and never executes tools.
+- ApprovalGate only controls whether an already-authorized explicit tool may execute.
+- Approval is bound to a request fingerprint, so changing request text creates a new approval identity.
+- No credentials, hidden reasoning, or tool outputs are persisted by this phase.
+- Approval state is currently in-process; durable approval history is a separate future increment.
+
+Known approval-required surfaces
+================================
+shell / shell.run
+github-actions / github.actions
+github-repository / github.repository.manage
+git-branch / git.branch
+pr-gate / git.pull_request
+
+Future work
+===========
+- durable approval audit records
+- UI approval prompts in Mission Control
+- expiring approvals / revocation policy
+- richer tool descriptors for declared side-effect classes
+- Agents SDK adapter only after local approval semantics are stable
