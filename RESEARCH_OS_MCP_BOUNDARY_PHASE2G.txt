@@ -1,0 +1,25 @@
+Research OS Friend — MCP Discovery Boundary Phase 2G
+
+Purpose
+=======
+Provide a safe normalization boundary for future Model Context Protocol (MCP) discovery without introducing remote execution.
+
+Current contract
+================
+- accept tool descriptors supplied by a future MCP connector
+- normalize name/server/description/capability
+- classify explicit side-effect descriptors as approval-required
+- deterministic bounded discovery
+
+Safety
+======
+- no MCP transport is opened in this phase
+- no remote tool is executed
+- no approval bypass exists
+- OwnerPolicy remains authorization authority
+- FriendOrchestrator remains execution authority
+- ApprovalGate remains approval authority
+
+Next MCP work
+=============
+A future connector may map real MCP server discovery into this descriptor boundary. Remote execution must still enter FriendOrchestrator and ApprovalGate rather than executing from discovery results directly.

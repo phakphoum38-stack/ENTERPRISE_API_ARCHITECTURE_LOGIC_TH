@@ -11,6 +11,7 @@ from .context import FriendContext
 from .evidence import EvidenceRecorder
 from .helpers import HelperAllocation, HelperScheduler
 from .identity import OwnerIdentity
+from .mcp_boundary import McpDiscoveryBoundary, McpDiscoveryResult, McpToolDescriptor
 from .memory import ScopedMemory
 from .models import FriendDecision, FriendRequest, FriendResponse, ScaleProfile
 from .orchestrator import FriendOrchestrator
@@ -34,6 +35,6 @@ __all__ = [
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
     "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
     "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
-    "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
+    "McpDiscoveryBoundary", "McpDiscoveryResult", "McpToolDescriptor", "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
     "install_friend_complete_capabilities",
 ]

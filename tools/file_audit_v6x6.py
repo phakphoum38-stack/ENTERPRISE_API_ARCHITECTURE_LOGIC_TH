@@ -135,9 +135,15 @@ def audit_file(path: Path, root: Path) -> FileResult:
     if text is None:
         return FileResult(rel, tuple(findings))
     if "\ufffd" in text:
-        findings.append(Finding(rel, "warning", "utf8-replacement", "File contains invalid UTF-8 bytes."))
+        findings.append(
+            Finding(rel, "warning", "utf8-replacement", "File contains invalid UTF-8 bytes.")
+        )
+
     if _has_unresolved_merge_markers(text):
-        findings.append(Finding(rel, "error", "merge-marker", "Unresolved Git merge marker found."))
+        findings.append(
+            Finding(rel, "error", "merge-marker", "Unresolved Git merge marker found.")
+        )
+
     for code, pattern in SECRET_PATTERNS:
         if pattern.search(text):
             findings.append(Finding(rel, "error", code, "Credential-like material found; verify and remove or rotate if real."))
