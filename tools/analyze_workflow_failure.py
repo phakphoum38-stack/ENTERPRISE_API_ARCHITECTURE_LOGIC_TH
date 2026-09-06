@@ -32,9 +32,9 @@ def classify(text: str) -> tuple[str, str]:
 
 def protected_hit(text: str) -> list[str]:
     hits = []
-    upper = text.upper()
+    normalized = re.sub(r"[^A-Z0-9]+", "_", text.upper())
     for item in sorted(PROTECTED):
-        if item in upper:
+        if item in normalized:
             hits.append(item)
     return hits
 
