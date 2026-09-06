@@ -67,10 +67,11 @@ TEXT_SUFFIXES = {
     ".yml",
 }
 
-# Match actual Git conflict-marker lines, not decorative separators such as
-# "================================" commonly used in plain-text documents.
+# Git conflict markers are structural. A standalone "=======" is also valid
+# plain-text/Markdown decoration, so it must not be treated as a conflict by
+# itself. Start/end markers remain errors even when a conflict is incomplete.
 MERGE_MARKER_RE = re.compile(
-    r"^(?:<<<<<<<(?:\s.*)?|=======$|>>>>>>>(?:\s.*)?)$", re.MULTILINE
+    r"^(?:<<<<<<<(?:\s.*)?|>>>>>>>(?:\s.*)?)$", re.MULTILINE
 )
 SECRET_PATTERNS = (
     ("openai-key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
