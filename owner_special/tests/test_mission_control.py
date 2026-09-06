@@ -30,6 +30,29 @@ class MissionControlTests(unittest.TestCase):
         self.assertIsNotNone(self.control.run(run.run_id, owner_id="owner-mission"))
         self.assertIsNone(self.control.run(run.run_id, owner_id="other-owner"))
 
+    def test_timeline_is_bounded_owner_scoped_and_deterministic(self) -> None:
+        request = self._request("owner-mission", "Inspect the workspace")
+        run = self.agent.run(request)
+
+        timeline = self.control.timeline(run.run_id)
+
+        assert timeline is not None
+        self.assertEqual(timeline["schema"], "research-os-mission-control-timeline/v1")
+        self.assertTrue(timeline["read_only"])
+        self.assertEqual(timeline["owner_id"], "owner-mission")
+        self.assertEqual(timeline["run_id"], run.run_id)
+        self.assertEqual(timeline["step_count"], 5)
+        self.assertFalse(timeline["truncated"])
+        self.assertEqual(
+            [step["category"] for step in timeline["steps"]],
+            ["goal", "plan", "action", "result", "evidence"],
+        )
+        self.assertEqual(
+            [step["sequence"] for step in timeline["steps"]],
+            [1, 2, 3, 4, 5],
+        )
+        self.assertIsNone(self.control.timeline(run.run_id, owner_id="other-owner"))
+
     def test_limit_is_bounded(self) -> None:
         with self.assertRaises(ValueError):
             self.control.snapshot(limit=0)
