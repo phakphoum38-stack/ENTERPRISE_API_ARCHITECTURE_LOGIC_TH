@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - feat/research-os-ui-v4-20260902
+      - fix/friend-github-tool
     paths:
       - "apps/research_os_flutter/**"
       - ".github/workflows/research-os-flutter-app-ci.yml"
@@ -23,7 +24,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  APP_PROJECT_NAME: research_os_flutter
   APP_EXE_NAME: research_os_flutter.exe
+  APP_PRODUCT_NAME: Research OS
+  APP_COMPANY_NAME: Research OS Team
 
 jobs:
   flutter-app:
@@ -40,51 +44,73 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Canonical Windows source gate
+      - name: Research OS source contract
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: |
-          $required = @(
-            'windows/CMakeLists.txt',
-            'windows/runner/CMakeLists.txt',
-            'windows/runner/main.cpp',
-            'windows/runner/Runner.rc'
-          )
-          foreach ($path in $required) {
-            if (-not (Test-Path $path -PathType Leaf)) {
-              throw "Canonical Research OS Windows source missing: $path"
-            }
-          }
-          $runner = Get-Content 'windows/runner/Runner.rc' -Raw
-          if ($runner -match 'research_os_owner_special') { throw 'Owner Special identity leaked into Research OS Runner.rc' }
-          Write-Host 'CANONICAL_WINDOWS_SOURCE_GATE=PASS'
+          if (-not (Test-Path 'pubspec.yaml')) { throw 'Research OS pubspec.yaml is missing.' }
+          if (-not (Test-Path 'lib')) { throw 'Research OS lib source is missing.' }
+          if (-not (Test-Path 'test')) { throw 'Research OS test source is missing.' }
+          Write-Host 'RESEARCH_OS_SOURCE_CONTRACT=PASS'
 
       - name: Flutter dependencies
         working-directory: apps/research_os_flutter
         shell: pwsh
-        run: flutter pub get
+        run: |
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS flutter pub get failed.' }
 
       - name: Flutter analyze
         working-directory: apps/research_os_flutter
         shell: pwsh
-        run: flutter analyze
+        run: |
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Flutter analyze failed.' }
 
       - name: Flutter tests
         working-directory: apps/research_os_flutter
         shell: pwsh
-        run: flutter test --reporter expanded
+        run: |
+          flutter test --reporter expanded
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Flutter tests failed.' }
 
-      - name: Windows release build
-        working-directory: apps/research_os_flutter
+      - name: Isolate Windows Flutter bootstrap workspace
         shell: pwsh
         run: |
-          flutter build windows --release
-          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows build failed' }
-          $exe = Join-Path $env:GITHUB_WORKSPACE 'apps/research_os_flutter/build/windows/x64/runner/Release/research_os_flutter.exe'
-          if (-not (Test-Path $exe -PathType Leaf)) { throw "Expected Research OS EXE missing: $exe" }
-          $info = (Get-Item $exe).VersionInfo
-          if ($info.InternalName -eq 'research_os_owner_special' -or $info.OriginalFilename -eq 'research_os_owner_special.exe') {
-            throw 'Owner Special EXE identity leaked into Research OS build'
+          $source = Join-Path $env:GITHUB_WORKSPACE 'apps/research_os_flutter'
+          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
+          if (Test-Path $workspace) { Remove-Item $workspace -Recurse -Force }
+          New-Item -ItemType Directory -Path $workspace | Out-Null
+          Get-ChildItem -Path $source -Force | ForEach-Object {
+            Copy-Item $_.FullName -Destination $workspace -Recurse -Force
           }
-          Write-Host "RESEARCH_OS_EXE=$exe"
+          Set-Location $workspace
+          flutter config --enable-windows-desktop
+          flutter create --platforms=windows --project-name=$env:APP_PROJECT_NAME .
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter Windows bootstrap failed.' }
+          if (-not (Test-Path 'windows/CMakeLists.txt')) { throw 'Isolated Windows CMakeLists.txt was not generated.' }
+          if (-not (Test-Path 'windows/runner/CMakeLists.txt')) { throw 'Isolated Windows runner CMakeLists.txt was not generated.' }
+          if (-not (Test-Path 'windows/runner/main.cpp')) { throw 'Isolated Windows runner main.cpp was not generated.' }
+          if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Isolated Windows Runner.rc was not generated.' }
+          $runner = Get-Content 'windows/runner/Runner.rc' -Raw
+          if ($runner -match 'research_os_owner_special') { throw 'Owner Special identity leaked into isolated Research OS Runner.rc' }
+          Write-Host 'RESEARCH_OS_ISOLATED_WINDOWS_BOOTSTRAP=PASS'
+
+      - name: Windows release build
+        shell: pwsh
+        run: |
+          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
+          Set-Location $workspace
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS isolated flutter pub get failed.' }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows build failed.' }
+          $exe = Get-ChildItem -Path 'build/windows' -Filter $env:APP_EXE_NAME -File -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Expected Research OS EXE missing: $env:APP_EXE_NAME" }
+          $info = $exe.VersionInfo
+          if ($info.ProductName -ne $env:APP_PRODUCT_NAME) { throw "Unexpected ProductName: '$($info.ProductName)'" }
+          if ($info.CompanyName -ne $env:APP_COMPANY_NAME) { throw "Unexpected CompanyName: '$($info.CompanyName)'" }
+          if ($info.InternalName -eq 'research_os_owner_special') { throw 'Owner Special EXE InternalName leaked into Research OS build' }
+          if ($info.OriginalFilename -match 'owner_special') { throw 'Owner Special EXE OriginalFilename leaked into Research OS build' }
+          Write-Host "RESEARCH_OS_EXE=$($exe.FullName)"
           Write-Host 'RESEARCH_OS_BUILD_IDENTITY_GATE=PASS'
