@@ -60,6 +60,11 @@ jobs:
       - name: Validate failure memory policy
         run: python tools/validate_failure_memory.py
 
+      - name: Audit stale repair branches and PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/audit_stale_repairs.py --days 7
+
       - name: Run workflow architecture audit against trusted tooling
         run: python tools/audit_workflow_order.py --ref "${{ github.event.workflow_run.head_sha || github.sha }}"
 
@@ -71,7 +76,8 @@ jobs:
             --commit "$SOURCE_HEAD_SHA" \
             --input reports/WORKFLOW_DEPENDENCY_GRAPH.json \
             --input reports/WORKFLOW_BUILD_ORDER_AUDIT.txt \
-            --input current/GOLDEN_RELEASE_CONTRACT.yml
+            --input current/GOLDEN_RELEASE_CONTRACT.yml \
+            --input reports/STALE_REPAIR_AUDIT.json
 
       - name: Upload audit reports
         uses: actions/upload-artifact@v4
