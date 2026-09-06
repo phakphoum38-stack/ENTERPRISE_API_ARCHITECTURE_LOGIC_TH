@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .brain import FriendBrain
@@ -10,6 +13,7 @@ from .catalog import install_builtin_skills, install_builtin_tools
 from .evidence import EvidenceRecorder
 from .helpers import HelperScheduler
 from .identity import OwnerIdentity
+from .learning import LearningRecord, PersistentLearningStore
 from .memory import ScopedMemory
 from .models import FriendRequest, FriendResponse
 from .orchestrator import FriendOrchestrator
@@ -40,6 +44,28 @@ class FriendRuntime:
     data_root: Path | None = None
     previews: SchedulePreviewStore | None = None
     self_learning: SelfLearningEngine | None = None
+    learning_store: PersistentLearningStore | None = None
+    source_commit: str = ""
+
+    @staticmethod
+    def _source_commit(repository_root: Path) -> str:
+        for key in ("RESEARCH_OS_SOURCE_SHA", "GITHUB_SHA"):
+            value = os.environ.get(key, "").strip()
+            if value:
+                return value
+        build_info_candidates = (
+            repository_root / "RESEARCH_OS_BUILD_INFO.txt",
+            repository_root / "owner_special" / "RESEARCH_OS_BUILD_INFO.txt",
+        )
+        for candidate in build_info_candidates:
+            if not candidate.is_file():
+                continue
+            for line in candidate.read_text(encoding="utf-8", errors="replace").splitlines():
+                if line.lower().startswith("desktop commit:"):
+                    value = line.split(":", 1)[1].strip()
+                    if value:
+                        return value
+        return ""
 
     @classmethod
     def create_owner_special(cls, owner_id: str, *, display_name: str = "Owner", evidence_path: Path | None = None, data_root: Path | None = None, repository_root: Path | None = None) -> "FriendRuntime":
@@ -77,14 +103,28 @@ class FriendRuntime:
         if normalized_root is None:
             memory: ScopedMemory = ScopedMemory()
             previews = SchedulePreviewStore(Path.cwd() / ".research_os_previews")
+            learning_store = None
         else:
             owner_root = normalized_root / "owners" / owner.owner_id
             memory = PersistentScopedMemory(owner_root / "memory" / "memory.json")
             previews = SchedulePreviewStore(normalized_root)
             if evidence_path is None:
                 evidence_path = owner_root / "evidence" / "events.jsonl"
+            learning_store = PersistentLearningStore(owner_root / "learning" / "learning.json")
         orchestrator = FriendOrchestrator(owner=owner, brain=FriendBrain(bridge), planner=DecisionPlanner(), skills=skills, tools=tools, providers=providers, memory=memory, policy=OwnerPolicy(), evidence=EvidenceRecorder(evidence_path))
-        return cls(owner=owner, orchestrator=orchestrator, capabilities=capabilities, bridge=bridge, helpers=HelperScheduler(), v3=v3, data_root=normalized_root, previews=previews, self_learning=SelfLearningEngine())
+        return cls(
+            owner=owner,
+            orchestrator=orchestrator,
+            capabilities=capabilities,
+            bridge=bridge,
+            helpers=HelperScheduler(),
+            v3=v3,
+            data_root=normalized_root,
+            previews=previews,
+            self_learning=SelfLearningEngine(),
+            learning_store=learning_store,
+            source_commit=cls._source_commit(repo_root),
+        )
 
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
@@ -129,13 +169,66 @@ class FriendRuntime:
             evidence=evidence,
             confidence=confidence,
         )
-        return self.self_learning.learn(candidate)
+        approved = self.self_learning.learn(candidate)
+        if approved is None or self.learning_store is None:
+            return approved
+        if not self.source_commit:
+            raise RuntimeError("learning persistence requires a canonical source commit")
+
+        payload = {
+            "owner_id": self.owner.owner_id,
+            "skill_id": approved.name,
+            "goal": approved.goal,
+            "procedure": approved.procedure,
+            "evidence": approved.evidence,
+            "confidence": approved.confidence,
+        }
+        record_id = hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        record = LearningRecord(
+            record_id=record_id,
+            owner_id=self.owner.owner_id,
+            skill_id=approved.name,
+            trigger="self_learning",
+            decision_source="skill_promotion_gate",
+            tools_used=(),
+            source_commit=self.source_commit,
+            source_workflow_run=os.environ.get("GITHUB_RUN_ID", "").strip(),
+            changed_files=tuple(str(item) for item in approved.metadata.get("changed_files", ())),
+            validation_result="validated",
+            pr_reference=os.environ.get("GITHUB_PR_NUMBER", "").strip(),
+            verification_timestamp=datetime.now(timezone.utc).isoformat(),
+            confidence=approved.confidence,
+            evidence=tuple(approved.evidence),
+        )
+        try:
+            self.learning_store.add(record)
+        except ValueError as exc:
+            if not str(exc).startswith("duplicate learning record"):
+                raise
+            return approved
+        self.learning_store.promote(record.record_id, "validated", evidence=tuple(approved.evidence))
+        self.learning_store.promote(record.record_id, "reusable", evidence=tuple(approved.evidence))
+        return approved
 
     def self_learning_snapshot(self) -> dict[str, object]:
         """Expose learning state without exposing or mutating the core skill registry."""
         if self.self_learning is None:
             self.self_learning = SelfLearningEngine()
-        return self.self_learning.snapshot()
+        snapshot = dict(self.self_learning.snapshot())
+        if self.learning_store is None:
+            snapshot.update({"persistence": "disabled", "persistent_records": 0, "persistent_reusable": 0})
+        else:
+            snapshot.update(
+                {
+                    "persistence": "owner-scoped-disk",
+                    "persistent_records": self.learning_store.count(),
+                    "persistent_reusable": len(self.learning_store.reusable(owner_id=self.owner.owner_id)),
+                    "source_commit": self.source_commit,
+                }
+            )
+        return snapshot
 
     def execute_v3(
         self,
