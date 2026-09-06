@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feat/chatgpt-style-desktop-shell
+      - fix/friend-github-tool
     paths:
       - "apps/research_os_flutter/**"
       - ".github/workflows/research-os-windows-artifact.yml"
@@ -57,6 +58,9 @@ jobs:
         working-directory: apps/research_os_flutter
         shell: pwsh
         run: |
+          if (-not (Test-Path 'pubspec.yaml')) { throw 'Research OS pubspec.yaml is missing.' }
+          if (-not (Test-Path 'lib')) { throw 'Research OS lib source is missing.' }
+          if (-not (Test-Path 'test')) { throw 'Research OS test source is missing.' }
           flutter pub get
           if ($LASTEXITCODE -ne 0) { throw 'Research OS flutter pub get failed.' }
           flutter analyze
@@ -66,20 +70,32 @@ jobs:
           flutter test test/desktop_shell_test.dart --reporter expanded
           if ($LASTEXITCODE -ne 0) { throw 'Research OS desktop shell UI test failed.' }
 
-      - name: Prepare canonical Research OS Windows project
-        working-directory: apps/research_os_flutter
+      - name: Isolate Windows Flutter bootstrap workspace
         shell: pwsh
         run: |
-          if (-not (Test-Path 'windows/CMakeLists.txt')) { throw 'Canonical Research OS Windows project is missing.' }
-          if (-not (Test-Path 'windows/runner/main.cpp')) { throw 'Canonical Research OS Windows runner is missing.' }
-          if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Canonical Research OS Windows identity file is missing.' }
-          Write-Host 'RESEARCH_OS_CANONICAL_WINDOWS_SOURCE=PASS'
-
-      - name: Build canonical Research OS Windows release
-        working-directory: apps/research_os_flutter
-        shell: pwsh
-        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE 'apps/research_os_flutter'
+          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
+          if (Test-Path $workspace) { Remove-Item $workspace -Recurse -Force }
+          New-Item -ItemType Directory -Path $workspace | Out-Null
+          Get-ChildItem -Path $source -Force | ForEach-Object {
+            Copy-Item $_.FullName -Destination $workspace -Recurse -Force
+          }
+          Set-Location $workspace
           flutter config --enable-windows-desktop
+          flutter create --platforms=windows --project-name=$env:APP_PROJECT_NAME .
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter Windows bootstrap failed.' }
+          if (-not (Test-Path 'windows/CMakeLists.txt')) { throw 'Isolated Windows CMakeLists.txt was not generated.' }
+          if (-not (Test-Path 'windows/runner/main.cpp')) { throw 'Isolated Windows runner was not generated.' }
+          if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Isolated Windows identity file was not generated.' }
+          Write-Host 'RESEARCH_OS_ISOLATED_WINDOWS_BOOTSTRAP=PASS'
+
+      - name: Build isolated Research OS Windows release
+        shell: pwsh
+        run: |
+          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
+          Set-Location $workspace
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS isolated flutter pub get failed.' }
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows build failed.' }
 
@@ -106,6 +122,7 @@ jobs:
           Desktop commit: $env:GITHUB_SHA
           Identity isolation gate: PASS
           UI gate: flutter analyze + full tests + desktop shell test
+          Windows bootstrap: isolated temporary workspace only
           "@ | Set-Content (Join-Path $stage 'RESEARCH_OS_BUILD_INFO.txt') -Encoding utf8
 
       - name: Launch smoke test
