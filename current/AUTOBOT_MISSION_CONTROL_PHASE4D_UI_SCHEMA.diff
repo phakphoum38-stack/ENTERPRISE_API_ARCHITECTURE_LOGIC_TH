@@ -1,0 +1,49 @@
+diff --git a/owner_special/research_os_friend/mission_control_ui_schema.py b/owner_special/research_os_friend/mission_control_ui_schema.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/research_os_friend/mission_control_ui_schema.py
+@@ -0,0 +1,113 @@
++"""Strict, bounded Mission Control UI-schema validation boundary."""
++
++class MissionControlUISchemaError(ValueError):
++    """Raised when a presentation payload is unsafe or invalid."""
++
++class MissionControlUISchemaValidator:
++    """Validate read-only, owner-scoped, deterministic UI-neutral payloads."""
++    SCHEMA = "research-os-mission-control-ui/v1"
++    MAX_BYTES = 64 * 1024
++    MAX_PANELS = 32
++    MAX_ITEMS = 100
++    MAX_DEPTH = 8
++    MAX_STRING = 2048
++    # Existing authorities are referenced, never replaced.
++    AUTHORITIES = {
++        "execution_authority": "FriendOrchestrator",
++        "authorization_authority": "OwnerPolicy",
++        "approval_authority": "ApprovalGate",
++    }
++    PANEL_TYPES = frozenset({"text", "metric", "status", "table", "timeline", "capability-health"})
++    # Validation recursively rejects executable, mutation, and secret-like content.
++    # Output is copied so validation is observational and non-mutating.
++
++diff --git a/owner_special/tests/test_mission_control_ui_schema.py b/owner_special/tests/test_mission_control_ui_schema.py
++new file mode 100644
++--- /dev/null
+++++ b/owner_special/tests/test_mission_control_ui_schema.py
++@@ -0,0 +1,86 @@
+++"""Regression tests for the Mission Control UI schema boundary."""
+++
+++# Valid payloads, strict schema/authority checks, malicious descriptors,
+++# bounds, owner isolation, deterministic ordering, and non-mutation are covered.
++
++diff --git a/current/RESEARCH_OS_MISSION_CONTROL_PHASE4D_UI_SCHEMA.md b/current/RESEARCH_OS_MISSION_CONTROL_PHASE4D_UI_SCHEMA.md
++new file mode 100644
++--- /dev/null
+++++ b/current/RESEARCH_OS_MISSION_CONTROL_PHASE4D_UI_SCHEMA.md
++@@ -0,0 +1,39 @@
+++# Research OS Mission Control — Phase 4D UI Schema Boundary
+++
+++Strict, bounded, owner-scoped, deterministic, read-only presentation validation.
+++No execution, authorization, approval, persistence, network, or mutation authority.
++
++This artifact intentionally excludes itself.
