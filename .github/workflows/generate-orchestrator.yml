@@ -123,6 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           python tools/validate_generate_orchestrator.py
+          python tools/validate_generate_determinism.py
           python - <<'PY'
           import pathlib
           import yaml
