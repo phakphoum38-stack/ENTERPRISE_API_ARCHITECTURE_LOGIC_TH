@@ -33,6 +33,19 @@ class FileAuditV6x6Tests(unittest.TestCase):
         self.assertEqual(report["contract"], "adaptive-file-audit-v6x6")
         self.assertEqual(report["capacity"]["max_leaf_capacity"], 46656)
 
+    def test_ignores_standalone_separator_in_plain_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "phase.txt").write_text(
+                "Research OS Phase\n=======\nPurpose\n=======\n",
+                encoding="utf-8",
+            )
+            report = audit_repository(root, workers=1)
+
+        codes = {item["code"] for item in report["findings"]}
+        self.assertNotIn("merge-marker", codes)
+        self.assertEqual(report["errors"], 0)
+
     def test_clean_tree_has_no_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
