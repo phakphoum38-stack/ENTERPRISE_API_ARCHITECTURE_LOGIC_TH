@@ -1,4 +1,5 @@
 from .agent_runtime import AgentRun, AgentRuntime, AgentRunStatus, AgentTraceEvent
+from .agent_trace_store import PersistentAgentTraceStore
 from .brain import FriendBrain
 from .bundle import OwnerBundleBuilder
 from .capabilities import Capability, CapabilityRegistry, install_friend_complete_capabilities
@@ -23,7 +24,7 @@ from .unified_tool_catalog import TOOL_CATALOG, ToolDescriptor, ToolState, Unifi
 from .v3_bridge import V3Bridge, V3BridgeStatus
 
 __all__ = [
-    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
+    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
     "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "HelperAllocation",
     "HelperScheduler", "MemorySecretStore", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
