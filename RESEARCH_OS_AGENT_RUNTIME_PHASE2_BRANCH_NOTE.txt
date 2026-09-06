@@ -1,0 +1,4 @@
+Clean branch marker for Agent Runtime Phase 2.
+Base: 820bc97798158e1b5052ba7a75a541e9e0b0bcc7
+
+Implementation is kept on feat/friend-agent-runtime-foundation; this branch is not the PR source.
