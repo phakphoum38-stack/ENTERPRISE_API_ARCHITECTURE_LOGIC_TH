@@ -24,7 +24,7 @@ class MissionControlCapabilitiesTests(unittest.TestCase):
         self.assertTrue(snapshot["truncated"])
         self.assertEqual(
             [row["name"] for row in snapshot["rows"]],
-            ["echo", "file", "github", "github-actions", "github-repository"],
+            ["echo", "file", "git-branch", "github", "github-actions"],
         )
 
     def test_limit_is_bounded(self) -> None:
