@@ -1,0 +1,89 @@
+version: 1
+status: CANONICAL
+purpose: >-
+  Deterministic governance contract for task isolation, branch lineage,
+  verification state, quarantine, and merge readiness.
+
+states:
+  - CREATED
+  - ACTIVE
+  - RUNNING
+  - VERIFIED
+  - FROZEN
+  - MERGE_CANDIDATE
+  - MERGED
+  - QUARANTINED
+  - ARCHIVED
+
+active_branch_prefixes:
+  - task/
+  - fix/
+  - feat/
+  - security/
+  - release/
+
+reserved_branch_prefixes:
+  - quarantine/
+  - archive/
+
+ambiguous_names:
+  - tmp
+  - tmp2
+  - tmp3
+  - tmp4
+  - tmp5
+  - new
+  - new2
+  - final
+  - final2
+  - clean
+  - clean2
+
+required_task_fields:
+  - task_id
+  - purpose
+  - repository
+  - branch
+  - base_branch
+  - base_sha
+  - parent_task
+  - head_sha
+  - state
+
+sha_pattern: "^[0-9a-f]{40}$"
+
+rules:
+  one_task_one_branch: true
+  exact_base_sha_required: true
+  exact_head_sha_required: true
+  running_branch_is_locked: true
+  failed_branch_becomes_quarantined: true
+  quarantined_branch_cannot_be_implicit_base: true
+  unknown_state_cannot_be_base: true
+  unknown_base_sha_cannot_be_base: true
+  verified_state_can_be_frozen: true
+  merge_requires_exact_head_evidence: true
+  merge_requires_explicit_authorization: true
+  governance_validation_is_read_only: true
+
+protected_refs:
+  - main
+  - mcp-boundary
+  - computer-use-boundary
+
+current_stack:
+  - "#250"
+  - "#251"
+  - "#252"
+  - "#253"
+  - "#254"
+  - "#255"
+
+current_active_review:
+  task_id: "255"
+  branch: "computer-use-boundary"
+  base_branch: "mcp-boundary"
+  base_sha: "771ffeadd7ca9a85a3038859bb13a078b284230b"
+  head_sha: "b577e21df399c5e2d3d58c7d24cff0d1b3d13bc2"
+  state: RUNNING
+  note: "Treat as locked for unrelated work until PR #255 reaches a terminal decision."
