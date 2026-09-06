@@ -109,7 +109,7 @@ jobs:
           grep -qF 'python owner_special/scripts/build_bundle.py' "$workflow"
           grep -qF "owner-special-friend-complete-$expected_target_ref" "$workflow"
           grep -qF 'verify-installed-owner-provenance.ps1' "$workflow"
-          grep -qF '-ExpectedCommit $env:TARGET_SHA' "$workflow"
+          grep -qF -- '-ExpectedCommit $env:TARGET_SHA' "$workflow"
           grep -qF '$env:GITHUB_SHA = $env:TARGET_SHA' "$workflow"
           echo "OWNER_RELEASE_CONTROL_GATE=PASS"
 
