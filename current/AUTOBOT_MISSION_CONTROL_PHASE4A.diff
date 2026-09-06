@@ -1,21 +1,32 @@
 diff --git a/owner_special/research_os_friend/__init__.py b/owner_special/research_os_friend/__init__.py
 --- a/owner_special/research_os_friend/__init__.py
 +++ b/owner_special/research_os_friend/__init__.py
-@@ -17,6 +17,7 @@ from .memory import ScopedMemory
+@@ -13,6 +13,7 @@
+ from .identity import OwnerIdentity
+ from .memory import ScopedMemory
  from .models import FriendDecision, FriendRequest, FriendResponse, ScaleProfile
 +from .mission_control import MissionControl
  from .orchestrator import FriendOrchestrator
-@@ -29,6 +30,7 @@ __all__ = [
+@@ -30,7 +31,7 @@
+ __all__ = [
+     "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
+     "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "HelperAllocation",
 -    "HelperScheduler", "MemorySecretStore", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
 +    "HelperScheduler", "MemorySecretStore", "MissionControl", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
      "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
-
-diff --git a/owner_special/research_os_friend/mission_control.py b/owner_special/research_os_friend/mission_control.py
-new file mode 100644
---- /dev/null
-+++ b/owner_special/research_os_friend/mission_control.py
-@@ -0,0 +1,75 @@
-+from __future__ import annotations
+     "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
+     "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
+-diff --git a/owner_special/research_os_friend/mission_control.py b/owner_special/research_os_friend/mission_control.py
+-new file mode 100644
+---- /dev/null
+-+++ b/owner_special/research_os_friend/mission_control.py
+-@@ -0,0 +1,75 @@
++diff --git a/owner_special/research_os_friend/mission_control.py b/owner_special/research_os_friend/mission_control.py
++new file mode 100644
++--- /dev/null
+++++ b/owner_special/research_os_friend/mission_control.py
++@@ -0,0 +1,78 @@
++from __future__
 +
 +from typing import Any
 +
@@ -93,99 +104,157 @@ new file mode 100644
 +        if run is None or run.owner_id != effective_owner:
 +            return None
 +        return self._run_view(run)
-+
 +diff --git a/owner_special/tests/test_mission_control.py b/owner_special/tests/test_mission_control.py
 +new file mode 100644
 +--- /dev/null
 ++++ b/owner_special/tests/test_mission_control.py
-+@@ -0,0 +1,49 @@
-++import unittest
-++
-++from owner_special.research_os_friend.agent_runtime import AgentRunStatus
-++from owner_special.research_os_friend.mission_control import MissionControl
-++from owner_special.research_os_friend.runtime import FriendRuntime
-++
-++
-++class MissionControlTests(unittest.TestCase):
-++    def setUp(self) -> None:
-++        self.runtime = FriendRuntime.create_owner_special("owner-mission", data_root=None)
-++        self.agent = self.runtime.agent_runtime
-++        assert self.agent is not None
-++        self.control = MissionControl(self.agent)
-++
-++    def test_snapshot_is_read_only_and_owner_scoped(self) -> None:
-++        request = self._request("owner-mission", "Inspect the workspace")
-++        run = self.agent.run(request)
-++        snapshot = self.control.snapshot(limit=10)
-++        self.assertEqual(snapshot["schema"], "research-os-mission-control/v1")
-++        self.assertTrue(snapshot["read_only"])
-++        self.assertEqual(snapshot["execution_authority"], "FriendOrchestrator")
-++        self.assertEqual(snapshot["authorization_authority"], "OwnerPolicy")
-++        self.assertEqual(snapshot["approval_authority"], "ApprovalGate")
-++        self.assertEqual(snapshot["total_runs"], 1)
-++        self.assertEqual(snapshot["runs"][0]["run_id"], run.run_id)
-++        self.assertEqual(snapshot["runs"][0]["status"], AgentRunStatus.COMPLETED.value)
-++        self.assertIsNotNone(self.control.run(run.run_id, owner_id="owner-mission"))
-++        self.assertIsNone(self.control.run(run.run_id, owner_id="other-owner"))
-++
-++    def test_limit_is_bounded(self) -> None:
-++        with self.assertRaises(ValueError):
-++            self.control.snapshot(limit=0)
-++        with self.assertRaises(ValueError):
-++            self.control.snapshot(limit=MissionControl.MAX_RUNS + 1)
-++
-++    @staticmethod
-++    def _request(owner_id: str, text: str):
-++        from owner_special.research_os_friend.models import FriendRequest
-++        return FriendRequest(owner_id=owner_id, profile_id="default", session_id="mission-session", text=text)
-++
-++
-++if __name__ == "__main__":
-++    unittest.main()
-++
++@@ -0,0 +1,52 @@
++import unittest
++
++from owner_special.research_os_friend.agent_runtime import AgentRunStatus, AgentRuntime
++from owner_special.research_os_friend.mission_control import MissionControl
++from owner_special.research_os_friend.runtime import FriendRuntime
++
++
++class MissionControlTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self.runtime = FriendRuntime.create_owner_special("owner-mission", data_root=None)
++        self.agent = self.runtime.agent_runtime
++        assert self.agent is not None
++        self.control = MissionControl(self.agent)
++
++    def test_snapshot_is_read_only_and_owner_scoped(self) -> None:
++        request = self._request("owner-mission", "Inspect the workspace")
++        run = self.agent.run(request)
++
++        snapshot = self.control.snapshot(limit=10)
++
++        self.assertEqual(snapshot["schema"], "research-os-mission-control/v1")
++        self.assertTrue(snapshot["read_only"])
++        self.assertEqual(snapshot["execution_authority"], "FriendOrchestrator")
++        self.assertEqual(snapshot["authorization_authority"], "OwnerPolicy")
++        self.assertEqual(snapshot["approval_authority"], "ApprovalGate")
++        self.assertEqual(snapshot["total_runs"], 1)
++        self.assertEqual(snapshot["runs"][0]["run_id"], run.run_id)
++        self.assertEqual(snapshot["runs"][0]["status"], AgentRunStatus.COMPLETED.value)
++
++        self.assertIsNotNone(self.control.run(run.run_id, owner_id="owner-mission"))
++        self.assertIsNone(self.control.run(run.run_id, owner_id="other-owner"))
++
++    def test_limit_is_bounded(self) -> None:
++        with self.assertRaises(ValueError):
++            self.control.snapshot(limit=0)
++        with self.assertRaises(ValueError):
++            self.control.snapshot(limit=MissionControl.MAX_RUNS + 1)
++
++    @staticmethod
++    def _request(owner_id: str, text: str):
++        from owner_special.research_os_friend.models import FriendRequest
++
++        return FriendRequest(
++            owner_id=owner_id,
++            profile_id="default",
++            session_id="mission-session",
++            text=text,
++        )
++
++
++if __name__ == "__main__":
++    unittest.main()
 +diff --git a/RESEARCH_OS_MISSION_CONTROL_PHASE4A.md b/RESEARCH_OS_MISSION_CONTROL_PHASE4A.md
 +new file mode 100644
 +--- /dev/null
 ++++ b/RESEARCH_OS_MISSION_CONTROL_PHASE4A.md
-+@@ -0,0 +1,57 @@
-++# Research OS — Mission Control Phase 4A
-++
-++## Purpose
-++
-++Add a deterministic, read-only Mission Control projection over the existing `AgentRuntime` trace model. This is the first presentation-layer contract for an agent-native workspace and does not create a second execution authority.
-++
-++## Lifecycle view
-++
-++`goal -> plan -> tool/action -> result -> evidence -> decision`
-++
-++The current AgentRuntime trace provides high-level lifecycle events safe to expose: `run-created`, `planning`, `executing`, `verifying`, and `completed`/`failed`.
-++
-++## Authority boundaries
-++
-++- `FriendOrchestrator` remains execution authority.
-++- `OwnerPolicy` remains authorization authority.
-++- `ApprovalGate` remains approval authority.
-++- `AgentRuntime` remains trace/lifecycle authority.
-++- `MissionControl` is presentation/projection only.
-++
-++Mission Control must never execute a tool, authorize a tool, mutate a skill, change policy, or grant approval.
-++
-++## Owner isolation
-++
-++Snapshots are owner-scoped through `AgentRuntime.list_runs(owner_id=...)`. Individual run lookup verifies that the recovered run belongs to the requested owner.
-++
-++## Bounded projection
-++
-++Maximum snapshot runs: 100. Default snapshot limit: 25. Maximum events projected per run: 250. The projection reports truncation.
-++
-++## Explicit non-goals
-++
-++No browser automation, Windows input automation, tool execution, new permissions, MCP execution, provider-response persistence, dynamic UI code execution, or automatic promotion/release behavior.
-++
-++## Next increments
-++
-++1. Connect the projection to the desktop shell as a read-only timeline.
-++2. Add structured goal/plan/tool/result/evidence/decision step categories.
-++3. Add capability and tool-health panels using existing read-only catalog data.
-++4. Add safe UI-schema validation before dynamic panels render.
-++5. Keep every action behind the existing orchestrator/policy/approval gates.
++@@ -0,0 +1,92 @@
++# Research OS — Mission Control Phase 4A
++
++## Purpose
++
++Add a deterministic, read-only Mission Control projection over the existing
++`AgentRuntime` trace model. This is the first presentation-layer contract for
++an agent-native workspace and does not create a second execution authority.
++
++## Lifecycle view
++
++Mission Control exposes the observable chain:
++
++`goal -> plan -> tool/action -> result -> evidence -> decision`
++
++The current AgentRuntime trace provides the high-level lifecycle events that
++are safe to expose:
++
++- `run-created`
++- `planning`
++- `executing`
++- `verifying`
++- `completed` or `failed`
++
++## Authority boundaries
++
++- `FriendOrchestrator` remains execution authority.
++- `OwnerPolicy` remains authorization authority.
++- `ApprovalGate` remains approval authority.
++- `AgentRuntime` remains trace/lifecycle authority.
++- `MissionControl` is presentation/projection only.
++
++Mission Control must never execute a tool, authorize a tool, mutate a skill,
++change policy, or grant approval.
++
++## Owner isolation
++
++Snapshots are owner-scoped through `AgentRuntime.list_runs(owner_id=...)`.
++Individual run lookup additionally verifies that the recovered run belongs to
++the requested owner. A run from another owner is therefore not projected.
++
++## Bounded projection
++
++- Maximum snapshot runs: 100.
++- Default snapshot limit: 25.
++- Maximum events projected per run: 250.
++- The projection reports when events were truncated.
++
++The limits prevent an unbounded trace store from becoming an unbounded UI
++payload.
++
++## Evidence and privacy
++
++Mission Control projects evidence identifiers and high-level provider/tool
++metadata already present in the trace. It does not persist or reconstruct
++model hidden reasoning, credentials, or full provider response bodies.
++
++## API contract
++
++`MissionControl.snapshot()` returns:
++
++- schema/version
++- owner identity
++- read-only flag
++- authority declarations
++- ordered recent runs
++- per-run lifecycle events
++- evidence id/provider when available
++- status counts
++
++`MissionControl.run(run_id)` returns one owner-validated run projection or
++`None` when it cannot be safely projected.
++
++## Explicit non-goals
++
++This phase does not add:
++
++- browser automation
++- Windows input automation
++- tool execution
++- new permissions
++- MCP execution
++- provider response persistence
++- dynamic UI code execution
++- automatic promotion or release behavior
++
++## Next increments
++
++1. Connect this projection to the desktop shell as a read-only timeline.
++2. Add structured step categories for goal/plan/tool/result/evidence/decision.
++3. Add capability and tool-health panels using existing read-only catalog data.
++4. Add safe UI-schema validation before dynamic panels are rendered.
++5. Keep every action behind the existing orchestrator/policy/approval gates.
