@@ -69,12 +69,15 @@ class SkillProvenanceLedger:
     def record(self, provenance: SkillProvenance) -> SkillProvenance:
         records = self._records.setdefault(provenance.skill_name, ())
         if records:
-            if provenance.version <= records[-1].version:
-                raise ValueError("provenance versions must increase monotonically")
-            if provenance.parent_version != records[-1].version:
+            previous = records[-1]
+            if provenance.version != previous.version + 1:
+                raise ValueError("provenance versions must be contiguous")
+            if provenance.parent_version != previous.version:
                 raise ValueError("provenance parent_version must match the previous version")
         elif provenance.version == 1 and provenance.parent_version is not None:
             raise ValueError("version 1 provenance cannot have a parent version")
+        elif provenance.version > 1:
+            raise ValueError("provenance history must start at version 1")
         self._records[provenance.skill_name] = (*records, provenance)
         return provenance
 
