@@ -267,7 +267,7 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           name: owner-special-setup-validated-${{ env.TARGET_SHA }}
-          path: owner_special/installer/output
+          path: owner_special/dist/validated-installer
       - name: Build Friend Complete source bundle
         shell: pwsh
         run: |
