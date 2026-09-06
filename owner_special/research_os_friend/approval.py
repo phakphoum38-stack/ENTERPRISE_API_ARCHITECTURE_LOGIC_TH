@@ -22,8 +22,6 @@ class ApprovalState(str, Enum):
     DENIED = "denied"
 
 
-# Known side-effect surfaces are explicitly approval-gated. Unknown tools are
-# not granted implicit approval by this module.
 SIDE_EFFECT_TOOLS = frozenset(
     {
         "shell",
@@ -111,6 +109,14 @@ class ApprovalGate:
         with self._lock:
             existing = self._records.get(approval_id)
             if existing is not None:
+                if (
+                    existing.owner_id != owner.owner_id
+                    or existing.profile_id != request.profile_id
+                    or existing.session_id != request.session_id
+                    or existing.tool_name != tool_name
+                    or existing.request_fingerprint != fingerprint
+                ):
+                    raise PermissionError("approval record integrity mismatch")
                 return existing
             record = ApprovalRecord(
                 approval_id=approval_id,
