@@ -78,7 +78,7 @@ class MissionControlUISchemaValidator:
             for key, child in value.items():
                 if not isinstance(key, str) or len(key) > self.MAX_STRING:
                     raise MissionControlUISchemaError("invalid field name")
-                if self.BLOCKED_KEY.search(key):
+                if key not in self.AUTHORITIES and self.BLOCKED_KEY.search(key):
                     raise MissionControlUISchemaError(f"blocked field: {key}")
                 self._walk(child, depth + 1)
         elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
