@@ -13,16 +13,16 @@ class AgentsSdkAdapterTests(unittest.TestCase):
     def test_contract_is_deterministic_and_read_only(self):
         runtime = FriendRuntime.create_owner_special("owner-sdk")
         runtime.orchestrator.tools.register(
-            Tool("echo", "safe echo", lambda text: text)
+            Tool("safe.lookup", "safe lookup", lambda text: text)
         )
-        request = FriendRequest(owner_id="owner-sdk", text="hello", requested_tools=("echo",))
+        request = FriendRequest(owner_id="owner-sdk", text="hello", requested_tools=("safe.lookup",))
 
         contract = AgentsSdkAdapter(runtime.orchestrator).build_contract(request)
 
         self.assertEqual(contract.agent_name, "research-os-friend")
         self.assertEqual(contract.owner_id, "owner-sdk")
         self.assertEqual(len(contract.tools), 1)
-        self.assertEqual(contract.tools[0].name, "echo")
+        self.assertEqual(contract.tools[0].name, "safe.lookup")
         self.assertEqual(contract.tools[0].approval_state, ApprovalState.NOT_REQUIRED.value)
         self.assertFalse(contract.tools[0].approval_required)
 
