@@ -8,7 +8,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-from .evidence_provenance import EvidenceRecord, ProvenanceChain, ProvenanceError, validate_freshness
+from .evidence_provenance import EvidenceRecord, ProvenanceChain, validate_freshness
 
 
 class MissionControlDesktopError(ValueError):
@@ -26,7 +26,7 @@ class MissionControlDesktopContract:
     STATUSES = frozenset({"PASS", "FAIL", "PENDING", "UNKNOWN", "BLOCKED"})
     BLOCKED_KEYS = re.compile(
         r"(?:approval|approve|authorize|permission|release|merge|dispatch|"
-        r"credential|secret|token|password|private.?key|callback|callable|"
+        r"credential|secret|token|password|private.?key|api.?key|callback|callable|"
         r"function|lambda|eval|exec|shell|command|process|subprocess|"
         r"computer.?use|mcp)",
         re.I,
