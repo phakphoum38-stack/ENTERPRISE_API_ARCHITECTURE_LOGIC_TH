@@ -142,17 +142,17 @@ def _validate_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default).encode("utf-8")
     if len(encoded) > _MAX_PAYLOAD_BYTES:
         raise ProvenanceError("evidence payload exceeds size bound")
-    return {str(key): _sanitize_value(value) for key, value in payload.items()}
+    return {str(key): _sanitize_value(value, key_name=str(key)) for key, value in payload.items()}
 
 
-def _sanitize_value(value: Any) -> Any:
+def _sanitize_value(value: Any, *, key_name: str | None = None) -> Any:
+    if key_name is not None and key_name.lower() in _SECRET_KEYS:
+        raise ProvenanceError("secret-like evidence key rejected")
     if isinstance(value, Mapping):
         result: dict[str, Any] = {}
         for key, child in value.items():
             key_text = str(key)
-            if key_text.lower() in _SECRET_KEYS:
-                raise ProvenanceError("secret-like evidence key rejected")
-            result[key_text] = _sanitize_value(child)
+            result[key_text] = _sanitize_value(child, key_name=key_text)
         return result
     if isinstance(value, (list, tuple)):
         if len(value) > 128:
