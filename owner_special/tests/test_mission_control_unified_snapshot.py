@@ -41,6 +41,7 @@ def timeline() -> dict[str, object]:
 
 
 def capabilities(rows: list[dict[str, object]] | None = None) -> dict[str, object]:
+    rows = rows or [{"name": "zeta", "status": "healthy"}, {"name": "alpha", "status": "healthy"}]
     return {
         "schema": "research-os-mission-control-capabilities/v1",
         "owner_id": OWNER,
@@ -49,11 +50,11 @@ def capabilities(rows: list[dict[str, object]] | None = None) -> dict[str, objec
         "authorization_authority": "OwnerPolicy",
         "approval_authority": "ApprovalGate",
         "source": "UnifiedToolCatalog+ToolHealthMatrix+ToolHealthGate",
-        "total": len(rows or [{"name": "zeta"}, {"name": "alpha"}]),
+        "total": len(rows),
         "healthy": 2,
         "counts": {"healthy": 2},
         "gate": {"passed": True},
-        "rows": rows or [{"name": "zeta", "status": "healthy"}, {"name": "alpha", "status": "healthy"}],
+        "rows": rows,
         "limit": 25,
         "truncated": False,
     }
@@ -133,13 +134,8 @@ class MissionControlUnifiedSnapshotTests(unittest.TestCase):
         self.assertEqual(result["schema"], MissionControlUnifiedSnapshot.SCHEMA)
         self.assertEqual(result["owner_id"], OWNER)
         self.assertIs(result["read_only"], True)
-        self.assertIn("trace", result)
-        self.assertIn("timeline", result)
-        self.assertIn("capabilities", result)
-        self.assertIn("ui_schema", result)
-        self.assertIn("evidence", result)
-        self.assertIn("gate_status", result)
-        self.assertIn("build_identity", result)
+        for key in ("trace", "timeline", "capabilities", "ui_schema", "evidence", "gate_status", "build_identity"):
+            self.assertIn(key, result)
 
     def test_owner_isolation(self) -> None:
         bad = trace()
@@ -169,7 +165,7 @@ class MissionControlUnifiedSnapshotTests(unittest.TestCase):
     def test_truncation_is_explicit(self) -> None:
         runs = [{"run_id": f"run-{index:03d}", "status": "completed"} for index in range(3)]
         records = [{"run_id": f"run-{index:03d}", "status": "completed"} for index in range(3)]
-        rows = [{"name": f"tool-{index:03d", "status": "healthy"} for index in range(3)]
+        rows = [{"name": f"tool-{index:03d}", "status": "healthy"} for index in range(3)]
         result = self.make_snapshot(
             trace=trace(runs),
             evidence=evidence(records),
