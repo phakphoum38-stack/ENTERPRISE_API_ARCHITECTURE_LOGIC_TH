@@ -57,7 +57,16 @@ class RepairVerification:
         clean = _sanitize(self.evidence, "evidence")
         object.__setattr__(self, "evidence", clean)
         if self.state is VerificationState.PASSED:
-            raise RepairVerificationError("PASSED requires verified_ci_pass()")
+            if self.ci_status != "PASS":
+                raise RepairVerificationError("PASSED requires PASS CI status")
+            if clean.get("status") != "PASS":
+                raise RepairVerificationError("PASSED requires explicit PASS evidence")
+            if clean.get("commit_sha") != self.repair_sha:
+                raise RepairVerificationError("PASSED requires matching repair SHA")
+            if clean.get("correlation_id") != self.correlation_id:
+                raise RepairVerificationError("PASSED requires matching correlation")
+            if self.provenance_fingerprint is None:
+                raise RepairVerificationError("PASSED requires provenance fingerprint")
 
     def verified_ci_pass(self) -> "RepairVerification":
         status = self.evidence.get("status")
