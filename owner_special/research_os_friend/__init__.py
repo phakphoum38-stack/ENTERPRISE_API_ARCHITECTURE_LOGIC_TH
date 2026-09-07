@@ -8,6 +8,7 @@ from .bundle import OwnerBundleBuilder
 from .capabilities import Capability, CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
 from .context import FriendContext
+from .controlled_automation_contract import AutomationDecision, AutomationRequest, ControlledAutomationContract, ControlledAutomationError
 from .evidence import EvidenceRecorder
 from .friend_runtime_contract import FriendRuntimeContract, FriendRuntimeContractError
 from .helpers import HelperAllocation, HelperScheduler
@@ -32,7 +33,7 @@ from .unified_tool_catalog import TOOL_CATALOG, ToolDescriptor, ToolState, Unifi
 from .v3_bridge import V3Bridge, V3BridgeStatus
 
 __all__ = [
-    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
+    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "ControlledAutomationContract", "ControlledAutomationError", "AutomationDecision", "AutomationRequest", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
     "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "FriendRuntimeContract", "FriendRuntimeContractError", "HelperAllocation",
     "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
