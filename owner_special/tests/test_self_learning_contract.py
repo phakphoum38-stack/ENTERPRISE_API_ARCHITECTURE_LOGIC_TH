@@ -102,12 +102,20 @@ class SelfLearningContractTests(unittest.TestCase):
             )
 
     def test_snapshot_is_defensively_copied(self) -> None:
+        self.contract.propose_and_promote(
+            name="verified-skill",
+            goal="repeat a verified operation",
+            procedure=("inspect", "validate"),
+            evidence=("ci-pass",),
+            confidence=0.95,
+            run_correlation_id="h5.test.run",
+        )
         first = self.contract.snapshot()
-        first["learning"]["approved_skills"].append({"name": "mutated"})
+        first["learning"]["approved_skills"][0]["name"] = "mutated"
         second = self.contract.snapshot()
-        self.assertNotIn(
-            {"name": "mutated"},
-            second["learning"]["approved_skills"],
+        self.assertEqual(
+            second["learning"]["approved_skills"][0]["name"],
+            "verified-skill",
         )
 
 
