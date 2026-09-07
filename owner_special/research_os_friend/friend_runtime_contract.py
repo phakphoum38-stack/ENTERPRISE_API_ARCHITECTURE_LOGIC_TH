@@ -25,8 +25,18 @@ class FriendRuntimeContract:
     MAX_RUNS = 64
     SHA_RE = re.compile(r"^[0-9a-f]{40}$")
     CORRELATION_RE = re.compile(r"^[A-Za-z0-9._:-]{1,2048}$")
-    BLOCKED_KEYS = re.compile(r"(?:approval|approve|authorize|permission|release|merge|dispatch|credential|secret|token|password|private.?key|api.?key|callback|callable|function|lambda|eval|exec|shell|command|process|subprocess|computer.?use|mcp)", re.I)
-    BLOCKED_VALUES = re.compile(r"(?:BEGIN PRIVATE KEY|ghp_|sk-proj-|javascript:|data:text/html|powershell|cmd\.exe|bash\s+-c|os\.system|child_process)", re.I)
+    BLOCKED_KEYS = re.compile(
+        r"(?:approval|approve|authorize|permission|release|merge|dispatch|"
+        r"credential|secret|token|password|private.?key|api.?key|callback|callable|"
+        r"function|lambda|eval|exec|shell|command|process|subprocess|"
+        r"computer.?use|mcp)",
+        re.I,
+    )
+    BLOCKED_VALUES = re.compile(
+        r"(?:BEGIN PRIVATE KEY|ghp_|sk-proj-|javascript:|data:text/html|"
+        r"powershell|cmd\.exe|bash\s+-c|os\.system|child_process)",
+        re.I,
+    )
 
     def __init__(self, runtime: FriendRuntime, *, owner_id: str, expected_source_sha: str) -> None:
         self._validate_text(owner_id, "owner_id")
@@ -36,8 +46,10 @@ class FriendRuntimeContract:
         if runtime.owner.owner_id != owner_id:
             raise FriendRuntimeContractError("runtime owner mismatch")
         source_sha = str(runtime.source_commit).strip()
-        if not self.SHA_RE.fullmatch(source_sha) or source_sha != expected_source_sha:
-            raise FriendRuntimeContractError("runtime source SHA is missing, malformed, or mismatched")
+        if not self.SHA_RE.fullmatch(source_sha):
+            raise FriendRuntimeContractError("runtime source commit is missing or malformed")
+        if source_sha != expected_source_sha:
+            raise FriendRuntimeContractError("runtime source SHA mismatch")
         self._runtime = runtime
         self.owner_id = owner_id
         self.source_sha = expected_source_sha
