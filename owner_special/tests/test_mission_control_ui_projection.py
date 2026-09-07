@@ -14,12 +14,12 @@ OWNER = "owner-special"
 
 def snapshot() -> dict[str, object]:
     panels = [
-        {"id": "timeline", "type": "timeline", "title": "Timeline", "steps": [{"sequence": 1, "status": "PASS"}]},
-        {"id": "status", "type": "status", "title": "Status", "value": "PENDING"},
-        {"id": "text", "type": "text", "title": "Summary", "value": "Read-only"},
-        {"id": "metric", "type": "metric", "title": "Runs", "value": 2},
-        {"id": "table", "type": "table", "title": "Evidence", "columns": ["run_id", "status"], "rows": [{"run_id": "run-001", "status": "PASS"}]},
         {"id": "capability", "type": "capability-health", "title": "Capability Health", "items": [{"name": "tool-a", "status": "PASS"}]},
+        {"id": "metric", "type": "metric", "title": "Runs", "value": 2},
+        {"id": "status", "type": "status", "title": "Status", "value": "PENDING"},
+        {"id": "table", "type": "table", "title": "Evidence", "columns": ["run_id", "status"], "rows": [{"run_id": "run-001", "status": "PASS"}]},
+        {"id": "text", "type": "text", "title": "Summary", "value": "Read-only"},
+        {"id": "timeline", "type": "timeline", "title": "Timeline", "steps": [{"sequence": 1, "status": "PASS"}]},
     ]
     return {
         "schema": "research-os-mission-control-unified-snapshot/v1",
