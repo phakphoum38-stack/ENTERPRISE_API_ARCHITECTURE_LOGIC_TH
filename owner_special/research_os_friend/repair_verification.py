@@ -80,19 +80,21 @@ class RepairVerification:
             raise RepairVerificationError("CI evidence correlation does not match")
         if self.provenance_fingerprint is None:
             raise RepairVerificationError("provenance fingerprint is required")
-        return RepairVerification(
+
+        # Validate the complete PASS payload while still in VERIFYING state.
+        # The transition itself is then applied internally so __post_init__ is
+        # not recursively re-entered by constructing another PASSED record.
+        result = RepairVerification(
             source_sha=self.source_sha,
             repair_sha=self.repair_sha,
             correlation_id=self.correlation_id,
             ci_status="PASS",
             evidence=dict(self.evidence),
             provenance_fingerprint=self.provenance_fingerprint,
-            state=VerificationState.PASSED,
-        )._finalize()
-
-    def _finalize(self) -> "RepairVerification":
-        object.__setattr__(self, "evidence", _sanitize(self.evidence, "evidence"))
-        return self
+            state=VerificationState.VERIFYING,
+        )
+        object.__setattr__(result, "state", VerificationState.PASSED)
+        return result
 
     @property
     def fingerprint(self) -> str:
