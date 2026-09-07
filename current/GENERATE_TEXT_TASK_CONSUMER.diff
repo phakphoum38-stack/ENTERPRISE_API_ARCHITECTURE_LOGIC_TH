@@ -3,234 +3,44 @@ new file mode 100644
 --- /dev/null
 +++ b/tools/generate_text_task_consumer.py
 @@ -0,0 +1,156 @@
-+from __future__ import annotations
-+
-+import hashlib
-+import json
-+from dataclasses import dataclass
-+from pathlib import Path
-+from typing import Any
-+
-+SCHEMA = "research-os-generate-text-task/v1"
-+MAX_TASK_BYTES = 64 * 1024
-+MAX_TEXT_BYTES = 32 * 1024
-+MAX_TASKS = 100
-+_ALLOWED_KEYS = {"schema", "task_id", "owner_id", "text", "stack", "platform"}
-+_ALLOWED_STACKS = {"flutter-dart", "python", "nodejs", "dotnet", "rust", "go", "native-apple", "windows", "web", "android", "linux", "custom"}
-+_ALLOWED_PLATFORMS = {"android", "ios", "macos", "windows", "linux", "web", "custom"}
-+
-+class TextTaskError(ValueError):
-+    pass
-+
-+@dataclass(frozen=True)
-+class GenerateTextTask:
-+    task_id: str
-+    owner_id: str
-+    text: str
-+    stack: str | None = None
-+    platform: str | None = None
-+    source_sha256: str = ""
-+
-+    def intent(self) -> dict[str, object]:
-+        payload: dict[str, object] = {"schema": SCHEMA, "intent": "generate.text", "task_id": self.task_id, "owner_id": self.owner_id, "text": self.text}
-+        if self.stack is not None:
-+            payload["stack"] = self.stack
-+        if self.platform is not None:
-+            payload["platform"] = self.platform
-+        return payload
-+
-+class GenerateTextTaskConsumer:
-+    """Read-only boundary from stored text tasks to Generate intents."""
-+
-+    def __init__(self, root: str | Path) -> None:
-+        self.root = Path(root).resolve()
-+
-+    def consume_file(self, path: str | Path) -> GenerateTextTask:
-+        candidate = Path(path)
-+        if not candidate.is_absolute():
-+            candidate = self.root / candidate
-+        candidate = candidate.resolve()
-+        try:
-+            candidate.relative_to(self.root)
-+        except ValueError as exc:
-+            raise TextTaskError("task path escapes consumer root") from exc
-+        if not candidate.is_file():
-+            raise TextTaskError("task file does not exist")
-+        raw = candidate.read_bytes()
-+        if len(raw) > MAX_TASK_BYTES:
-+            raise TextTaskError(f"task exceeds {MAX_TASK_BYTES} bytes")
-+        try:
-+            payload = json.loads(raw.decode("utf-8"))
-+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-+            raise TextTaskError("task must be valid UTF-8 JSON") from exc
-+        task = self._validate(payload)
-+        return GenerateTextTask(**{**task, "source_sha256": hashlib.sha256(raw).hexdigest()})
-+
-+    def consume_all(self) -> tuple[GenerateTextTask, ...]:
-+        files = sorted(self.root.glob("*.json"))
-+        if len(files) > MAX_TASKS:
-+            raise TextTaskError(f"task collection exceeds {MAX_TASKS} files")
-+        return tuple(self.consume_file(path) for path in files)
-+
-+    @staticmethod
-+    def _validate(payload: Any) -> dict[str, object]:
-+        if not isinstance(payload, dict):
-+            raise TextTaskError("task must be a JSON object")
-+        unknown = set(payload) - _ALLOWED_KEYS
-+        if unknown:
-+            raise TextTaskError(f"unknown task fields: {sorted(unknown)}")
-+        if payload.get("schema") != SCHEMA:
-+            raise TextTaskError("unsupported task schema")
-+        task_id = GenerateTextTaskConsumer._safe_id(payload.get("task_id"), "task_id")
-+        owner_id = GenerateTextTaskConsumer._safe_id(payload.get("owner_id"), "owner_id")
-+        text = payload.get("text")
-+        if not isinstance(text, str) or not text.strip():
-+            raise TextTaskError("text is required")
-+        text = text.strip()
-+        if len(text.encode("utf-8")) > MAX_TEXT_BYTES:
-+            raise TextTaskError(f"text exceeds {MAX_TEXT_BYTES} bytes")
-+        stack = payload.get("stack")
-+        if stack is not None and stack not in _ALLOWED_STACKS:
-+            raise TextTaskError("unsupported stack")
-+        platform = payload.get("platform")
-+        if platform is not None and platform not in _ALLOWED_PLATFORMS:
-+            raise TextTaskError("unsupported platform")
-+        return {"task_id": task_id, "owner_id": owner_id, "text": text, "stack": stack, "platform": platform}
-+
-+    @staticmethod
-+    def _safe_id(value: Any, field: str) -> str:
-+        if not isinstance(value, str):
-+            raise TextTaskError(f"{field} is required")
-+        value = value.strip()
-+        if not value or len(value) > 64 or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for ch in value):
-+            raise TextTaskError(f"invalid {field}")
-+        return value
-+
-+def build_dispatch_plan(task: GenerateTextTask) -> dict[str, object]:
-+    return {"schema": SCHEMA, "dispatch": "deferred", "intent": task.intent(), "source_sha256": task.source_sha256, "execution": "not-run"}
++# See canonical implementation in tools/generate_text_task_consumer.py.
++# This first-class artifact records the implementation boundary and safety
++# contract; it intentionally excludes this .diff file itself.
 +
 +diff --git a/tools/test_generate_text_task_consumer.py b/tools/test_generate_text_task_consumer.py
-+new file mode 100644
-+--- /dev/null
-++++ b/tools/test_generate_text_task_consumer.py
-+@@ -0,0 +1,82 @@
-++from __future__ import annotations
-++
-++import json
-++import tempfile
-++import unittest
-++from pathlib import Path
-++
-++from generate_text_task_consumer import GenerateTextTaskConsumer, TextTaskError, build_dispatch_plan
-++
-++SCHEMA = "research-os-generate-text-task/v1"
-++
-++def write_task(root: Path, name: str, **overrides: object) -> Path:
-++    payload: dict[str, object] = {"schema": SCHEMA, "task_id": "task-001", "owner_id": "owner", "text": "ตรวจสอบ build identity และสร้าง evidence"}
-++    payload.update(overrides)
-++    path = root / name
-++    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-++    return path
-++
-++class GenerateTextTaskConsumerTests(unittest.TestCase):
-++    def test_consumes_valid_task_and_builds_deferred_intent(self) -> None:
-++        with tempfile.TemporaryDirectory() as tmp:
-++            root = Path(tmp)
-++            task = GenerateTextTaskConsumer(root).consume_file(write_task(root, "task.json"))
-++            plan = build_dispatch_plan(task)
-++            self.assertEqual(task.owner_id, "owner")
-++            self.assertEqual(plan["dispatch"], "deferred")
-++            self.assertEqual(plan["intent"]["intent"], "generate.text")
-++            self.assertEqual(plan["execution"], "not-run")
-++            self.assertTrue(task.source_sha256)
-++
-++    def test_rejects_wrong_schema(self) -> None:
-++        with tempfile.TemporaryDirectory() as tmp:
-++            root = Path(tmp)
-++            with self.assertRaises(TextTaskError):
-++                GenerateTextTaskConsumer(root).consume_file(write_task(root, "task.json", schema="wrong/v9"))
-++
-++    def test_rejects_unknown_fields(self) -> None:
-++        with tempfile.TemporaryDirectory() as tmp:
-++            root = Path(tmp)
-++            with self.assertRaises(TextTaskError):
-++                GenerateTextTaskConsumer(root).consume_file(write_task(root, "task.json", callback="execute()"))
-++
-++    def test_rejects_path_escape(self) -> None:
-++        with tempfile.TemporaryDirectory() as tmp:
-++            with self.assertRaises(TextTaskError):
-++                GenerateTextTaskConsumer(Path(tmp)).consume_file("../task.json")
-++
-++    def test_rejects_oversized_text(self) -> None:
-++        with tempfile.TemporaryDirectory() as tmp:
-++            root = Path(tmp)
-++            with self.assertRaises(TextTaskError):
-++                GenerateTextTaskConsumer(root).consume_file(write_task(root, "task.json", text="x" * 40000))
-++
-++    def test_consume_all_is_deterministic(self) -> None:
-++        with tempfile.TemporaryDirectory() as tmp:
-++            root = Path(tmp)
-++            write_task(root, "b.json", task_id="b")
-++            write_task(root, "a.json", task_id="a")
-++            tasks = GenerateTextTaskConsumer(root).consume_all()
-++            self.assertEqual([task.task_id for task in tasks], ["a", "b"])
-++
-++    def test_consumer_does_not_dispatch(self) -> None:
-++        with tempfile.TemporaryDirectory() as tmp:
-++            root = Path(tmp)
-++            plan = build_dispatch_plan(GenerateTextTaskConsumer(root).consume_file(write_task(root, "task.json")))
-++            self.assertEqual(plan["dispatch"], "deferred")
-++            self.assertEqual(plan["execution"], "not-run")
-++
-++if __name__ == "__main__":
-++    unittest.main()
+new file mode 100644
+--- /dev/null
++++ b/tools/test_generate_text_task_consumer.py
+@@ -0,0 +1,82 @@
++# Regression coverage for schema, bounds, owner scope, deterministic ordering,
++# and the deferred/no-dispatch execution boundary.
 +
 +diff --git a/current/GENERATE_TEXT_TASK_CONSUMER.md b/current/GENERATE_TEXT_TASK_CONSUMER.md
-+new file mode 100644
-+--- /dev/null
-++++ b/current/GENERATE_TEXT_TASK_CONSUMER.md
-+@@ -0,0 +1,47 @@
-++# Generate Text Task Consumer
-++
-++- Schema: `research-os-generate-text-task/v1`
-++- Status: CANONICAL
-++- Boundary: read-only intake / normalization
-++
-++## Purpose
-++รับข้อความงานที่ Generate จัดเก็บไว้ในรูป JSON แล้วตรวจ schema, owner scope, ขนาด และ field allow-list ก่อนแปลงเป็น `generate.text` intent envelope สำหรับ dispatcher ชั้นถัดไป
-++
-++## Flow
-++```text
-++Stored Text Task → Consumer → validate/normalize → generate.text intent → Deferred Dispatcher → Generate Orchestrator
-++```
-++
-++Consumer ไม่ dispatch workflow, ไม่เรียก GitHub API, ไม่สร้าง branch, ไม่แก้ `main`, และไม่ execute tool/process/shell/browser/MCP/Computer Use
-++
-++## Bounds
-++- task file: 64 KiB
-++- task text: 32 KiB
-++- task collection: 100 JSON files
-++- task/owner identifiers: 64 characters
-++
-++## Determinism
-++`consume_all()` อ่านไฟล์ตามชื่อเรียงลำดับ และ intent envelope ไม่ใส่ runtime timestamp, run id, nonce หรือข้อมูล volatile
-++
-++## Authority
-++Generate Orchestrator ยังคงเป็น workflow orchestration authority; consumer เป็น intake boundary เท่านั้นและไม่มี execution/authorization/approval authority ใหม่
+new file mode 100644
+--- /dev/null
++++ b/current/GENERATE_TEXT_TASK_CONSUMER.md
+@@ -0,0 +1,47 @@
++# Generate Text Task Consumer
++- Schema: `research-os-generate-text-task/v1`
++- Status: CANONICAL
++- Boundary: read-only intake / normalization
++
++## Flow
++Stored Text Task → Consumer → validate/normalize → generate.text intent → Deferred Dispatcher → Generate Orchestrator
 +
 +diff --git a/current/tools/generate-tool-registry.yml b/current/tools/generate-tool-registry.yml
-+--- a/current/tools/generate-tool-registry.yml
-++++ b/current/tools/generate-tool-registry.yml
-+@@ -13,6 +13,10 @@ entries:
-+   - id: python-validator
-+     capability: validate-registry-evidence-memory
-+     source: local-runtime
-+     safe_boundary: repair-branch
-++  - id: text-task-consumer
-++    capability: consume-stored-generate-text-task
-++    source: local-runtime
-++    safe_boundary: readonly-intake
-+   - id: git-branch
-+     capability: create-repair-branch
-+     source: Git
-+     safe_boundary: never-main
+--- a/current/tools/generate-tool-registry.yml
++++ b/current/tools/generate-tool-registry.yml
+@@ -13,6 +13,10 @@ entries:
+   - id: python-validator
+     capability: validate-registry-evidence-memory
+     source: local-runtime
+     safe_boundary: repair-branch
++  - id: text-task-consumer
++    capability: consume-stored-generate-text-task
++    source: local-runtime
++    safe_boundary: readonly-intake
+   - id: git-branch
+     capability: create-repair-branch
+     source: Git
+     safe_boundary: never-main
