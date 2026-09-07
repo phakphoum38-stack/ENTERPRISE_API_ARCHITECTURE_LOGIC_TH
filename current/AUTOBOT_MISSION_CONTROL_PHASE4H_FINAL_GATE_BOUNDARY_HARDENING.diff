@@ -1,0 +1,23 @@
+diff --git a/owner_special/research_os_friend/mission_control_final_gate_boundary.py b/owner_special/research_os_friend/mission_control_final_gate_boundary.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/research_os_friend/mission_control_final_gate_boundary.py
+@@
++Read-only fail-closed boundary hardening for the Phase 4H Final Gate readiness contract.
++Requires canonical authoritative CI source, rejects nested action authority and secret-like values,
++enforces bounded input, preserves input immutability, and emits no release authority.
++
++diff --git a/owner_special/tests/test_mission_control_final_gate_boundary.py b/owner_special/tests/test_mission_control_final_gate_boundary.py
++new file mode 100644
++--- /dev/null
+++++ b/owner_special/tests/test_mission_control_final_gate_boundary.py
++@@
+++Covers valid boundary crossing, invalid source authority, nested action/secret rejection,
+++input immutability, and output authority isolation.
++
++diff --git a/evidence/mission-control/phase4h-final-gate-boundary-hardening.json b/evidence/mission-control/phase4h-final-gate-boundary-hardening.json
++new file mode 100644
++--- /dev/null
+++++ b/evidence/mission-control/phase4h-final-gate-boundary-hardening.json
++@@
+++Bound Phase 4H hardening evidence; CI verification remains pending and Final Gate remains authoritative.
