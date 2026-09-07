@@ -1,0 +1,27 @@
+{
+  "schema": "research-os-mission-control-evidence/v1",
+  "phase": "4E",
+  "base_sha": "c6f4fcd9ca4061b0a8381f6d7ec4284ea0c0c158",
+  "implementation_head_sha": "d060fa77bd5cd1cea8d422fdc6a99f502d0c4790",
+  "owner_scope": "explicit owner_id filter",
+  "read_only": true,
+  "source_authority": "AgentRuntime",
+  "bounds": {
+    "max_records": 100,
+    "max_string": 2048,
+    "max_bytes": 65536
+  },
+  "tests": [
+    "owner_special/research_os_friend/test_mission_control_evidence.py"
+  ],
+  "diff_artifact": "current/AUTOBOT_MISSION_CONTROL_PHASE4E_EVIDENCE.diff",
+  "verification": "PENDING_CI",
+  "authority_audit": {
+    "execution": false,
+    "authorization": false,
+    "approval": false,
+    "persistence": false,
+    "network": false,
+    "tool_dispatch": false
+  }
+}
