@@ -136,6 +136,9 @@ class MissionControlUnifiedSnapshot:
                 raise MissionControlUnifiedSnapshotError(f"{name} owner mismatch")
             if source.get("read_only") is not True:
                 raise MissionControlUnifiedSnapshotError(f"{name} must be read-only")
+            for field, expected in self.AUTHORITIES.items():
+                if field in source and source.get(field) != expected:
+                    raise MissionControlUnifiedSnapshotError(f"invalid {name} {field}")
 
         build = sources["build_identity"]
         if build is not None:
@@ -145,6 +148,9 @@ class MissionControlUnifiedSnapshot:
                 raise MissionControlUnifiedSnapshotError("build identity owner mismatch")
             if build.get("read_only") is not True:
                 raise MissionControlUnifiedSnapshotError("build identity must be read-only")
+            for field, expected in self.AUTHORITIES.items():
+                if field in build and build.get(field) != expected:
+                    raise MissionControlUnifiedSnapshotError(f"invalid build identity {field}")
 
         self._walk_safe(sources)
 
