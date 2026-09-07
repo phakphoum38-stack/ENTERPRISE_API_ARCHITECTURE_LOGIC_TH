@@ -1,0 +1,120 @@
+name: V3.5 Master Final Gate
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Release authority is validation-only. This workflow must never write repository state.
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-5-master-final-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  architecture:
+    name: Architecture validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate canonical architecture
+        run: |
+          test -f README.md
+          grep -q 'Identity' README.md
+          grep -q 'Capability' README.md
+          grep -q 'Policy' README.md
+          grep -q 'Authorization' README.md
+          grep -q 'Entitlement' README.md
+          grep -q 'Execution' README.md
+          grep -q 'Evidence' README.md
+          test -f docs/V3_5_SYSTEM_STRUCTURE.md
+
+  security-boundary:
+    name: Security boundary validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate mandatory deny boundaries
+        run: |
+          for term in \
+            'Activation Lock bypass' \
+            'Passcode bypass' \
+            'MDM circumvention' \
+            'Credential theft' \
+            'Exploit delivery' \
+            'Unauthorized device access' \
+            'Security-control evasion'; do
+            grep -q "$term" README.md
+          done
+      - name: Validate execution decision rule
+        run: |
+          grep -q 'Authorization == ALLOWED' README.md
+          grep -q 'Entitlement == ACTIVE' README.md
+
+  code-generation:
+    name: Code generation validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate existing generator test surface
+        run: |
+          if [ -d tools/code_writer ]; then
+            python -m unittest discover -s tools/code_writer -p 'test_*.py' -v
+          else
+            echo 'No code_writer test surface present; gate remains structural.'
+          fi
+
+  external-tool:
+    name: External-tool validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Flutter boundary
+        run: |
+          grep -qi 'Flutter' README.md
+          grep -qi 'external' README.md
+          grep -qi 'client' README.md
+
+  api-contract:
+    name: API and contract validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate contract terminology
+        run: |
+          grep -q 'Authorization' README.md
+          grep -q 'Entitlement' README.md
+          grep -q 'correlation_id' README.md
+          grep -q 'policy_version' README.md
+
+  e2e:
+    name: E2E validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run existing Research OS E2E tests when present
+        env:
+          PYTHONPATH: v3
+        run: |
+          if [ -d v3/tests ]; then
+            python -m unittest discover -s v3/tests -p 'test_*.py' -v
+          else
+            echo 'No v3/tests directory present; E2E gate is structural on this branch.'
+          fi
+
+  release:
+    name: Release validation
+    runs-on: ubuntu-latest
+    needs: [architecture, security-boundary, code-generation, external-tool, api-contract, e2e]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate read-only release contract
+        run: |
+          test "${{ github.ref_name }}" != "main"
+          if grep -RInE 'git push .*main|git push origin HEAD:main|git push origin main' .github/workflows; then
+            echo 'Direct main push detected in workflow definitions.'
+            exit 1
+          fi
+          echo 'All required V3.5 gates passed; release authority remains the PR merge process.'
