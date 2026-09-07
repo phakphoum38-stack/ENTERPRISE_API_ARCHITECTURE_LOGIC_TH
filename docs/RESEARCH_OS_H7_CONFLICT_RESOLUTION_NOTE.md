@@ -1,0 +1,1 @@
+H7 conflict resolution was performed against the current H6 lineage. CI remains authoritative.
