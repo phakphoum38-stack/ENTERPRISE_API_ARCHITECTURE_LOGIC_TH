@@ -32,10 +32,11 @@ from .tools import Tool, ToolRegistry
 from .unified_tool_catalog import TOOL_CATALOG, ToolDescriptor, ToolState, UnifiedToolCatalog
 from .v3_bridge import V3Bridge, V3BridgeStatus
 from .autobot_execution_loop import AutobotExecutionError, ExecutionEvent, ExecutionJob, ExecutionState, validate_job_payload
+from .trusted_web_research import MatchState, ResearchError, ResearchRecord, SourceKind, classify_source, match_environment, validate_research_finding
 
 __all__ = [
     "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "ControlledAutomationContract", "ControlledAutomationError", "AutomationDecision", "AutomationRequest", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
     "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "FriendRuntimeContract", "FriendRuntimeContractError", "HelperAllocation", "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager", "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "SelfLearningContract", "SelfLearningContractError", "Skill", "SkillRegistry", "Tool", "ToolRegistry", "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
-    "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools", "install_friend_complete_capabilities", "AutobotExecutionError", "ExecutionEvent", "ExecutionJob", "ExecutionState", "validate_job_payload",
+    "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools", "install_friend_complete_capabilities", "AutobotExecutionError", "ExecutionEvent", "ExecutionJob", "ExecutionState", "validate_job_payload", "MatchState", "ResearchError", "ResearchRecord", "SourceKind", "classify_source", "match_environment", "validate_research_finding",
 ]
