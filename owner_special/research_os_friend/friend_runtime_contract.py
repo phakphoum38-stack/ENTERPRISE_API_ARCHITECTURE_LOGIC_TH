@@ -27,7 +27,7 @@ class FriendRuntimeContract:
     CORRELATION_RE = re.compile(r"^[A-Za-z0-9._:-]{1,2048}$")
     BLOCKED_KEYS = re.compile(
         r"(?:approval|approve|authorize|permission|release|merge|dispatch|"
-        r"credential|secret|token|password|private.?key|callback|callable|"
+        r"credential|secret|token|password|private.?key|api.?key|callback|callable|"
         r"function|lambda|eval|exec|shell|command|process|subprocess|"
         r"computer.?use|mcp)",
         re.I,
@@ -38,13 +38,7 @@ class FriendRuntimeContract:
         re.I,
     )
 
-    def __init__(
-        self,
-        runtime: FriendRuntime,
-        *,
-        owner_id: str,
-        expected_source_sha: str,
-    ) -> None:
+    def __init__(self, runtime: FriendRuntime, *, owner_id: str, expected_source_sha: str) -> None:
         self._validate_text(owner_id, "owner_id")
         self._validate_sha(expected_source_sha, "expected_source_sha")
         if not isinstance(runtime, FriendRuntime):
@@ -61,49 +55,27 @@ class FriendRuntimeContract:
         self.source_sha = expected_source_sha
 
     def snapshot(self) -> dict[str, Any]:
-        """Return a bounded, read-only runtime observation."""
         runs = self._runtime.agent_runs()
         if len(runs) > self.MAX_RUNS:
             raise FriendRuntimeContractError("runtime run list exceeds bound")
         run_items = []
         for run in runs:
-            item = {
-                "run_id": getattr(run, "run_id", ""),
-                "owner_id": getattr(run, "owner_id", ""),
-                "state": getattr(run, "state", ""),
-            }
+            item = {"run_id": getattr(run, "run_id", ""), "owner_id": getattr(run, "owner_id", ""), "state": getattr(run, "state", "")}
             self._walk_safe(item)
             run_items.append(item)
-        payload = {
-            "schema": self.SCHEMA,
-            "owner_id": self.owner_id,
-            "source_sha": self.source_sha,
-            "read_only": True,
-            "tool_health": copy.deepcopy(self._runtime.tool_health_gate()),
-            "agent_runs": run_items,
-        }
+        payload = {"schema": self.SCHEMA, "owner_id": self.owner_id, "source_sha": self.source_sha, "read_only": True, "tool_health": copy.deepcopy(self._runtime.tool_health_gate()), "agent_runs": run_items}
         self._validate_payload(payload)
         return copy.deepcopy(payload)
 
     def ask(self, request: FriendRequest) -> Any:
-        """Delegate a normal request through the existing orchestrator."""
         self._validate_request(request)
         return self._runtime.ask(request)
 
     def run_agent(self, request: FriendRequest, *, run_correlation_id: str) -> dict[str, Any]:
-        """Run an agent through the existing runtime with explicit identity binding."""
         self._validate_request(request)
         self._validate_correlation(run_correlation_id)
         run = self._runtime.run_agent(request)
-        envelope = {
-            "schema": self.SCHEMA,
-            "owner_id": self.owner_id,
-            "source_sha": self.source_sha,
-            "run_correlation_id": run_correlation_id,
-            "run_id": getattr(run, "run_id", ""),
-            "state": getattr(run, "state", ""),
-            "read_only": True,
-        }
+        envelope = {"schema": self.SCHEMA, "owner_id": self.owner_id, "source_sha": self.source_sha, "run_correlation_id": run_correlation_id, "run_id": getattr(run, "run_id", ""), "state": getattr(run, "state", ""), "read_only": True}
         self._validate_payload(envelope)
         return copy.deepcopy(envelope)
 
@@ -111,17 +83,10 @@ class FriendRuntimeContract:
         self._validate_text(run_id, "run_id")
         result = self._runtime.get_agent_run(run_id)
         if result is not None:
-            self._walk_safe(
-                {
-                    "run_id": getattr(result, "run_id", ""),
-                    "owner_id": getattr(result, "owner_id", ""),
-                    "state": getattr(result, "state", ""),
-                }
-            )
+            self._walk_safe({"run_id": getattr(result, "run_id", ""), "owner_id": getattr(result, "owner_id", ""), "state": getattr(result, "state", "")})
         return result
 
     def tool_health(self) -> dict[str, Any]:
-        """Expose the runtime's deterministic health gate without changing it."""
         result = copy.deepcopy(self._runtime.tool_health_gate())
         self._validate_payload(result)
         return copy.deepcopy(result)
@@ -129,16 +94,14 @@ class FriendRuntimeContract:
     def _validate_request(self, request: FriendRequest) -> None:
         if not isinstance(request, FriendRequest):
             raise FriendRuntimeContractError("request must be FriendRequest")
-        request_owner = getattr(request, "owner_id", self.owner_id)
-        if request_owner != self.owner_id:
+        if getattr(request, "owner_id", self.owner_id) != self.owner_id:
             raise FriendRuntimeContractError("request owner mismatch")
 
     def _validate_payload(self, value: Mapping[str, Any]) -> None:
         if not isinstance(value, Mapping):
             raise FriendRuntimeContractError("runtime payload must be an object")
         self._walk_safe(value)
-        encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        if len(encoded) > self.MAX_BYTES:
+        if len(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")) > self.MAX_BYTES:
             raise FriendRuntimeContractError("runtime payload exceeds byte bound")
 
     def _walk_safe(self, value: Any, *, depth: int = 0) -> None:
