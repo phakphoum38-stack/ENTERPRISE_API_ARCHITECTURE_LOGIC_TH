@@ -1,0 +1,18 @@
+{
+  "phase": "4H",
+  "name": "Final Gate readiness contract",
+  "schema": "research-os-mission-control-final-gate-contract/v1",
+  "authority": "read-only contract checker",
+  "input": "research-os-mission-control-release-readiness/v1",
+  "required_input_status": "READY_FOR_FINAL_GATE",
+  "required_build_identity_status": "VERIFIED",
+  "required_gate_state": "all required gates PASSED",
+  "output": "READY_FOR_FINAL_GATE",
+  "release_authority": "Final Gate remains authoritative",
+  "actions": [],
+  "fail_closed": true,
+  "bounded": true,
+  "deterministic": true,
+  "input_immutable": true,
+  "ci_verification": "PENDING_CI"
+}
