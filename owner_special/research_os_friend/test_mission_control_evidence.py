@@ -3,7 +3,10 @@ from __future__ import annotations
 import copy
 import unittest
 
-from .mission_control_evidence import MissionControlEvidenceError, MissionControlEvidenceProjection
+from owner_special.research_os_friend.mission_control_evidence import (
+    MissionControlEvidenceError,
+    MissionControlEvidenceProjection,
+)
 
 
 class _Owner:
@@ -45,7 +48,7 @@ class MissionControlEvidenceProjectionTests(unittest.TestCase):
         runtime = _Runtime([_Run("b", "owner-a", "completed", "e-2"), _Run("a", "owner-a", "completed", "e-1")])
         result = MissionControlEvidenceProjection(runtime).snapshot()
         self.assertEqual([item["run_id"] for item in result["records"]], ["a", "b"])
-        self.assertEqual(result["read_only"], True)
+        self.assertTrue(result["read_only"])
         self.assertEqual(result["evidence_source"], "AgentRuntime")
 
     def test_owner_mismatch_isolated(self):
