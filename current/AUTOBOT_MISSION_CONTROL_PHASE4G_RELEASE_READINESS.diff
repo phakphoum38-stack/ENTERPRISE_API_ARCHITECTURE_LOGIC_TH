@@ -1,0 +1,26 @@
+diff --git a/owner_special/research_os_friend/mission_control_release_readiness.py b/owner_special/research_os_friend/mission_control_release_readiness.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/research_os_friend/mission_control_release_readiness.py
+@@
++Read-only Mission Control release-readiness projection.
++Consumes authoritative CI gate evidence and reports PASSED/FAILED/PENDING.
++Requires VERIFIED build identity for READY_FOR_FINAL_GATE.
++Never grants release authority or exposes execute/approve/install/dispatch/release/authorize actions.
++
+diff --git a/owner_special/tests/test_mission_control_release_readiness.py b/owner_special/tests/test_mission_control_release_readiness.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/tests/test_mission_control_release_readiness.py
+@@
++Coverage for all-passed readiness, missing gates, failed gates, non-verified identity,
++input immutability, secret-like evidence rejection, authority-boundary enforcement,
++and bounded owner input.
++
+diff --git a/evidence/mission-control/phase4g-release-readiness-projection.json b/evidence/mission-control/phase4g-release-readiness-projection.json
+new file mode 100644
+--- /dev/null
++++ b/evidence/mission-control/phase4g-release-readiness-projection.json
+@@
++Machine-readable Phase 4G contract metadata.
++Verification remains PENDING_CI until authoritative repository CI executes.
