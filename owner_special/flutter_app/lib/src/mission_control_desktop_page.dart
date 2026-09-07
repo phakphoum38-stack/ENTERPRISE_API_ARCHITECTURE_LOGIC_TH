@@ -228,7 +228,7 @@ class _BoundedList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (values is! List || values.isEmpty) return const Text('No data available');
+    if (values is! List || (values as List).isEmpty) return const Text('No data available');
     final items = (values as List).take(100).toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
