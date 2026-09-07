@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/src/friend_app_shell.dart';
-import '../lib/src/friend_theme.dart';
-import '../lib/src/mission_control_desktop_page.dart';
+import 'package:research_os_owner_special/friend_app_shell.dart';
+import 'package:research_os_owner_special/friend_theme.dart';
+import 'package:research_os_owner_special/mission_control_desktop_page.dart';
 
 Widget _host(Widget child) => MaterialApp(theme: FriendTheme.build(), home: Scaffold(body: child));
 
