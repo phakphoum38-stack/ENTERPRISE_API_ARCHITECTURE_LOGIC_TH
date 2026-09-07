@@ -2,7 +2,7 @@ diff --git a/owner_special/research_os_friend/mission_control_evidence.py b/owne
 new file mode 100644
 --- /dev/null
 +++ b/owner_special/research_os_friend/mission_control_evidence.py
-@@ -0,0 +1,70 @@
+@@ -1,0 +1,70 @@
 +# Deterministic, bounded, owner-scoped projection of existing AgentRuntime evidence.
 +# No evidence is manufactured and no execution/approval/authorization authority is added.
 +
@@ -13,12 +13,5 @@ new file mode 100644
 new file mode 100644
 --- /dev/null
 +++ b/owner_special/research_os_friend/test_mission_control_evidence.py
-@@ -0,0 +1,73 @@
+@@ -1,0 +1,73 @@
 +# Regression coverage for evidence projection safety and determinism.
-+
-+diff --git a/current/AUTOBOT_MISSION_CONTROL_PHASE4E_EVIDENCE.diff b/current/AUTOBOT_MISSION_CONTROL_PHASE4E_EVIDENCE.diff
-new file mode 100644
---- /dev/null
-+++ b/current/AUTOBOT_MISSION_CONTROL_PHASE4E_EVIDENCE.diff
-@@ -0,0 +1,0 @@
-+# This diff artifact intentionally excludes itself from the proposal payload.
