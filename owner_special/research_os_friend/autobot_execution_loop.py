@@ -146,6 +146,8 @@ class ExecutionJob:
     def complete_from_ci(self, *, commit_sha: str, correlation_id: str, ci_run_id: str, passed: bool) -> "ExecutionJob":
         current = self.bind_ci_result(commit_sha=commit_sha, correlation_id=correlation_id, ci_run_id=ci_run_id, passed=passed)
         if not passed:
+            if current.state is ExecutionState.QUEUED:
+                return current.transition(ExecutionState.DIAGNOSING, "fresh CI failure requires diagnosis")
             return current.transition(ExecutionState.DIAGNOSING, "fresh CI failure requires diagnosis")
         return current.transition(ExecutionState.COMPLETED, "fresh CI evidence is authoritative")
 
