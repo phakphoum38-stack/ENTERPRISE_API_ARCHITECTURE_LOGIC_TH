@@ -49,6 +49,7 @@ class MissionControlReleaseReadinessProjection:
             raise MissionControlReleaseReadinessError("gate evidence must be an object")
 
         copied = copy.deepcopy(dict(gate_evidence))
+        self._validate_evidence(copied)
         states: dict[str, str] = {}
         for gate in self.REQUIRED_GATES:
             evidence = copied.get(gate)
@@ -87,6 +88,14 @@ class MissionControlReleaseReadinessProjection:
         }
         self._validate(result)
         return copy.deepcopy(result)
+
+    def _validate_evidence(self, evidence: Mapping[str, Any]) -> None:
+        for value in self._walk_values(evidence):
+            if isinstance(value, str) and (len(value) > self.MAX_STRING or self.BLOCKED.search(value)):
+                raise MissionControlReleaseReadinessError("blocked or oversized evidence")
+        encoded = json.dumps(evidence, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        if len(encoded) > self.MAX_BYTES:
+            raise MissionControlReleaseReadinessError("gate evidence exceeds byte bound")
 
     def _validate(self, payload: Mapping[str, Any]) -> None:
         for value in self._walk_values(payload):
