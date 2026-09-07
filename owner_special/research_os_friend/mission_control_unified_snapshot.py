@@ -28,7 +28,6 @@ class MissionControlUnifiedSnapshot:
     MAX_RUNS = 100
     MAX_RECORDS = 100
     MAX_CAPABILITY_ROWS = 100
-    MAX_PANELS = 32
     MAX_DEPTH = 8
     SOURCE_SCHEMAS = {
         "trace": "research-os-mission-control/v1",
@@ -131,8 +130,7 @@ class MissionControlUnifiedSnapshot:
             source = sources[name]
             if not isinstance(source, Mapping):
                 raise MissionControlUnifiedSnapshotError(f"{name} projection must be an object")
-            expected_schema = self.SOURCE_SCHEMAS[name]
-            if source.get("schema") != expected_schema:
+            if source.get("schema") != self.SOURCE_SCHEMAS[name]:
                 raise MissionControlUnifiedSnapshotError(f"unsupported {name} schema/version")
             if source.get("owner_id") != owner_id:
                 raise MissionControlUnifiedSnapshotError(f"{name} owner mismatch")
@@ -162,6 +160,8 @@ class MissionControlUnifiedSnapshot:
         runs = source.get("runs")
         if not isinstance(runs, list):
             raise MissionControlUnifiedSnapshotError("trace runs must be a list")
+        if not all(isinstance(item, Mapping) for item in runs):
+            raise MissionControlUnifiedSnapshotError("trace runs must contain objects")
         ordered = sorted(runs, key=lambda item: str(item.get("run_id", "")))
         selected = ordered[:limit]
         value = copy.deepcopy(dict(source))
@@ -174,6 +174,8 @@ class MissionControlUnifiedSnapshot:
         records = source.get("records")
         if not isinstance(records, list):
             raise MissionControlUnifiedSnapshotError("evidence records must be a list")
+        if not all(isinstance(item, Mapping) for item in records):
+            raise MissionControlUnifiedSnapshotError("evidence records must contain objects")
         ordered = sorted(records, key=lambda item: str(item.get("run_id", "")))
         selected = ordered[:limit]
         value = copy.deepcopy(dict(source))
@@ -186,6 +188,8 @@ class MissionControlUnifiedSnapshot:
         rows = source.get("rows")
         if not isinstance(rows, list):
             raise MissionControlUnifiedSnapshotError("capability rows must be a list")
+        if not all(isinstance(item, Mapping) for item in rows):
+            raise MissionControlUnifiedSnapshotError("capability rows must contain objects")
         ordered = sorted(rows, key=lambda item: str(item.get("name", "")))
         selected = ordered[:limit]
         value = copy.deepcopy(dict(source))
@@ -216,7 +220,7 @@ class MissionControlUnifiedSnapshot:
             for key, child in value.items():
                 if not isinstance(key, str) or len(key) > self.MAX_STRING:
                     raise MissionControlUnifiedSnapshotError("invalid or oversized field name")
-                if self.BLOCKED_KEYS.search(key):
+                if key not in self.AUTHORITIES and self.BLOCKED_KEYS.search(key):
                     raise MissionControlUnifiedSnapshotError(f"blocked field: {key}")
                 self._walk_safe(child, depth + 1)
         elif isinstance(value, list):
