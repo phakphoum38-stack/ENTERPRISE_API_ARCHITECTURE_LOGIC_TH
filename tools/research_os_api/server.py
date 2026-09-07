@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import hashlib
+import hmac
 import mimetypes
 import os
 import sys
@@ -17,7 +19,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from api_auth import require_session
+from api_auth import extract_session_token, require_session
+from auth_session import cookie_header, issue_session, verify_session
 from conversation_store import (
     authorize as authorize_sync,
     delete_session as delete_cloud_session,
@@ -93,6 +96,20 @@ def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
 
 
+def _password_matches(username: str, password: str) -> bool:
+    configured_user = (os.getenv("RESEARCH_OS_LOGIN_USERNAME") or "").strip()
+    configured_hash = (os.getenv("RESEARCH_OS_LOGIN_PASSWORD_HASH") or "").strip()
+    salt = (os.getenv("RESEARCH_OS_LOGIN_PASSWORD_SALT") or "").strip()
+    if not configured_user or not configured_hash or not salt:
+        return False
+    derived = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), 210_000
+    ).hex()
+    return hmac.compare_digest(username, configured_user) and hmac.compare_digest(
+        derived, configured_hash
+    )
+
+
 class ResearchOSHandler(BaseHTTPRequestHandler):
     server_version = "ResearchOSAPI/0.6"
 
@@ -109,6 +126,17 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         body = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_session(self, account: dict[str, Any]) -> None:
+        token = issue_session(account)
+        body = _json_bytes({"authenticated": True, "account": account})
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Set-Cookie", cookie_header(token, secure=False))
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -195,7 +223,18 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})
                 return
             if path == "/v1/auth/google/status":
-                self._send(HTTPStatus.OK, GoogleIdentityBroker().status())
+                try:
+                    session = verify_session(extract_session_token(self.headers))
+                except (ValueError, RuntimeError):
+                    self._send(HTTPStatus.OK, GoogleIdentityBroker().status())
+                else:
+                    self._send(HTTPStatus.OK, {
+                        "connected": True,
+                        "account": {
+                            "email": session["email"],
+                            "role": str(session.get("role") or "user").upper(),
+                        },
+                    })
                 return
             if path == "/v1/auth/google/callback":
                 params = parse_qs(parsed.query)
@@ -275,6 +314,14 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = self._read_json()
+            if path == "/v1/auth/login":
+                username = str(body.get("username") or "").strip()
+                password = str(body.get("password") or "")
+                if not username or not password or not _password_matches(username, password):
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "invalid_credentials", "detail": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"})
+                    return
+                self._send_session({"sub": username, "email": username, "role": "user"})
+                return
             if path == "/v1/auth/google/start":
                 self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
                 return

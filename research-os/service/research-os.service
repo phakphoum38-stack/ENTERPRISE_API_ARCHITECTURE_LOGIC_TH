@@ -1,0 +1,13 @@
+[Unit]
+Description=Research OS Service
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+WorkingDirectory=/opt/research-os
+ExecStart=/usr/bin/env python -m research_os.app.main
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

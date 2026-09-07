@@ -21,14 +21,18 @@
         <p>เข้าสู่ workspace ของคุณ เพื่อเริ่มงานวิจัย จัดการหลักฐาน และบันทึกความรู้ที่ผ่านการตรวจสอบ</p>
       </div>
 
-      <div class="login-actions">
-        <button id="google-login" class="google-button" type="button">
-          <span class="google-icon" aria-hidden="true">G</span>
-          <span>เข้าสู่ระบบด้วย Google</span>
+      <form id="login-form" class="login-actions">
+        <label for="username">อีเมลหรือชื่อผู้ใช้</label>
+        <input id="username" name="username" type="text" autocomplete="username" required placeholder="you@example.com">
+        <label for="password">รหัสผ่าน</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="ป้อนรหัสผ่านของคุณ">
+        <button id="login-button" class="google-button" type="submit">
+          <span class="google-icon" aria-hidden="true">R</span>
+          <span>เข้าสู่ระบบ</span>
           <span class="arrow" aria-hidden="true">&#8594;</span>
         </button>
         <p id="login-status" class="status" role="status" aria-live="polite"></p>
-      </div>
+      </form>
 
       <div class="login-footer">
         <span>หรือ</span>
@@ -53,21 +57,28 @@
     </aside>
   </main>
   <script>
-    const button = document.getElementById('google-login');
+    const form = document.getElementById('login-form');
+    const button = document.getElementById('login-button');
     const status = document.getElementById('login-status');
-    button.addEventListener('click', async () => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
       button.disabled = true;
-      status.textContent = 'กำลังเชื่อมต่อ Google…';
+      status.textContent = 'กำลังเข้าสู่ระบบ…';
       try {
-        const response = await fetch('/v1/auth/google/start', {
+        const response = await fetch('/v1/auth/login', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'}
+          credentials: 'include',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value
+          })
         });
         const payload = await response.json();
-        if (!response.ok || !payload.authorization_url) {
-          throw new Error(payload.detail || 'Google sign-in ยังไม่พร้อมใช้งาน');
+        if (!response.ok) {
+          throw new Error(payload.detail || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
         }
-        window.location.assign(payload.authorization_url);
+        window.location.assign('/');
       } catch (error) {
         status.textContent = error.message;
         button.disabled = false;
