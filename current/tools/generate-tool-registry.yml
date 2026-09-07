@@ -18,6 +18,10 @@ entries:
     capability: validate-registry-evidence-memory
     source: local-runtime
     safe_boundary: repair-branch
+  - id: text-task-consumer
+    capability: consume-stored-generate-text-task
+    source: local-runtime
+    safe_boundary: readonly-intake
   - id: git-branch
     capability: create-repair-branch
     source: Git
