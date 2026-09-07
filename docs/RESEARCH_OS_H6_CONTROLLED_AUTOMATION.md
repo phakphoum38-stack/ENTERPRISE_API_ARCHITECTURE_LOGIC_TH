@@ -50,6 +50,10 @@ Targets must be explicit and bounded. URLs require a permitted scheme and host a
 
 H6 consumes decision context but never fabricates execution evidence. An executor must return fresh evidence bound to the same source SHA and correlation ID before any downstream system may treat an action as completed.
 
+## Lineage checkpoint
+
+H6 CI must evaluate the H6 head against the current H5 branch head. A refreshed H5 dependency does not require H6 to rewrite or fabricate evidence; GitHub's pull-request merge ref is the authoritative combined revision used by CI. H6 remains blocked from execution, approval, release, merge, install, workflow dispatch, ref mutation, and evidence fabrication.
+
 ## Authority
 
 H6 cannot merge, release, install, dispatch workflows, mutate Git refs, rewrite evidence, grant capabilities, approve itself, or replace the release authority model.
