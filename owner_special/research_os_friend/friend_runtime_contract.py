@@ -27,7 +27,7 @@ class FriendRuntimeContract:
     CORRELATION_RE = re.compile(r"^[A-Za-z0-9._:-]{1,2048}$")
     BLOCKED_KEYS = re.compile(
         r"(?:approval|approve|authorize|permission|release|merge|dispatch|"
-        r"credential|secret|token|password|private.?key|callback|callable|"
+        r"credential|secret|token|password|private.?key|api.?key|callback|callable|"
         r"function|lambda|eval|exec|shell|command|process|subprocess|"
         r"computer.?use|mcp)",
         re.I,
