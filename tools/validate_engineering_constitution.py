@@ -111,10 +111,12 @@ def main() -> int:
     parser.add_argument("--constitution", type=Path, default=CONSTITUTION)
     parser.add_argument("--fixture", type=Path, default=None)
     args = parser.parse_args()
-    errors = validate(args.constitution)
-    if args.fixture:
-        errors.extend(validate(args.fixture))
-    report = {"status": "PASS" if not errors else "FAIL", "constitution": str(args.constitution.relative_to(ROOT)), "errors": errors}
+    constitution_path = args.constitution if args.constitution.is_absolute() else (Path.cwd() / args.constitution).resolve()
+    fixture_path = None if args.fixture is None else (args.fixture if args.fixture.is_absolute() else (Path.cwd() / args.fixture).resolve())
+    errors = validate(constitution_path)
+    if fixture_path:
+        errors.extend(validate(fixture_path))
+    report = {"status": "PASS" if not errors else "FAIL", "constitution": str(constitution_path.relative_to(ROOT)), "errors": errors}
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0 if not errors else 1
 
