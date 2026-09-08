@@ -68,6 +68,11 @@ def validate(contract: dict, fixture: dict) -> list[str]:
         errors.append("contract_not_canonical")
     if not SEMVER_RE.fullmatch(str(contract.get("version", ""))):
         errors.append("invalid_contract_version")
+    # Do not dereference policy sections from an untrusted/non-canonical contract.
+    # The validator's fail-closed boundary must still emit structured JSON rather
+    # than crashing with KeyError/TypeError and producing an empty stdout stream.
+    if errors:
+        return errors
 
     identities = fixture.get("identities") if isinstance(fixture, dict) else None
     capabilities = fixture.get("capabilities") if isinstance(fixture, dict) else None
