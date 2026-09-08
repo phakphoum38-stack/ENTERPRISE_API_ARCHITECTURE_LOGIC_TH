@@ -107,6 +107,13 @@ def validate(path: Path) -> list[str]:
     return errors
 
 
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--constitution", type=Path, default=CONSTITUTION)
@@ -117,7 +124,7 @@ def main() -> int:
     errors = validate(constitution_path)
     if fixture_path:
         errors.extend(validate(fixture_path))
-    report = {"status": "PASS" if not errors else "FAIL", "constitution": str(constitution_path.relative_to(ROOT)), "errors": errors}
+    report = {"status": "PASS" if not errors else "FAIL", "constitution": display_path(constitution_path), "errors": errors}
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0 if not errors else 1
 
