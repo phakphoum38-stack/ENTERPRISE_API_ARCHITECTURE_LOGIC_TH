@@ -11,13 +11,10 @@ class SelfLearningRootContractTests(unittest.TestCase):
         candidate = LearnedSkillCandidate(
             name="evidence-free-candidate",
             goal="looks plausible but has no verification evidence",
-            procedure=("inspect", "validate"),
+            procedure=("inspect", "validate", "record", "compare", "score", "summarize"),
             evidence=(),
-            confidence=0.99,
+            confidence=1.0,
         )
-
-        # Root contract: confidence alone is never sufficient for promotion.
-        # This test intentionally targets the first self-learning implementation.
         self.assertIsNone(engine.learn(candidate))
         self.assertEqual(engine.registry.names(), ())
 
