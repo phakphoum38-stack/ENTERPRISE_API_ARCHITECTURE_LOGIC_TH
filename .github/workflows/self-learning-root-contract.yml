@@ -1,0 +1,34 @@
+name: Self-Learning Root Contract
+
+on:
+  pull_request:
+    paths:
+      - 'owner_special/research_os_friend/self_learning/**'
+      - 'owner_special/tests/test_self_learning*.py'
+      - '.github/workflows/self-learning-root-contract.yml'
+  push:
+    branches:
+      - 'fix/root-self-learning-evidence-gate'
+    paths:
+      - 'owner_special/research_os_friend/self_learning/**'
+      - 'owner_special/tests/test_self_learning*.py'
+      - '.github/workflows/self-learning-root-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  root-learning-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Compile self-learning root
+        run: python -m compileall -q owner_special/research_os_friend/self_learning
+      - name: Run self-learning root contract
+        env:
+          PYTHONPATH: .
+        run: python -m unittest owner_special.tests.test_self_learning_root_contract -v
