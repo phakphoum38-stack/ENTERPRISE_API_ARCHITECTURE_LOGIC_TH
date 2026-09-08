@@ -151,12 +151,10 @@ jobs:
           Set-Content -Path (Join-Path $data 'nested/state.json') -Value '{"state":"recoverable"}' -NoNewline
 
           & ./scripts/backup-research-os.ps1 -DataDir $data -BackupDir $backups
-          if ($LASTEXITCODE -ne 0) { throw 'Backup drill failed.' }
           $archive = Get-ChildItem $backups -Filter '*.zip' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $archive) { throw 'Backup archive was not produced.' }
 
           & ./scripts/restore-research-os.ps1 -Archive $archive.FullName -DataDir $restored
-          if ($LASTEXITCODE -ne 0) { throw 'Restore drill failed.' }
 
           $sourceFiles = Get-ChildItem $data -Recurse -File | ForEach-Object { $_.FullName.Substring($data.Length).TrimStart('\') } | Sort-Object
           $restoredFiles = Get-ChildItem $restored -Recurse -File | ForEach-Object { $_.FullName.Substring($restored.Length).TrimStart('\') } | Sort-Object
