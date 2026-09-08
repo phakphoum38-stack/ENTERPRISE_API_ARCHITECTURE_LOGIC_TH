@@ -89,6 +89,14 @@ class LearnedSkillRegistryBoundary:
         if not isinstance(candidate["procedure"], (list, tuple)) or not candidate["procedure"]:
             raise LearnedSkillRegistryBoundaryError("invalid candidate procedure")
 
+        unsigned = dict(receipt)
+        unsigned.pop("receipt_fingerprint", None)
+        expected = hashlib.sha256(
+            json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        ).hexdigest()
+        if expected != receipt.get("receipt_fingerprint"):
+            raise LearnedSkillRegistryBoundaryError("promotion receipt fingerprint mismatch")
+
     def _scan(self, value: Any, depth: int) -> None:
         if depth > 8:
             raise LearnedSkillRegistryBoundaryError("candidate depth exceeds bounds")
