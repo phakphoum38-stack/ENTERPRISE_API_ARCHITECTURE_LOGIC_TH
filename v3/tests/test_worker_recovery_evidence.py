@@ -15,7 +15,9 @@ class WorkerRecoveryEvidenceTests(unittest.TestCase):
     """Cross-layer recovery evidence for queue ownership + stateless execution."""
 
     def test_crash_reclaim_execution_and_exactly_once_completion(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        tmp = tempfile.mkdtemp()
+        queue: DurableTaskQueue | None = None
+        try:
             path = Path(tmp) / "queue.sqlite"
             events: list[dict[str, object]] = []
 
@@ -85,15 +87,34 @@ class WorkerRecoveryEvidenceTests(unittest.TestCase):
                 "events": events,
             }
             print("WORKER_RECOVERY_EVIDENCE=" + json.dumps(evidence, sort_keys=True))
-            queue.close()
+        finally:
+            if queue is not None:
+                queue.close()
+            self._remove_sqlite_tree(Path(tmp))
+
+    @staticmethod
+    def _remove_sqlite_tree(root: Path) -> None:
+        # Windows runners can briefly retain SQLite file handles after explicit
+        # connection close. Remove the database files before deleting the temp tree.
+        for suffix in ("-wal", "-shm"):
+            sidecar = root / f"queue.sqlite{suffix}"
+            if sidecar.exists():
+                sidecar.unlink()
+        db_path = root / "queue.sqlite"
+        if db_path.exists():
+            db_path.unlink()
+        root.rmdir()
 
     @staticmethod
     def _status(path: Path, task_id: str) -> str:
-        with sqlite3.connect(path) as db:
+        db = sqlite3.connect(path)
+        try:
             row = db.execute(
                 "SELECT status FROM research_queue WHERE task_id=?",
                 (task_id,),
             ).fetchone()
+        finally:
+            db.close()
         assert row is not None
         return str(row[0])
 
