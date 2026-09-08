@@ -30,9 +30,8 @@ class BaselineTruthVerifierTests(unittest.TestCase):
 
     def test_missing_commit_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            (root / "current").mkdir()
-            (root / "current" / "BASELINE_TRUTH_CONTRACT.json").write_text(
+            contract = Path(temp_dir) / "contract.json"
+            contract.write_text(
                 json.dumps(
                     {
                         "schema_version": "1.0",
@@ -42,26 +41,14 @@ class BaselineTruthVerifierTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (root / "tools").mkdir()
-            # Execute the verifier from the repository checkout so its git object
-            # database remains authoritative; this test validates the failure
-            # contract directly through a temporary contract replacement only.
-            original = CONTRACT.read_text(encoding="utf-8")
-            try:
-                CONTRACT.write_text(
-                    (root / "current" / "BASELINE_TRUTH_CONTRACT.json").read_text(encoding="utf-8"),
-                    encoding="utf-8",
-                )
-                result = subprocess.run(
-                    ["python", str(SCRIPT), "--head", "1" * 40],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("BASELINE_TRUTH_GATE=FAIL", result.stdout)
-            finally:
-                CONTRACT.write_text(original, encoding="utf-8")
+            result = subprocess.run(
+                ["python", str(SCRIPT), "--contract", str(contract), "--head", "1" * 40],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("BASELINE_TRUTH_GATE=FAIL", result.stdout)
 
 
 if __name__ == "__main__":
