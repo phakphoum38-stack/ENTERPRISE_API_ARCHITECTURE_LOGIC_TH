@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-CONTRACT = Path("current/BASELINE_TRUTH_CONTRACT.json")
+DEFAULT_CONTRACT = Path("current/BASELINE_TRUTH_CONTRACT.json")
 
 
 def run_git(*args: str) -> str:
@@ -31,8 +31,8 @@ def commit_exists(sha: str) -> bool:
     return result.returncode == 0
 
 
-def verify(expected_head: str | None = None) -> int:
-    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+def verify(contract_path: Path, expected_head: str | None = None) -> int:
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
     production = contract["production_code_truth"]["commit"]
     canonical = contract["canonical_main_history_truth"]["commit"]
     head = expected_head or run_git("rev-parse", "HEAD")
@@ -65,12 +65,13 @@ def verify(expected_head: str | None = None) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--head", help="Explicit working HEAD SHA for deterministic CI checks")
+    parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     args = parser.parse_args()
-    if not CONTRACT.is_file():
-        print(f"BASELINE_TRUTH_GATE=FAIL: missing {CONTRACT}")
+    if not args.contract.is_file():
+        print(f"BASELINE_TRUTH_GATE=FAIL: missing {args.contract}")
         return 1
     try:
-        return verify(args.head)
+        return verify(args.contract, args.head)
     except (OSError, RuntimeError, json.JSONDecodeError, KeyError) as exc:
         print(f"BASELINE_TRUTH_GATE=FAIL: {exc}")
         return 1
