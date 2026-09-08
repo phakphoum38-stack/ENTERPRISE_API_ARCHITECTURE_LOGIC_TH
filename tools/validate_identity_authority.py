@@ -47,10 +47,10 @@ def timestamp(value, field: str, errors: list[str]) -> None:
         errors.append(f"invalid_timestamp:{field}")
 
 
-def ids_unique(items: list[dict], kind: str, errors: list[str]) -> None:
+def ids_unique(items: list[dict], kind: str, id_field: str, errors: list[str]) -> None:
     seen: set[str] = set()
     for item in items:
-        ident = item.get("id")
+        ident = item.get(id_field)
         if ident in seen:
             errors.append(f"duplicate_{kind}_id:{ident}")
         seen.add(ident)
@@ -75,13 +75,13 @@ def validate(contract: dict, fixture: dict) -> list[str]:
     delegations = fixture.get("delegations") if isinstance(fixture, dict) else None
     revocations = fixture.get("revocations") if isinstance(fixture, dict) else None
     proofs = fixture.get("authorization_proofs") if isinstance(fixture, dict) else None
-    collections = [(identities, "identity"), (capabilities, "capability"), (grants, "grant"),
-                   (delegations, "delegation"), (revocations, "revocation"), (proofs, "proof")]
-    for items, kind in collections:
+    collections = [(identities, "identity", "id"), (capabilities, "capability", "id"), (grants, "grant", "id"),
+                   (delegations, "delegation", "id"), (revocations, "revocation", "id"), (proofs, "proof", "proof_id")]
+    for items, kind, id_field in collections:
         if not isinstance(items, list):
             errors.append(f"{kind}_collection_missing")
         else:
-            ids_unique(items, kind, errors)
+            ids_unique(items, kind, id_field, errors)
 
     identity_map = {x.get("id"): x for x in identities or []}
     capability_map = {x.get("id"): x for x in capabilities or []}
