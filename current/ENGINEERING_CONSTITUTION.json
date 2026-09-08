@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "status": "CANONICAL",
+  "constitution_id": "EC-001",
+  "version": "1.0.0",
+  "world_model_dependency": {
+    "schema": "current/ENGINEERING_WORLD_MODEL_SCHEMA.json",
+    "required_entity_types": ["decision", "contract", "evidence", "gate", "knowledge"],
+    "required_relationship_types": ["decides", "constrains", "supported_by", "enforced_by", "learns_from"]
+  },
+  "principles": [
+    {"id":"C-001","name":"constitutional_invariants","rule":"No change may bypass a declared non-negotiable invariant."},
+    {"id":"C-002","name":"authority_non_escalation","rule":"No agent, workflow, tool, or runtime may grant itself authority it does not already possess."},
+    {"id":"C-003","name":"human_control_of_high_risk","rule":"High-risk mutable actions require explicit human authority unless an approved emergency protocol applies."},
+    {"id":"C-004","name":"evidence_required","rule":"Governance decisions and amendments require reproducible evidence; assumption alone is not approval evidence."},
+    {"id":"C-005","name":"append_only_history","rule":"Constitutional history is append-only; prior effective versions are never silently rewritten."},
+    {"id":"C-006","name":"fail_closed","rule":"Unknown, missing, contradictory, or unverifiable authority state must fail closed."}
+  ],
+  "authority_levels": [
+    {"id":"human_owner","subject":"human","powers":["constitutional_approval","high_risk_approval","emergency_override"]},
+    {"id":"governed_agent","subject":"agent","powers":["propose","analyze","execute_within_granted_capability"]},
+    {"id":"workflow","subject":"automation","powers":["validate","gate","record_evidence","execute_preapproved_actions"]},
+    {"id":"runtime","subject":"service","powers":["execute_granted_operation","emit_evidence","report_incident"]}
+  ],
+  "high_risk_action_classes": [
+    "authority_change",
+    "constitutional_amendment",
+    "production_mutation",
+    "release_promotion",
+    "installed_artifact_change",
+    "security_policy_change",
+    "identity_or_capability_revocation"
+  ],
+  "governance_rules": {
+    "agent_self_approval_for_high_risk": false,
+    "workflow_self_grant_authority": false,
+    "unknown_authority_is_allowed": false,
+    "unverified_amendment_is_effective": false,
+    "history_rewrite_is_allowed": false,
+    "production_bypass_is_allowed": false
+  },
+  "amendment_lifecycle": ["proposed","reviewed","approved","effective","superseded","retired"],
+  "amendment_requirements": {
+    "required_fields": ["amendment_id","base_version","target_version","proposed_at","proposer","reason","changes","evidence_ids","approval","effective_at"],
+    "version_must_increase": true,
+    "approval_required": true,
+    "evidence_required": true,
+    "effective_at_required": true,
+    "supersession_must_be_explicit": true
+  },
+  "emergency_protocol": {
+    "allowed": true,
+    "initiator": "human_owner",
+    "requires_reason": true,
+    "requires_evidence": true,
+    "requires_post_event_review": true,
+    "must_be_time_bounded": true
+  },
+  "enforcement": {
+    "contract_is_machine_readable": true,
+    "validator_is_fail_closed": true,
+    "ci_gate_required": true,
+    "release_gate_required_for_production_effect": true
+  }
+}
