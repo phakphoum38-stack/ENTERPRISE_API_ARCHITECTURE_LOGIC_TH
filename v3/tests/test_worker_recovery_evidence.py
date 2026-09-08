@@ -37,11 +37,15 @@ class WorkerRecoveryEvidenceTests(unittest.TestCase):
             })
 
             expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
-            with sqlite3.connect(path) as db:
+            db = sqlite3.connect(path)
+            try:
                 db.execute(
                     "UPDATE research_queue SET lease_until=? WHERE task_id=?",
                     (expired, crashed.task_id),
                 )
+                db.commit()
+            finally:
+                db.close()
 
             recovered = queue.recover_expired_leases()
             self.assertEqual(1, recovered)
