@@ -1,0 +1,35 @@
+{
+  "contract_version": "1.0.0",
+  "entries": [
+    {
+      "entry_id": "EV-001",
+      "sequence": 1,
+      "recorded_at": "2026-09-09T00:00:00Z",
+      "actor_id": "H-OWNER",
+      "action": "change",
+      "subject_type": "change",
+      "subject_id": "CHG-001",
+      "input_hashes": {"source_commit_sha256": "47f18e77cad4716870add0689757110de4df276741299c2f0efec4d97a298aef"},
+      "output_hashes": {"contract_sha256": "8a636eb04b46145c95176cffae3510605df38aaf"},
+      "evidence_type": "change",
+      "evidence": {"reason":"Establish canonical provenance evidence chain","source_commit":"0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10","evidence_ids":["EV-001"],"attestation_id":"ATT-001"},
+      "previous_entry_hash": null,
+      "entry_hash": "1805afca1ee351b5ac2acf427e1ab8c6b09c2ded11b0dbebe2e6c0060676a696"
+    },
+    {
+      "entry_id": "EV-002",
+      "sequence": 2,
+      "recorded_at": "2026-09-09T00:05:00Z",
+      "actor_id": "H-OWNER",
+      "action": "attest",
+      "subject_type": "change",
+      "subject_id": "CHG-001",
+      "input_hashes": {"prior_entry": "1805afca1ee351b5ac2acf427e1ab8c6b09c2ded11b0dbebe2e6c0060676a696"},
+      "output_hashes": {"attestation": "47f4a45784e11bbc22b9cfae7c18a598519bce6eb5d9837a650b0782071ca07b"},
+      "evidence_type": "attestation",
+      "evidence": {"attestation_id":"ATT-001","subject_id":"CHG-001","attester_id":"H-OWNER","statement":"Change evidence is reproducible and hash-verified.","evidence_ids":["EV-001"],"issued_at":"2026-09-09T00:05:00Z"},
+      "previous_entry_hash": "1805afca1ee351b5ac2acf427e1ab8c6b09c2ded11b0dbebe2e6c0060676a696",
+      "entry_hash": "7a0d3771b78b5c87061e4744a63f12a1cfcf1101efe99f09730cea2db2acbb38"
+    }
+  ]
+}
