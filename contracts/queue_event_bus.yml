@@ -1,0 +1,85 @@
+version: "1.0"
+kind: queue_event_bus_contract
+status: foundation
+purpose: Define the durable event and job queue contract for distributed workflow execution.
+
+job:
+  required:
+    - job_id
+    - workflow_id
+    - event_id
+    - status
+    - created_at
+  statuses:
+    - QUEUED
+    - CLAIMED
+    - RUNNING
+    - SUCCEEDED
+    - FAILED
+    - RETRYING
+    - CANCELLED
+    - DEAD_LETTER
+
+  fields:
+    job_id: string
+    workflow_id: string
+    event_id: string
+    idempotency_key: string
+    priority: integer
+    payload: object
+    attempts: integer
+    max_attempts: integer
+    lease_id: string|null
+    lease_expires_at: string|null
+    created_at: string
+    updated_at: string
+
+event:
+  required:
+    - event_id
+    - event_type
+    - aggregate_id
+    - occurred_at
+  fields:
+    event_id: string
+    event_type: string
+    aggregate_id: string
+    payload: object
+    occurred_at: string
+    correlation_id: string|null
+    causation_id: string|null
+
+operations:
+  enqueue:
+    guarantees:
+      - idempotent_by_idempotency_key
+      - durable_before_ack
+  claim:
+    guarantees:
+      - single_active_lease
+      - lease_expiry_recovery
+  heartbeat:
+    guarantees:
+      - lease_extension
+  ack:
+    guarantees:
+      - terminal_success_only
+  nack:
+    guarantees:
+      - retry_or_dead_letter
+
+reliability:
+  visibility_timeout_seconds: 60
+  heartbeat_interval_seconds: 20
+  max_attempts_default: 3
+  dead_letter_enabled: true
+  duplicate_event_protection: true
+  idempotency_required: true
+
+acceptance_criteria:
+  - duplicate enqueue does not create duplicate active jobs
+  - only one runner may hold an active lease for a job
+  - expired leases become claimable
+  - failed jobs retry until max_attempts
+  - exhausted jobs enter DEAD_LETTER
+  - successful jobs cannot be re-executed by normal polling
