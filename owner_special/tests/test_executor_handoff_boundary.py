@@ -64,7 +64,7 @@ class ExecutorHandoffBoundaryTests(unittest.TestCase):
     def test_invalid_identity_is_rejected(self) -> None:
         with self.assertRaises(ExecutorHandoffError):
             ExecutorHandoffBoundary().handoff(
-                request(source_sha="c" * 40), skill()
+                request(owner="other_owner"), skill()
             )
 
     def test_unsafe_skill_is_rejected(self) -> None:
