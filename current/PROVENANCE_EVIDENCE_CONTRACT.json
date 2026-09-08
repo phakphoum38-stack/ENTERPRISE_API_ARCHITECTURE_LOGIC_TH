@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "status": "CANONICAL",
+  "contract_id": "PEC-001",
+  "version": "1.0.0",
+  "constitution_dependency": "current/ENGINEERING_CONSTITUTION.json",
+  "identity_dependency": "current/IDENTITY_AUTHORITY_CONTRACT.json",
+  "purpose": "Make critical changes, artifacts, builds, tests, releases, and installations independently traceable and tamper-evident.",
+  "ledger": {
+    "append_only": true,
+    "required_entry_fields": ["entry_id","sequence","recorded_at","actor_id","action","subject_type","subject_id","input_hashes","output_hashes","evidence_type","evidence","previous_entry_hash","entry_hash"],
+    "evidence_types": ["change","build","test","security","attestation","artifact","release","installation","incident"],
+    "hash_algorithm": "sha256",
+    "canonical_serialization": "json_object_keys_sorted_utf8_no_whitespace",
+    "sequence_must_start_at": 1,
+    "sequence_must_be_contiguous": true,
+    "first_previous_entry_hash": null,
+    "entry_hash_formula": "sha256(canonical_json(entry_without_entry_hash))"
+  },
+  "proof_carrying_change": {
+    "required": true,
+    "required_links": ["actor_id","action","subject_id","input_hashes","output_hashes","evidence_ids","attestation_id"]
+  },
+  "proof_carrying_artifact": {
+    "required": true,
+    "required_links": ["artifact_id","build_evidence_id","test_evidence_ids","source_commit"]
+  },
+  "proof_carrying_release": {
+    "required": true,
+    "required_links": ["release_id","artifact_id","approval_evidence_id","verification_evidence_ids"]
+  },
+  "attestation": {
+    "required_fields": ["attestation_id","subject_id","attester_id","statement","evidence_ids","issued_at"],
+    "self_attestation_for_high_risk": false
+  },
+  "tamper_detection": {
+    "verify_previous_hash": true,
+    "verify_entry_hash": true,
+    "verify_sequence": true,
+    "unknown_or_missing_evidence_fails_closed": true
+  },
+  "enforcement": {
+    "machine_readable_contract": true,
+    "fail_closed_validator": true,
+    "negative_tests_required": true,
+    "ci_gate_required": true,
+    "release_proof_required": true
+  }
+}
