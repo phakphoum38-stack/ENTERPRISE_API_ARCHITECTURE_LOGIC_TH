@@ -48,7 +48,16 @@ class BaselineTruthVerifierTests(unittest.TestCase):
                 check=False,
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("BASELINE_TRUTH_GATE=FAIL", result.stdout)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "FAIL")
+            self.assertIn(
+                "production commit missing: " + "0" * 40,
+                payload["failures"],
+            )
+            self.assertIn(
+                "canonical commit missing: " + "1" * 40,
+                payload["failures"],
+            )
 
 
 if __name__ == "__main__":
