@@ -14,7 +14,7 @@
       "evidence_type": "change",
       "evidence": {"reason":"Establish canonical provenance evidence chain","source_commit":"0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10","evidence_ids":["EV-001"],"attestation_id":"ATT-001"},
       "previous_entry_hash": null,
-      "entry_hash": "1805afca1ee351b5ac2acf427e1ab8c6b09c2ded11b0dbebe2e6c0060676a696"
+      "entry_hash": "8a84d4fa3cd0db478aacfc4ceb942ef4e414106e72951c8e04b594f471b55ab6"
     },
     {
       "entry_id": "EV-002",
@@ -24,12 +24,12 @@
       "action": "attest",
       "subject_type": "change",
       "subject_id": "CHG-001",
-      "input_hashes": {"prior_entry": "1805afca1ee351b5ac2acf427e1ab8c6b09c2ded11b0dbebe2e6c0060676a696"},
+      "input_hashes": {"prior_entry": "8a84d4fa3cd0db478aacfc4ceb942ef4e414106e72951c8e04b594f471b55ab6"},
       "output_hashes": {"attestation": "47f4a45784e11bbc22b9cfae7c18a598519bce6eb5d9837a650b0782071ca07b"},
       "evidence_type": "attestation",
       "evidence": {"attestation_id":"ATT-001","subject_id":"CHG-001","attester_id":"H-OWNER","statement":"Change evidence is reproducible and hash-verified.","evidence_ids":["EV-001"],"issued_at":"2026-09-09T00:05:00Z"},
-      "previous_entry_hash": "1805afca1ee351b5ac2acf427e1ab8c6b09c2ded11b0dbebe2e6c0060676a696",
-      "entry_hash": "7a0d3771b78b5c87061e4744a63f12a1cfcf1101efe99f09730cea2db2acbb38"
+      "previous_entry_hash": "8a84d4fa3cd0db478aacfc4ceb942ef4e414106e72951c8e04b594f471b55ab6",
+      "entry_hash": "57482196aae5254482444dae05916d892e1b8df0f3202b8d506db54bcfb791ab"
     }
   ]
 }
