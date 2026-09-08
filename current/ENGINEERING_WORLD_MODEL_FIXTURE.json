@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "entities": [
+    {"id":"REQ-001","type":"requirement","state":"approved","created_at":"2026-09-08T00:00:00Z","valid_from":"2026-09-08T00:00:00Z"},
+    {"id":"DEC-001","type":"decision","state":"approved","created_at":"2026-09-08T01:00:00Z","valid_from":"2026-09-08T01:00:00Z"},
+    {"id":"ARC-001","type":"architecture","state":"approved","created_at":"2026-09-08T02:00:00Z","valid_from":"2026-09-08T02:00:00Z"},
+    {"id":"CON-001","type":"contract","state":"approved","created_at":"2026-09-08T03:00:00Z","valid_from":"2026-09-08T03:00:00Z"},
+    {"id":"CODE-001","type":"code","state":"implemented","created_at":"2026-09-08T04:00:00Z","valid_from":"2026-09-08T04:00:00Z"},
+    {"id":"COM-001","type":"commit","state":"verified","created_at":"2026-09-08T05:00:00Z","valid_from":"2026-09-08T05:00:00Z"},
+    {"id":"BLD-001","type":"build","state":"verified","created_at":"2026-09-08T06:00:00Z","valid_from":"2026-09-08T06:00:00Z"},
+    {"id":"ART-001","type":"artifact","state":"released","created_at":"2026-09-08T07:00:00Z","valid_from":"2026-09-08T07:00:00Z"},
+    {"id":"TST-001","type":"test","state":"verified","created_at":"2026-09-08T08:00:00Z","valid_from":"2026-09-08T08:00:00Z"},
+    {"id":"EVD-001","type":"evidence","state":"verified","created_at":"2026-09-08T09:00:00Z","valid_from":"2026-09-08T09:00:00Z"},
+    {"id":"GATE-001","type":"gate","state":"verified","created_at":"2026-09-08T10:00:00Z","valid_from":"2026-09-08T10:00:00Z"},
+    {"id":"REL-001","type":"release","state":"released","created_at":"2026-09-08T11:00:00Z","valid_from":"2026-09-08T11:00:00Z"},
+    {"id":"INS-001","type":"installation","state":"installed","created_at":"2026-09-08T12:00:00Z","valid_from":"2026-09-08T12:00:00Z"},
+    {"id":"RUN-001","type":"runtime","state":"running","created_at":"2026-09-08T13:00:00Z","valid_from":"2026-09-08T13:00:00Z"},
+    {"id":"INC-001","type":"incident","state":"incident","created_at":"2026-09-08T14:00:00Z","valid_from":"2026-09-08T14:00:00Z"},
+    {"id":"RC-001","type":"root_cause","state":"root_caused","created_at":"2026-09-08T15:00:00Z","valid_from":"2026-09-08T15:00:00Z"},
+    {"id":"KN-001","type":"knowledge","state":"learned","created_at":"2026-09-08T16:00:00Z","valid_from":"2026-09-08T16:00:00Z"}
+  ],
+  "relationships": [
+    {"id":"R1","type":"derived_from","from":"DEC-001","to":"REQ-001","valid_from":"2026-09-08T01:00:00Z"},
+    {"id":"R2","type":"decides","from":"ARC-001","to":"DEC-001","valid_from":"2026-09-08T02:00:00Z"},
+    {"id":"R3","type":"architects","from":"CON-001","to":"ARC-001","valid_from":"2026-09-08T03:00:00Z"},
+    {"id":"R4","type":"constrains","from":"CODE-001","to":"CON-001","valid_from":"2026-09-08T04:00:00Z"},
+    {"id":"R5","type":"committed_as","from":"CODE-001","to":"COM-001","valid_from":"2026-09-08T05:00:00Z"},
+    {"id":"R6","type":"built_by","from":"ART-001","to":"BLD-001","valid_from":"2026-09-08T07:00:00Z"},
+    {"id":"R7","type":"produces","from":"BLD-001","to":"ART-001","valid_from":"2026-09-08T07:00:00Z"},
+    {"id":"R8","type":"verified_by","from":"ART-001","to":"TST-001","valid_from":"2026-09-08T08:00:00Z"},
+    {"id":"R9","type":"supported_by","from":"GATE-001","to":"EVD-001","valid_from":"2026-09-08T10:00:00Z"},
+    {"id":"R10","type":"enforced_by","from":"REL-001","to":"GATE-001","valid_from":"2026-09-08T11:00:00Z"},
+    {"id":"R11","type":"released_as","from":"REL-001","to":"ART-001","valid_from":"2026-09-08T11:00:00Z"},
+    {"id":"R12","type":"installed_as","from":"INS-001","to":"REL-001","valid_from":"2026-09-08T12:00:00Z"},
+    {"id":"R13","type":"runs_as","from":"RUN-001","to":"INS-001","valid_from":"2026-09-08T13:00:00Z"},
+    {"id":"R14","type":"observed_by","from":"RUN-001","to":"INC-001","valid_from":"2026-09-08T14:00:00Z"},
+    {"id":"R15","type":"caused_by","from":"INC-001","to":"RC-001","valid_from":"2026-09-08T15:00:00Z"},
+    {"id":"R16","type":"learns_from","from":"KN-001","to":"RC-001","valid_from":"2026-09-08T16:00:00Z"}
+  ]
+}
