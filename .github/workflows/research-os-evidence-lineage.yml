@@ -40,7 +40,6 @@ jobs:
       BASE_SHA: ${{ inputs.base_sha || '' }}
       HEAD_SHA: ${{ inputs.head_sha || '' }}
       MERGE_SHA: ${{ inputs.merge_sha || github.sha }}
-      RUN_STARTED_AT: ${{ github.run_started_at }}
     steps:
       - name: Resolve current merged PR on main push
         if: ${{ github.event_name == 'push' }}
@@ -131,6 +130,7 @@ jobs:
           head = os.environ['HEAD_SHA']
           merge = os.environ['MERGE_SHA']
           token = os.environ['GH_TOKEN']
+          run_id = os.environ['GITHUB_RUN_ID']
 
           def gh(path):
               out = subprocess.check_output([
@@ -148,6 +148,12 @@ jobs:
           status = gh(f'/repos/{owner}/{repo}/commits/{head}/status')
           checks = gh(f'/repos/{owner}/{repo}/commits/{head}/check-runs?per_page=100')
           runs = gh(f'/repos/{owner}/{repo}/actions/runs?head_sha={head}&per_page=100')
+          current_run = gh(f'/repos/{owner}/{repo}/actions/runs/{run_id}')
+          run_started_at = current_run.get('run_started_at', '')
+          if not run_started_at:
+              raise SystemExit(
+                  f'Current Actions run {run_id} has no run_started_at in the Actions API'
+              )
 
           parents = [p['sha'] for p in merge_data.get('parents', [])]
           pr_head_sha = pr_data.get('head', {}).get('sha', '')
@@ -225,7 +231,7 @@ jobs:
               'traceability_gap': None if lineage_ok else 'PR head/merge lineage could not be fully reconciled',
               'next_stage': '#115' if lineage_ok else '#111',
               'generated_by': 'research-os-evidence-lineage',
-              'generated_at': os.environ.get('RUN_STARTED_AT'),
+              'generated_at': run_started_at,
           }
 
           Path('evidence/lineage/canonical-evidence.json').write_text(
