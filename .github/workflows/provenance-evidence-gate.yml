@@ -7,7 +7,9 @@ on:
       - 'tools/validate_provenance_evidence.py'
       - 'tools/record_provenance_entry.py'
       - 'tools/test_validate_provenance_evidence.py'
+      - 'tools/provenance_conformance/**'
       - 'docs/PROVENANCE_EVIDENCE_LEDGER.md'
+      - 'docs/PROVENANCE_THREAT_MODEL.md'
       - '.github/workflows/provenance-evidence-gate.yml'
   push:
     branches: [main]
@@ -16,7 +18,9 @@ on:
       - 'tools/validate_provenance_evidence.py'
       - 'tools/record_provenance_entry.py'
       - 'tools/test_validate_provenance_evidence.py'
+      - 'tools/provenance_conformance/**'
       - 'docs/PROVENANCE_EVIDENCE_LEDGER.md'
+      - 'docs/PROVENANCE_THREAT_MODEL.md'
       - '.github/workflows/provenance-evidence-gate.yml'
   workflow_dispatch:
 
@@ -33,5 +37,7 @@ jobs:
           fetch-depth: 0
       - name: Validate canonical provenance ledger
         run: python tools/validate_provenance_evidence.py
-      - name: Run provenance producer and tamper regressions
+      - name: Run provenance conformance and tamper regressions
         run: python -m unittest tools.test_validate_provenance_evidence -v
+      - name: Compile verifier and producer
+        run: python -m py_compile tools/validate_provenance_evidence.py tools/record_provenance_entry.py tools/test_validate_provenance_evidence.py
