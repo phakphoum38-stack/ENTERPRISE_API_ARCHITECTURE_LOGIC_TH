@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONSTITUTION = ROOT / "current" / "ENGINEERING_CONSTITUTION.json"
 FIXTURE = ROOT / "current" / "ENGINEERING_CONSTITUTION_FIXTURE.json"
+SCHEMA_VERSION_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 VERSION_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 
@@ -28,8 +29,8 @@ def validate(path: Path) -> list[str]:
             errors.append(f"missing required field: {key}")
     if c.get("status") != "CANONICAL":
         errors.append("status must be CANONICAL")
-    if not isinstance(c.get("schema_version"), str) or not VERSION_RE.match(c.get("schema_version", "0.0.0")):
-        errors.append("schema_version must be semver")
+    if not isinstance(c.get("schema_version"), str) or not SCHEMA_VERSION_RE.match(c.get("schema_version", "0.0")):
+        errors.append("schema_version must be major.minor")
     if not isinstance(c.get("version"), str) or not VERSION_RE.match(c.get("version", "0.0.0")):
         errors.append("version must be semver")
 
