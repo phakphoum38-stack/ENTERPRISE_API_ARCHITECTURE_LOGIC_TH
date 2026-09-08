@@ -77,9 +77,11 @@ class LearningLifecycleBoundary:
             raise LearningLifecycleError("executor result authority contract violated")
 
     def _match(self, request: LearningLifecycleRequest, expected: dict[str, Any]) -> None:
-        for field in ("owner", "source_sha", "correlation_id", "skill_fingerprint", "result_fingerprint", "result_status"):
+        for field in ("owner", "source_sha", "correlation_id", "skill_fingerprint", "result_fingerprint"):
             if getattr(request, field) != expected.get(field):
                 raise LearningLifecycleError(f"result {field} mismatch")
+        if request.result_status != expected.get("status"):
+            raise LearningLifecycleError("result result_status mismatch")
 
     def _scan(self, value: Any, depth: int) -> None:
         if depth > self.MAX_DEPTH:
