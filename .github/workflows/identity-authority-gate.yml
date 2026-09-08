@@ -1,0 +1,37 @@
+name: Identity Authority Gate
+
+on:
+  pull_request:
+    paths:
+      - 'current/IDENTITY_AUTHORITY_*.json'
+      - 'tools/validate_identity_authority.py'
+      - 'tools/test_validate_identity_authority.py'
+      - 'docs/IDENTITY_AUTHORITY_ZERO_TRUST.md'
+      - '.github/workflows/identity-authority-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'current/IDENTITY_AUTHORITY_*.json'
+      - 'tools/validate_identity_authority.py'
+      - 'tools/test_validate_identity_authority.py'
+      - 'docs/IDENTITY_AUTHORITY_ZERO_TRUST.md'
+      - '.github/workflows/identity-authority-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate canonical identity authority fixture
+        run: python tools/validate_identity_authority.py
+
+      - name: Run negative regression suite
+        run: python -m unittest tools.test_validate_identity_authority -v
