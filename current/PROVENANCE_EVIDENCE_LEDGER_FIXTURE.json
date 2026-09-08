@@ -1,35 +1,72 @@
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "entries": [
     {
-      "entry_id": "EV-001",
-      "sequence": 1,
-      "recorded_at": "2026-09-09T00:00:00Z",
-      "actor_id": "H-OWNER",
       "action": "change",
-      "subject_type": "change",
-      "subject_id": "CHG-001",
-      "input_hashes": {"source_commit_sha256": "47f18e77cad4716870add0689757110de4df276741299c2f0efec4d97a298aef"},
-      "output_hashes": {"contract_sha256": "8a636eb04b46145c95176cffae3510605df38aaf"},
+      "actor_id": "H-OWNER",
+      "entry_hash": "0382bcd803021945f8ff4cce6fb9d0c5eb136032469f1bb4985db220fc74d925",
+      "entry_id": "EV-001",
+      "evidence": {
+        "attestation_id": "ATT-001",
+        "evidence_ids": ["EV-001"],
+        "reason": "Establish canonical provenance evidence chain",
+        "source_commit": "0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10",
+        "target_commit": "a34557a13e4afaafc2b2575be28ca79b74406a79"
+      },
       "evidence_type": "change",
-      "evidence": {"reason":"Establish canonical provenance evidence chain","source_commit":"0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10","evidence_ids":["EV-001"],"attestation_id":"ATT-001"},
+      "input_hashes": {
+        "source_commit": {
+          "algorithm": "git-sha1",
+          "digest": "0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10",
+          "subject": "git-commit"
+        }
+      },
+      "output_hashes": {
+        "contract": {
+          "algorithm": "sha256",
+          "digest": "5e4c5d3d92d835c0f750ac650b733c067287bcdcfc417b2ae2d37b6b39c46aae",
+          "subject": "artifact:current/PROVENANCE_EVIDENCE_CONTRACT.json"
+        }
+      },
       "previous_entry_hash": null,
-      "entry_hash": "8a84d4fa3cd0db478aacfc4ceb942ef4e414106e72951c8e04b594f471b55ab6"
+      "recorded_at": "2026-09-09T00:00:00Z",
+      "sequence": 1,
+      "subject_id": "CHG-001",
+      "subject_type": "change"
     },
     {
-      "entry_id": "EV-002",
-      "sequence": 2,
-      "recorded_at": "2026-09-09T00:05:00Z",
-      "actor_id": "H-OWNER",
       "action": "attest",
-      "subject_type": "change",
-      "subject_id": "CHG-001",
-      "input_hashes": {"prior_entry": "8a84d4fa3cd0db478aacfc4ceb942ef4e414106e72951c8e04b594f471b55ab6"},
-      "output_hashes": {"attestation": "47f4a45784e11bbc22b9cfae7c18a598519bce6eb5d9837a650b0782071ca07b"},
+      "actor_id": "H-OWNER",
+      "entry_hash": "926c317a2061c8628c2b09628e1d274237430c0700c71e6a427c9d3106956115",
+      "entry_id": "EV-002",
+      "evidence": {
+        "attestation_id": "ATT-001",
+        "attester_id": "H-OWNER",
+        "evidence_ids": ["EV-001"],
+        "issued_at": "2026-09-09T00:05:00Z",
+        "statement": "Change evidence is reproducible and hash-verified.",
+        "subject_id": "CHG-001"
+      },
       "evidence_type": "attestation",
-      "evidence": {"attestation_id":"ATT-001","subject_id":"CHG-001","attester_id":"H-OWNER","statement":"Change evidence is reproducible and hash-verified.","evidence_ids":["EV-001"],"issued_at":"2026-09-09T00:05:00Z"},
-      "previous_entry_hash": "8a84d4fa3cd0db478aacfc4ceb942ef4e414106e72951c8e04b594f471b55ab6",
-      "entry_hash": "57482196aae5254482444dae05916d892e1b8df0f3202b8d506db54bcfb791ab"
+      "input_hashes": {
+        "prior_entry": {
+          "algorithm": "sha256",
+          "digest": "0382bcd803021945f8ff4cce6fb9d0c5eb136032469f1bb4985db220fc74d925",
+          "subject": "ledger:EV-001"
+        }
+      },
+      "output_hashes": {
+        "attestation": {
+          "algorithm": "sha256",
+          "digest": "47f4a45784e11bbc22b9cfae7c18a598519bce6eb5d9837a650b0782071ca07b",
+          "subject": "attestation:ATT-001"
+        }
+      },
+      "previous_entry_hash": "0382bcd803021945f8ff4cce6fb9d0c5eb136032469f1bb4985db220fc74d925",
+      "recorded_at": "2026-09-09T00:05:00Z",
+      "sequence": 2,
+      "subject_id": "CHG-001",
+      "subject_type": "change"
     }
   ]
 }
