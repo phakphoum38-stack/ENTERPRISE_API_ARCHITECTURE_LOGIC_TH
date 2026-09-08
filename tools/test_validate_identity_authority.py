@@ -41,6 +41,13 @@ class IdentityAuthorityValidatorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(json.loads(result.stdout)["status"], "PASS")
 
+    def test_duplicate_proof_id_fails_closed(self):
+        fixture = self.load_fixture()
+        fixture["authorization_proofs"][1]["proof_id"] = fixture["authorization_proofs"][0]["proof_id"]
+        result, payload = self.run_validator(fixture)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate_proof_id:P-001", payload["errors"])
+
     def test_self_grant_fails_closed(self):
         fixture = self.load_fixture()
         fixture["grants"][0]["granted_by"] = fixture["grants"][0]["subject_id"]
