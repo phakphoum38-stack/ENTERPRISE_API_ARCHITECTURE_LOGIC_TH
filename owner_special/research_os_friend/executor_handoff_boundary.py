@@ -35,6 +35,7 @@ class ExecutorHandoffRequest:
 class ExecutorHandoffBoundary:
     """Build a bounded handoff envelope without invoking an executor."""
 
+    EXPECTED_OWNER = "owner_special"
     ALLOWED_CAPABILITIES = frozenset({"LEARNED_SKILL_EXECUTOR", "LEARNED_SKILL_INSPECTOR"})
     MAX_CORRELATION = 128
 
@@ -64,6 +65,8 @@ class ExecutorHandoffBoundary:
         return json.loads(json.dumps(payload, sort_keys=True))
 
     def _validate_request(self, request: ExecutorHandoffRequest) -> None:
+        if request.owner != self.EXPECTED_OWNER:
+            raise ExecutorHandoffError("owner identity mismatch")
         if not request.owner or len(request.owner) > 128 or _BLOCKED.search(request.owner):
             raise ExecutorHandoffError("invalid owner")
         if not _SHA_RE.fullmatch(request.source_sha):
