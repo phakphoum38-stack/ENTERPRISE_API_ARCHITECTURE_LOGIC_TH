@@ -68,10 +68,9 @@ class AutonomousWorkloopTests(unittest.TestCase):
                                   stale=0, unverified=0, blocked_required=0,
                                   uncertified_integrations=0, main_verified=True, final_rescan=True))
 
-    def test_stop_proof_is_hold_when_observation_is_missing(self):
-        proof = build_stop_proof()
-        self.assertEqual(proof["status"], "HOLD")
-        self.assertEqual(proof["terminal_state"], "ACTIVE")
+    def test_stop_proof_rejects_missing_observation(self):
+        with self.assertRaises(WorkloopError):
+            build_stop_proof()
 
     def test_stop_proof_rejects_string_boolean_coercion(self):
         with self.assertRaises(WorkloopError):
