@@ -3,13 +3,17 @@
 Authority is separate from identity, capability, evidence, and risk. The
 boundary accepts only an explicit verification proof produced from a
 canonicalized observation; raw caller booleans are intentionally rejected.
-This module never grants or escalates authority.
+The proof is bound to the exact baseline, policy, evidence root, provenance
+root, and evidence references it claims to verify. This module never grants
+or escalates authority and does not implement an independent provenance
+verifier.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
 import json
+import re
 from typing import Literal, Mapping, Any
 
 
@@ -20,6 +24,22 @@ class AuthorityRiskError(ValueError):
 Risk = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL", "IRREVERSIBLE", "SAFETY_CRITICAL", "SECURITY_CRITICAL", "GOVERNANCE_CRITICAL"]
 
 _HIGH_RISK = {"HIGH", "CRITICAL", "IRREVERSIBLE", "SAFETY_CRITICAL", "SECURITY_CRITICAL", "GOVERNANCE_CRITICAL"}
+_HEX40 = re.compile(r"^[0-9a-f]{40}$")
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _require_sha(value: Any, length: int, label: str) -> str:
+    if not isinstance(value, str) or not (len(value) == length and re.fullmatch(r"[0-9a-f]+", value)):
+        raise AuthorityRiskError(f"{label} must be lowercase hexadecimal SHA-{length * 4}")
+    return value
+
+
+def _canonical_digest(payload: Mapping[str, Any]) -> str:
+    try:
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise AuthorityRiskError("verification proof must be canonicalizable") from exc
+    return hashlib.sha256(encoded).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -29,7 +49,11 @@ class AuthorityVerificationProof:
     authority_verified: bool
     capability_verified: bool
     provenance_verified: bool
+    baseline_sha: str
     policy_version: str
+    policy_sha256: str
+    evidence_root: str
+    provenance_root: str
     evidence_refs: tuple[str, ...]
     verifier_id: str
     evidence_digest: str
@@ -38,6 +62,10 @@ class AuthorityVerificationProof:
         for name, value in (("authority_verified", self.authority_verified), ("capability_verified", self.capability_verified), ("provenance_verified", self.provenance_verified)):
             if type(value) is not bool:
                 raise AuthorityRiskError(f"{name} must be boolean")
+        _require_sha(self.baseline_sha, 40, "baseline_sha")
+        _require_sha(self.policy_sha256, 64, "policy_sha256")
+        _require_sha(self.evidence_root, 64, "evidence_root")
+        _require_sha(self.provenance_root, 64, "provenance_root")
         if not isinstance(self.policy_version, str) or not self.policy_version:
             raise AuthorityRiskError("policy_version required")
         if not isinstance(self.verifier_id, str) or not self.verifier_id:
@@ -46,8 +74,7 @@ class AuthorityVerificationProof:
             raise AuthorityRiskError("unique evidence_refs required")
         if any(not isinstance(ref, str) or not ref for ref in self.evidence_refs):
             raise AuthorityRiskError("invalid evidence reference")
-        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) != 64 or any(ch not in "0123456789abcdef" for ch in self.evidence_digest):
-            raise AuthorityRiskError("invalid evidence_digest")
+        _require_sha(self.evidence_digest, 64, "evidence_digest")
 
 
 def build_authority_verification_proof(
@@ -55,36 +82,46 @@ def build_authority_verification_proof(
     authority_verified: bool,
     capability_verified: bool,
     provenance_verified: bool,
+    baseline_sha: str,
     policy_version: str,
+    policy_sha256: str,
+    evidence_root: str,
+    provenance_root: str,
     evidence_refs: tuple[str, ...],
     verifier_id: str,
 ) -> AuthorityVerificationProof:
     """Build a deterministic proof envelope from verifier observations.
 
     A governance/external verifier remains responsible for establishing the
-    observations. This function only canonicalizes the evidence so downstream
-    decisions cannot silently replace or omit the proof.
+    observations and for ensuring the supplied roots identify the canonical
+    evidence/provenance records. This function only canonicalizes and binds
+    those observations so downstream decisions cannot silently replace or
+    omit the proof. It is deliberately not a provenance verifier.
     """
     payload: Mapping[str, Any] = {
         "authority_verified": authority_verified,
+        "baseline_sha": baseline_sha,
         "capability_verified": capability_verified,
-        "provenance_verified": provenance_verified,
-        "policy_version": policy_version,
         "evidence_refs": list(evidence_refs),
+        "evidence_root": evidence_root,
+        "policy_sha256": policy_sha256,
+        "policy_version": policy_version,
+        "provenance_root": provenance_root,
+        "provenance_verified": provenance_verified,
         "verifier_id": verifier_id,
     }
-    try:
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-    except (TypeError, ValueError) as exc:
-        raise AuthorityRiskError("verification proof must be canonicalizable") from exc
     return AuthorityVerificationProof(
         authority_verified=authority_verified,
         capability_verified=capability_verified,
         provenance_verified=provenance_verified,
+        baseline_sha=baseline_sha,
         policy_version=policy_version,
+        policy_sha256=policy_sha256,
+        evidence_root=evidence_root,
+        provenance_root=provenance_root,
         evidence_refs=evidence_refs,
         verifier_id=verifier_id,
-        evidence_digest=hashlib.sha256(encoded).hexdigest(),
+        evidence_digest=_canonical_digest(payload),
     )
 
 
@@ -95,7 +132,11 @@ class AuthorityRiskDecision:
     capability: str
     scope: str
     risk: Risk
+    baseline_sha: str
     policy_version: str
+    policy_sha256: str
+    evidence_root: str
+    provenance_root: str
     evidence_refs: tuple[str, ...]
     independently_verified: bool
     human_approval: bool
@@ -106,14 +147,17 @@ class AuthorityRiskDecision:
         for name, value in (("actor", self.actor), ("authority", self.authority), ("capability", self.capability), ("scope", self.scope), ("policy_version", self.policy_version)):
             if not isinstance(value, str) or not value:
                 raise AuthorityRiskError(f"{name} required")
+        _require_sha(self.baseline_sha, 40, "baseline_sha")
+        _require_sha(self.policy_sha256, 64, "policy_sha256")
+        _require_sha(self.evidence_root, 64, "evidence_root")
+        _require_sha(self.provenance_root, 64, "provenance_root")
         if not isinstance(self.evidence_refs, tuple) or not self.evidence_refs or len(set(self.evidence_refs)) != len(self.evidence_refs):
             raise AuthorityRiskError("unique evidence_refs required")
         if any(not isinstance(ref, str) or not ref for ref in self.evidence_refs):
             raise AuthorityRiskError("invalid evidence reference")
         if type(self.independently_verified) is not bool or type(self.human_approval) is not bool or type(self.allowed) is not bool:
             raise AuthorityRiskError("boolean fields must be strict booleans")
-        if not isinstance(self.verification_digest, str) or len(self.verification_digest) != 64:
-            raise AuthorityRiskError("verification_digest required")
+        _require_sha(self.verification_digest, 64, "verification_digest")
         if self.risk in _HIGH_RISK and not self.human_approval:
             raise AuthorityRiskError("high-risk action requires human approval")
         if self.allowed and not self.independently_verified:
@@ -122,19 +166,32 @@ class AuthorityRiskDecision:
 
 def evaluate_authority_risk(
     *, actor: str, authority: str, capability: str, scope: str, risk: Risk,
-    policy_version: str, evidence_refs: tuple[str, ...], human_approval: bool,
-    verification_proof: AuthorityVerificationProof,
+    baseline_sha: str, policy_version: str, policy_sha256: str,
+    evidence_root: str, provenance_root: str, evidence_refs: tuple[str, ...],
+    human_approval: bool, verification_proof: AuthorityVerificationProof,
 ) -> AuthorityRiskDecision:
     """Evaluate a bounded authority decision from an explicit verification proof."""
     for value, label in ((actor, "actor"), (authority, "authority"), (capability, "capability"), (scope, "scope"), (policy_version, "policy_version")):
         if not isinstance(value, str) or not value:
             raise AuthorityRiskError(f"{label} required")
+    _require_sha(baseline_sha, 40, "baseline_sha")
+    _require_sha(policy_sha256, 64, "policy_sha256")
+    _require_sha(evidence_root, 64, "evidence_root")
+    _require_sha(provenance_root, 64, "provenance_root")
     if type(human_approval) is not bool:
         raise AuthorityRiskError("human_approval must be boolean")
     if not isinstance(verification_proof, AuthorityVerificationProof):
         raise AuthorityRiskError("verification_proof required")
+    if verification_proof.baseline_sha != baseline_sha:
+        raise AuthorityRiskError("verification baseline mismatch")
     if verification_proof.policy_version != policy_version:
         raise AuthorityRiskError("verification policy version mismatch")
+    if verification_proof.policy_sha256 != policy_sha256:
+        raise AuthorityRiskError("verification policy digest mismatch")
+    if verification_proof.evidence_root != evidence_root:
+        raise AuthorityRiskError("verification evidence root mismatch")
+    if verification_proof.provenance_root != provenance_root:
+        raise AuthorityRiskError("verification provenance root mismatch")
     if verification_proof.evidence_refs != evidence_refs:
         raise AuthorityRiskError("verification evidence mismatch")
 
@@ -146,6 +203,7 @@ def evaluate_authority_risk(
     if risk in _HIGH_RISK:
         allowed = allowed and human_approval
     return AuthorityRiskDecision(
-        actor, authority, capability, scope, risk, policy_version, evidence_refs,
+        actor, authority, capability, scope, risk, baseline_sha, policy_version,
+        policy_sha256, evidence_root, provenance_root, evidence_refs,
         True, human_approval, allowed, verification_proof.evidence_digest,
     )
