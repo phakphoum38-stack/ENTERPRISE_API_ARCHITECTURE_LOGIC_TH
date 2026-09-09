@@ -25,6 +25,7 @@ class PolicyGateTests(unittest.TestCase):
             "scope_verified": "VERIFIED",
             "revocation_verified": "VERIFIED",
             "delegation_verified": "VERIFIED",
+            "human_approval": "VERIFIED",
         }
 
     def test_valid_policy_passes(self) -> None:
@@ -63,6 +64,19 @@ class PolicyGateTests(unittest.TestCase):
         receipt = evaluate(self.plan, evidence)
         self.assertEqual(receipt["decision"], "BLOCK")
 
+    def test_high_risk_without_approval_requires_approval(self) -> None:
+        evidence = self.complete_evidence()
+        del evidence["human_approval"]
+        receipt = evaluate(self.plan, evidence)
+        self.assertEqual(receipt["decision"], "REQUIRE_APPROVAL")
+        self.assertIn("human_approval:PENDING", receipt["reason_codes"])
+
+    def test_rejected_approval_blocks(self) -> None:
+        evidence = self.complete_evidence()
+        evidence["human_approval"] = "REJECTED"
+        receipt = evaluate(self.plan, evidence)
+        self.assertEqual(receipt["decision"], "BLOCK")
+
     def test_deterministic_fingerprint_excludes_clock(self) -> None:
         evidence = self.complete_evidence()
         first = evaluate(self.plan, evidence)
@@ -74,6 +88,14 @@ class PolicyGateTests(unittest.TestCase):
         tampered = dict(self.policy)
         tampered["policy_fingerprint"] = "0" * 64
         with self.assertRaisesRegex(ValueError, "invalid_policy_fingerprint"):
+            compile_policy(tampered)
+
+    def test_compiler_rejects_high_risk_without_approval(self) -> None:
+        tampered = json.loads(json.dumps(self.policy))
+        tampered["rules"][0]["approval_mode"] = "NONE"
+        from tools.compile_policy_gate import policy_fingerprint
+        tampered["policy_fingerprint"] = policy_fingerprint(tampered)
+        with self.assertRaisesRegex(ValueError, "high_risk_requires_approval"):
             compile_policy(tampered)
 
     def test_compiler_cannot_grant_authority(self) -> None:
