@@ -33,14 +33,6 @@ jobs:
           ref: ${{ env.AEOS_EXPECTED_SHA }}
           fetch-depth: 1
 
-      - name: 1a. AEOS execution integrity fence
-        shell: pwsh
-        run: |
-          Write-Host "AEOS_EXPECTED_SHA=$env:AEOS_EXPECTED_SHA"
-          Write-Host "GITHUB_SHA=$env:GITHUB_SHA"
-          python tools/aeos_execution_integrity_gate.py
-          if ($LASTEXITCODE -ne 0) { throw 'AEOS execution integrity fence failed' }
-
       - name: 2. Setup toolchains
         uses: actions/setup-python@v6
         with:
@@ -54,6 +46,14 @@ jobs:
         with:
           channel: stable
           cache: true
+
+      - name: 2a. AEOS execution integrity fence
+        shell: pwsh
+        run: |
+          Write-Host "AEOS_EXPECTED_SHA=$env:AEOS_EXPECTED_SHA"
+          Write-Host "GITHUB_SHA=$env:GITHUB_SHA"
+          python tools/aeos_execution_integrity_gate.py
+          if ($LASTEXITCODE -ne 0) { throw 'AEOS execution integrity fence failed' }
 
       - name: 3. Source + Launch Desk Gate
         shell: pwsh
