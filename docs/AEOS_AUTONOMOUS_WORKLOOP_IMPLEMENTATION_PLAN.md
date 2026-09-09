@@ -4,6 +4,18 @@
 
 Implement in certified increments. Never modify the active H3 verification candidate merely to add future automation capabilities.
 
+## Phase 0 — Assurance Universe
+
+- composable assurance ontology
+- assurance domains, dimensions, states, risks, actors, and verification modes
+- deterministic assurance-case compiler
+- bounded combinatorial expansion
+- high-risk case selection
+- explicit assurance blind spots and unobserved space
+- meta-assurance requirements for verifier correctness, independence, replay, and mutation resistance
+
+The ontology is a model of the assurance space, not a certificate. The compiler produces deterministic case identities; concrete scanners and independent verifiers must supply the actual observations and evidence.
+
 ## Phase A — Foundation
 
 - Mission Contract
@@ -28,6 +40,7 @@ Implement in certified increments. Never modify the active H3 verification candi
 - counterfactual verification
 - evidence freshness
 - decision replay
+- assurance-case execution selected from the ontology
 
 ## Phase C — Recovery
 
@@ -39,6 +52,7 @@ Implement in certified increments. Never modify the active H3 verification candi
 - chaos tests
 - emergency freeze
 - human escalation packet
+- recovery replay verification
 
 ## Phase D — Continuous Operation
 
@@ -51,6 +65,7 @@ Implement in certified increments. Never modify the active H3 verification candi
 - technical-debt queue
 - maintenance queue
 - cross-work dependency re-planning
+- long-horizon drift detection
 
 ## Phase E — Trust / Security
 
@@ -63,6 +78,7 @@ Implement in certified increments. Never modify the active H3 verification candi
 - secret/PII firewall
 - prompt-injection boundary
 - supply-chain verification
+- verifier diversity and self-approval prevention
 
 ## Phase F — Proof / Completion
 
@@ -73,6 +89,9 @@ Implement in certified increments. Never modify the active H3 verification candi
 - final drain verification
 - post-merge verification
 - re-anchor proof
+- certificate replay
+- temporal consistency
+- provenance continuity
 
 ## Phase G — Scale
 
@@ -83,6 +102,7 @@ Implement in certified increments. Never modify the active H3 verification candi
 - global incident correlation
 - architecture evolution engine
 - predictive failure prevention
+- global assurance coverage
 
 ## Delivery rule
 
@@ -93,3 +113,18 @@ branch -> docs -> source -> tests -> diff -> CI -> forensic review -> evidence -
 ```
 
 If a phase discovers a failure, stop forward progression for the affected dependency, preserve evidence, identify the root cause, fix the source, and re-run the complete affected verification chain.
+
+## Assurance rule
+
+```text
+Possible assurance space
+        -> risk/coverage selection
+        -> concrete observation
+        -> independent verification
+        -> evidence binding
+        -> freshness / TOCTOU check
+        -> final rescan
+        -> certification
+```
+
+Never treat an unobserved case, caller-supplied projection, stale evidence, or self-attestation as a PASS.
