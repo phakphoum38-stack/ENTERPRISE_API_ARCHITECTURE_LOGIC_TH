@@ -51,6 +51,8 @@ class LearningExecutorResultBoundary:
                 raise LearningExecutorResultError(f"activation {field} mismatch")
         if request.status not in _ALLOWED:
             raise LearningExecutorResultError("invalid runtime status")
+        if result.get("status") not in _ALLOWED:
+            raise LearningExecutorResultError("invalid result status")
         if result.get("status") != request.status:
             raise LearningExecutorResultError("runtime result status mismatch")
 
