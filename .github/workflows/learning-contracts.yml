@@ -28,4 +28,4 @@ jobs:
       - name: Run learning boundary tests
         env:
           PYTHONPATH: .
-        run: python -m unittest discover -s owner_special/research_os_friend -p 'test_*.py' -v
+        run: python -m unittest discover -s owner_special/research_os_friend -t . -p 'test_*.py' -v
