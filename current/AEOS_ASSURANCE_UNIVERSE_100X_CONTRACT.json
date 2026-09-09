@@ -1,0 +1,72 @@
+{
+  "contract": "research-os-aeos-assurance-universe-100x/v1",
+  "status": "IMPLEMENTATION_DRAFT",
+  "purpose": "Define a scalable machine-readable assurance space without requiring one artifact per assertion.",
+  "constitutional_anchor": "current/AEOS_ASSURANCE_FABRIC_CONTRACT.json",
+  "universe": "current/AEOS_GLOBAL_ASSURANCE_UNIVERSE.json",
+  "model": "domain x assurance_family x dimension x lifecycle x assertion",
+  "scale_target": {
+    "domains": 120,
+    "assurance_families": 100,
+    "dimensions": 100,
+    "lifecycle_phases": 16,
+    "address_space": "120 x 100 x 100 x 16",
+    "address_space_size": 1920000
+  },
+  "important": "The address space is generated deterministically; it is not a claim that every address is applicable or observed.",
+  "states": ["NOT_APPLICABLE","NOT_OBSERVED","UNKNOWN","ASSERTED","OBSERVED","DERIVED","SUPPORTED","VALID","INVALID","STALE","CONFLICT","QUARANTINED","VERIFIED","INDEPENDENTLY_VERIFIED","CERTIFIED","PROMOTABLE","PROMOTED","DEPLOYED","RECOVERED","REVERIFIED"],
+  "never_pass": ["NOT_OBSERVED","UNKNOWN","STALE","CONFLICT","UNCLASSIFIED","QUARANTINED"],
+  "forbidden_promotions": [
+    "ASSERTED->VERIFIED",
+    "OBSERVED->CERTIFIED",
+    "VERIFIED->CERTIFIED without independent verification boundary",
+    "CERTIFIED->MERGED",
+    "MERGED->COMPLETED",
+    "DISCOVERED->AUTHORIZED"
+  ],
+  "lifecycle": ["DECLARE","IDENTIFY","OBSERVE","VALIDATE","BIND","VERIFY","AUTHORIZE","EXECUTE","PROVE","CERTIFY","PROMOTE","DEPLOY","MONITOR","RECOVER","REPLAY","REBASELINE"],
+  "conservation_laws": [
+    "identity_continuity",
+    "authority_non_escalation",
+    "evidence_temporal_causality",
+    "intent_continuity",
+    "provenance_continuity",
+    "causal_ordering",
+    "policy_binding",
+    "state_transition_integrity",
+    "trust_non_reuse",
+    "uncertainty_preservation"
+  ],
+  "root_of_trust": {
+    "constitutional": "current/AEOS_ASSURANCE_FABRIC_CONTRACT.json",
+    "self_modification": "forbidden",
+    "autonomous_constitution_mutation": "forbidden",
+    "self_certification": "forbidden",
+    "merge_authority": "outside_assurance_self_evaluation"
+  },
+  "generation_rules": [
+    "Generated assertion identifiers are deterministic.",
+    "Generation never implies applicability.",
+    "Generation never implies observation.",
+    "Generation never implies verification.",
+    "Missing observations remain NOT_OBSERVED or UNKNOWN.",
+    "Novel conditions enter the novelty firewall.",
+    "Common-mode dependencies must be represented separately from evidence count.",
+    "A generated assertion cannot manufacture evidence.",
+    "A generated assertion cannot grant authority.",
+    "A generated assertion cannot certify itself."
+  ],
+  "coverage_fields": ["assertion_id","domain_id","family_id","dimension_id","lifecycle","applicability","state","source_ref","observation_ref","evidence_refs","provenance_ref","verifier_id","independence_ref","policy_version","contract_version","target_sha","artifact_sha","unknowns","novelty","assurance_debt_id","recovery_ref","certificate_ref"],
+  "coverage_status": ["MISSING","PARTIAL","HARDEN","FOUND","CONFLICT","REGRESSION","FALSE_NEGATIVE","FALSE_GREEN","PROVENANCE_GAP","AUTHORITY_GAP","GOVERNANCE_GAP","UNKNOWN","NOVEL","VERIFIED","CERTIFIED"],
+  "hard_rules": [
+    "No coverage record is PASS merely because its address exists.",
+    "No assertion can upgrade its own state.",
+    "No evidence count is treated as independence count.",
+    "No stale proof can satisfy a fresh target without revalidation.",
+    "Any main SHA, policy, contract, verifier, oracle, or evidence-root change invalidates dependent certification.",
+    "Unknown budget exhaustion blocks certification.",
+    "Mutation escape blocks certification.",
+    "Canary failure blocks certification.",
+    "Bypass surface not governed or blocked blocks certification."
+  ]
+}
