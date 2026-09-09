@@ -8,6 +8,7 @@ from owner_special.research_os_friend.aeos_certificate_chain import (
     verify_chain,
 )
 from owner_special.research_os_friend.aeos_constitutional_firewall import (
+    ConstitutionalFirewallError,
     evaluate_constitutional_mutation,
 )
 from owner_special.research_os_friend.aeos_evidence_fabric import (
@@ -140,7 +141,7 @@ class Aeos100xRealityCertificateTests(unittest.TestCase):
         self.assertTrue(decision.requires_governance)
 
     def test_constitutional_mutation_does_not_accept_raw_boolean(self) -> None:
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ConstitutionalFirewallError):
             evaluate_constitutional_mutation(
                 paths=("current/AEOS_100X_CONTRACT.json",),
                 mutation_kind="trust_anchor",
