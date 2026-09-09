@@ -4,9 +4,10 @@ Authority is separate from identity, capability, evidence, and risk. The
 boundary accepts only an explicit verification proof produced from a
 canonicalized observation; raw caller booleans are intentionally rejected.
 The proof is bound to the exact baseline, policy, evidence root, provenance
-root, and evidence references it claims to verify. This module never grants
-or escalates authority and does not implement an independent provenance
-verifier.
+root, and evidence references it claims to verify. Human approval is bound to
+the canonical ApprovalGate through ApprovalProof for high-risk decisions.
+This module never grants or escalates authority and does not implement an
+independent provenance verifier.
 """
 from __future__ import annotations
 
@@ -16,6 +17,8 @@ import json
 import re
 from typing import Literal, Mapping, Any
 
+from .approval import ApprovalProof, ApprovalState
+
 
 class AuthorityRiskError(ValueError):
     """Raised when an authority/risk decision is unsafe or malformed."""
@@ -24,8 +27,6 @@ class AuthorityRiskError(ValueError):
 Risk = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL", "IRREVERSIBLE", "SAFETY_CRITICAL", "SECURITY_CRITICAL", "GOVERNANCE_CRITICAL"]
 _ALLOWED_RISKS = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL", "IRREVERSIBLE", "SAFETY_CRITICAL", "SECURITY_CRITICAL", "GOVERNANCE_CRITICAL"})
 _HIGH_RISK = _ALLOWED_RISKS - {"LOW", "MEDIUM"}
-_HEX40 = re.compile(r"^[0-9a-f]{40}$")
-_HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _require_sha(value: Any, length: int, label: str) -> str:
@@ -171,8 +172,14 @@ def evaluate_authority_risk(
     baseline_sha: str, policy_version: str, policy_sha256: str,
     evidence_root: str, provenance_root: str, evidence_refs: tuple[str, ...],
     human_approval: bool, verification_proof: AuthorityVerificationProof,
+    approval_proof: ApprovalProof | None = None,
 ) -> AuthorityRiskDecision:
-    """Evaluate a bounded authority decision from an explicit verification proof."""
+    """Evaluate a bounded authority decision from explicit verification proofs.
+
+    ``human_approval`` is retained for compatibility but is never sufficient
+    for high-risk decisions. High-risk approval must come from the canonical
+    ApprovalGate as an APPROVED ApprovalProof bound to the exact request.
+    """
     for value, label in ((actor, "actor"), (authority, "authority"), (capability, "capability"), (scope, "scope"), (policy_version, "policy_version")):
         if not isinstance(value, str) or not value:
             raise AuthorityRiskError(f"{label} required")
@@ -203,15 +210,25 @@ def evaluate_authority_risk(
     if verification_proof.evidence_refs != evidence_refs:
         raise AuthorityRiskError("verification evidence mismatch")
 
+    approved = False
+    if approval_proof is not None:
+        if not isinstance(approval_proof, ApprovalProof):
+            raise AuthorityRiskError("invalid approval proof")
+        if approval_proof.state is not ApprovalState.APPROVED:
+            raise AuthorityRiskError("approval proof is not approved")
+        approved = True
+
     allowed = (
         verification_proof.authority_verified
         and verification_proof.capability_verified
         and verification_proof.provenance_verified
     )
     if risk in _HIGH_RISK:
-        allowed = allowed and human_approval
+        if not approved:
+            raise AuthorityRiskError("high-risk action requires canonical ApprovalGate proof")
+        allowed = allowed and approved
     return AuthorityRiskDecision(
         actor, authority, capability, scope, risk, baseline_sha, policy_version,
         policy_sha256, evidence_root, provenance_root, evidence_refs,
-        True, human_approval, allowed, verification_proof.evidence_digest,
+        True, approved, allowed, verification_proof.evidence_digest,
     )
