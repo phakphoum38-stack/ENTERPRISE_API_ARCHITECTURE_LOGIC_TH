@@ -37,7 +37,7 @@ jobs:
           python-version: '3.12'
 
       - name: Validate canonical policy gate contract
-        run: python tools/validate_policy_gate.py
+        run: python -m tools.validate_policy_gate
 
       - name: Run fail-closed and determinism tests
         run: python -m unittest tools.test_policy_gate -v
