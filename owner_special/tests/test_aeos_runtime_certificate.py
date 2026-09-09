@@ -35,7 +35,7 @@ class RuntimeCertificateBoundaryTests(unittest.TestCase):
     def test_valid_result_is_bound(self):
         certificate = make_certificate()
         self.assertEqual(certificate.baseline_sha, BASELINE)
-        self.assertEqual(certificate.result_digest, "c9f2d7f9f2e5e0a0f9dbe1e43b8d3e9aab9cc3a0d7d1a0d9b3d1d8c6c3b7c9a4") if False else None
+        self.assertEqual(len(certificate.result_digest), 64)
         self.assertTrue(certificate.independently_verified)
 
     def test_stale_runtime_result_is_rejected(self):
