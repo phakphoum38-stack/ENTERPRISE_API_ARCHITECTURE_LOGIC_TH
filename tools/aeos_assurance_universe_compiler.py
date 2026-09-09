@@ -109,13 +109,14 @@ def compile_addresses(
 
 
 def compile_catalog(domain_ids: Iterable[str]) -> dict:
-    addresses = compile_addresses(domain_ids)
+    domains = tuple(domain_ids)
+    addresses = compile_addresses(domains)
     canonical = [a.__dict__ for a in addresses]
     digest = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return {
         "contract": "research-os-aeos-assurance-universe-100x/v1",
         "generated": True,
-        "domain_count": len(tuple(domain_ids)),
+        "domain_count": len(domains),
         "family_count": len(ASSURANCE_FAMILIES),
         "dimension_count": len(DIMENSIONS),
         "lifecycle_count": len(LIFECYCLE),
