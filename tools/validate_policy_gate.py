@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
-from compile_policy_gate import compile_policy
+from tools.compile_policy_gate import compile_policy
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "current" / "POLICY_GATE_CONTRACT.json"
@@ -33,7 +32,7 @@ def main() -> int:
 
     try:
         plan = compile_policy(fixture)
-    except Exception as exc:  # validator must report a deterministic failure
+    except Exception as exc:
         errors.append(f"compile_failure:{exc}")
         plan = None
 
