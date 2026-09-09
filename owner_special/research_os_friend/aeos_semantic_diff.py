@@ -47,7 +47,7 @@ def _digest(value: Any) -> str:
 
 
 def _leaf_fingerprint(value: Any) -> str:
-    """Fingerprint a leaf with its JSON type to avoid bool/int aliasing."""
+    """Fingerprint a flattened value with its JSON type to avoid aliases."""
     if value is None:
         tagged = {"type": "null", "value": None}
     elif type(value) is bool:
@@ -58,6 +58,10 @@ def _leaf_fingerprint(value: Any) -> str:
         tagged = {"type": "float", "value": value}
     elif isinstance(value, str):
         tagged = {"type": "string", "value": value}
+    elif type(value) is dict:
+        tagged = {"type": "object", "value": {}}
+    elif type(value) is list:
+        tagged = {"type": "array", "value": []}
     else:
         raise SemanticDiffError("unsupported semantic leaf type")
     return _digest(tagged)
