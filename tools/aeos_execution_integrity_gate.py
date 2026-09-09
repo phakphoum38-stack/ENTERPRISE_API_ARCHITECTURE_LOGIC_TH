@@ -54,8 +54,11 @@ def assert_contract_migration() -> None:
 
 
 def assert_import_origin() -> None:
-    sys.path.insert(0, str(AUTHORITY.parent))
-    import aeos_authority_risk  # type: ignore
+    # Import through the real package so relative imports (e.g. .approval) retain
+    # their package context. Importing the module as a top-level name would make
+    # Python reject valid package-relative dependencies with "no known parent package".
+    import owner_special.research_os_friend.aeos_authority_risk as aeos_authority_risk
+
     origin = Path(inspect.getfile(aeos_authority_risk)).resolve()
     if origin != AUTHORITY.resolve():
         raise RuntimeError(f"authority module imported from unexpected origin: {origin}")
