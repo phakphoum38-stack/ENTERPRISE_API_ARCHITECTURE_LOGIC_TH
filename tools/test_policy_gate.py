@@ -4,8 +4,8 @@ import json
 import unittest
 from pathlib import Path
 
-from compile_policy_gate import compile_policy
-from evaluate_policy_gate import evaluate
+from tools.compile_policy_gate import compile_policy
+from tools.evaluate_policy_gate import evaluate
 
 ROOT = Path(__file__).resolve().parents[1]
 
