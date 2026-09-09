@@ -40,7 +40,7 @@ jobs:
         run: python tools/validate_policy_gate.py
 
       - name: Run fail-closed and determinism tests
-        run: python -m unittest tools/test_policy_gate.py -v
+        run: python -m unittest tools.test_policy_gate -v
 
       - name: Compile canonical fixture
         run: python tools/compile_policy_gate.py current/POLICY_GATE_FIXTURE.json > policy-gate-plan.json
