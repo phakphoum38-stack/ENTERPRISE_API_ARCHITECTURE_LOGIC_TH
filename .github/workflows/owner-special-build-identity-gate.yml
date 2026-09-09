@@ -19,6 +19,7 @@ env:
   OWNER_EXE: 'owner_special/flutter_app/build/windows/x64/runner/Release/research_os_owner_special.exe'
   OWNER_IDENTITY: 'owner_special/flutter_app/build/windows/x64/runner/Release/OWNER_BUILD_IDENTITY.json'
   OWNER_SETUP: 'owner_special/installer/output/Research-OS-Owner-Special-Setup-1.3.1-x64.exe'
+  AEOS_EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   owner-special-gate:
@@ -28,6 +29,14 @@ jobs:
     steps:
       - name: 1. Checkout source
         uses: actions/checkout@v5
+
+      - name: 1a. AEOS execution integrity fence
+        shell: pwsh
+        run: |
+          Write-Host "AEOS_EXPECTED_SHA=$env:AEOS_EXPECTED_SHA"
+          Write-Host "GITHUB_SHA=$env:GITHUB_SHA"
+          python tools/aeos_execution_integrity_gate.py
+          if ($LASTEXITCODE -ne 0) { throw 'AEOS execution integrity fence failed' }
 
       - name: 2. Setup toolchains
         uses: actions/setup-python@v6
