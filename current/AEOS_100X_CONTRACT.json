@@ -24,7 +24,10 @@
     "reality_observation_is_not_verification",
     "certificate_chain_integrity_is_not_subject_truth",
     "governance_proof_is_external_to_autonomous_execution",
-    "complexity_may_grow_without_bound_but_trust_requires_proof"
+    "complexity_may_grow_without_bound_but_trust_requires_proof",
+    "freshness_is_explicit_and_replayable",
+    "shared_sources_do_not_count_as_independent_evidence",
+    "negative_space_requires_explicit_absence_evidence"
   ],
   "state_order": [
     "MISSION_CREATED", "CONTRACTED", "PLANNED", "QUEUED", "LEASED", "BRANCHED", "DOCUMENTED", "IMPLEMENTED", "DIFF_CAPTURED", "TESTED", "CI_VERIFIED", "FORENSIC_VERIFIED", "REGRESSION_VERIFIED", "EVIDENCE_VERIFIED", "PROVENANCE_VERIFIED", "AUTHORITY_VERIFIED", "CERTIFIED", "INTEGRATED", "MAIN_VERIFIED", "REANCHORED", "COMPLETED"
@@ -63,9 +66,13 @@
     "toctou": "owner_special/research_os_friend/aeos_toctou_boundary.py",
     "main_reanchor": "owner_special/research_os_friend/aeos_main_reanchor.py",
     "reality_observation": "owner_special/research_os_friend/aeos_reality_boundary.py",
+    "reality_scanner": "owner_special/research_os_friend/aeos_reality_scanner.py",
     "evidence_fabric": "owner_special/research_os_friend/aeos_evidence_fabric.py",
     "certificate_chain": "owner_special/research_os_friend/aeos_certificate_chain.py",
-    "constitutional_firewall": "owner_special/research_os_friend/aeos_constitutional_firewall.py"
+    "constitutional_firewall": "owner_special/research_os_friend/aeos_constitutional_firewall.py",
+    "temporal_freshness": "owner_special/research_os_friend/aeos_temporal_freshness.py",
+    "anti_circularity": "owner_special/research_os_friend/aeos_anti_circularity.py",
+    "negative_space": "owner_special/research_os_friend/aeos_negative_space.py"
   },
   "certificate_chain": [
     "OBSERVATION_CERTIFICATE",
@@ -76,6 +83,8 @@
     "COMPLETION_CERTIFICATE"
   ],
   "reality_rule": "DECLARED -> OBSERVED -> EVIDENCE_BOUND -> INDEPENDENTLY_VERIFIED -> ASSURED -> CERTIFIED",
+  "freshness_rule": "observed_at + explicit_reference_time + bounded_max_age -> FRESH|STALE|CONFLICT",
+  "independence_rule": "distinct verifier identity + no undisclosed common source + evidence source not equal subject source",
   "negative_space_rule": "absence of unresolved failures, unknowns, stale evidence, orphan work, unauthorized mutation, and uncertified integration must be evidenced before completion",
   "budgets": {
     "max_retry_without_new_evidence": 0,
