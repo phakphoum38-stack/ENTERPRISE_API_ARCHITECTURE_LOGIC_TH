@@ -11,9 +11,7 @@ from owner_special.research_os_friend.aeos_constitutional_firewall import (
     ConstitutionalFirewallError,
     evaluate_constitutional_mutation,
 )
-from owner_special.research_os_friend.aeos_evidence_fabric import (
-    bind_evidence_bundle,
-)
+from owner_special.research_os_friend.aeos_evidence_fabric import bind_evidence_bundle
 from owner_special.research_os_friend.aeos_reality_boundary import (
     RealityObservationError,
     bind_reality_observation,
@@ -26,6 +24,7 @@ POLICY = "c" * 64
 PROVENANCE = "d" * 64
 REFS = ("ci:1", "git:1")
 FINGERPRINTS = {"ci:1": "e" * 64, "git:1": "f" * 64}
+VERIFICATION_PROOF = "9" * 64
 
 
 class Aeos100xRealityCertificateTests(unittest.TestCase):
@@ -92,7 +91,7 @@ class Aeos100xRealityCertificateTests(unittest.TestCase):
             evidence_root="1" * 64,
             provenance_root=PROVENANCE,
             payload={"status": "VALID"},
-            independently_verified=True,
+            verification_proof=VERIFICATION_PROOF,
         )
         second = issue_chain_certificate(
             certificate_id="c2",
@@ -103,7 +102,7 @@ class Aeos100xRealityCertificateTests(unittest.TestCase):
             provenance_root=PROVENANCE,
             payload={"status": "VERIFIED"},
             previous_certificate=first,
-            independently_verified=True,
+            verification_proof=VERIFICATION_PROOF,
         )
         self.assertTrue(verify_chain(first, second))
         self.assertEqual(second.previous_certificate_digest, first.payload_digest)
@@ -117,7 +116,7 @@ class Aeos100xRealityCertificateTests(unittest.TestCase):
             evidence_root="1" * 64,
             provenance_root=PROVENANCE,
             payload={"status": "VALID"},
-            independently_verified=True,
+            verification_proof=VERIFICATION_PROOF,
         )
         with self.assertRaises(CertificateChainError):
             issue_chain_certificate(
@@ -129,7 +128,7 @@ class Aeos100xRealityCertificateTests(unittest.TestCase):
                 provenance_root=PROVENANCE,
                 payload={"status": "VERIFIED"},
                 previous_certificate=first,
-                independently_verified=True,
+                verification_proof=VERIFICATION_PROOF,
             )
 
     def test_constitutional_mutation_requires_governance_proof(self) -> None:
