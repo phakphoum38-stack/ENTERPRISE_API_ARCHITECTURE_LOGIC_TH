@@ -31,13 +31,36 @@ class SemanticDiff:
 
 def _canonical(value: Any) -> str:
     try:
-        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        )
     except (TypeError, ValueError) as exc:
         raise SemanticDiffError("inputs must be JSON-canonicalizable") from exc
 
 
 def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def _leaf_fingerprint(value: Any) -> str:
+    """Fingerprint a leaf with its JSON type to avoid bool/int aliasing."""
+    if value is None:
+        tagged = {"type": "null", "value": None}
+    elif type(value) is bool:
+        tagged = {"type": "bool", "value": value}
+    elif type(value) is int:
+        tagged = {"type": "int", "value": value}
+    elif type(value) is float:
+        tagged = {"type": "float", "value": value}
+    elif isinstance(value, str):
+        tagged = {"type": "string", "value": value}
+    else:
+        raise SemanticDiffError("unsupported semantic leaf type")
+    return _digest(tagged)
 
 
 def _validate_path_segment(segment: Any) -> str:
@@ -49,9 +72,9 @@ def _validate_path_segment(segment: Any) -> str:
 def _flatten(value: Any, path: str = "$") -> dict[str, Any]:
     if isinstance(value, Mapping):
         result: dict[str, Any] = {}
-        for key in sorted(value):
-            segment = _validate_path_segment(key)
-            result.update(_flatten(value[key], f"{path}.{segment}"))
+        keys = tuple(_validate_path_segment(key) for key in value.keys())
+        for segment in sorted(keys):
+            result.update(_flatten(value[segment], f"{path}.{segment}"))
         if not value:
             result[path] = {}
         return result
@@ -85,9 +108,19 @@ def classify_semantic_diff(
     before_flat = _flatten(before)
     after_flat = _flatten(after)
     paths = tuple(sorted(set(before_flat) | set(after_flat)))
-    changed = tuple(path for path in paths if before_flat.get(path) != after_flat.get(path))
+
+    def same_leaf(path: str) -> bool:
+        if path not in before_flat or path not in after_flat:
+            return False
+        return _leaf_fingerprint(before_flat[path]) == _leaf_fingerprint(after_flat[path])
+
+    changed = tuple(path for path in paths if not same_leaf(path))
     change_proof = tuple(
-        (path, _digest(before_flat[path]) if path in before_flat else "MISSING", _digest(after_flat[path]) if path in after_flat else "MISSING")
+        (
+            path,
+            _leaf_fingerprint(before_flat[path]) if path in before_flat else "MISSING",
+            _leaf_fingerprint(after_flat[path]) if path in after_flat else "MISSING",
+        )
         for path in changed
     )
 
