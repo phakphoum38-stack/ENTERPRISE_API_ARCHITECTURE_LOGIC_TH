@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.1",
+  "status": "CANONICAL",
+  "contract_id": "PEC-001",
+  "version": "1.1.0",
+  "constitution_dependency": "current/ENGINEERING_CONSTITUTION.json",
+  "identity_dependency": "current/IDENTITY_AUTHORITY_CONTRACT.json",
+  "purpose": "Make critical changes, artifacts, builds, tests, releases, and installations independently traceable and tamper-evident.",
+  "ledger": {
+    "append_only": true,
+    "required_entry_fields": ["entry_id","sequence","recorded_at","actor_id","action","subject_type","subject_id","input_hashes","output_hashes","evidence_type","evidence","previous_entry_hash","entry_hash"],
+    "evidence_types": ["change","build","test","security","attestation","artifact","release","installation","incident"],
+    "hash_algorithm": "sha256",
+    "supported_algorithms": ["sha256","git-sha1"],
+    "canonical_serialization": "json_object_keys_sorted_utf8_no_whitespace",
+    "canonicalization_version": "canonical-json-v1",
+    "sequence_must_start_at": 1,
+    "sequence_must_be_contiguous": true,
+    "first_previous_entry_hash": null,
+    "entry_hash_formula": "sha256(domain:provenance-entry-v1 || 0x00 || canonical_json(entry_without_entry_hash))",
+    "domain_separation": "provenance-entry-v1"
+  },
+  "hash_identity": {
+    "digest_record_required": true,
+    "fields": ["algorithm","digest","subject"],
+    "artifact_digest_must_be_derived": true,
+    "git_sha1_is_not_artifact_sha256": true,
+    "no_truncation_or_padding": true,
+    "no_algorithm_inference": true,
+    "git_sha1_allowed_only_for": ["git-commit","git-blob"]
+  },
+  "proof_carrying_change": {
+    "required": true,
+    "required_links": ["actor_id","action","subject_id","input_hashes","output_hashes","evidence_ids","attestation_id","target_commit"]
+  },
+  "proof_carrying_artifact": {"required": true,"required_links": ["artifact_id","build_evidence_id","test_evidence_ids","source_commit"]},
+  "proof_carrying_release": {"required": true,"required_links": ["release_id","artifact_id","approval_evidence_id","verification_evidence_ids"]},
+  "attestation": {"required_fields": ["attestation_id","subject_id","attester_id","statement","evidence_ids","issued_at"],"self_attestation_for_high_risk": false},
+  "trust": {"unverified":"CLAIM","verified":"VERIFIED","release_accepted":"RELEASE_ACCEPTED","producer_may_not_self_verify":true},
+  "freshness": {"target_commit_binding_required": true,"stale_evidence_fails_closed": true,"implicit_downgrade_fails_closed": true},
+  "schema_evolution": {"unknown_critical_fields_fail_closed": true,"unknown_noncritical_metadata_may_be_ignored": true},
+  "tamper_detection": {"verify_previous_hash": true,"verify_entry_hash": true,"verify_sequence": true,"unknown_or_missing_evidence_fails_closed": true},
+  "enforcement": {"machine_readable_contract": true,"fail_closed_validator": true,"negative_tests_required": true,"ci_gate_required": true,"release_proof_required": true}
+}

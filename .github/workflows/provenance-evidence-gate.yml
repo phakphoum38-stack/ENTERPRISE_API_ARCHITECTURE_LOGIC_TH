@@ -1,0 +1,43 @@
+name: Provenance Evidence Gate
+
+on:
+  pull_request:
+    paths:
+      - 'current/PROVENANCE_EVIDENCE_*.json'
+      - 'tools/validate_provenance_evidence.py'
+      - 'tools/record_provenance_entry.py'
+      - 'tools/test_validate_provenance_evidence.py'
+      - 'tools/provenance_conformance/**'
+      - 'docs/PROVENANCE_EVIDENCE_LEDGER.md'
+      - 'docs/PROVENANCE_THREAT_MODEL.md'
+      - '.github/workflows/provenance-evidence-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'current/PROVENANCE_EVIDENCE_*.json'
+      - 'tools/validate_provenance_evidence.py'
+      - 'tools/record_provenance_entry.py'
+      - 'tools/test_validate_provenance_evidence.py'
+      - 'tools/provenance_conformance/**'
+      - 'docs/PROVENANCE_EVIDENCE_LEDGER.md'
+      - 'docs/PROVENANCE_THREAT_MODEL.md'
+      - '.github/workflows/provenance-evidence-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provenance-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate canonical provenance ledger
+        run: python tools/validate_provenance_evidence.py
+      - name: Run provenance conformance and tamper regressions
+        run: python -m unittest tools.test_validate_provenance_evidence -v
+      - name: Compile verifier and producer
+        run: python -m py_compile tools/validate_provenance_evidence.py tools/record_provenance_entry.py tools/test_validate_provenance_evidence.py
