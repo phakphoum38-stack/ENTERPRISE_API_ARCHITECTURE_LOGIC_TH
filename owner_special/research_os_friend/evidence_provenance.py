@@ -130,19 +130,32 @@ def validate_evidence_authority(payload: Mapping[str, Any]) -> None:
     """Reject evidence payloads that attempt to become an authority channel."""
     if not isinstance(payload, Mapping):
         raise ProvenanceError("evidence payload must be a mapping")
-    lowered = {str(key).lower() for key in payload}
-    if lowered & _AUTHORITY_KEYS:
-        raise ProvenanceError("evidence payload contains authority fields")
+    _reject_authority_keys(payload)
 
 
 def _validate_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(payload, Mapping):
         raise ProvenanceError("payload must be a mapping")
     validate_evidence_authority(payload)
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default).encode("utf-8")
+    sanitized = _sanitize_value(payload)
+    if not isinstance(sanitized, dict):
+        raise ProvenanceError("evidence payload must be a mapping")
+    encoded = json.dumps(sanitized, sort_keys=True, separators=(",", ":"), default=_json_default).encode("utf-8")
     if len(encoded) > _MAX_PAYLOAD_BYTES:
         raise ProvenanceError("evidence payload exceeds size bound")
-    return {str(key): _sanitize_value(value, key_name=str(key)) for key, value in payload.items()}
+    return sanitized
+
+
+def _reject_authority_keys(value: Any) -> None:
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            key_text = str(key)
+            if key_text.lower() in _AUTHORITY_KEYS:
+                raise ProvenanceError("evidence payload contains authority fields")
+            _reject_authority_keys(child)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _reject_authority_keys(item)
 
 
 def _sanitize_value(value: Any, *, key_name: str | None = None) -> Any:
@@ -153,11 +166,11 @@ def _sanitize_value(value: Any, *, key_name: str | None = None) -> Any:
         for key, child in value.items():
             key_text = str(key)
             result[key_text] = _sanitize_value(child, key_name=key_text)
-        return result
+        return MappingProxyType(result)
     if isinstance(value, (list, tuple)):
         if len(value) > 128:
             raise ProvenanceError("evidence list exceeds size bound")
-        return [_sanitize_value(item) for item in value]
+        return tuple(_sanitize_value(item) for item in value)
     if isinstance(value, str):
         if len(value) > _MAX_TEXT:
             raise ProvenanceError("evidence string exceeds size bound")
