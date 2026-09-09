@@ -1,7 +1,7 @@
 # H3 Mission Control Automation Boundary — generated diff manifest
 
 base_sha=c04d60b36d51eb8529a4c65a61c7d5a411e5fe85
-head_sha=fc05352584d81a4faa4b2450a25a1bafef946ce0
+head_sha=REPLACED_BY_EXACT_PR_HEAD_AT_VERIFICATION
 mode=AUTO_GUARDED
 auto_merge=DISABLED
 
@@ -19,4 +19,5 @@ authority_audit:
 - merge=false
 - workflow_dispatch=false
 
+self_inclusion=false
 verification_state=CI_REQUIRED
