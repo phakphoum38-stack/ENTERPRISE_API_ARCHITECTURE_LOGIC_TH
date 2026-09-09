@@ -1,7 +1,7 @@
 from .agent_runtime import AgentRun, AgentRuntime, AgentRunStatus, AgentTraceEvent
 from .agent_trace_store import PersistentAgentTraceStore
 from .agents_sdk_adapter import AgentsSdkAdapter, AgentsSdkContract, AgentsSdkToolContract
-from .approval import ApprovalGate, ApprovalRecord, ApprovalState, SIDE_EFFECT_TOOLS
+from .approval import ApprovalGate, ApprovalProof, ApprovalRecord, ApprovalState, SIDE_EFFECT_TOOLS
 from .approval_store import PersistentApprovalStore
 from .brain import FriendBrain
 from .bundle import OwnerBundleBuilder
@@ -30,7 +30,7 @@ from .unified_tool_catalog import TOOL_CATALOG, ToolDescriptor, ToolState, Unifi
 from .v3_bridge import V3Bridge, V3BridgeStatus
 
 __all__ = [
-    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
+    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalProof", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
     "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "HelperAllocation",
     "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
