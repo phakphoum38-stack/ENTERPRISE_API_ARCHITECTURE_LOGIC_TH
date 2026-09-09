@@ -20,7 +20,11 @@
     "declared_state_is_not_reality",
     "discovery_is_not_authorization",
     "merge_is_not_post_merge_health",
-    "open_ended_assurance_must_not_expand_trust_anchors"
+    "open_ended_assurance_must_not_expand_trust_anchors",
+    "reality_observation_is_not_verification",
+    "certificate_chain_integrity_is_not_subject_truth",
+    "governance_proof_is_external_to_autonomous_execution",
+    "complexity_may_grow_without_bound_but_trust_requires_proof"
   ],
   "state_order": [
     "MISSION_CREATED", "CONTRACTED", "PLANNED", "QUEUED", "LEASED", "BRANCHED", "DOCUMENTED", "IMPLEMENTED", "DIFF_CAPTURED", "TESTED", "CI_VERIFIED", "FORENSIC_VERIFIED", "REGRESSION_VERIFIED", "EVIDENCE_VERIFIED", "PROVENANCE_VERIFIED", "AUTHORITY_VERIFIED", "CERTIFIED", "INTEGRATED", "MAIN_VERIFIED", "REANCHORED", "COMPLETED"
@@ -57,8 +61,22 @@
     "assurance_fabric": "owner_special/research_os_friend/aeos_assurance_fabric.py",
     "runtime_certificate": "owner_special/research_os_friend/aeos_runtime_certificate.py",
     "toctou": "owner_special/research_os_friend/aeos_toctou_boundary.py",
-    "main_reanchor": "owner_special/research_os_friend/aeos_main_reanchor.py"
+    "main_reanchor": "owner_special/research_os_friend/aeos_main_reanchor.py",
+    "reality_observation": "owner_special/research_os_friend/aeos_reality_boundary.py",
+    "evidence_fabric": "owner_special/research_os_friend/aeos_evidence_fabric.py",
+    "certificate_chain": "owner_special/research_os_friend/aeos_certificate_chain.py",
+    "constitutional_firewall": "owner_special/research_os_friend/aeos_constitutional_firewall.py"
   },
+  "certificate_chain": [
+    "OBSERVATION_CERTIFICATE",
+    "VERIFICATION_CERTIFICATE",
+    "ASSURANCE_CERTIFICATE",
+    "INTEGRATION_CERTIFICATE",
+    "MAIN_STATE_CERTIFICATE",
+    "COMPLETION_CERTIFICATE"
+  ],
+  "reality_rule": "DECLARED -> OBSERVED -> EVIDENCE_BOUND -> INDEPENDENTLY_VERIFIED -> ASSURED -> CERTIFIED",
+  "negative_space_rule": "absence of unresolved failures, unknowns, stale evidence, orphan work, unauthorized mutation, and uncertified integration must be evidenced before completion",
   "budgets": {
     "max_retry_without_new_evidence": 0,
     "max_concurrent_high_risk": 1,
