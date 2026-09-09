@@ -21,6 +21,13 @@ AUTHORITY_TEST = ROOT / "owner_special" / "tests" / "test_aeos_assurance_fabric_
 CONTRACT = ROOT / "current" / "AEOS_ASSURANCE_FABRIC_CONTRACT.json"
 UNIVERSE = ROOT / "current" / "AEOS_GLOBAL_ASSURANCE_UNIVERSE.json"
 
+# When a script is executed as `python tools/<script>.py`, Python places the
+# script directory (`tools/`) on sys.path, not the repository root. The gate
+# imports the real `owner_special.research_os_friend` package, so explicitly
+# anchor the repository root without weakening the exact-SHA fence below.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
