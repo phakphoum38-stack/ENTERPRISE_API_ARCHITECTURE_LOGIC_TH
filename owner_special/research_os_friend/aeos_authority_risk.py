@@ -216,6 +216,8 @@ def evaluate_authority_risk(
             raise AuthorityRiskError("invalid approval proof")
         if approval_proof.state is not ApprovalState.APPROVED:
             raise AuthorityRiskError("approval proof is not approved")
+        if not approval_proof.is_integrity_valid():
+            raise AuthorityRiskError("approval proof integrity mismatch")
         approved = True
 
     allowed = (
