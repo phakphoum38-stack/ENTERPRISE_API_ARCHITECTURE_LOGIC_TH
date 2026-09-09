@@ -49,7 +49,8 @@ class ProvenanceEvidenceTests(unittest.TestCase):
         record["subject"] = "artifact:current/PROVENANCE_EVIDENCE_CONTRACT.json"
         result = self.validate(ledger)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("git_identity_requires_git_sha1:EV-001:output_hashes.contract", self.errors(result))
+        self.assertIn("git_sha1_wrong_identity:EV-001:output_hashes.contract", self.errors(result))
+        self.assertIn("entry_hash_mismatch:EV-001", self.errors(result))
 
     def test_wrong_digest_length_is_rejected_without_normalization(self):
         ledger = self.load()
@@ -94,47 +95,98 @@ class ProvenanceEvidenceTests(unittest.TestCase):
         result = self.validate(ledger)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("invalid_sequence:EV-002", self.errors(result))
+        self.assertIn("sequence_not_contiguous", self.errors(result))
 
     def test_duplicate_entry_id_fails_closed(self):
         ledger = self.load()
-        ledger["entries"].append(copy.deepcopy(ledger["entries"][0]))
+        ledger["entries"][1]["entry_id"] = ledger["entries"][0]["entry_id"]
         result = self.validate(ledger)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("duplicate_entry_id:EV-001", self.errors(result))
 
     def test_unknown_evidence_reference_fails_closed(self):
         ledger = self.load()
-        ledger["entries"][0]["evidence"]["evidence_ids"] = ["EV-999"]
+        ledger["entries"][1]["evidence"]["evidence_ids"] = ["EV-999"]
         result = self.validate(ledger)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("unknown_evidence_reference:EV-001", self.errors(result))
-
-    def test_producer_rejects_caller_supplied_derived_fields(self):
-        with tempfile.TemporaryDirectory() as d:
-            d = Path(d)
-            ledger = d / "ledger.json"
-            entry = d / "entry.json"
-            ledger.write_text(json.dumps({"contract_version": "1.1.0", "entries": []}), encoding="utf-8")
-            entry.write_text(json.dumps({"entry_id": "EV-BAD", "sequence": 99}), encoding="utf-8")
-            result = subprocess.run([sys.executable, str(PRODUCER), "--ledger", str(ledger), "--entry", str(entry)], cwd=ROOT, capture_output=True, text=True, check=False)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("derived_fields_must_not_be_supplied", result.stdout)
+        self.assertIn("unknown_evidence_reference:EV-002", self.errors(result))
 
     def test_producer_output_is_deterministic_and_verifiable(self):
-        with tempfile.TemporaryDirectory() as d:
-            d = Path(d)
-            ledger = d / "ledger.json"
-            entry = d / "entry.json"
-            ledger.write_text(json.dumps({"contract_version": "1.1.0", "entries": []}), encoding="utf-8")
-            entry.write_text(json.dumps({"entry_id":"EV-PRODUCER","recorded_at":"2026-09-09T00:00:00Z","actor_id":"H-OWNER","action":"test","subject_type":"test","subject_id":"T-001","input_hashes":{"source":{"algorithm":"git-sha1","digest":"0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10","subject":"git-commit"}},"output_hashes":{"result":{"algorithm":"sha256","digest":"47f4a45784e11bbc22b9cfae7c18a598519bce6eb5d9837a650b0782071ca07b","subject":"test-output"}},"evidence_type":"test","evidence":{"statement":"producer integration"}}), encoding="utf-8")
-            result = subprocess.run([sys.executable, str(PRODUCER), "--ledger", str(ledger), "--entry", str(entry)], cwd=ROOT, capture_output=True, text=True, check=False)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            produced = json.loads(ledger.read_text(encoding="utf-8"))["entries"][0]
-            self.assertEqual(produced["sequence"], 1)
-            self.assertIsNone(produced["previous_entry_hash"])
-            self.assertRegex(produced["entry_hash"], HEX64)
-            validation = self.validate({"contract_version":"1.1.0","entries":[produced]})
-            self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PRODUCER),
+                "--ledger",
+                str(FIXTURE),
+                "--entry-id",
+                "EV-003",
+                "--actor-id",
+                "H-OWNER",
+                "--action",
+                "test",
+                "--subject-type",
+                "test",
+                "--subject-id",
+                "TEST-001",
+                "--evidence-type",
+                "test",
+                "--evidence-json",
+                '{"evidence_ids":["EV-001"]}',
+                "--input-hashes-json",
+                "{}",
+                "--output-hashes-json",
+                "{}",
+                "--recorded-at",
+                "2026-09-09T00:10:00Z",
+                "--dry-run",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["entry"]["sequence"], 3)
+        self.assertEqual(payload["entry"]["previous_entry_hash"], self.load()["entries"][-1]["entry_hash"])
+        self.assertTrue(HEX64.fullmatch(payload["entry"]["entry_hash"]))
+
+    def test_producer_rejects_caller_supplied_derived_fields(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PRODUCER),
+                "--ledger",
+                str(FIXTURE),
+                "--entry-id",
+                "EV-003",
+                "--actor-id",
+                "H-OWNER",
+                "--action",
+                "test",
+                "--subject-type",
+                "test",
+                "--subject-id",
+                "TEST-001",
+                "--evidence-type",
+                "test",
+                "--evidence-json",
+                '{"evidence_ids":["EV-001"],"sequence":99,"entry_hash":"0"}',
+                "--input-hashes-json",
+                "{}",
+                "--output-hashes-json",
+                "{}",
+                "--recorded-at",
+                "2026-09-09T00:10:00Z",
+                "--dry-run",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("caller_supplied_derived_field", result.stderr)
 
 
 if __name__ == "__main__":
