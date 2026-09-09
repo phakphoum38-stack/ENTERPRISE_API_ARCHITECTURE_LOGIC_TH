@@ -4,6 +4,7 @@
   "baseline_sha": "c04d60b36d51eb8529a4c65a61c7d5a411e5fe85",
   "mode": "AUTO_GUARDED",
   "auto_merge": false,
+  "assurance_fabric": "current/AEOS_ASSURANCE_FABRIC_CONTRACT.json",
   "mission_semantics": "single_user_command_may_execute_a_durable_governed_work_graph_until_certified_idle",
   "core_principles": ["detect_before_diagnose", "root_cause_before_fix", "evidence_before_certification", "provenance_before_trust", "independent_verification_before_integration", "main_verification_before_reanchor", "no_unknown_as_pass", "no_merge_as_repair", "no_governance_self_modification", "no_autonomous_stop_without_stop_proof", "declared_state_is_not_reality", "discovery_is_not_authorization", "merge_is_not_post_merge_health", "open_ended_assurance_must_not_expand_trust_anchors", "reality_observation_is_not_verification", "certificate_chain_integrity_is_not_subject_truth", "governance_proof_is_external_to_autonomous_execution", "complexity_may_grow_without_bound_but_trust_requires_proof", "freshness_is_explicit_and_replayable", "shared_sources_do_not_count_as_independent_evidence", "negative_space_requires_explicit_absence_evidence"],
   "state_order": ["MISSION_CREATED", "CONTRACTED", "PLANNED", "QUEUED", "LEASED", "BRANCHED", "DOCUMENTED", "IMPLEMENTED", "DIFF_CAPTURED", "TESTED", "CI_VERIFIED", "FORENSIC_VERIFIED", "REGRESSION_VERIFIED", "EVIDENCE_VERIFIED", "PROVENANCE_VERIFIED", "AUTHORITY_VERIFIED", "CERTIFIED", "INTEGRATED", "MAIN_VERIFIED", "REANCHORED", "COMPLETED"],
