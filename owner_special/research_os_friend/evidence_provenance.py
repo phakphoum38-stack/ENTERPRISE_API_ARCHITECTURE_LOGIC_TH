@@ -138,12 +138,12 @@ def _validate_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise ProvenanceError("payload must be a mapping")
     validate_evidence_authority(payload)
     sanitized = _sanitize_value(payload)
-    if not isinstance(sanitized, dict):
+    if not isinstance(sanitized, Mapping):
         raise ProvenanceError("evidence payload must be a mapping")
     encoded = json.dumps(sanitized, sort_keys=True, separators=(",", ":"), default=_json_default).encode("utf-8")
     if len(encoded) > _MAX_PAYLOAD_BYTES:
         raise ProvenanceError("evidence payload exceeds size bound")
-    return sanitized
+    return dict(sanitized)
 
 
 def _reject_authority_keys(value: Any) -> None:
