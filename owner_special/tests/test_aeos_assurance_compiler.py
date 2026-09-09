@@ -20,8 +20,9 @@ class AssuranceCompilerTests(unittest.TestCase):
         first = compile_assurance_cases(**kwargs)
         second = compile_assurance_cases(**kwargs)
         self.assertEqual(first, second)
-        self.assertEqual(len(first), 4)
-        self.assertEqual(len({case.case_id for case in first}), 4)
+        # 2 domains × 1 dimension × 2 states × 1 risk × 2 actors × 1 mode.
+        self.assertEqual(len(first), 8)
+        self.assertEqual(len({case.case_id for case in first}), 8)
 
     def test_unbounded_space_is_rejected(self):
         with self.assertRaises(AssuranceCompilerError):
