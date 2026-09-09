@@ -45,12 +45,12 @@ def evaluate_constitutional_mutation(
     *,
     paths: tuple[str, ...],
     mutation_kind: str,
-    governance_approval: bool = False,
+    governance_proof: str | None = None,
 ) -> ConstitutionalDecision:
     """Classify a mutation without granting permission to perform it.
 
-    Protected mutations always require explicit governance. Autonomous callers
-    cannot turn a governance requirement into an approval flag by self-attesting.
+    Protected mutations require an externally issued governance proof. A raw
+    caller boolean is deliberately not accepted as authoritative approval.
     """
     if not isinstance(paths, tuple) or not paths or any(not isinstance(path, str) or not path for path in paths):
         raise ConstitutionalFirewallError("mutation paths required")
@@ -58,12 +58,13 @@ def evaluate_constitutional_mutation(
         raise ConstitutionalFirewallError("duplicate mutation path")
     if not isinstance(mutation_kind, str) or not mutation_kind:
         raise ConstitutionalFirewallError("mutation_kind required")
-    if type(governance_approval) is not bool:
-        raise ConstitutionalFirewallError("governance_approval must be bool")
+    if governance_proof is not None:
+        if not isinstance(governance_proof, str) or len(governance_proof) != 64 or any(c not in "0123456789abcdef" for c in governance_proof):
+            raise ConstitutionalFirewallError("invalid governance proof")
 
     protected = mutation_kind in _PROTECTED_KINDS or bool(_PROTECTED_PATHS.intersection(paths))
-    if protected and not governance_approval:
-        return ConstitutionalDecision(False, "governance required for protected mutation", True)
+    if protected and governance_proof is None:
+        return ConstitutionalDecision(False, "governance proof required for protected mutation", True)
     if protected:
-        return ConstitutionalDecision(True, "explicit governance required and present", True)
+        return ConstitutionalDecision(True, "governance proof supplied; external governance must validate it", True)
     return ConstitutionalDecision(True, "mutation is outside protected constitutional boundary", False)
