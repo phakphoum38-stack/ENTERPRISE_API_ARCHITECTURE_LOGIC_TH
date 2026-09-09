@@ -32,13 +32,28 @@ class EvidenceProvenanceTests(unittest.TestCase):
         self.assertEqual(record().fingerprint, record().fingerprint)
         self.assertEqual(record().source_sha, SHA_A)
 
-    def test_payload_is_immutable(self):
-        source = {"workflow": "ci"}
+    def test_payload_is_deeply_immutable(self):
+        source = {"workflow": "ci", "details": {"attempt": 1}, "items": [{"state": "failed"}]}
         evidence = record(payload=source)
         source["workflow"] = "changed"
+        source["details"]["attempt"] = 2
+        source["items"][0]["state"] = "changed"
         self.assertEqual(evidence.payload["workflow"], "ci")
+        self.assertEqual(evidence.payload["details"]["attempt"], 1)
+        self.assertEqual(evidence.payload["items"][0]["state"], "failed")
         with self.assertRaises(TypeError):
             evidence.payload["new"] = "value"
+        with self.assertRaises(TypeError):
+            evidence.payload["details"]["attempt"] = 3
+        with self.assertRaises(TypeError):
+            evidence.payload["items"][0]["state"] = "changed"
+
+    def test_fingerprint_cannot_change_after_nested_mutation_attempt(self):
+        evidence = record(payload={"details": {"attempt": 1}})
+        fingerprint = evidence.fingerprint
+        with self.assertRaises(TypeError):
+            evidence.payload["details"]["attempt"] = 2
+        self.assertEqual(evidence.fingerprint, fingerprint)
 
     def test_chain_requires_same_source(self):
         with self.assertRaises(ProvenanceError):
@@ -66,9 +81,21 @@ class EvidenceProvenanceTests(unittest.TestCase):
         with self.assertRaises(ProvenanceError):
             record(payload={"api_key": "secret"})
 
+    def test_nested_secret_like_payload_is_rejected(self):
+        with self.assertRaises(ProvenanceError):
+            record(payload={"details": {"token": "secret"}})
+
     def test_authority_fields_are_rejected(self):
         with self.assertRaises(ProvenanceError):
             validate_evidence_authority({"approved": True})
+
+    def test_nested_authority_fields_are_rejected(self):
+        with self.assertRaises(ProvenanceError):
+            record(payload={"details": {"approved": True}})
+
+    def test_authority_fields_inside_lists_are_rejected(self):
+        with self.assertRaises(ProvenanceError):
+            record(payload={"events": [{"authorize": True}]})
 
     def test_oversized_payload_is_rejected(self):
         with self.assertRaises(ProvenanceError):
