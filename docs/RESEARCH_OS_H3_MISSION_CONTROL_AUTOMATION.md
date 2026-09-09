@@ -21,7 +21,7 @@ Exact Main SHA
   -> Certification
 ```
 
-The existing 4H snapshot is explicitly an aggregation/read-only boundary and must not execute tools, providers, workflows, authorization, approval, or runtime mutation. citeturn136file0
+The existing 4H snapshot is an aggregation/read-only boundary and must not execute tools, providers, workflows, authorization, approval, or runtime mutation.
 
 ## Guarded automation rules
 
@@ -30,7 +30,7 @@ The existing 4H snapshot is explicitly an aggregation/read-only boundary and mus
 3. H2 evidence is descriptive proof, never authority.
 4. UNKNOWN, stale, missing, conflicting, or owner-mismatched evidence fails closed at an authority boundary.
 5. H3 may propose/diagnose/verify; it cannot approve, release, merge, dispatch workflows, or escalate capability.
-6. UI projection remains presentation-only and cannot acquire execution authority. citeturn140file0
+6. UI projection remains presentation-only and cannot acquire execution authority.
 7. PASS/FAIL/PENDING/UNKNOWN are preserved and never reinterpreted as approval.
 8. Certification requires exact-SHA verification plus authoritative CI evidence.
 9. No generated evidence is fabricated by H3.
