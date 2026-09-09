@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Compile a P0-06 policy into a deterministic gate plan.
-
-The compiler is intentionally non-authoritative: it validates and normalizes policy
-metadata but never grants capability, changes ownership, or executes an action.
-"""
+"""Compile a P0-06 policy into a deterministic gate plan."""
 from __future__ import annotations
 
 import hashlib
@@ -12,10 +8,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-ALLOWED_DECISIONS = {"PASS", "BLOCK", "REQUIRE_APPROVAL"}
 ALLOWED_MODES = {"ALL", "ANY", "SEQUENCE"}
+ALLOWED_APPROVAL = {"NONE", "REQUIRED"}
+HIGH_RISK_CLASSES = {
+    "high", "authority_change", "constitutional_amendment", "production_mutation",
+    "release_promotion", "installed_artifact_change", "security_policy_change",
+    "identity_or_capability_revocation",
+}
 REQUIRED_POLICY = {"policy_id", "policy_version", "policy_fingerprint", "lineage", "rules", "gates"}
-REQUIRED_RULE = {"rule_id", "risk_class", "required_evidence", "on_unknown", "on_failure"}
+REQUIRED_RULE = {"rule_id", "risk_class", "required_evidence", "approval_mode", "on_unknown", "on_failure"}
 REQUIRED_GATE = {"gate_id", "rule_ids", "mode"}
 
 
@@ -50,6 +51,10 @@ def compile_policy(policy: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("invalid_rule_id")
         if rule_id in rules:
             raise ValueError(f"duplicate_rule:{rule_id}")
+        if rule["approval_mode"] not in ALLOWED_APPROVAL:
+            raise ValueError(f"invalid_approval_mode:{rule_id}")
+        if rule["risk_class"] in HIGH_RISK_CLASSES and rule["approval_mode"] != "REQUIRED":
+            raise ValueError(f"high_risk_requires_approval:{rule_id}")
         if rule["on_unknown"] != "BLOCK" or rule["on_failure"] != "BLOCK":
             raise ValueError(f"rule_not_fail_closed:{rule_id}")
         if not isinstance(rule["required_evidence"], list) or not rule["required_evidence"]:
@@ -70,16 +75,12 @@ def compile_policy(policy: dict[str, Any]) -> dict[str, Any]:
         gate_ids.add(gate_id)
         if gate["mode"] not in ALLOWED_MODES:
             raise ValueError(f"invalid_gate_mode:{gate_id}")
-        if not gate["rule_ids"]:
+        if not isinstance(gate["rule_ids"], list) or not gate["rule_ids"]:
             raise ValueError(f"empty_gate:{gate_id}")
         for rule_id in gate["rule_ids"]:
             if rule_id not in rules:
                 raise ValueError(f"unknown_rule:{gate_id}:{rule_id}")
-        gates.append({
-            "gate_id": gate_id,
-            "rule_ids": sorted(gate["rule_ids"]),
-            "mode": gate["mode"],
-        })
+        gates.append({"gate_id": gate_id, "rule_ids": sorted(gate["rule_ids"]), "mode": gate["mode"]})
 
     plan = {
         "plan_type": "P0-06-GATE-PLAN",
