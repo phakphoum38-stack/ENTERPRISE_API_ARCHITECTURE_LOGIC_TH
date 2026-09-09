@@ -1,0 +1,90 @@
+{
+  "contract_id": "PGC-001",
+  "contract_name": "Policy-as-Code Gate Contract",
+  "version": "1.0.0",
+  "status": "canonical",
+  "purpose": "Deterministically compile and evaluate governance policies without creating or escalating authority.",
+  "decision_values": ["PASS", "BLOCK", "REQUIRE_APPROVAL"],
+  "unknown_state": "BLOCK",
+  "authority_boundary": {
+    "may_compile_policy": true,
+    "may_evaluate_policy": true,
+    "may_grant_authority": false,
+    "may_replace_owner_policy": false,
+    "may_replace_approval_gate": false,
+    "may_execute_runtime_action": false
+  },
+  "policy_required_fields": [
+    "policy_id",
+    "policy_version",
+    "policy_fingerprint",
+    "lineage",
+    "rules",
+    "gates"
+  ],
+  "rule_required_fields": [
+    "rule_id",
+    "risk_class",
+    "required_evidence",
+    "on_unknown",
+    "on_failure"
+  ],
+  "gate_required_fields": [
+    "gate_id",
+    "rule_ids",
+    "mode"
+  ],
+  "gate_modes": ["ALL", "ANY", "SEQUENCE"],
+  "risk_classes": [
+    "low",
+    "medium",
+    "high",
+    "authority_change",
+    "constitutional_amendment",
+    "production_mutation",
+    "release_promotion",
+    "installed_artifact_change",
+    "security_policy_change",
+    "identity_or_capability_revocation"
+  ],
+  "evidence_states": ["VERIFIED", "REJECTED", "UNKNOWN", "MISSING", "STALE"],
+  "exception_required_fields": [
+    "exception_id",
+    "reason",
+    "approver",
+    "issued_at",
+    "expires_at",
+    "scope",
+    "evidence"
+  ],
+  "invariants": [
+    "UNKNOWN_IS_NOT_PASS",
+    "MISSING_EVIDENCE_BLOCKS",
+    "REJECTED_EVIDENCE_BLOCKS",
+    "STALE_EVIDENCE_BLOCKS",
+    "REVOKED_IDENTITY_BLOCKS",
+    "EXPIRED_DELEGATION_BLOCKS",
+    "SCOPE_ESCALATION_BLOCKS",
+    "WILDCARD_SCOPE_BLOCKS",
+    "MISSING_AUTHORIZATION_PROOF_BLOCKS",
+    "CONFLICTING_AUTHORITY_BLOCKS",
+    "EXPIRED_EXCEPTION_BLOCKS",
+    "EXCEPTION_CANNOT_ESCALATE_AUTHORITY",
+    "POLICY_VERSION_IS_REPRODUCIBLE",
+    "EVALUATION_IS_DETERMINISTIC",
+    "DECISION_CARRIES_EVIDENCE",
+    "COMPILER_CANNOT_GRANT_AUTHORITY",
+    "EVALUATOR_CANNOT_REPLACE_APPROVAL_GATE",
+    "HISTORICAL_EVIDENCE_IS_IMMUTABLE"
+  ],
+  "fingerprints": {
+    "algorithm": "sha256",
+    "canonicalization": "UTF-8 JSON with sorted object keys and compact separators"
+  },
+  "enforcement": {
+    "required_in_ci": true,
+    "required_before_sensitive_action": true,
+    "release_gate_required": true,
+    "fail_closed": true
+  }
+}
