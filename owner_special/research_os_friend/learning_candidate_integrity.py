@@ -36,6 +36,7 @@ class LearningCandidateIntegrityBoundary:
         canonical = json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
         if hashlib.sha256(canonical.encode("utf-8")).hexdigest() != request.binding_fingerprint:
             raise LearningCandidateIntegrityError("binding fingerprint mismatch")
+        candidate = json.loads(json.dumps(binding["candidate"], sort_keys=True))
         payload = {
             "schema": "research-os-learning-candidate-integrity/v1",
             "owner": request.owner,
@@ -47,6 +48,7 @@ class LearningCandidateIntegrityBoundary:
             "binding_fingerprint": request.binding_fingerprint,
             "integrity_verified": True,
             "promotion_authority": "H10",
+            "candidate": candidate,
             "read_only": True,
             "authority": "none",
         }
