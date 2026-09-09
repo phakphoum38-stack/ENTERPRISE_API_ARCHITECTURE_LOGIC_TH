@@ -1,5 +1,8 @@
 import unittest
 
+from owner_special.research_os_friend.approval import ApprovalGate
+from owner_special.research_os_friend.identity import OwnerIdentity
+from owner_special.research_os_friend.models import FriendRequest
 from owner_special.research_os_friend.aeos_assurance_fabric import AssuranceControl, AssuranceFabric, AssuranceFabricError, compile_control_spec
 from owner_special.research_os_friend.aeos_authority_risk import AuthorityRiskError, build_authority_verification_proof, evaluate_authority_risk
 from owner_special.research_os_friend.aeos_semantic_diff import SemanticDiffError, classify_semantic_diff
@@ -64,9 +67,25 @@ class AEOSAssuranceFabricExpansionTests(unittest.TestCase):
         with self.assertRaises(AssuranceFabricError):
             AssuranceControl("C-002", "u", "p", "d", "LOW", "repo", REFS, ("REPLAY",), "PASS", "REVIEW")
 
-    def test_high_risk_requires_human_approval(self):
+    def test_high_risk_requires_canonical_approval_proof(self):
         with self.assertRaises(AuthorityRiskError):
-            evaluate(risk="HIGH", human_approval=False)
+            evaluate(risk="HIGH", human_approval=True)
+
+    def test_high_risk_accepts_approval_gate_proof(self):
+        owner = OwnerIdentity(owner_id="aeos-approval-owner", display_name="Owner")
+        request = FriendRequest(
+            owner_id=owner.owner_id,
+            profile_id="default",
+            session_id="session-1",
+            text="run command",
+            requested_tools=("shell.run",),
+        )
+        gate = ApprovalGate()
+        gate.approve(owner, request, "shell.run", reason="owner approved")
+        approval_proof = gate.issue_proof(owner, request, "shell.run")
+        result = evaluate(risk="HIGH", human_approval=True, approval_proof=approval_proof)
+        self.assertTrue(result.allowed)
+        self.assertTrue(result.human_approval)
 
     def test_authority_risk_rejects_raw_verification_booleans(self):
         with self.assertRaises(TypeError):
