@@ -22,8 +22,8 @@ class AuthorityRiskError(ValueError):
 
 
 Risk = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL", "IRREVERSIBLE", "SAFETY_CRITICAL", "SECURITY_CRITICAL", "GOVERNANCE_CRITICAL"]
-
-_HIGH_RISK = {"HIGH", "CRITICAL", "IRREVERSIBLE", "SAFETY_CRITICAL", "SECURITY_CRITICAL", "GOVERNANCE_CRITICAL"}
+_ALLOWED_RISKS = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL", "IRREVERSIBLE", "SAFETY_CRITICAL", "SECURITY_CRITICAL", "GOVERNANCE_CRITICAL"})
+_HIGH_RISK = _ALLOWED_RISKS - {"LOW", "MEDIUM"}
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -147,6 +147,8 @@ class AuthorityRiskDecision:
         for name, value in (("actor", self.actor), ("authority", self.authority), ("capability", self.capability), ("scope", self.scope), ("policy_version", self.policy_version)):
             if not isinstance(value, str) or not value:
                 raise AuthorityRiskError(f"{name} required")
+        if self.risk not in _ALLOWED_RISKS:
+            raise AuthorityRiskError("invalid risk")
         _require_sha(self.baseline_sha, 40, "baseline_sha")
         _require_sha(self.policy_sha256, 64, "policy_sha256")
         _require_sha(self.evidence_root, 64, "evidence_root")
@@ -174,10 +176,16 @@ def evaluate_authority_risk(
     for value, label in ((actor, "actor"), (authority, "authority"), (capability, "capability"), (scope, "scope"), (policy_version, "policy_version")):
         if not isinstance(value, str) or not value:
             raise AuthorityRiskError(f"{label} required")
+    if risk not in _ALLOWED_RISKS:
+        raise AuthorityRiskError("invalid risk")
     _require_sha(baseline_sha, 40, "baseline_sha")
     _require_sha(policy_sha256, 64, "policy_sha256")
     _require_sha(evidence_root, 64, "evidence_root")
     _require_sha(provenance_root, 64, "provenance_root")
+    if not isinstance(evidence_refs, tuple) or not evidence_refs or len(set(evidence_refs)) != len(evidence_refs):
+        raise AuthorityRiskError("unique evidence_refs required")
+    if any(not isinstance(ref, str) or not ref for ref in evidence_refs):
+        raise AuthorityRiskError("invalid evidence reference")
     if type(human_approval) is not bool:
         raise AuthorityRiskError("human_approval must be boolean")
     if not isinstance(verification_proof, AuthorityVerificationProof):
