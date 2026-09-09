@@ -11,6 +11,7 @@ from typing import Any
 
 VALID = {"VERIFIED", "REJECTED", "UNKNOWN", "MISSING", "STALE"}
 BLOCKING = {"REJECTED", "UNKNOWN", "MISSING", "STALE"}
+APPROVAL_VALID = {"VERIFIED", "REJECTED", "UNKNOWN", "PENDING"}
 
 
 def canonical_json(value: Any) -> bytes:
@@ -30,9 +31,21 @@ def _state(evidence: dict[str, Any], key: str) -> str:
     return state if state in VALID else "UNKNOWN"
 
 
+def _approval_state(evidence: dict[str, Any]) -> str:
+    raw = evidence.get("human_approval")
+    if raw is None:
+        return "PENDING"
+    if isinstance(raw, str):
+        state = raw
+    elif isinstance(raw, dict):
+        state = raw.get("state", "UNKNOWN")
+    else:
+        return "UNKNOWN"
+    return state if state in APPROVAL_VALID else "UNKNOWN"
+
+
 def evaluate(plan: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
     results = []
-    approval_pending = False
     for rule in plan.get("rules", []):
         reasons = []
         states = {}
@@ -43,16 +56,18 @@ def evaluate(plan: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
                 reasons.append(f"{key}:{state}")
         if reasons:
             decision = "BLOCK"
+        elif rule.get("approval_mode") == "REQUIRED":
+            approval_state = _approval_state(evidence)
+            if approval_state == "VERIFIED":
+                decision = "PASS"
+            elif approval_state == "PENDING":
+                decision = "REQUIRE_APPROVAL"
+                reasons.append("human_approval:PENDING")
+            else:
+                decision = "BLOCK"
+                reasons.append(f"human_approval:{approval_state}")
         else:
             decision = "PASS"
-            if rule.get("approval_mode") == "REQUIRED":
-                approval_state = _state(evidence, "human_approval")
-                if approval_state == "UNKNOWN" or approval_state in BLOCKING:
-                    decision = "BLOCK"
-                    reasons.append(f"human_approval:{approval_state}")
-                elif approval_state == "PENDING":
-                    decision = "REQUIRE_APPROVAL"
-                    approval_pending = True
         results.append({
             "rule_id": rule["rule_id"],
             "decision": decision,
@@ -64,7 +79,9 @@ def evaluate(plan: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
     for gate in plan.get("gates", []):
         members = [r for r in results if r["rule_id"] in gate["rule_ids"]]
         decisions = [r["decision"] for r in members]
-        if gate["mode"] in {"ALL", "SEQUENCE"}:
+        if not members:
+            gd = "BLOCK"
+        elif gate["mode"] in {"ALL", "SEQUENCE"}:
             if "BLOCK" in decisions:
                 gd = "BLOCK"
             elif "REQUIRE_APPROVAL" in decisions:
@@ -82,14 +99,12 @@ def evaluate(plan: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
             gd = "BLOCK"
         gate_results.append({"gate_id": gate["gate_id"], "decision": gd, "rule_decisions": decisions})
 
-    if any(g["decision"] == "BLOCK" for g in gate_results):
+    if not gate_results or any(g["decision"] == "BLOCK" for g in gate_results):
         decision = "BLOCK"
-    elif any(g["decision"] == "REQUIRE_APPROVAL" for g in gate_results) or approval_pending:
+    elif any(g["decision"] == "REQUIRE_APPROVAL" for g in gate_results):
         decision = "REQUIRE_APPROVAL"
-    elif gate_results and all(g["decision"] == "PASS" for g in gate_results):
-        decision = "PASS"
     else:
-        decision = "BLOCK"
+        decision = "PASS"
 
     receipt = {
         "receipt_type": "P0-06-EVALUATION",
