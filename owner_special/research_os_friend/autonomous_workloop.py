@@ -108,10 +108,26 @@ class WorkItem:
             raise WorkloopError("invalid lifecycle state")
         if _INDEX[target] != _INDEX[self.state] + 1:
             raise WorkloopError(f"invalid transition {self.state.value} -> {target.value}")
+
+        mutation_adjacent = target in {
+            WorkState.BRANCHED,
+            WorkState.DOCUMENTED,
+            WorkState.IMPLEMENTED,
+            WorkState.DIFF_CAPTURED,
+            WorkState.TESTED,
+        }
         if observed_sha is not None and observed_sha != self.baseline_sha:
             raise WorkloopError("stale baseline: observed SHA does not match work baseline")
-        if target in {WorkState.BRANCHED, WorkState.DOCUMENTED, WorkState.IMPLEMENTED, WorkState.DIFF_CAPTURED, WorkState.TESTED} and not (self.lease_id or lease_id):
-            raise WorkloopError("mutation-adjacent state requires an active lease")
+        if mutation_adjacent:
+            if observed_sha is None:
+                raise WorkloopError("mutation-adjacent state requires an observed baseline SHA")
+            active_lease = self.lease_id or lease_id
+            if not active_lease:
+                raise WorkloopError("mutation-adjacent state requires an active lease")
+            if self.lease_id and lease_id is not None and lease_id != self.lease_id:
+                raise WorkloopError("lease mismatch")
+            if self.lease_id and lease_id is None:
+                lease_id = self.lease_id
         next_lease = lease_id if target == WorkState.LEASED else self.lease_id
         return WorkItem(**{**self.__dict__, "state": target, "lease_id": next_lease})
 
@@ -137,19 +153,36 @@ def can_stop(*, required_work: int, recovery_work: int, unresolved_failures: int
     return main_verified and final_rescan
 
 
+def _strict_bool(value: Any, name: str) -> bool:
+    if type(value) is not bool:
+        raise WorkloopError(f"{name} must be a boolean")
+    return value
+
+
+def _strict_count(value: Any, name: str) -> int:
+    if type(value) is not int or value < 0:
+        raise WorkloopError(f"{name} must be a non-negative integer")
+    return value
+
+
 def build_stop_proof(**observations: Any) -> dict[str, Any]:
-    """Create a deterministic stop-proof projection; it does not mutate queues."""
+    """Create a deterministic stop-proof projection; it does not mutate queues.
+
+    This function intentionally accepts only strictly typed observations. It is
+    still a projection: callers must supply observations from an independently
+    verified scanner before the resulting proof can be treated as authoritative.
+    """
     required = {
-        "required_work": int(observations.get("required_work", -1)),
-        "recovery_work": int(observations.get("recovery_work", -1)),
-        "unresolved_failures": int(observations.get("unresolved_failures", -1)),
-        "unknown": int(observations.get("unknown", -1)),
-        "stale": int(observations.get("stale", -1)),
-        "unverified": int(observations.get("unverified", -1)),
-        "blocked_required": int(observations.get("blocked_required", -1)),
-        "uncertified_integrations": int(observations.get("uncertified_integrations", -1)),
-        "main_verified": bool(observations.get("main_verified", False)),
-        "final_rescan": bool(observations.get("final_rescan", False)),
+        "required_work": _strict_count(observations.get("required_work", -1), "required_work"),
+        "recovery_work": _strict_count(observations.get("recovery_work", -1), "recovery_work"),
+        "unresolved_failures": _strict_count(observations.get("unresolved_failures", -1), "unresolved_failures"),
+        "unknown": _strict_count(observations.get("unknown", -1), "unknown"),
+        "stale": _strict_count(observations.get("stale", -1), "stale"),
+        "unverified": _strict_count(observations.get("unverified", -1), "unverified"),
+        "blocked_required": _strict_count(observations.get("blocked_required", -1), "blocked_required"),
+        "uncertified_integrations": _strict_count(observations.get("uncertified_integrations", -1), "uncertified_integrations"),
+        "main_verified": _strict_bool(observations.get("main_verified", False), "main_verified"),
+        "final_rescan": _strict_bool(observations.get("final_rescan", False), "final_rescan"),
     }
     status = "PASS" if can_stop(**required) else "HOLD"
     return {"schema": "research-os-aeos-stop-proof/v1", "status": status, "observations": required, "terminal_state": "CERTIFIED_IDLE" if status == "PASS" else "ACTIVE"}
