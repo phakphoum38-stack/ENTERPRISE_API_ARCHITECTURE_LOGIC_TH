@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 
 from owner_special.research_os_friend.approval import ApprovalGate
 from owner_special.research_os_friend.identity import OwnerIdentity
@@ -83,9 +84,25 @@ class AEOSAssuranceFabricExpansionTests(unittest.TestCase):
         gate = ApprovalGate()
         gate.approve(owner, request, "shell.run", reason="owner approved")
         approval_proof = gate.issue_proof(owner, request, "shell.run")
-        result = evaluate(risk="HIGH", human_approval=True, approval_proof=approval_proof)
+        result = evaluate(risk="HIGH", human_approval=False, approval_proof=approval_proof)
         self.assertTrue(result.allowed)
         self.assertTrue(result.human_approval)
+
+    def test_high_risk_rejects_tampered_approval_proof(self):
+        owner = OwnerIdentity(owner_id="aeos-approval-owner", display_name="Owner")
+        request = FriendRequest(
+            owner_id=owner.owner_id,
+            profile_id="default",
+            session_id="session-1",
+            text="run command",
+            requested_tools=("shell.run",),
+        )
+        gate = ApprovalGate()
+        gate.approve(owner, request, "shell.run", reason="owner approved")
+        proof = gate.issue_proof(owner, request, "shell.run")
+        tampered = replace(proof, tool_name="shell")
+        with self.assertRaises(AuthorityRiskError):
+            evaluate(risk="HIGH", approval_proof=tampered)
 
     def test_authority_risk_rejects_raw_verification_booleans(self):
         with self.assertRaises(TypeError):
