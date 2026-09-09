@@ -24,6 +24,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONPATH: .
+
 jobs:
   policy-gate:
     runs-on: ubuntu-latest
