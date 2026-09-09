@@ -51,6 +51,8 @@ class LearningExecutorResultBoundary:
                 raise LearningExecutorResultError(f"activation {field} mismatch")
         if request.status not in _ALLOWED:
             raise LearningExecutorResultError("invalid runtime status")
+        if result.get("status") != request.status:
+            raise LearningExecutorResultError("runtime result status mismatch")
 
         self._scan(result, 0)
         result_copy = json.loads(json.dumps(result, sort_keys=True))
