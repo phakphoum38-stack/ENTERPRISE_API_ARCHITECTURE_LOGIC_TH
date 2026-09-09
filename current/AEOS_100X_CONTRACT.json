@@ -1,0 +1,83 @@
+{
+  "contract": "research-os-aeos-100x/v1",
+  "status": "IMPLEMENTATION_DRAFT",
+  "baseline_sha": "c04d60b36d51eb8529a4c65a61c7d5a411e5fe85",
+  "mode": "AUTO_GUARDED",
+  "auto_merge": false,
+  "mission_semantics": "single_user_command_may_execute_a_durable_governed_work_graph_until_certified_idle",
+  "core_principles": [
+    "detect_before_diagnose",
+    "root_cause_before_fix",
+    "evidence_before_certification",
+    "provenance_before_trust",
+    "independent_verification_before_integration",
+    "main_verification_before_reanchor",
+    "no_unknown_as_pass",
+    "no_merge_as_repair",
+    "no_governance_self_modification",
+    "no_autonomous_stop_without_stop_proof"
+  ],
+  "state_order": [
+    "MISSION_CREATED",
+    "CONTRACTED",
+    "PLANNED",
+    "QUEUED",
+    "LEASED",
+    "BRANCHED",
+    "DOCUMENTED",
+    "IMPLEMENTED",
+    "DIFF_CAPTURED",
+    "TESTED",
+    "CI_VERIFIED",
+    "FORENSIC_VERIFIED",
+    "REGRESSION_VERIFIED",
+    "EVIDENCE_VERIFIED",
+    "PROVENANCE_VERIFIED",
+    "AUTHORITY_VERIFIED",
+    "CERTIFIED",
+    "INTEGRATED",
+    "MAIN_VERIFIED",
+    "REANCHORED",
+    "COMPLETED"
+  ],
+  "terminal_states": ["COMPLETED", "BLOCKED", "QUARANTINED", "CANCELLED"],
+  "failure_protocol": [
+    "PRESERVE_FAILURE_EVIDENCE",
+    "CLASSIFY",
+    "REPRODUCE",
+    "HYPOTHESIZE",
+    "VERIFY_ROOT_CAUSE",
+    "APPLY_SOURCE_FIX",
+    "RETEST",
+    "REGRESSION",
+    "REVERIFY"
+  ],
+  "stop_requirements": {
+    "required_queue": 0,
+    "recovery_queue": 0,
+    "unresolved_failures": 0,
+    "unknown": 0,
+    "stale": 0,
+    "unverified_changes": 0,
+    "blocked_required_dependencies": 0,
+    "uncertified_integrations": 0,
+    "main_verified": true,
+    "stop_proof": "PASS"
+  },
+  "authority": {
+    "planner": "bounded",
+    "builder": "bounded",
+    "verifier": "independent",
+    "certifier": "governed",
+    "merge": "outside_self_evaluation",
+    "constitution_mutation": false,
+    "policy_self_weakening": false
+  },
+  "budgets": {
+    "max_retry_without_new_evidence": 0,
+    "max_concurrent_high_risk": 1,
+    "lease_required": true,
+    "change_budget_required": true,
+    "recovery_point_required_for_irreversible_action": true
+  }
+}
