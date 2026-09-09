@@ -4,7 +4,7 @@
     {
       "action": "change",
       "actor_id": "H-OWNER",
-      "entry_hash": "0382bcd803021945f8ff4cce6fb9d0c5eb136032469f1bb4985db220fc74d925",
+      "entry_hash": "851bc690488ae9921c3dc7e2ff75886a59c073d0900322a67547eea80302edbf",
       "entry_id": "EV-001",
       "evidence": {
         "attestation_id": "ATT-001",
@@ -24,7 +24,7 @@
       "output_hashes": {
         "contract": {
           "algorithm": "sha256",
-          "digest": "5e4c5d3d92d835c0f750ac650b733c067287bcdcfc417b2ae2d37b6b39c46aae",
+          "digest": "d3b770630c29ad353ee88f4e9e17034610b45ad490d88b1c7f6f190d040ae958",
           "subject": "artifact:current/PROVENANCE_EVIDENCE_CONTRACT.json"
         }
       },
@@ -37,7 +37,7 @@
     {
       "action": "attest",
       "actor_id": "H-OWNER",
-      "entry_hash": "926c317a2061c8628c2b09628e1d274237430c0700c71e6a427c9d3106956115",
+      "entry_hash": "ae1f67abbd7c9e531111c71838653bd98a855937ed1173eda410e72fbf75e49d",
       "entry_id": "EV-002",
       "evidence": {
         "attestation_id": "ATT-001",
@@ -51,7 +51,7 @@
       "input_hashes": {
         "prior_entry": {
           "algorithm": "sha256",
-          "digest": "0382bcd803021945f8ff4cce6fb9d0c5eb136032469f1bb4985db220fc74d925",
+          "digest": "851bc690488ae9921c3dc7e2ff75886a59c073d0900322a67547eea80302edbf",
           "subject": "ledger:EV-001"
         }
       },
@@ -62,7 +62,7 @@
           "subject": "attestation:ATT-001"
         }
       },
-      "previous_entry_hash": "0382bcd803021945f8ff4cce6fb9d0c5eb136032469f1bb4985db220fc74d925",
+      "previous_entry_hash": "851bc690488ae9921c3dc7e2ff75886a59c073d0900322a67547eea80302edbf",
       "recorded_at": "2026-09-09T00:05:00Z",
       "sequence": 2,
       "subject_id": "CHG-001",
