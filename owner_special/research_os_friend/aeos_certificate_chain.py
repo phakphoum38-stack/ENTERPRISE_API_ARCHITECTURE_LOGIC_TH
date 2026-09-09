@@ -1,8 +1,8 @@
 """AEOS certificate-chain integrity boundary.
 
 Certificates remain claims until their upstream evidence and verification are
-independently validated. This module only guarantees chain linkage and
-immutability of the certificate envelope.
+independently validated. This module only guarantees chain linkage and binds
+that external verification proof into each immutable certificate envelope.
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ class ChainCertificate:
     provenance_root: str
     payload_digest: str
     previous_certificate_digest: str | None
-    independently_verified: bool
+    verification_proof: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.certificate_id, str) or not self.certificate_id:
@@ -53,12 +53,9 @@ class ChainCertificate:
         _sha(self.evidence_root, "evidence_root")
         _sha(self.provenance_root, "provenance_root")
         _sha(self.payload_digest, "payload_digest")
+        _sha(self.verification_proof, "verification_proof")
         if self.previous_certificate_digest is not None:
             _sha(self.previous_certificate_digest, "previous_certificate_digest")
-        if type(self.independently_verified) is not bool:
-            raise CertificateChainError("independently_verified must be bool")
-        if not self.independently_verified:
-            raise CertificateChainError("certificate chain requires independent verification")
 
 
 def issue_chain_certificate(
@@ -71,13 +68,12 @@ def issue_chain_certificate(
     provenance_root: str,
     payload: Mapping[str, Any],
     previous_certificate: ChainCertificate | None = None,
-    independently_verified: bool,
+    verification_proof: str,
 ) -> ChainCertificate:
-    """Create one immutable link after upstream verification has occurred."""
+    """Create one immutable link using an externally issued verification proof."""
     if not isinstance(payload, Mapping) or not payload:
         raise CertificateChainError("certificate payload required")
-    if type(independently_verified) is not bool or not independently_verified:
-        raise CertificateChainError("certificate requires independent verification")
+    _sha(verification_proof, "verification_proof")
     if previous_certificate is not None:
         if previous_certificate.baseline_sha != baseline_sha:
             raise CertificateChainError("certificate baseline mismatch")
@@ -98,7 +94,7 @@ def issue_chain_certificate(
         provenance_root=provenance_root,
         payload_digest=payload_digest,
         previous_certificate_digest=previous_digest,
-        independently_verified=True,
+        verification_proof=verification_proof,
     )
 
 
@@ -107,8 +103,6 @@ def verify_chain(*certificates: ChainCertificate) -> bool:
     if not certificates:
         raise CertificateChainError("certificate chain required")
     for index, certificate in enumerate(certificates):
-        if not certificate.independently_verified:
-            return False
         if index == 0:
             if certificate.previous_certificate_digest is not None:
                 return False
