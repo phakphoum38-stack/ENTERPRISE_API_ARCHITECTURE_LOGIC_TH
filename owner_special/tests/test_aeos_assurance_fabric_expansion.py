@@ -1,7 +1,7 @@
 import unittest
 from dataclasses import replace
 
-from owner_special.research_os_friend.approval import ApprovalGate
+from owner_special.research_os_friend.approval import ApprovalGate, ApprovalProof, ApprovalState
 from owner_special.research_os_friend.identity import OwnerIdentity
 from owner_special.research_os_friend.models import FriendRequest
 from owner_special.research_os_friend.aeos_assurance_fabric import AssuranceControl, AssuranceFabric, AssuranceFabricError, compile_control_spec
@@ -103,6 +103,20 @@ class AEOSAssuranceFabricExpansionTests(unittest.TestCase):
         tampered = replace(proof, tool_name="shell")
         with self.assertRaises(AuthorityRiskError):
             evaluate(risk="HIGH", approval_proof=tampered)
+
+    def test_approval_proof_rejects_non_approved_state(self):
+        with self.assertRaises(ValueError):
+            ApprovalProof(
+                approval_id="a" * 64,
+                owner_id="owner",
+                profile_id="default",
+                session_id="session",
+                tool_name="shell.run",
+                request_fingerprint="b" * 64,
+                state=ApprovalState.PENDING,
+                decided_at=None,
+                evidence_digest="c" * 64,
+            )
 
     def test_authority_risk_rejects_raw_verification_booleans(self):
         with self.assertRaises(TypeError):
