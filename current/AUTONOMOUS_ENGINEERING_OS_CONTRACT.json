@@ -1,0 +1,125 @@
+{
+  "contract": "AUTONOMOUS_ENGINEERING_OS",
+  "version": "1.0.0",
+  "status": "PROPOSED",
+  "operating_mode": "AUTO_GUARDED",
+  "auto_horizon": {
+    "enabled_range": ["H0", "H24"],
+    "hold_range": ["H25"],
+    "reserved_range": ["H26", "H27"]
+  },
+  "constitutional_invariants": [
+    "identity_is_not_capability",
+    "capability_is_not_authority",
+    "authority_is_not_trust",
+    "unknown_is_not_verified",
+    "self_attestation_is_not_independent_verification",
+    "merge_requires_proof",
+    "agent_cannot_weaken_its_own_gate",
+    "exceptions_cannot_escalate_authority",
+    "main_sha_change_invalidates_dependent_evidence",
+    "post_merge_failure_stops_autonomy"
+  ],
+  "required_gates": [
+    "queue_snapshot",
+    "dependency_check",
+    "ancestry_check",
+    "isolated_diff_check",
+    "semantic_diff_check",
+    "blast_radius_check",
+    "contract_check",
+    "exact_sha_binding",
+    "regression_check",
+    "exact_head_ci",
+    "evidence_integrity",
+    "provenance_integrity",
+    "independent_verification",
+    "final_gate",
+    "change_certificate",
+    "post_merge_verification"
+  ],
+  "hard_stop_states": [
+    "UNKNOWN",
+    "ROOT_CAUSE_UNKNOWN",
+    "ANCESTRY_UNKNOWN",
+    "PROVENANCE_INVALID",
+    "EVIDENCE_STALE",
+    "AUTHORITY_UNKNOWN",
+    "CONTRACT_DRIFT",
+    "BREAKING_CHANGE_UNRESOLVED",
+    "SECURITY_RISK_UNRESOLVED",
+    "CI_NOT_EXACT_HEAD",
+    "DEPENDENCY_CYCLE",
+    "POST_MERGE_HEALTH_UNKNOWN",
+    "DECISION_REPLAY_MISMATCH"
+  ],
+  "retry_policy": {
+    "bounded": true,
+    "retry_must_not_weaken_gate": true,
+    "default_ci_retry_budget": 2,
+    "default_reanchor_budget": 1,
+    "forensic_retry_budget": 1
+  },
+  "merge_policy": {
+    "one_dependency_safe_change_at_a_time": true,
+    "expected_head_sha_required": true,
+    "fresh_main_sha_required_after_merge": true,
+    "post_merge_verification_required": true,
+    "merge_is_not_a_fix_stage": true
+  },
+  "authority": {
+    "agent_can": [
+      "inspect",
+      "classify",
+      "reanchor",
+      "propose_fix",
+      "apply_bounded_fix",
+      "run_tests",
+      "collect_evidence",
+      "request_verification"
+    ],
+    "agent_cannot": [
+      "weaken_contract",
+      "weaken_test_to_pass",
+      "convert_unknown_to_verified",
+      "escalate_authority",
+      "rewrite_canonical_history_without_governance",
+      "self_approve_own_change",
+      "delete_required_evidence",
+      "modify_constitution_to_pass_its_own_change"
+    ]
+  },
+  "evidence": {
+    "freshness_required": true,
+    "exact_identity_binding": true,
+    "required_fields": [
+      "source_sha",
+      "target_sha",
+      "contract_version",
+      "policy_version",
+      "producer",
+      "verifier",
+      "timestamp",
+      "validity_scope",
+      "fingerprint"
+    ]
+  },
+  "recovery": {
+    "certified_predecessor_required": true,
+    "rollback_is_proof_carrying": true,
+    "post_rollback_verification_required": true
+  },
+  "learning": {
+    "failure_to_knowledge": true,
+    "knowledge_requires_forensic_verification": true,
+    "regression_promotion_required": true,
+    "autonomous_constitutional_self_modification": false
+  },
+  "modes": [
+    "AUTO_FULL",
+    "AUTO_GUARDED",
+    "AUTO_REVIEW_ONLY",
+    "AUTO_OFF"
+  ],
+  "default_failure_action": "HOLD_AND_PRESERVE_EVIDENCE"
+}
