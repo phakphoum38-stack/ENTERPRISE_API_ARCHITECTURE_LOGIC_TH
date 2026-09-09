@@ -78,6 +78,23 @@ class ApprovalProof:
         if not self.evidence_digest or len(self.evidence_digest) != 64:
             raise ValueError("approval proof evidence digest must be SHA-256")
 
+    def is_integrity_valid(self) -> bool:
+        """Verify the deterministic digest over the approval evidence fields."""
+        payload = {
+            "approval_id": self.approval_id,
+            "owner_id": self.owner_id,
+            "profile_id": self.profile_id,
+            "session_id": self.session_id,
+            "tool_name": self.tool_name,
+            "request_fingerprint": self.request_fingerprint,
+            "state": self.state.value,
+            "decided_at": self.decided_at,
+        }
+        digest = hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        return digest == self.evidence_digest
+
 
 class ApprovalGate:
     """Owner-scoped approval state for explicitly side-effecting tools."""
