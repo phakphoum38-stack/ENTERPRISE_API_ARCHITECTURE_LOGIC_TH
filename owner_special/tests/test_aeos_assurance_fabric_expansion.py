@@ -10,6 +10,8 @@ from owner_special.research_os_friend.aeos_post_merge_verification import PostMe
 
 SHA = "a" * 40
 HASH = "b" * 64
+EVIDENCE_ROOT = "c" * 64
+PROVENANCE_ROOT = "d" * 64
 REFS = ("EV-001", "EV-002")
 
 
@@ -18,10 +20,34 @@ def verification_proof():
         authority_verified=True,
         capability_verified=True,
         provenance_verified=True,
+        baseline_sha=SHA,
         policy_version="p1",
+        policy_sha256=HASH,
+        evidence_root=EVIDENCE_ROOT,
+        provenance_root=PROVENANCE_ROOT,
         evidence_refs=REFS,
         verifier_id="independent-verifier-1",
     )
+
+
+def evaluate(**overrides):
+    values = {
+        "actor": "builder",
+        "authority": "write",
+        "capability": "code",
+        "scope": "repo",
+        "risk": "LOW",
+        "baseline_sha": SHA,
+        "policy_version": "p1",
+        "policy_sha256": HASH,
+        "evidence_root": EVIDENCE_ROOT,
+        "provenance_root": PROVENANCE_ROOT,
+        "evidence_refs": REFS,
+        "human_approval": False,
+        "verification_proof": verification_proof(),
+    }
+    values.update(overrides)
+    return evaluate_authority_risk(**values)
 
 
 class AEOSAssuranceFabricExpansionTests(unittest.TestCase):
@@ -40,24 +66,43 @@ class AEOSAssuranceFabricExpansionTests(unittest.TestCase):
 
     def test_high_risk_requires_human_approval(self):
         with self.assertRaises(AuthorityRiskError):
-            evaluate_authority_risk(actor="builder", authority="write", capability="code", scope="repo", risk="HIGH", policy_version="p1", evidence_refs=REFS, human_approval=False, verification_proof=verification_proof())
+            evaluate(risk="HIGH", human_approval=False)
 
     def test_authority_risk_rejects_raw_verification_booleans(self):
         with self.assertRaises(TypeError):
-            evaluate_authority_risk(actor="builder", authority="write", capability="code", scope="repo", risk="LOW", policy_version="p1", evidence_refs=REFS, human_approval=False, authority_verified=True, capability_verified=True, provenance_verified=True)  # type: ignore[call-arg]
+            evaluate_authority_risk(actor="builder", authority="write", capability="code", scope="repo", risk="LOW", baseline_sha=SHA, policy_version="p1", policy_sha256=HASH, evidence_root=EVIDENCE_ROOT, provenance_root=PROVENANCE_ROOT, evidence_refs=REFS, human_approval=False, authority_verified=True, capability_verified=True, provenance_verified=True)  # type: ignore[call-arg]
 
     def test_authority_risk_accepts_verified_proof(self):
-        result = evaluate_authority_risk(actor="builder", authority="write", capability="code", scope="repo", risk="LOW", policy_version="p1", evidence_refs=REFS, human_approval=False, verification_proof=verification_proof())
+        proof = verification_proof()
+        result = evaluate(verification_proof=proof)
         self.assertTrue(result.allowed)
         self.assertTrue(result.independently_verified)
-        self.assertEqual(result.verification_digest, verification_proof().evidence_digest)
+        self.assertEqual(result.verification_digest, proof.evidence_digest)
+        self.assertEqual(result.baseline_sha, SHA)
+        self.assertEqual(result.evidence_root, EVIDENCE_ROOT)
+        self.assertEqual(result.provenance_root, PROVENANCE_ROOT)
 
-    def test_authority_risk_rejects_policy_or_evidence_mismatch(self):
+    def test_authority_risk_rejects_binding_mismatch(self):
         proof = verification_proof()
+        for overrides in (
+            {"baseline_sha": "e" * 40},
+            {"policy_sha256": "f" * 64},
+            {"evidence_root": "1" * 64},
+            {"provenance_root": "2" * 64},
+            {"evidence_refs": ("EV-001",)},
+        ):
+            with self.subTest(overrides=overrides):
+                with self.assertRaises(AuthorityRiskError):
+                    evaluate(verification_proof=proof, **overrides)
+
+    def test_authority_risk_rejects_malformed_proof_roots(self):
         with self.assertRaises(AuthorityRiskError):
-            evaluate_authority_risk(actor="builder", authority="write", capability="code", scope="repo", risk="LOW", policy_version="p2", evidence_refs=REFS, human_approval=False, verification_proof=proof)
-        with self.assertRaises(AuthorityRiskError):
-            evaluate_authority_risk(actor="builder", authority="write", capability="code", scope="repo", risk="LOW", policy_version="p1", evidence_refs=("EV-001",), human_approval=False, verification_proof=proof)
+            build_authority_verification_proof(
+                authority_verified=True, capability_verified=True, provenance_verified=True,
+                baseline_sha=SHA, policy_version="p1", policy_sha256="not-a-sha",
+                evidence_root=EVIDENCE_ROOT, provenance_root=PROVENANCE_ROOT,
+                evidence_refs=REFS, verifier_id="independent-verifier-1",
+            )
 
     def test_semantic_diff_marks_authority_change_critical(self):
         result = classify_semantic_diff(before={"authority": "read"}, after={"authority": "write"})
