@@ -6,9 +6,13 @@ import ast
 import importlib
 import json
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 REGISTRY = ROOT / "current" / "AEOS_ASSURANCE_CHECK_REGISTRY.json"
 SEMANTIC_BOUNDARY = "owner_special/research_os_friend/aeos_source_semantic_checks.py"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
