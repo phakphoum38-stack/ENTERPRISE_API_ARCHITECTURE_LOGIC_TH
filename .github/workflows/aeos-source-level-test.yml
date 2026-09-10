@@ -1,0 +1,39 @@
+name: AEOS Source-Level Test
+
+on:
+  pull_request:
+    paths:
+      - 'current/AEOS_ASSURANCE_CHECK_REGISTRY.json'
+      - 'current/AEOS_*_CONTRACT.json'
+      - 'owner_special/research_os_friend/**'
+      - 'owner_special/tests/test_aeos_source_checks.py'
+      - 'tools/validate_aeos_source_checks.py'
+      - '.github/workflows/aeos-source-level-test.yml'
+  push:
+    branches:
+      - main
+      - 'feat/aeos-*'
+
+permissions:
+  contents: read
+
+jobs:
+  source-level-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Verify source-level check coverage
+        run: python tools/validate_aeos_source_checks.py
+
+      - name: Run source-level regression test
+        run: python -m unittest owner_special.tests.test_aeos_source_checks -v
