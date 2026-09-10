@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "platform": "AEOS_AUTOBOT_PLATFORM",
+  "purpose": "One orchestrator for up to 100 independent assurance sets with barriered execution, evidence binding, bounded recovery, and authority firewall.",
+  "constitutional_rules": [
+    "RUNNING is never PASS or FAIL.",
+    "No wave advances until every required control reaches a terminal state.",
+    "Evidence must bind to iteration, wave, source SHA, command, and result.",
+    "Stale or mismatched evidence is rejected and creates HOLD.",
+    "Autobot may repair and re-verify but may not self-authorize merge.",
+    "PowerShell is an execution backend; authority remains bounded by policy.",
+    "Master aggregation does not self-certify independent review."
+  ],
+  "terminal_states": [
+    "PASSED",
+    "FAILED",
+    "CANCELLED",
+    "TIMED_OUT",
+    "INFRA_FAILED",
+    "STALE",
+    "UNKNOWN",
+    "HOLD"
+  ],
+  "waves": [
+    "IDENTITY",
+    "SOURCE_CONTRACT",
+    "UNIT_REGRESSION",
+    "INTEGRATION_BEHAVIOR",
+    "SECURITY_ADVERSARIAL",
+    "PROVENANCE_EVIDENCE",
+    "FORENSIC",
+    "INDEPENDENT_REVIEW"
+  ],
+  "autobot_states": [
+    "OBSERVE",
+    "DIAGNOSE",
+    "PLAN_FIX",
+    "APPLY_FIX",
+    "RUN",
+    "WAIT",
+    "COLLECT",
+    "VERIFY",
+    "NEXT_WAVE",
+    "HOLD",
+    "AUTHORITY_PACKET",
+    "READY_TO_MERGE"
+  ],
+  "limits": {
+    "max_iterations": 20,
+    "max_runtime_seconds": 3600,
+    "max_changed_files": 100,
+    "max_risk_level": 4,
+    "max_sets": 100
+  },
+  "power_shell_policy": {
+    "capability": "unlimited",
+    "authority": "bounded",
+    "required_bounds": [
+      "repository_scope",
+      "working_directory",
+      "environment",
+      "allowed_commands",
+      "network_policy",
+      "process_policy",
+      "artifact_boundary",
+      "runtime_watchdog"
+    ]
+  },
+  "hold_recovery": {
+    "recoverable": true,
+    "protected_requires_independent_review": true,
+    "recovery_states": [
+      "HOLD_CREATED",
+      "HOLD_CLASSIFIED",
+      "RECOVERY_PLANNED",
+      "RECOVERY_AUTHORIZED",
+      "RECOVERY_EXECUTED",
+      "RE_VERIFIED",
+      "RELEASE_HOLD",
+      "PROTECTED_HOLD"
+    ]
+  }
+}
