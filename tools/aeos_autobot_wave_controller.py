@@ -7,7 +7,7 @@ from typing import Iterable, Mapping
 
 from tools.aeos_autobot_evidence_manifest import SnapshotLock, build_manifest, verify_manifest, write_manifest
 from tools.aeos_autobot_orchestrator import Job, WaveResult, run_wave
-from tools.aeos_autobot_state_machine import ResultState, Snapshot
+from tools.aeos_autobot_state_machine import ResultState
 
 WAVES: tuple[str, ...] = tuple(f"W{i}" for i in range(8))
 
@@ -85,7 +85,10 @@ def run_controller(
     for wave_id in WAVES:
         if wave_id not in waves:
             return ControllerResult(iteration_id, source_sha, ResultState.HOLD, tuple(records))
-        jobs = _validate_jobs(wave_id, waves[wave_id], iteration_id, source_sha)
+        try:
+            jobs = _validate_jobs(wave_id, waves[wave_id], iteration_id, source_sha)
+        except ValueError:
+            return ControllerResult(iteration_id, source_sha, ResultState.HOLD, tuple(records))
         result = run_wave(wave_id, jobs, max_workers=max_workers)
         manifest_path: str | None = None
 
