@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FAILURE_STATUSES = {"FAIL", "ERROR", "STALE", "INSUFFICIENT_EVIDENCE"}
 MANIFEST_SCHEMA = "AEOS_MASTER_ASSURANCE_V2"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass
@@ -77,7 +78,6 @@ def run_control(
         # V3 tests intentionally use both import forms: v3.<module> and
         # research_os_v3.<module>. Running with cwd=v3 supplies the latter,
         # but removes the repository root from sys.path and breaks the former.
-        # Bind both roots explicitly in the subprocess instead of changing tests.
         env = os.environ.copy()
         pythonpath = [str(ROOT), str(cwd)]
         existing = env.get("PYTHONPATH", "").strip()
@@ -94,7 +94,7 @@ def run_control(
         )
         returncode = proc.returncode
         output = (proc.stdout + "\n" + proc.stderr).strip()
-    except Exception as exc:  # fail closed: a control that cannot execute is not PASS
+    except Exception as exc:
         returncode = 125
         output = f"control_execution_error:{type(exc).__name__}:{exc}"
     duration = round(time.monotonic() - started, 3)
@@ -116,9 +116,7 @@ def run_control(
 
 
 def git_sha() -> str:
-    return subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-    ).strip()
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
 
 
 def git_base_sha() -> str:
@@ -128,43 +126,45 @@ def git_base_sha() -> str:
 def git_sha_exists(sha: str) -> bool:
     if not SHA_RE.fullmatch(sha):
         return False
-    try:
-        subprocess.run(
-            ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
-            cwd=ROOT,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return True
-    except subprocess.CalledProcessError:
+    return subprocess.run(
+        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode == 0
+
+
+def git_is_ancestor(old_sha: str, new_sha: str) -> bool:
+    if not SHA_RE.fullmatch(old_sha) or not SHA_RE.fullmatch(new_sha):
         return False
+    return subprocess.run(
+        ["git", "merge-base", "--is-ancestor", old_sha, new_sha],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode == 0
 
 
 def git_scope(base_sha: str, source_sha: str) -> dict[str, object]:
     if not base_sha:
         return {"status": "NOT_REQUESTED", "base_sha": None, "changed_files": []}
     try:
-        names = subprocess.check_output(
-            ["git", "diff", "--name-only", base_sha, source_sha],
-            cwd=ROOT,
-            text=True,
-        ).splitlines()
-        return {
-            "status": "PASS",
-            "base_sha": base_sha,
-            "source_sha": source_sha,
-            "changed_files": names,
-            "changed_file_count": len(names),
-        }
+        names = subprocess.check_output(["git", "diff", "--name-only", base_sha, source_sha], cwd=ROOT, text=True).splitlines()
+        return {"status": "PASS", "base_sha": base_sha, "source_sha": source_sha, "changed_files": names, "changed_file_count": len(names)}
     except subprocess.CalledProcessError as exc:
-        return {
-            "status": "INSUFFICIENT_EVIDENCE",
-            "base_sha": base_sha,
-            "source_sha": source_sha,
-            "changed_files": [],
-            "error": f"scope_diff_error:{exc}",
-        }
+        return {"status": "INSUFFICIENT_EVIDENCE", "base_sha": base_sha, "source_sha": source_sha, "changed_files": [], "error": f"scope_diff_error:{exc}"}
+
+
+def _verify_manifest_sidecar(path: Path) -> str:
+    sidecar = Path(str(path) + ".sha256")
+    if not sidecar.is_file():
+        raise SystemExit(f"missing_previous_manifest_digest:{sidecar}")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    for line in sidecar.read_text(encoding="utf-8").splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[0] == digest and fields[1].lstrip("*") == path.name:
+            return digest
+    raise SystemExit(f"previous_manifest_digest_mismatch:{path}")
 
 
 def _validate_previous_control(item: object) -> bool:
@@ -181,11 +181,9 @@ def _validate_previous_control(item: object) -> bool:
         return False
     if not isinstance(item["command"], list) or not item["command"] or not all(isinstance(v, str) for v in item["command"]):
         return False
-    if not isinstance(item["cwd"], str):
+    if not isinstance(item["cwd"], str) or not isinstance(item["returncode"], int):
         return False
-    if not isinstance(item["returncode"], int):
-        return False
-    if not isinstance(item["evidence_id"], str) or not re.fullmatch(r"[0-9a-f]{64}", item["evidence_id"]):
+    if not isinstance(item["evidence_id"], str) or not DIGEST_RE.fullmatch(item["evidence_id"]):
         return False
     if item["status"] != "PASS" and not item.get("failure_signature"):
         return False
@@ -198,34 +196,32 @@ def load_previous_manifest(path: str) -> dict[str, object] | None:
     candidate = Path(path)
     if not candidate.is_file():
         raise SystemExit(f"missing_previous_manifest:{path}")
+    _verify_manifest_sidecar(candidate)
     try:
         data = json.loads(candidate.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"invalid_previous_manifest:{type(exc).__name__}") from exc
-    if not isinstance(data, dict):
-        raise SystemExit("invalid_previous_manifest:object_required")
-    if data.get("schema") != MANIFEST_SCHEMA:
-        raise SystemExit(f"invalid_previous_manifest:schema:{data.get('schema')}")
+    if not isinstance(data, dict) or data.get("schema") != MANIFEST_SCHEMA:
+        raise SystemExit("invalid_previous_manifest:schema")
     old_sha = data.get("source_sha")
+    current_sha = git_sha()
     if not isinstance(old_sha, str) or not SHA_RE.fullmatch(old_sha):
         raise SystemExit("invalid_previous_manifest:source_sha")
-    if old_sha == git_sha():
-        raise SystemExit("invalid_previous_manifest:source_sha_is_current")
-    if not git_sha_exists(old_sha):
-        raise SystemExit(f"invalid_previous_manifest:unknown_source_sha:{old_sha}")
+    if old_sha == current_sha or not git_sha_exists(old_sha):
+        raise SystemExit("invalid_previous_manifest:source_sha")
+    if not git_is_ancestor(old_sha, current_sha):
+        raise SystemExit("invalid_previous_manifest:source_sha_not_ancestor")
     controls = data.get("controls")
-    if not isinstance(controls, list) or not controls:
+    if not isinstance(controls, list) or not controls or data.get("control_count") != len(controls):
         raise SystemExit("invalid_previous_manifest:controls")
-    if data.get("control_count") != len(controls):
-        raise SystemExit("invalid_previous_manifest:control_count")
-    if len({item.get("control_id") for item in controls if isinstance(item, dict)}) != len(controls):
-        raise SystemExit("invalid_previous_manifest:duplicate_control_id")
+    ids = [item.get("control_id") for item in controls if isinstance(item, dict)]
+    if len(ids) != len(controls) or len(set(ids)) != len(ids):
+        raise SystemExit("invalid_previous_manifest:control_ids")
     if any(not _validate_previous_control(item) for item in controls):
         raise SystemExit("invalid_previous_manifest:control_record")
     if data.get("decision") not in {"PASS", "FAIL", "INSUFFICIENT_EVIDENCE"}:
         raise SystemExit("invalid_previous_manifest:decision")
-    passed = data.get("passed")
-    failed = data.get("failed")
+    passed, failed = data.get("passed"), data.get("failed")
     if not isinstance(passed, int) or not isinstance(failed, int) or passed + failed != len(controls):
         raise SystemExit("invalid_previous_manifest:result_counts")
     return data
@@ -233,30 +229,30 @@ def load_previous_manifest(path: str) -> dict[str, object] | None:
 
 def verify_fix(current: list[ControlResult], previous: dict[str, object] | None) -> dict[str, object]:
     if previous is None:
-        return {
-            "status": "NOT_REQUESTED",
-            "mode": "none",
-            "old_sha": None,
-            "new_sha": git_sha(),
-            "regressions": [],
-            "resolved_failures": [],
-        }
+        return {"status": "NOT_REQUESTED", "mode": "none", "old_sha": None, "new_sha": git_sha(), "regressions": [], "resolved_failures": []}
 
     old_sha = str(previous["source_sha"])
     new_sha = git_sha()
     old_controls = previous["controls"]
     assert isinstance(old_controls, list)
-    old_failures = {
-        str(item["failure_signature"])
-        for item in old_controls
-        if isinstance(item, dict) and item.get("status") in FAILURE_STATUSES and item.get("failure_signature")
-    }
-    new_failures = {
-        r.failure_signature for r in current if r.status in FAILURE_STATUSES and r.failure_signature
-    }
+    old_ids = {str(item["control_id"]) for item in old_controls if isinstance(item, dict)}
+    current_ids = {r.control_id for r in current}
+    missing_controls = sorted(old_ids - current_ids)
+    old_failures = {str(item["failure_signature"]) for item in old_controls if isinstance(item, dict) and item.get("status") in FAILURE_STATUSES and item.get("failure_signature")}
+    new_failures = {r.failure_signature for r in current if r.status in FAILURE_STATUSES and r.failure_signature}
     regressions = sorted(new_failures - old_failures)
     resolved = sorted(old_failures - new_failures)
-    status = "PASS" if not regressions else "FAIL"
+    unresolved = sorted(old_failures & new_failures)
+    if missing_controls:
+        status = "FAIL"
+    elif regressions:
+        status = "FAIL"
+    elif old_failures and unresolved:
+        status = "FAIL"
+    elif not old_failures:
+        status = "INSUFFICIENT_EVIDENCE"
+    else:
+        status = "PASS"
     return {
         "status": status,
         "mode": "previous_manifest",
@@ -267,72 +263,35 @@ def verify_fix(current: list[ControlResult], previous: dict[str, object] | None)
         "current_failure_signatures": sorted(new_failures),
         "regressions": regressions,
         "resolved_failures": resolved,
+        "unresolved_failures": unresolved,
+        "missing_controls": missing_controls,
+        "old_manifest_sha256_verified": True,
+        "old_sha_ancestor_of_new_sha": True,
     }
 
 
 def discover_controls() -> list[tuple[str, str, list[str], Path]]:
     controls: list[tuple[str, str, list[str], Path]] = []
-
     expected = os.environ.get("AEOS_EXPECTED_SHA", "").strip()
     if expected:
-        controls.append(
-            (
-                "IDENTITY_SHA",
-                "identity",
-                [sys.executable, "-c", f"import subprocess; actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); expected={expected!r}; print(actual); assert actual == expected, f'expected {{expected}}, got {{actual}}'"],
-                ROOT,
-            )
-        )
-
+        controls.append(("IDENTITY_SHA", "identity", [sys.executable, "-c", f"import subprocess; actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); expected={expected!r}; print(actual); assert actual == expected, f'expected {{expected}}, got {{actual}}'"], ROOT))
     compile_paths = [p for p in (ROOT / "owner_special", ROOT / "tools") if p.exists()]
     if compile_paths:
-        controls.append(
-            (
-                "PYTHON_COMPILE",
-                "static",
-                [sys.executable, "-m", "compileall", "-q", *(str(p.relative_to(ROOT)) for p in compile_paths)],
-                ROOT,
-            )
-        )
-
-    validator_candidates = [
-        ROOT / "tools" / "validate_aeos_source_checks.py",
-        ROOT / "tools" / "validate_aeos_assurance_checks.py",
-        ROOT / "tools" / "validate_provenance_evidence.py",
-    ]
+        controls.append(("PYTHON_COMPILE", "static", [sys.executable, "-m", "compileall", "-q", *(str(p.relative_to(ROOT)) for p in compile_paths)], ROOT))
+    validator_candidates = [ROOT / "tools" / "validate_aeos_source_checks.py", ROOT / "tools" / "validate_aeos_assurance_checks.py", ROOT / "tools" / "validate_provenance_evidence.py"]
     for path in validator_candidates:
         if path.is_file():
             args = [sys.executable, str(path.relative_to(ROOT))]
             if path.name == "validate_aeos_assurance_checks.py":
                 args.append("--registry-only")
             controls.append((path.stem.upper(), "validator", args, ROOT))
-
     test_dir = ROOT / "owner_special" / "tests"
     if test_dir.is_dir():
-        controls.append(
-            (
-                "AEOS_REGRESSION",
-                "behavioral",
-                [sys.executable, "-m", "unittest", "discover", "-s", str(test_dir.relative_to(ROOT)), "-p", "test_aeos_*.py", "-v"],
-                ROOT,
-            )
-        )
-
+        controls.append(("AEOS_REGRESSION", "behavioral", [sys.executable, "-m", "unittest", "discover", "-s", str(test_dir.relative_to(ROOT)), "-p", "test_aeos_*.py", "-v"], ROOT))
     v3_test_dir = ROOT / "v3" / "tests"
     v3_package_dir = ROOT / "v3"
     if v3_test_dir.is_dir() and (v3_package_dir / "research_os_v3").is_dir():
-        # Keep the established V3 execution boundary: tests run from v3/ with
-        # -s tests. run_control supplies both repository-root and v3 import roots
-        # so tests importing v3.* and research_os_v3.* both resolve correctly.
-        controls.append(
-            (
-                "V3_REGRESSION",
-                "integration",
-                [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"],
-                v3_package_dir,
-            )
-        )
-
+        controls.append(("V3_REGRESSION", "integration", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], v3_package_dir))
     return controls
 
 
@@ -341,29 +300,20 @@ def main() -> int:
     parser.add_argument("--output", default="aeos_master_assurance_manifest.json")
     parser.add_argument("--previous-manifest", default="", help="Explicit prior assurance manifest for old-vs-new fix verification")
     args = parser.parse_args()
-
     controls = discover_controls()
     if not controls:
         print("AEOS_MASTER_ASSURANCE=FAIL: no executable controls discovered")
         return 2
-
     results: list[ControlResult] = []
-    # Controls are independent: one failure must not cancel or suppress the others.
     with ThreadPoolExecutor(max_workers=len(controls)) as executor:
-        futures = {
-            executor.submit(run_control, control_id, class_name, command, control_cwd): control_id
-            for control_id, class_name, command, control_cwd in controls
-        }
+        futures = {executor.submit(run_control, control_id, class_name, command, control_cwd): control_id for control_id, class_name, command, control_cwd in controls}
         for future in as_completed(futures):
-            result = future.result()
-            results.append(result)
+            results.append(future.result())
     results.sort(key=lambda item: item.control_id)
-
     for result in results:
         print(f"[{result.status}] {result.control_id} ({result.duration_seconds}s)")
         if result.status != "PASS":
             print(result.detail)
-
     source_sha = git_sha()
     previous = load_previous_manifest(args.previous_manifest)
     failed = [r for r in results if r.status != "PASS"]
@@ -371,7 +321,6 @@ def main() -> int:
     decision = "FAIL" if failed or fix_verification["status"] == "FAIL" else "PASS"
     if fix_verification["status"] == "INSUFFICIENT_EVIDENCE":
         decision = "INSUFFICIENT_EVIDENCE"
-
     manifest = {
         "schema": MANIFEST_SCHEMA,
         "assurance_run_id": os.environ.get("AEOS_ASSURANCE_RUN_ID", f"local-{int(time.time())}"),
@@ -382,10 +331,7 @@ def main() -> int:
         "passed": len(results) - len(failed),
         "failed": len(failed),
         "decision": decision,
-        "decision_reasons": [
-            "control_failure" if failed else "all_controls_pass",
-            "fix_regression" if fix_verification["status"] == "FAIL" else "fix_verification_not_failed",
-        ],
+        "decision_reasons": ["control_failure" if failed else "all_controls_pass", "fix_regression" if fix_verification["status"] == "FAIL" else "fix_verification_not_failed"],
         "change_scope": git_scope(git_base_sha(), source_sha),
         "fix_verification": fix_verification,
         "controls": [asdict(r) for r in results],
