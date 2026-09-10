@@ -5,7 +5,6 @@ from tools.aeos_autobot_state_machine import (
     Evidence,
     ResultState,
     Snapshot,
-    State,
     all_passed,
     bounded_recovery_attempt,
     reject_stale,
@@ -14,22 +13,16 @@ from tools.aeos_autobot_state_machine import (
 
 class TestAutobotStateMachine(unittest.TestCase):
     def snapshot(self, iteration="i-1", wave="W0", set_id="S01"):
-        return Snapshot(
-            iteration_id=iteration,
-            source_sha="a" * 40,
-            set_id=set_id,
-            wave_id=wave,
-            command="python -m unittest",
-            cwd=".",
-        )
+        return Snapshot(iteration, "a" * 40, set_id, wave, "python -m unittest", ".")
 
     def evidence(self, state, iteration="i-1", wave="W0", set_id="S01"):
-        return Evidence(self.snapshot(iteration, wave, set_id), state, "e" * 64)
+        snap = self.snapshot(iteration, wave, set_id)
+        return Evidence(snap, state, "e" * 64)
 
     def test_all_passed_requires_nonempty_complete_evidence(self):
-        self.assertTrue(all_passed([self.evidence(ResultState.PASSED)]))
+        self.assertTrue(all_passed([ResultState.PASSED]))
         self.assertFalse(all_passed([]))
-        self.assertFalse(all_passed([self.evidence(ResultState.FAILED)]))
+        self.assertFalse(all_passed([ResultState.FAILED]))
 
     def test_barrier_rejects_running_evidence(self):
         barrier = Barrier("W0", {"S01"})
@@ -50,20 +43,20 @@ class TestAutobotStateMachine(unittest.TestCase):
         barrier = Barrier("W0", {"S01", "S02"})
         barrier.accept(self.evidence(ResultState.PASSED, set_id="S01"))
         self.assertFalse(barrier.complete())
-        self.assertEqual(barrier.decision(), State.HOLD)
+        self.assertEqual(barrier.decision(), ResultState.HOLD)
 
     def test_failed_barrier_is_hold(self):
         barrier = Barrier("W0", {"S01"})
         barrier.accept(self.evidence(ResultState.FAILED))
         self.assertTrue(barrier.complete())
-        self.assertEqual(barrier.decision(), State.HOLD)
+        self.assertEqual(barrier.decision(), ResultState.HOLD)
 
     def test_complete_passed_barrier_is_passed(self):
         barrier = Barrier("W0", {"S01", "S02"})
         barrier.accept(self.evidence(ResultState.PASSED, set_id="S01"))
         barrier.accept(self.evidence(ResultState.PASSED, set_id="S02"))
         self.assertTrue(barrier.complete())
-        self.assertEqual(barrier.decision(), State.NEXT_WAVE)
+        self.assertEqual(barrier.decision(), ResultState.PASSED)
 
     def test_stale_snapshot_is_rejected(self):
         active = self.snapshot(iteration="i-2")
