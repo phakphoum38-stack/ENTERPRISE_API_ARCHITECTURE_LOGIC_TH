@@ -57,7 +57,6 @@ jobs:
           python - <<'PY'
           import ast
           from pathlib import Path
-
           path = Path('tools/aeos_master_assurance.py')
           tree = ast.parse(path.read_text(encoding='utf-8'))
           source = path.read_text(encoding='utf-8')
@@ -95,7 +94,6 @@ jobs:
           import importlib.util
           import sys
           from pathlib import Path
-
           root = Path.cwd().resolve()
           print(f'REPOSITORY_ROOT={root}')
           print(f'PYTHON={sys.executable}')
@@ -169,7 +167,6 @@ jobs:
           import json
           import subprocess
           from pathlib import Path
-
           path = Path('aeos_master_assurance_manifest.json')
           if not path.is_file():
               raise SystemExit('missing_assurance_manifest')
@@ -236,7 +233,6 @@ jobs:
           python - <<'PY'
           import ast
           from pathlib import Path
-
           path = Path('tools/aeos_master_assurance.py')
           tree = ast.parse(path.read_text(encoding='utf-8'))
           source = path.read_text(encoding='utf-8')
@@ -246,6 +242,10 @@ jobs:
               raise SystemExit('missing_control_execution_fail_closed')
           if 'regressions' not in source or 'resolved_failures' not in source:
               raise SystemExit('missing_fix_verification_contract')
+          if 'source_sha_not_ancestor' not in source:
+              raise SystemExit('missing_previous_sha_ancestry_contract')
+          if 'old_manifest_sha256_verified' not in source:
+              raise SystemExit('missing_previous_manifest_provenance_contract')
           print('FAIL_CLOSED_PRIMITIVES=PASS')
           PY
 
@@ -261,10 +261,16 @@ jobs:
 
       - name: Verify manifest provenance and semantic contract
         if: always()
+        env:
+          AEOS_PREVIOUS_MANIFEST: ${{ inputs.previous_manifest || '' }}
         shell: bash
         run: |
           set -euo pipefail
-          python tools/validate_aeos_manifest.py aeos_master_assurance_manifest.json --repo .
+          if [ -n "$AEOS_PREVIOUS_MANIFEST" ]; then
+            python tools/validate_aeos_manifest.py aeos_master_assurance_manifest.json --repo . --previous "$AEOS_PREVIOUS_MANIFEST"
+          else
+            python tools/validate_aeos_manifest.py aeos_master_assurance_manifest.json --repo .
+          fi
 
       - name: Upload assurance evidence bundle
         if: always()
