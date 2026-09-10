@@ -7,7 +7,7 @@
   "forbidden_pass_states": ["UNKNOWN", "STALE", "CONFLICT", "BLOCKED", "QUARANTINED", "SELF_ATTESTED", "REVOKED", "EXPIRED"],
   "checks": [
     {"id":"CI_EXACT_SHA","class":"build","boundary":"owner_special/research_os_friend/aeos_reality_scanner.py"},
-    {"id":"CONTRACT_CONFORMANCE","class":"contract","boundary":"current/AEOS_100X_CONTRACT.json"},
+    {"id":"CONTRACT_CONFORMANCE","class":"contract","boundary":"owner_special/research_os_friend/aeos_contract_conformance.py","required_symbols":["contract_conformance"]},
     {"id":"PROVENANCE_INTEGRITY","class":"proof","boundary":"tools/validate_provenance_evidence.py"},
     {"id":"EVIDENCE_INTEGRITY","class":"proof","boundary":"owner_special/research_os_friend/aeos_evidence_fabric.py"},
     {"id":"INDEPENDENT_VERIFICATION","class":"trust","boundary":"owner_special/research_os_friend/aeos_completion_verifier.py"},
