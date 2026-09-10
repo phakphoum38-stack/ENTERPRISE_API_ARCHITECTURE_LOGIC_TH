@@ -22,7 +22,7 @@ class State(str, Enum):
     VERIFY = "VERIFY"
     NEXT_WAVE = "NEXT_WAVE"
     HOLD = "HOLD"
-    READY_TO_MERGE = "READY_TO_MERGE"
+    READY_FOR_OWNER_AUTHORITY = "READY_FOR_OWNER_AUTHORITY"
 
 
 class ResultState(str, Enum):
@@ -71,11 +71,13 @@ class Barrier:
             raise ValueError("unexpected_set")
         if evidence.result_state in {ResultState.RUNNING, ResultState.QUEUED}:
             raise ValueError("incomplete_evidence")
+        if any(item.snapshot.set_id == evidence.snapshot.set_id for item in self.evidence):
+            raise ValueError("duplicate_set_id")
         self.evidence.append(evidence)
 
     def complete(self) -> bool:
         ids = {item.snapshot.set_id for item in self.evidence}
-        return ids == set(self.required_set_ids)
+        return ids == set(self.required_set_ids) and len(ids) == len(self.evidence)
 
     def decision(self) -> ResultState:
         if not self.complete():
