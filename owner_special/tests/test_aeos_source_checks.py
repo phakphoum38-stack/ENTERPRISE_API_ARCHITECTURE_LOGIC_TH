@@ -22,6 +22,15 @@ class AeosSourceCheckAuditTests(unittest.TestCase):
             if check.get("verification_mode", "source") == "source":
                 self.assertTrue(check.get("boundary"), check["id"])
 
+    def test_contract_conformance_is_executable_source(self):
+        payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+        check = next(item for item in payload["checks"] if item["id"] == "CONTRACT_CONFORMANCE")
+        self.assertEqual(
+            check["boundary"],
+            "owner_special/research_os_friend/aeos_contract_conformance.py",
+        )
+        self.assertEqual(check["required_symbols"], ["contract_conformance"])
+
     def test_source_audit_is_fail_closed(self):
         proc = subprocess.run(
             [sys.executable, str(TOOL)],
@@ -37,6 +46,7 @@ class AeosSourceCheckAuditTests(unittest.TestCase):
         self.assertEqual(report["status"], "FAIL")
         self.assertGreater(len(report["errors"]), 0)
         self.assertGreater(report["checks"], 0)
+        self.assertFalse(any("CONTRACT_CONFORMANCE" in error for error in report["errors"]))
 
 
 if __name__ == "__main__":
