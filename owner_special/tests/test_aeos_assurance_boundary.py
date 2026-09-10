@@ -93,6 +93,7 @@ class AeosAssuranceBoundaryTests(unittest.TestCase):
             evidence_refs=REFS,
         )
         self.assertTrue(observation.verified)
+        self.assertTrue(observation.is_verifier_issued())
         self.assertEqual(observation.baseline_sha, BASELINE)
 
     def test_integrated_boundary_rejects_stale_reality(self) -> None:
