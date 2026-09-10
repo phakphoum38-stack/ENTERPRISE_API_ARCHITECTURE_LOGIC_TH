@@ -1,16 +1,16 @@
 """Independent verification boundary for AEOS completion observations.
 
-The workloop is intentionally a pure state machine.  This module is the
+The workloop is intentionally a pure state machine. This module is the
 separate trust boundary that accepts observations only when they carry an
 exact baseline, a complete ordered scan, and a deterministic evidence digest.
 It does not discover repository state itself; concrete scanners supply the
-observations and their evidence.  That keeps discovery separate from the
+observations and their evidence. That keeps discovery separate from the
 stop-proof projection and prevents a caller from promoting unverified values
 directly to CERTIFIED_IDLE.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 import re
@@ -51,14 +51,29 @@ _REQUIRED_SCANS = (
     "final_rescan",
 )
 
+# Construction is intentionally sealed. A caller must go through
+# verify_completion_observation(), which is the only code path that mints
+# this token. The stop controller checks the private seal rather than a
+# caller-controlled ``verified=True`` field or an exposed factory method.
+_VERIFICATION_SEAL = object()
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, init=False)
 class VerifiedCompletionObservation:
     baseline_sha: str
     scan_order: tuple[str, ...]
     observations: Mapping[str, Any]
     evidence_digest: str
-    verified: bool = True
+    _verification_seal: object = field(repr=False, compare=False)
+
+    @property
+    def verified(self) -> bool:
+        """Compatibility view; truth comes only from the private verifier seal."""
+        return self.is_verifier_issued()
+
+    def is_verifier_issued(self) -> bool:
+        """Return true only for an object minted by this verification boundary."""
+        return getattr(self, "_verification_seal", None) is _VERIFICATION_SEAL
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -87,7 +102,7 @@ def verify_completion_observation(
 
     The function requires the complete contract-defined scan order, an exact
     baseline match, strict scalar types, and at least one evidence reference.
-    Every scan must explicitly report PASS.  No missing or UNKNOWN value is
+    Every scan must explicitly report PASS. No missing or UNKNOWN value is
     coerced into a passing value.
     """
     if not _SHA_RE.fullmatch(baseline_sha) or not _SHA_RE.fullmatch(observed_sha):
@@ -134,9 +149,14 @@ def verify_completion_observation(
         "scan_evidence_refs": {name: list(scans[name]["evidence_refs"]) for name in _REQUIRED_SCANS},
     }
     digest = _canonical_digest(evidence_payload)
-    return VerifiedCompletionObservation(
-        baseline_sha=baseline_sha,
-        scan_order=_REQUIRED_SCANS,
-        observations=dict(observations),
-        evidence_digest=digest,
-    )
+
+    # Minting is deliberately kept inside the verifier function. There is no
+    # public constructor or public factory that callers can invoke to obtain
+    # the verifier-issued seal.
+    instance = object.__new__(VerifiedCompletionObservation)
+    object.__setattr__(instance, "baseline_sha", baseline_sha)
+    object.__setattr__(instance, "scan_order", _REQUIRED_SCANS)
+    object.__setattr__(instance, "observations", dict(observations))
+    object.__setattr__(instance, "evidence_digest", digest)
+    object.__setattr__(instance, "_verification_seal", _VERIFICATION_SEAL)
+    return instance

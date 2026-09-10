@@ -1,8 +1,8 @@
 """Authoritative AEOS stop-proof boundary.
 
-Only a VerifiedCompletionObservation may reach the stop-proof projection.
-This prevents direct caller-supplied counters/flags from being treated as an
-independent completion decision.
+Only a verifier-issued VerifiedCompletionObservation may reach the
+stop-proof projection. This prevents direct caller-supplied counters/flags
+from being treated as an independent completion decision.
 """
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ def build_authoritative_stop_proof(
     observation: VerifiedCompletionObservation,
 ) -> dict[str, Any]:
     """Project a stop proof from an independently verified observation."""
-    if not isinstance(observation, VerifiedCompletionObservation) or not observation.verified:
-        raise TypeError("stop proof requires a verified completion observation")
+    if not isinstance(observation, VerifiedCompletionObservation) or not observation.is_verifier_issued():
+        raise TypeError("stop proof requires a verifier-issued completion observation")
 
     proof = build_stop_proof(**observation.observations)
     proof["observation_schema"] = "research-os-aeos-completion-observation/v1"
