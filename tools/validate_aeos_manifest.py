@@ -14,7 +14,6 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 STATUSES = {"PASS", "FAIL"}
 DECISIONS = {"PASS", "FAIL", "INSUFFICIENT_EVIDENCE"}
-FAILURE_STATUSES = {"FAIL", "ERROR", "STALE", "INSUFFICIENT_EVIDENCE"}
 
 
 def _die(reason: str) -> None:
@@ -34,12 +33,13 @@ def _load(path: Path) -> dict[str, object]:
 def _git_commit_exists(sha: str, repo: Path) -> bool:
     if not SHA_RE.fullmatch(sha):
         return False
-    return subprocess.run(
-        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
-        cwd=repo,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).returncode == 0
+    return subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+def _git_is_ancestor(old_sha: str, new_sha: str, repo: Path) -> bool:
+    if not SHA_RE.fullmatch(old_sha) or not SHA_RE.fullmatch(new_sha):
+        return False
+    return subprocess.run(["git", "merge-base", "--is-ancestor", old_sha, new_sha], cwd=repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
 def _verify_sidecar(manifest: Path) -> str:
@@ -47,15 +47,11 @@ def _verify_sidecar(manifest: Path) -> str:
     if not sidecar.is_file():
         _die(f"missing_manifest_digest:{sidecar}")
     digest = hashlib.sha256(manifest.read_bytes()).hexdigest()
-    matches = False
     for line in sidecar.read_text(encoding="utf-8").splitlines():
         fields = line.split()
         if len(fields) >= 2 and fields[1].lstrip("*") == manifest.name and fields[0] == digest:
-            matches = True
-            break
-    if not matches:
-        _die(f"manifest_digest_mismatch:{manifest}")
-    return digest
+            return digest
+    _die(f"manifest_digest_mismatch:{manifest}")
 
 
 def _validate_control(item: object) -> None:
@@ -144,11 +140,15 @@ def validate_manifest(path: Path, *, repo: Path, require_commit: bool) -> str:
             _die(f"unknown_fix_old_sha:{old_sha}")
         if new_sha != source_sha:
             _die("fix_new_sha_not_bound_to_manifest")
+        if not _git_is_ancestor(old_sha, new_sha, repo):
+            _die("fix_old_sha_not_ancestor_of_new_sha")
         for key in ("regressions", "resolved_failures"):
             if not isinstance(fix.get(key), list) or not all(isinstance(v, str) for v in fix[key]):
                 _die(f"invalid_fix_list:{key}")
         if fix["status"] == "PASS" and fix["regressions"]:
             _die("fix_pass_with_regressions")
+        if fix["status"] == "PASS" and not fix["resolved_failures"]:
+            _die("fix_pass_without_resolved_failures")
     return _verify_sidecar(path)
 
 
@@ -156,15 +156,26 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("manifest")
     parser.add_argument("--repo", default=".")
-    parser.add_argument("--previous", action="store_true", help="Validate as prior evidence; require a resolvable historical commit")
+    parser.add_argument("--previous", default="", help="Validate a separate prior manifest, including its SHA256 sidecar and ancestry")
     args = parser.parse_args()
-    digest = validate_manifest(Path(args.manifest), repo=Path(args.repo).resolve(), require_commit=True)
+    repo = Path(args.repo).resolve()
+    digest = validate_manifest(Path(args.manifest), repo=repo, require_commit=True)
     print(f"MANIFEST_SCHEMA={SCHEMA}")
     print("MANIFEST_SEMANTICS=PASS")
     print("MANIFEST_PROVENANCE_DIGEST=PASS")
     print(f"MANIFEST_SHA256={digest}")
     if args.previous:
+        previous = Path(args.previous)
+        previous_digest = validate_manifest(previous, repo=repo, require_commit=True)
+        current_data = _load(Path(args.manifest))
+        previous_data = _load(previous)
+        current_sha = current_data["source_sha"]
+        previous_sha = previous_data["source_sha"]
+        if not isinstance(current_sha, str) or not isinstance(previous_sha, str) or not _git_is_ancestor(previous_sha, current_sha, repo):
+            _die("previous_manifest_source_sha_not_ancestor_of_current")
         print("PREVIOUS_MANIFEST_PROVENANCE=PASS")
+        print(f"PREVIOUS_MANIFEST_SHA256={previous_digest}")
+        print("PREVIOUS_MANIFEST_ANCESTRY=PASS")
     return 0
 
 
