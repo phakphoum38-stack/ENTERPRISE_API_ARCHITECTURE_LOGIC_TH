@@ -37,6 +37,11 @@ def _sha256_json(value: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _validate_sha(value: str, label: str) -> None:
+    if not isinstance(value, str) or len(value) != 40 or any(c not in "0123456789abcdef" for c in value):
+        raise AssuranceCheckError(f"{label} must be an exact lowercase commit SHA")
+
+
 def validate_registry() -> dict[str, Any]:
     data = _load(REGISTRY)
     if data.get("schema") != "research-os-aeos-assurance-check-registry/v1":
@@ -44,8 +49,7 @@ def validate_registry() -> dict[str, Any]:
     if data.get("policy") != "fail_closed":
         raise AssuranceCheckError("assurance registry must be fail_closed")
     baseline = data.get("baseline_sha")
-    if not isinstance(baseline, str) or len(baseline) != 40 or any(c not in "0123456789abcdef" for c in baseline):
-        raise AssuranceCheckError("invalid registry baseline_sha")
+    _validate_sha(baseline, "registry baseline_sha")
     checks = data.get("checks")
     if type(checks) is not list or not checks:
         raise AssuranceCheckError("assurance registry must contain checks")
@@ -73,12 +77,15 @@ def validate_registry() -> dict[str, Any]:
     return {"check_count": len(checks), "registry_sha256": _sha256_json(data), "baseline_sha": baseline}
 
 
-def validate_report(report: Mapping[str, Any], registry: Mapping[str, Any]) -> dict[str, Any]:
+def validate_report(report: Mapping[str, Any], registry: Mapping[str, Any], expected_sha: str | None = None) -> dict[str, Any]:
     if report.get("baseline_sha") != registry.get("baseline_sha"):
         raise AssuranceCheckError("report baseline does not match registry baseline")
     report_head = report.get("observed_sha")
-    if not isinstance(report_head, str) or len(report_head) != 40 or any(c not in "0123456789abcdef" for c in report_head):
-        raise AssuranceCheckError("report observed_sha must be an exact lowercase commit SHA")
+    _validate_sha(report_head, "report observed_sha")
+    if expected_sha is not None:
+        _validate_sha(expected_sha, "expected_sha")
+        if report_head != expected_sha:
+            raise AssuranceCheckError("report observed_sha does not match expected exact head SHA")
     checks = report.get("checks")
     if type(checks) is not dict:
         raise AssuranceCheckError("report checks must be a mapping")
@@ -118,16 +125,22 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", type=Path)
     parser.add_argument("--registry-only", action="store_true")
+    parser.add_argument("--expected-sha")
     args = parser.parse_args()
     registry_summary = validate_registry()
     if args.registry_only:
+        if args.expected_sha is not None:
+            _validate_sha(args.expected_sha, "expected_sha")
+            actual = _git_head()
+            if actual != args.expected_sha:
+                raise AssuranceCheckError("working tree HEAD does not match expected exact head SHA")
         print(json.dumps({"registry": registry_summary, "status": "PASS"}, sort_keys=True))
         return 0
     if args.report is None:
         raise AssuranceCheckError("--report is required unless --registry-only is used")
     report = _load(args.report)
     registry = _load(REGISTRY)
-    report_summary = validate_report(report, registry)
+    report_summary = validate_report(report, registry, args.expected_sha)
     print(json.dumps({"registry": registry_summary, "report": report_summary, "status": "PASS"}, sort_keys=True))
     return 0
 
@@ -135,6 +148,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (AssuranceCheckError, OSError, json.JSONDecodeError) as exc:
+    except (AssuranceCheckError, OSError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
         print(json.dumps({"status": "FAIL", "error": str(exc)}, sort_keys=True))
         raise SystemExit(1)
