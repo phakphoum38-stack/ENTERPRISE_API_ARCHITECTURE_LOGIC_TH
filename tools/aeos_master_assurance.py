@@ -216,16 +216,24 @@ def discover_controls() -> list[tuple[str, str, list[str], Path]]:
     v3_test_dir = ROOT / "v3" / "tests"
     v3_package_dir = ROOT / "v3"
     if v3_test_dir.is_dir() and (v3_package_dir / "research_os_v3").is_dir():
-        # V3 is a self-contained Python package rooted at v3/. Running discovery
-        # from repository root hides research_os_v3 from sys.path and creates a
-        # false infrastructure failure. Execute the existing suite from its
-        # package root instead of weakening or modifying the V3 tests.
+        # V3 tests use both import forms: v3.<module> and research_os_v3.<module>.
+        # The repository root is required for the namespace package `v3`, while
+        # v3/ itself is required for the package-local `research_os_v3` imports.
+        # Keep the existing V3 tests unchanged and bind both source roots explicitly
+        # inside the assurance subprocess.
+        v3_runner = (
+            "import sys; from pathlib import Path; "
+            "root=Path.cwd(); sys.path[:0]=[str(root), str(root/'v3')]; "
+            "import unittest; "
+            "suite=unittest.defaultTestLoader.discover('v3/tests', pattern='test_*.py'); "
+            "raise SystemExit(not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful())"
+        )
         controls.append(
             (
                 "V3_REGRESSION",
                 "integration",
-                [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"],
-                v3_package_dir,
+                [sys.executable, "-c", v3_runner],
+                ROOT,
             )
         )
 
