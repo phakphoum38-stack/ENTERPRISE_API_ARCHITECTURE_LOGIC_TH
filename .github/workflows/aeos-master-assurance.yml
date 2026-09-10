@@ -7,6 +7,12 @@ on:
       - 'feat/aeos-*'
       - 'fix/aeos-*'
   workflow_dispatch:
+    inputs:
+      previous_manifest:
+        description: 'Path to a prior AEOS assurance manifest for explicit fix verification'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -65,7 +71,16 @@ jobs:
           git diff --name-status "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA"
 
       - name: Run AEOS master assurance controls
-        run: python tools/aeos_master_assurance.py --output aeos_master_assurance_manifest.json
+        env:
+          AEOS_PREVIOUS_MANIFEST: ${{ inputs.previous_manifest || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$AEOS_PREVIOUS_MANIFEST" ]; then
+            python tools/aeos_master_assurance.py --output aeos_master_assurance_manifest.json --previous-manifest "$AEOS_PREVIOUS_MANIFEST"
+          else
+            python tools/aeos_master_assurance.py --output aeos_master_assurance_manifest.json
+          fi
 
       - name: Verify assurance manifest integrity
         shell: bash
@@ -79,7 +94,7 @@ jobs:
           path = Path('aeos_master_assurance_manifest.json')
           data = json.loads(path.read_text(encoding='utf-8'))
           actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-          required = ('schema', 'assurance_run_id', 'source_sha', 'timestamp_utc', 'control_count', 'passed', 'failed', 'decision', 'controls')
+          required = ('schema', 'assurance_run_id', 'source_sha', 'timestamp_utc', 'control_count', 'passed', 'failed', 'decision', 'decision_reasons', 'change_scope', 'fix_verification', 'controls')
           missing = [key for key in required if key not in data]
           if missing:
               raise SystemExit(f'missing_manifest_fields:{missing}')
@@ -90,12 +105,18 @@ jobs:
           if data['passed'] + data['failed'] != data['control_count']:
               raise SystemExit('manifest_result_count_mismatch')
           expected = 'FAIL' if data['failed'] else 'PASS'
+          if data['fix_verification']['status'] == 'INSUFFICIENT_EVIDENCE':
+              expected = 'INSUFFICIENT_EVIDENCE'
+          if data['fix_verification']['status'] == 'FAIL':
+              expected = 'FAIL'
           if data['decision'] != expected:
               raise SystemExit(f'manifest_decision_mismatch:{data["decision"]}:{expected}')
           print('MANIFEST_INTEGRITY=PASS')
           print(f'CONTROL_COUNT={data["control_count"]}')
           print(f'PASSED={data["passed"]}')
           print(f'FAILED={data["failed"]}')
+          print(f'DECISION={data["decision"]}')
+          print(f'FIX_VERIFICATION={data["fix_verification"]["status"]}')
           PY
 
       - name: Generate provenance digest
