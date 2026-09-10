@@ -1,14 +1,18 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "platform": "AEOS_AUTOBOT_PLATFORM",
   "purpose": "One orchestrator for up to 100 independent assurance sets with barriered execution, evidence binding, bounded recovery, and authority firewall.",
   "constitutional_rules": [
     "RUNNING is never PASS or FAIL.",
-    "No wave advances until every required control reaches a terminal state.",
+    "No wave advances until every canonical required control reaches a terminal state.",
     "Evidence must bind to iteration, wave, source SHA, command, and result.",
     "Stale or mismatched evidence is rejected and creates HOLD.",
     "Autobot may repair and re-verify but may not self-authorize merge.",
     "PowerShell is an execution backend; authority remains bounded by policy.",
+    "The assurance set registry is canonical for set identity, lifecycle, and wave placement.",
+    "The execution set registry is a derived projection and may not invent, rename, move, or activate a canonical set.",
+    "Every canonical IMPLEMENTED set is required; a missing execution projection creates HOLD.",
+    "Global runtime, scope, changed-file, and risk limits are enforced at execution time.",
     "Master aggregation does not self-certify independent review."
   ],
   "terminal_states": [
@@ -31,6 +35,7 @@
     "FORENSIC",
     "INDEPENDENT_REVIEW"
   ],
+  "canonical_wave_ids": ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7"],
   "autobot_states": [
     "OBSERVE",
     "DIAGNOSE",
@@ -43,12 +48,13 @@
     "NEXT_WAVE",
     "HOLD",
     "AUTHORITY_PACKET",
-    "READY_TO_MERGE"
+    "READY_FOR_OWNER_AUTHORITY"
   ],
   "limits": {
     "max_iterations": 20,
     "max_runtime_seconds": 3600,
     "max_changed_files": 100,
+    "max_scope": 100,
     "max_risk_level": 4,
     "max_sets": 100
   },
