@@ -1,0 +1,118 @@
+name: AEOS Master Assurance
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'feat/aeos-*'
+      - 'fix/aeos-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aeos-master-assurance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  master-assurance:
+    name: AEOS 10000x Master Assurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AEOS_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      AEOS_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+      AEOS_ASSURANCE_RUN_ID: aeos-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Verify exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$AEOS_EXPECTED_SHA"
+          echo "SOURCE_SHA=$actual"
+
+      - name: Verify protected canonical boundary
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --name-only "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA" | grep -E '(^|/)canonical-source-lineage-gate\.yml$' >/dev/null; then
+            echo 'Protected canonical workflow was modified.' >&2
+            exit 1
+          fi
+          echo 'CANONICAL_344_IMMUTABLE=PASS'
+
+      - name: Inspect change scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --stat "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA"
+          echo '--- changed files ---'
+          git diff --name-status "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA"
+
+      - name: Run AEOS master assurance controls
+        run: python tools/aeos_master_assurance.py --output aeos_master_assurance_manifest.json
+
+      - name: Verify assurance manifest integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import subprocess
+
+          path = Path('aeos_master_assurance_manifest.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          required = ('schema', 'assurance_run_id', 'source_sha', 'timestamp_utc', 'control_count', 'passed', 'failed', 'decision', 'controls')
+          missing = [key for key in required if key not in data]
+          if missing:
+              raise SystemExit(f'missing_manifest_fields:{missing}')
+          if data['source_sha'] != actual:
+              raise SystemExit(f'manifest_sha_mismatch:{data["source_sha"]}:{actual}')
+          if data['control_count'] != len(data['controls']):
+              raise SystemExit('manifest_control_count_mismatch')
+          if data['passed'] + data['failed'] != data['control_count']:
+              raise SystemExit('manifest_result_count_mismatch')
+          expected = 'FAIL' if data['failed'] else 'PASS'
+          if data['decision'] != expected:
+              raise SystemExit(f'manifest_decision_mismatch:{data["decision"]}:{expected}')
+          print('MANIFEST_INTEGRITY=PASS')
+          print(f'CONTROL_COUNT={data["control_count"]}')
+          print(f'PASSED={data["passed"]}')
+          print(f'FAILED={data["failed"]}')
+          PY
+
+      - name: Generate provenance digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum aeos_master_assurance_manifest.json > aeos_master_assurance_manifest.json.sha256
+          sha256sum tools/aeos_master_assurance.py .github/workflows/aeos-master-assurance.yml >> aeos_master_assurance_manifest.json.sha256
+          cat aeos_master_assurance_manifest.json.sha256
+
+      - name: Upload assurance evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: aeos-master-assurance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            aeos_master_assurance_manifest.json
+            aeos_master_assurance_manifest.json.sha256
+          if-no-files-found: error
+          retention-days: 30
