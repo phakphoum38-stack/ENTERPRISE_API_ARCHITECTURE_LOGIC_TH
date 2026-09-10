@@ -29,7 +29,9 @@
     "constitutional_firewall": "owner_special/research_os_friend/aeos_constitutional_firewall.py",
     "temporal_freshness": "owner_special/research_os_friend/aeos_temporal_freshness.py",
     "anti_circularity": "owner_special/research_os_friend/aeos_anti_circularity.py",
-    "negative_space": "owner_special/research_os_friend/aeos_negative_space.py"
+    "negative_space": "owner_special/research_os_friend/aeos_negative_space.py",
+    "negative_space_scanner": "owner_special/research_os_friend/aeos_negative_space_scanner.py",
+    "assurance_boundary": "owner_special/research_os_friend/aeos_assurance_boundary.py"
   },
   "certificate_chain": ["OBSERVATION_CERTIFICATE", "VERIFICATION_CERTIFICATE", "ASSURANCE_CERTIFICATE", "INTEGRATION_CERTIFICATE", "MAIN_STATE_CERTIFICATE", "COMPLETION_CERTIFICATE"],
   "reality_rule": "DECLARED -> OBSERVED -> EVIDENCE_BOUND -> INDEPENDENTLY_VERIFIED -> ASSURED -> CERTIFIED",
