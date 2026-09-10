@@ -1,0 +1,42 @@
+name: AEOS Assurance Check Fabric
+
+on:
+  pull_request:
+    paths:
+      - 'current/AEOS_100X_CONTRACT.json'
+      - 'current/AEOS_ASSURANCE_CHECK_REGISTRY.json'
+      - 'owner_special/research_os_friend/aeos_*.py'
+      - 'owner_special/tests/test_aeos_*.py'
+      - 'tools/validate_aeos_assurance_checks.py'
+      - '.github/workflows/aeos-assurance-check-fabric.yml'
+  push:
+    branches:
+      - main
+      - 'feat/aeos-*'
+
+permissions:
+  contents: read
+
+jobs:
+  assurance-registry:
+    name: AEOS Assurance Registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Validate exact SHA and assurance universe
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python tools/validate_aeos_assurance_checks.py --registry-only --expected-sha "$EXPECTED_SHA"
+
+      - name: Validate assurance regression boundary
+        run: python -m unittest owner_special.tests.test_aeos_assurance_check_fabric -v
