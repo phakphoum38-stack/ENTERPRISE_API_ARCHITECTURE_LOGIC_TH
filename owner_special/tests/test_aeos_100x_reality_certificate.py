@@ -16,6 +16,10 @@ from owner_special.research_os_friend.aeos_reality_boundary import (
     RealityObservationError,
     bind_reality_observation,
 )
+from owner_special.research_os_friend.aeos_runtime_certificate import (
+    RuntimeCertificateError,
+    certify_runtime_result,
+)
 
 
 BASELINE = "a" * 40
@@ -129,6 +133,38 @@ class Aeos100xRealityCertificateTests(unittest.TestCase):
                 payload={"status": "VERIFIED"},
                 previous_certificate=first,
                 verification_proof=VERIFICATION_PROOF,
+            )
+
+    def test_runtime_certificate_requires_external_verification_proof(self) -> None:
+        certificate = certify_runtime_result(
+            certificate_id="runtime-1",
+            baseline_sha=BASELINE,
+            observed_sha=BASELINE,
+            contract_sha256=CONTRACT,
+            policy_sha256=POLICY,
+            evidence_root="1" * 64,
+            provenance_root=PROVENANCE,
+            test_manifest_sha256="2" * 64,
+            result={"status": "PASS"},
+            evidence_refs=REFS,
+            verification_proof=VERIFICATION_PROOF,
+        )
+        self.assertEqual(certificate.verification_proof, VERIFICATION_PROOF)
+
+    def test_runtime_certificate_rejects_boolean_self_attestation(self) -> None:
+        with self.assertRaises((RuntimeCertificateError, TypeError)):
+            certify_runtime_result(
+                certificate_id="runtime-2",
+                baseline_sha=BASELINE,
+                observed_sha=BASELINE,
+                contract_sha256=CONTRACT,
+                policy_sha256=POLICY,
+                evidence_root="1" * 64,
+                provenance_root=PROVENANCE,
+                test_manifest_sha256="2" * 64,
+                result={"status": "PASS"},
+                evidence_refs=REFS,
+                verification_proof=True,  # type: ignore[arg-type]
             )
 
     def test_constitutional_mutation_requires_governance_proof(self) -> None:
