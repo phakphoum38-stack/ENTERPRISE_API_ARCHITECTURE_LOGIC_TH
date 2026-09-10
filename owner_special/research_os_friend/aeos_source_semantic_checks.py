@@ -1,9 +1,4 @@
-"""Source-level semantic checks for AEOS assurance boundaries.
-
-Checks inspect executable source structure rather than caller-supplied observation
-booleans. Where a capability is not actually implemented, the check returns
-False so the validator emits SOURCE_GAP instead of fabricating PASS.
-"""
+"""Source-level semantic checks for AEOS assurance boundaries."""
 from __future__ import annotations
 
 import ast
@@ -93,11 +88,7 @@ def identity_continuity() -> bool:
 
 
 def delegation_chain() -> bool:
-    return _semantic(
-        "tools/validate_identity_authority.py",
-        symbols=("scope_subset", "validate"),
-        constructs=("delegation_scope_escalation", "self_delegation", "inactive_delegator", "unknown_delegatee", "valid_until"),
-    )
+    return _semantic("tools/validate_identity_authority.py", symbols=("scope_subset", "validate"), constructs=("delegation_scope_escalation", "self_delegation", "inactive_delegator", "unknown_delegatee", "valid_until"))
 
 
 def confused_deputy() -> bool:
@@ -109,7 +100,7 @@ def capability_boundary() -> bool:
 
 
 def policy_monotonicity() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_authority_risk.py", constructs=("policy", "deny", "risk"))
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("PolicySnapshot", "policy_monotonicity"), constructs=("version + 1", "issubset", "deny_rules"))
 
 
 def agent_loop_safety() -> bool:
@@ -129,9 +120,7 @@ def instruction_boundary() -> bool:
 
 
 def model_version_drift() -> bool:
-    # Temporal freshness is not model-version drift; keep this explicit gap
-    # until a real version-drift implementation exists.
-    return False
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("ModelVersion", "detect_model_version_drift", "model_version_drift"), constructs=("expected != observed", "provider", "model", "version"))
 
 
 def distributed_lock() -> bool:
@@ -143,11 +132,11 @@ def no_evidence_as_authority() -> bool:
 
 
 def no_merge_as_repair() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_authority_risk.py", constructs=("merge", "repair", "authority"))
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("no_merge_as_repair",), constructs=("unresolved_failures", "repair_in_progress", "merge_requested"))
 
 
 def no_self_merge() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_authority_risk.py", constructs=("merge", "authority", "self"))
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("no_self_merge",), constructs=("actor != source_owner", "merge identities"))
 
 
 def evidence_coverage() -> bool:
@@ -155,54 +144,55 @@ def evidence_coverage() -> bool:
 
 
 def evidence_tamper() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_evidence_fabric.py", constructs=("sha256", "digest", "tamper"))
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("evidence_tamper",), constructs=("original_digest == observed_digest", "len(observed_digest) == 64"))
 
 
 def evidence_conflict() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_evidence_fabric.py", constructs=("conflict", "evidence"))
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("evidence_conflict",), constructs=("len(set(digests)) > 1", "len(digests) > 0"))
 
 
 def evidence_revocation() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_evidence_fabric.py", constructs=("revok", "evidence"))
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("evidence_revocation",), constructs=("type(revoked) is bool", "return", "revoked"))
 
 
 def audit_chain_integrity() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_evidence_fabric.py", constructs=("audit", "sha256", "digest"))
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("AuditEntry", "audit_chain_integrity"), constructs=("previous_digest", "compute_digest", "entry.sequence != expected_sequence"))
 
 
 def audit_completeness() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_evidence_fabric.py", constructs=("audit", "evidence"))
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("audit_completeness",), constructs=("required_sequences", "actual == list(required_sequences)", "audit_chain_integrity"))
 
 
 def assurance_coverage() -> bool:
-    return _semantic(
-        "owner_special/research_os_friend/aeos_assurance_check_fabric.py",
-        symbols=("validate_registry", "validate_report"),
-        constructs=("required = [item[\"id\"] for item in registry[\"checks\"]]", "set(checks) != set(required)"),
-    )
+    return _semantic("owner_special/research_os_friend/aeos_assurance_check_fabric.py", symbols=("validate_registry", "validate_report"), constructs=("required = [item[\"id\"] for item in registry[\"checks\"]]", "set(checks) != set(required)"))
 
 
 def blind_spot_discovery() -> bool:
-    return _semantic(
-        "owner_special/research_os_friend/aeos_negative_space_scanner.py",
-        symbols=("InventoryItem", "scan_observed_inventory"),
-        constructs=("unknown inventory kind", "forbidden_states", "scan_negative_space"),
-    )
+    return _semantic("owner_special/research_os_friend/aeos_negative_space_scanner.py", symbols=("InventoryItem", "scan_observed_inventory"), constructs=("unknown inventory kind", "forbidden_states", "scan_negative_space"))
 
 
-# Explicitly unsupported until real executable compatibility/migration
-# implementations exist. These must remain SOURCE_GAP, never synthetic PASS.
-def semantic_compatibility() -> bool: return False
+def semantic_compatibility() -> bool:
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("SchemaProfile", "semantic_compatibility"), constructs=("new.version < old.version", "new.fields[name] != old_type", "new.defaults"))
+
+
 def version_monotonicity() -> bool:
-    return _semantic(
-        "owner_special/research_os_friend/self_learning/provenance.py",
-        symbols=("SkillProvenanceLedger",),
-        constructs=("previous.version + 1", "parent_version != previous.version", "provenance versions must be contiguous"),
-    )
-def backward_compatibility() -> bool: return False
-def forward_compatibility() -> bool: return False
-def migration_safety() -> bool: return False
-def rollback_migration() -> bool: return False
+    return _semantic("owner_special/research_os_friend/self_learning/provenance.py", symbols=("SkillProvenanceLedger",), constructs=("previous.version + 1", "parent_version != previous.version", "provenance versions must be contiguous"))
+
+
+def backward_compatibility() -> bool:
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("SchemaProfile", "backward_compatibility"), constructs=("return semantic_compatibility(old, new)",))
+
+
+def forward_compatibility() -> bool:
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("SchemaProfile", "forward_compatibility"), constructs=("name in old.fields or name in new.defaults",))
+
+
+def migration_safety() -> bool:
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("MigrationPlan", "migration_safety"), constructs=("target_version <= source_version", "preconditions", "postconditions", "reversible"))
+
+
+def rollback_migration() -> bool:
+    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("MigrationPlan", "rollback_migration"), constructs=("observed_version == plan.target_version", "observed_digest == plan.target_digest", "rollback_target == plan.source_version"))
 
 
 _CHECKS = {name for name, value in globals().items() if callable(value) and not name.startswith("_") and name not in {"Iterable", "Path"}}
