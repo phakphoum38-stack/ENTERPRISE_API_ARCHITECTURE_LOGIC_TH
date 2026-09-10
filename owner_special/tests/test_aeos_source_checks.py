@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "tools" / "validate_aeos_source_checks.py"
 REGISTRY = ROOT / "current" / "AEOS_ASSURANCE_CHECK_REGISTRY.json"
+EXTENDED = ROOT / "owner_special" / "research_os_friend" / "aeos_extended_assurance_checks.py"
 
 
 class AeosSourceCheckAuditTests(unittest.TestCase):
@@ -14,14 +15,13 @@ class AeosSourceCheckAuditTests(unittest.TestCase):
         payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
         self.assertEqual(payload["policy"], "fail_closed")
         checks = payload["checks"]
-        self.assertTrue(checks)
+        self.assertEqual(len(checks), 83)
+        self.assertEqual(len({check["id"] for check in checks}), 83)
         for check in checks:
             self.assertIn("id", check)
             mode = check.get("verification_mode", "source")
             if mode == "source":
-                boundary = check.get("boundary")
-                if boundary is not None:
-                    self.assertTrue(boundary, check["id"])
+                self.assertTrue(check.get("boundary"), check["id"])
             elif mode == "external_evidence":
                 self.assertIsNone(check.get("boundary"), check["id"])
             else:
@@ -36,7 +36,18 @@ class AeosSourceCheckAuditTests(unittest.TestCase):
         )
         self.assertEqual(check["required_symbols"], ["contract_conformance"])
 
-    def test_source_audit_is_fail_closed(self):
+    def test_extended_checks_have_registered_executable_symbols(self):
+        payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+        module_path = "owner_special/research_os_friend/aeos_extended_assurance_checks.py"
+        checks = [item for item in payload["checks"] if item.get("boundary") == module_path]
+        self.assertEqual(len(checks), 40)
+        source = EXTENDED.read_text(encoding="utf-8")
+        for check in checks:
+            symbols = check.get("required_symbols")
+            self.assertEqual(len(symbols), 1, check["id"])
+            self.assertIn(f"def {symbols[0]}(", source, check["id"])
+
+    def test_source_audit_is_clean(self):
         proc = subprocess.run(
             [sys.executable, str(TOOL)],
             cwd=ROOT,
@@ -45,13 +56,12 @@ class AeosSourceCheckAuditTests(unittest.TestCase):
             check=False,
         )
         report = json.loads(proc.stdout.strip().splitlines()[-1])
-        # The registry still contains assurance items without executable
-        # source-level boundaries; those remain certification blockers.
-        self.assertEqual(proc.returncode, 1)
-        self.assertEqual(report["status"], "FAIL")
-        self.assertGreater(len(report["errors"]), 0)
-        self.assertGreater(report["checks"], 0)
-        self.assertFalse(any("CONTRACT_CONFORMANCE" in error for error in report["errors"]))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["checks"], 83)
+        self.assertEqual(report["executable_source_checks"], 83)
+        self.assertEqual(report["external_evidence_checks"], 0)
+        self.assertEqual(report["errors"], [])
 
 
 if __name__ == "__main__":
