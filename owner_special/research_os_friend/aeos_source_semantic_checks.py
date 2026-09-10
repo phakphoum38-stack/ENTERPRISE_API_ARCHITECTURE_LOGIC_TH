@@ -93,7 +93,11 @@ def identity_continuity() -> bool:
 
 
 def delegation_chain() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_authority_risk.py", constructs=("delegat", "evidence", "policy"))
+    return _semantic(
+        "tools/validate_identity_authority.py",
+        symbols=("scope_subset", "validate"),
+        constructs=("delegation_scope_escalation", "self_delegation", "inactive_delegator", "unknown_delegatee", "valid_until"),
+    )
 
 
 def confused_deputy() -> bool:
@@ -171,8 +175,6 @@ def audit_completeness() -> bool:
 
 
 def assurance_coverage() -> bool:
-    # Coverage is implemented by registry validation + exact report-universe
-    # validation. Avoid brittle literal-token matching such as "ordered".
     return _semantic(
         "owner_special/research_os_friend/aeos_assurance_check_fabric.py",
         symbols=("validate_registry", "validate_report"),
@@ -181,8 +183,6 @@ def assurance_coverage() -> bool:
 
 
 def blind_spot_discovery() -> bool:
-    # The concrete adapter derives negative-space counts from an observed
-    # inventory and rejects unknown kinds; this is the executable boundary.
     return _semantic(
         "owner_special/research_os_friend/aeos_negative_space_scanner.py",
         symbols=("InventoryItem", "scan_observed_inventory"),
@@ -193,7 +193,12 @@ def blind_spot_discovery() -> bool:
 # Explicitly unsupported until real executable compatibility/migration
 # implementations exist. These must remain SOURCE_GAP, never synthetic PASS.
 def semantic_compatibility() -> bool: return False
-def version_monotonicity() -> bool: return False
+def version_monotonicity() -> bool:
+    return _semantic(
+        "owner_special/research_os_friend/self_learning/provenance.py",
+        symbols=("SkillProvenanceLedger",),
+        constructs=("previous.version + 1", "parent_version != previous.version", "provenance versions must be contiguous"),
+    )
 def backward_compatibility() -> bool: return False
 def forward_compatibility() -> bool: return False
 def migration_safety() -> bool: return False
