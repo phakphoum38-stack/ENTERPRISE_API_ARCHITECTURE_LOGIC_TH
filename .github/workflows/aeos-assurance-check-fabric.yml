@@ -39,4 +39,4 @@ jobs:
         run: python tools/validate_aeos_assurance_checks.py --registry-only --expected-sha "$EXPECTED_SHA"
 
       - name: Validate assurance regression boundary
-        run: python -m unittest owner_special.tests.test_aeos_assurance_check_fabric -v
+        run: python -m unittest owner_special.tests.test_aeos_assurance_check_fabric owner_special.tests.test_aeos_extended_assurance_checks -v
