@@ -52,9 +52,9 @@ _REQUIRED_SCANS = (
 )
 
 # Construction is intentionally sealed. A caller must go through
-# verify_completion_observation(), which is the only code path that can mint
-# this token. The stop controller checks the token rather than trusting a
-# caller-controlled ``verified=True`` field.
+# verify_completion_observation(), which is the only code path that mints
+# this token. The stop controller checks the private seal rather than a
+# caller-controlled ``verified=True`` field or an exposed factory method.
 _VERIFICATION_SEAL = object()
 
 
@@ -65,23 +65,6 @@ class VerifiedCompletionObservation:
     observations: Mapping[str, Any]
     evidence_digest: str
     _verification_seal: object = field(repr=False, compare=False)
-
-    @classmethod
-    def _from_verified_data(
-        cls,
-        *,
-        baseline_sha: str,
-        scan_order: tuple[str, ...],
-        observations: Mapping[str, Any],
-        evidence_digest: str,
-    ) -> "VerifiedCompletionObservation":
-        instance = object.__new__(cls)
-        object.__setattr__(instance, "baseline_sha", baseline_sha)
-        object.__setattr__(instance, "scan_order", scan_order)
-        object.__setattr__(instance, "observations", observations)
-        object.__setattr__(instance, "evidence_digest", evidence_digest)
-        object.__setattr__(instance, "_verification_seal", _VERIFICATION_SEAL)
-        return instance
 
     def is_verifier_issued(self) -> bool:
         """Return true only for an object minted by this verification boundary."""
@@ -161,9 +144,14 @@ def verify_completion_observation(
         "scan_evidence_refs": {name: list(scans[name]["evidence_refs"]) for name in _REQUIRED_SCANS},
     }
     digest = _canonical_digest(evidence_payload)
-    return VerifiedCompletionObservation._from_verified_data(
-        baseline_sha=baseline_sha,
-        scan_order=_REQUIRED_SCANS,
-        observations=dict(observations),
-        evidence_digest=digest,
-    )
+
+    # Minting is deliberately kept inside the verifier function. There is no
+    # public constructor or public factory that callers can invoke to obtain
+    # the verifier-issued seal.
+    instance = object.__new__(VerifiedCompletionObservation)
+    object.__setattr__(instance, "baseline_sha", baseline_sha)
+    object.__setattr__(instance, "scan_order", _REQUIRED_SCANS)
+    object.__setattr__(instance, "observations", dict(observations))
+    object.__setattr__(instance, "evidence_digest", digest)
+    object.__setattr__(instance, "_verification_seal", _VERIFICATION_SEAL)
+    return instance
