@@ -49,8 +49,26 @@ def run_control(
 ) -> ControlResult:
     started = time.monotonic()
     cwd = control_cwd or ROOT
+    env = None
+    if control_id == "V3_REGRESSION":
+        # V3 tests intentionally use both import forms: v3.<module> and
+        # research_os_v3.<module>. Running with cwd=v3 supplies the latter,
+        # but removes the repository root from sys.path and breaks the former.
+        # Bind both roots explicitly in the subprocess instead of changing tests.
+        env = os.environ.copy()
+        pythonpath = [str(ROOT), str(cwd)]
+        existing = env.get("PYTHONPATH", "").strip()
+        if existing:
+            pythonpath.append(existing)
+        env["PYTHONPATH"] = os.pathsep.join(pythonpath)
     try:
-        proc = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
+        proc = subprocess.run(
+            command,
+            cwd=cwd,
+            env=env,
+            text=True,
+            capture_output=True,
+        )
         returncode = proc.returncode
         output = (proc.stdout + "\n" + proc.stderr).strip()
     except Exception as exc:  # fail closed: a control that cannot execute is not PASS
@@ -216,24 +234,15 @@ def discover_controls() -> list[tuple[str, str, list[str], Path]]:
     v3_test_dir = ROOT / "v3" / "tests"
     v3_package_dir = ROOT / "v3"
     if v3_test_dir.is_dir() and (v3_package_dir / "research_os_v3").is_dir():
-        # V3 tests use both import forms: v3.<module> and research_os_v3.<module>.
-        # The repository root is required for the namespace package `v3`, while
-        # v3/ itself is required for the package-local `research_os_v3` imports.
-        # Keep the existing V3 tests unchanged and bind both source roots explicitly
-        # inside the assurance subprocess.
-        v3_runner = (
-            "import sys; from pathlib import Path; "
-            "root=Path.cwd(); sys.path[:0]=[str(root), str(root/'v3')]; "
-            "import unittest; "
-            "suite=unittest.defaultTestLoader.discover('v3/tests', pattern='test_*.py'); "
-            "raise SystemExit(not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful())"
-        )
+        # Keep the established V3 execution boundary: tests run from v3/ with
+        # -s tests. run_control supplies both repository-root and v3 import roots
+        # so tests importing v3.* and research_os_v3.* both resolve correctly.
         controls.append(
             (
                 "V3_REGRESSION",
                 "integration",
-                [sys.executable, "-c", v3_runner],
-                ROOT,
+                [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"],
+                v3_package_dir,
             )
         )
 
