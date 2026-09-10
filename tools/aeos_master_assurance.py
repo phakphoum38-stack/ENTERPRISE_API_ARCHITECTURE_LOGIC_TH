@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -19,6 +20,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FAILURE_STATUSES = {"FAIL", "ERROR", "STALE", "INSUFFICIENT_EVIDENCE"}
+MANIFEST_SCHEMA = "AEOS_MASTER_ASSURANCE_V2"
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 @dataclass
@@ -35,10 +38,30 @@ class ControlResult:
     failure_signature: str | None = None
 
 
-def failure_signature(control_id: str, detail: str) -> str:
+def _normalize_failure_detail(detail: str) -> str:
+    """Remove volatile execution metadata while preserving failure semantics."""
     normalized = " ".join(detail.split())
-    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+    normalized = re.sub(r"\baeos-[0-9]+-[0-9]+\b", "<run-id>", normalized)
+    normalized = re.sub(r"\b[0-9a-f]{40}\b", "<sha>", normalized)
+    normalized = re.sub(r"\b[0-9a-f]{64}\b", "<digest>", normalized)
+    normalized = re.sub(r"\b(?:duration|elapsed|time)[=:][0-9.]+s?\b", r"\1=<time>", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"(?<!\w)(?:line|lineno)[=:][0-9]+", "line=<number>", normalized, flags=re.IGNORECASE)
+    return normalized
+
+
+def failure_signature(control_id: str, class_name: str, command: list[str], detail: str) -> str:
+    """Create a stable recurrence identity independent of volatile run metadata."""
+    command_identity = " ".join(command)
+    semantic_detail = _normalize_failure_detail(detail)
+    payload = "|".join((control_id, class_name, command_identity, semantic_detail))
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
     return f"{control_id}:{digest}"
+
+
+def failure_event_id(control_id: str, returncode: int, detail: str) -> str:
+    """Create an exact evidence identity for this particular failure event."""
+    payload = f"{control_id}|{returncode}|{detail}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def run_control(
@@ -77,9 +100,7 @@ def run_control(
     duration = round(time.monotonic() - started, 3)
     detail = output[-4000:] if output else ""
     status = "PASS" if returncode == 0 else "FAIL"
-    evidence_id = hashlib.sha256(
-        f"{control_id}|{returncode}|{detail}".encode("utf-8")
-    ).hexdigest()
+    evidence_id = failure_event_id(control_id, returncode, detail)
     return ControlResult(
         control_id=control_id,
         class_name=class_name,
@@ -90,7 +111,7 @@ def run_control(
         duration_seconds=duration,
         detail=detail,
         evidence_id=evidence_id,
-        failure_signature=failure_signature(control_id, detail) if status != "PASS" else None,
+        failure_signature=(failure_signature(control_id, class_name, command, detail) if status != "PASS" else None),
     )
 
 
@@ -102,6 +123,22 @@ def git_sha() -> str:
 
 def git_base_sha() -> str:
     return os.environ.get("AEOS_BASE_SHA", "").strip()
+
+
+def git_sha_exists(sha: str) -> bool:
+    if not SHA_RE.fullmatch(sha):
+        return False
+    try:
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+            cwd=ROOT,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 
 def git_scope(base_sha: str, source_sha: str) -> dict[str, object]:
@@ -130,15 +167,67 @@ def git_scope(base_sha: str, source_sha: str) -> dict[str, object]:
         }
 
 
+def _validate_previous_control(item: object) -> bool:
+    if not isinstance(item, dict):
+        return False
+    required = ("control_id", "class_name", "status", "command", "cwd", "returncode", "evidence_id")
+    if any(key not in item for key in required):
+        return False
+    if not isinstance(item["control_id"], str) or not item["control_id"]:
+        return False
+    if not isinstance(item["class_name"], str) or not item["class_name"]:
+        return False
+    if item["status"] not in {"PASS", "FAIL"}:
+        return False
+    if not isinstance(item["command"], list) or not item["command"] or not all(isinstance(v, str) for v in item["command"]):
+        return False
+    if not isinstance(item["cwd"], str):
+        return False
+    if not isinstance(item["returncode"], int):
+        return False
+    if not isinstance(item["evidence_id"], str) or not re.fullmatch(r"[0-9a-f]{64}", item["evidence_id"]):
+        return False
+    if item["status"] != "PASS" and not item.get("failure_signature"):
+        return False
+    return True
+
+
 def load_previous_manifest(path: str) -> dict[str, object] | None:
     if not path:
         return None
     candidate = Path(path)
     if not candidate.is_file():
         raise SystemExit(f"missing_previous_manifest:{path}")
-    data = json.loads(candidate.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or "controls" not in data or "source_sha" not in data:
-        raise SystemExit("invalid_previous_manifest")
+    try:
+        data = json.loads(candidate.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"invalid_previous_manifest:{type(exc).__name__}") from exc
+    if not isinstance(data, dict):
+        raise SystemExit("invalid_previous_manifest:object_required")
+    if data.get("schema") != MANIFEST_SCHEMA:
+        raise SystemExit(f"invalid_previous_manifest:schema:{data.get('schema')}")
+    old_sha = data.get("source_sha")
+    if not isinstance(old_sha, str) or not SHA_RE.fullmatch(old_sha):
+        raise SystemExit("invalid_previous_manifest:source_sha")
+    if old_sha == git_sha():
+        raise SystemExit("invalid_previous_manifest:source_sha_is_current")
+    if not git_sha_exists(old_sha):
+        raise SystemExit(f"invalid_previous_manifest:unknown_source_sha:{old_sha}")
+    controls = data.get("controls")
+    if not isinstance(controls, list) or not controls:
+        raise SystemExit("invalid_previous_manifest:controls")
+    if data.get("control_count") != len(controls):
+        raise SystemExit("invalid_previous_manifest:control_count")
+    if len({item.get("control_id") for item in controls if isinstance(item, dict)}) != len(controls):
+        raise SystemExit("invalid_previous_manifest:duplicate_control_id")
+    if any(not _validate_previous_control(item) for item in controls):
+        raise SystemExit("invalid_previous_manifest:control_record")
+    if data.get("decision") not in {"PASS", "FAIL", "INSUFFICIENT_EVIDENCE"}:
+        raise SystemExit("invalid_previous_manifest:decision")
+    passed = data.get("passed")
+    failed = data.get("failed")
+    if not isinstance(passed, int) or not isinstance(failed, int) or passed + failed != len(controls):
+        raise SystemExit("invalid_previous_manifest:result_counts")
     return data
 
 
@@ -155,12 +244,10 @@ def verify_fix(current: list[ControlResult], previous: dict[str, object] | None)
 
     old_sha = str(previous["source_sha"])
     new_sha = git_sha()
-    old_controls = previous.get("controls", [])
-    if not isinstance(old_controls, list):
-        return {"status": "INSUFFICIENT_EVIDENCE", "mode": "previous_manifest", "old_sha": old_sha, "new_sha": new_sha, "regressions": [], "resolved_failures": []}
-
+    old_controls = previous["controls"]
+    assert isinstance(old_controls, list)
     old_failures = {
-        str(item.get("failure_signature"))
+        str(item["failure_signature"])
         for item in old_controls
         if isinstance(item, dict) and item.get("status") in FAILURE_STATUSES and item.get("failure_signature")
     }
@@ -286,7 +373,7 @@ def main() -> int:
         decision = "INSUFFICIENT_EVIDENCE"
 
     manifest = {
-        "schema": "AEOS_MASTER_ASSURANCE_V2",
+        "schema": MANIFEST_SCHEMA,
         "assurance_run_id": os.environ.get("AEOS_ASSURANCE_RUN_ID", f"local-{int(time.time())}"),
         "source_sha": source_sha,
         "base_sha": git_base_sha() or None,
