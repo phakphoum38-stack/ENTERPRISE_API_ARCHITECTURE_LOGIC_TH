@@ -27,6 +27,7 @@ class ControlResult:
     class_name: str
     status: str
     command: list[str]
+    cwd: str
     returncode: int
     duration_seconds: float
     detail: str = ""
@@ -40,10 +41,16 @@ def failure_signature(control_id: str, detail: str) -> str:
     return f"{control_id}:{digest}"
 
 
-def run_control(control_id: str, class_name: str, command: list[str]) -> ControlResult:
+def run_control(
+    control_id: str,
+    class_name: str,
+    command: list[str],
+    control_cwd: Path | None = None,
+) -> ControlResult:
     started = time.monotonic()
+    cwd = control_cwd or ROOT
     try:
-        proc = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
+        proc = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
         returncode = proc.returncode
         output = (proc.stdout + "\n" + proc.stderr).strip()
     except Exception as exc:  # fail closed: a control that cannot execute is not PASS
@@ -60,6 +67,7 @@ def run_control(control_id: str, class_name: str, command: list[str]) -> Control
         class_name=class_name,
         status=status,
         command=command,
+        cwd=str(cwd.relative_to(ROOT)),
         returncode=returncode,
         duration_seconds=duration,
         detail=detail,
@@ -157,8 +165,8 @@ def verify_fix(current: list[ControlResult], previous: dict[str, object] | None)
     }
 
 
-def discover_controls() -> list[tuple[str, str, list[str]]]:
-    controls: list[tuple[str, str, list[str]]] = []
+def discover_controls() -> list[tuple[str, str, list[str], Path]]:
+    controls: list[tuple[str, str, list[str], Path]] = []
 
     expected = os.environ.get("AEOS_EXPECTED_SHA", "").strip()
     if expected:
@@ -167,6 +175,7 @@ def discover_controls() -> list[tuple[str, str, list[str]]]:
                 "IDENTITY_SHA",
                 "identity",
                 [sys.executable, "-c", f"import subprocess; actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); expected={expected!r}; print(actual); assert actual == expected, f'expected {{expected}}, got {{actual}}'"],
+                ROOT,
             )
         )
 
@@ -177,6 +186,7 @@ def discover_controls() -> list[tuple[str, str, list[str]]]:
                 "PYTHON_COMPILE",
                 "static",
                 [sys.executable, "-m", "compileall", "-q", *(str(p.relative_to(ROOT)) for p in compile_paths)],
+                ROOT,
             )
         )
 
@@ -190,7 +200,7 @@ def discover_controls() -> list[tuple[str, str, list[str]]]:
             args = [sys.executable, str(path.relative_to(ROOT))]
             if path.name == "validate_aeos_assurance_checks.py":
                 args.append("--registry-only")
-            controls.append((path.stem.upper(), "validator", args))
+            controls.append((path.stem.upper(), "validator", args, ROOT))
 
     test_dir = ROOT / "owner_special" / "tests"
     if test_dir.is_dir():
@@ -199,16 +209,23 @@ def discover_controls() -> list[tuple[str, str, list[str]]]:
                 "AEOS_REGRESSION",
                 "behavioral",
                 [sys.executable, "-m", "unittest", "discover", "-s", str(test_dir.relative_to(ROOT)), "-p", "test_aeos_*.py", "-v"],
+                ROOT,
             )
         )
 
     v3_test_dir = ROOT / "v3" / "tests"
-    if v3_test_dir.is_dir():
+    v3_package_dir = ROOT / "v3"
+    if v3_test_dir.is_dir() and (v3_package_dir / "research_os_v3").is_dir():
+        # V3 is a self-contained Python package rooted at v3/. Running discovery
+        # from repository root hides research_os_v3 from sys.path and creates a
+        # false infrastructure failure. Execute the existing suite from its
+        # package root instead of weakening or modifying the V3 tests.
         controls.append(
             (
                 "V3_REGRESSION",
                 "integration",
-                [sys.executable, "-m", "unittest", "discover", "-s", "v3/tests", "-p", "test_*.py", "-v"],
+                [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"],
+                v3_package_dir,
             )
         )
 
@@ -230,8 +247,8 @@ def main() -> int:
     # Controls are independent: one failure must not cancel or suppress the others.
     with ThreadPoolExecutor(max_workers=len(controls)) as executor:
         futures = {
-            executor.submit(run_control, control_id, class_name, command): control_id
-            for control_id, class_name, command in controls
+            executor.submit(run_control, control_id, class_name, command, control_cwd): control_id
+            for control_id, class_name, command, control_cwd in controls
         }
         for future in as_completed(futures):
             result = future.result()
