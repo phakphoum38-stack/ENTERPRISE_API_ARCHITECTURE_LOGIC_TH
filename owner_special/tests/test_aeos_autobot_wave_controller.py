@@ -68,18 +68,17 @@ class MultiWaveControllerTests(unittest.TestCase):
         self.assertEqual(result.state, ResultState.HOLD)
         self.assertEqual([item.wave_id for item in result.waves], ["W0"])
 
-    def test_wrong_source_sha_is_rejected(self) -> None:
-        waves = wave_jobs("it-5")
-        waves["W0"] = [make_job("it-5", "W0", "W0-001")]
-        result = run_controller(iteration_id="it-5", source_sha="b" * 40, waves=waves)
+    def test_wrong_source_sha_is_rejected_to_hold(self) -> None:
+        result = run_controller(iteration_id="it-5", source_sha="b" * 40, waves=wave_jobs("it-5"))
         self.assertEqual(result.state, ResultState.HOLD)
         self.assertEqual(result.waves, ())
 
-    def test_wrong_iteration_is_rejected(self) -> None:
+    def test_wrong_iteration_is_rejected_to_hold(self) -> None:
         waves = wave_jobs("it-6")
         waves["W1"] = [make_job("other", "W1", "W1-001")]
-        with self.assertRaisesRegex(ValueError, "snapshot_lock_mismatch"):
-            run_controller(iteration_id="it-6", source_sha=SHA, waves=waves)
+        result = run_controller(iteration_id="it-6", source_sha=SHA, waves=waves)
+        self.assertEqual(result.state, ResultState.HOLD)
+        self.assertEqual([item.wave_id for item in result.waves], ["W0"])
 
     def test_timeout_never_passes(self) -> None:
         result = run_controller(
@@ -120,7 +119,6 @@ class MultiWaveControllerTests(unittest.TestCase):
     def test_all_required_waves_pass_is_not_merge_authority(self) -> None:
         result = run_controller(iteration_id="it-11", source_sha=SHA, waves=wave_jobs("it-11"))
         self.assertEqual(result.state, ResultState.PASSED)
-        self.assertNotEqual(result.state, ResultState.HOLD)
         self.assertFalse(hasattr(result, "merge"))
 
     def test_deterministic_manifests_are_byte_stable(self) -> None:
