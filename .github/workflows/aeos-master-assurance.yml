@@ -50,6 +50,65 @@ jobs:
           test "$actual" = "$AEOS_EXPECTED_SHA"
           echo "SOURCE_SHA=$actual"
 
+      - name: Verify master orchestrator execution contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('tools/aeos_master_assurance.py')
+          tree = ast.parse(path.read_text(encoding='utf-8'))
+          source = path.read_text(encoding='utf-8')
+          functions = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+          control_result = next((n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == 'ControlResult'), None)
+          required_fields = {'control_id', 'class_name', 'status', 'command', 'cwd', 'returncode', 'duration_seconds', 'evidence_id'}
+          if control_result is None:
+              raise SystemExit('missing_ControlResult')
+          fields = {n.target.id for n in control_result.body if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)}
+          missing_fields = sorted(required_fields - fields)
+          if missing_fields:
+              raise SystemExit(f'missing_control_result_fields:{missing_fields}')
+          run_control = functions.get('run_control')
+          if run_control is None:
+              raise SystemExit('missing_run_control')
+          args = {a.arg for a in run_control.args.args}
+          if 'control_cwd' not in args:
+              raise SystemExit('missing_control_cwd_contract')
+          if 'cwd=control_cwd' not in source and 'cwd=cwd' not in source:
+              raise SystemExit('missing_subprocess_cwd_binding')
+          if 'failure_signature' not in source:
+              raise SystemExit('missing_failure_signature_contract')
+          if 'ThreadPoolExecutor' not in source:
+              raise SystemExit('missing_independent_control_execution')
+          if 'V3_REGRESSION' in source and '"-s", "tests"' not in source:
+              raise SystemExit('v3_execution_boundary_contract_missing')
+          print('ORCHESTRATOR_CONTRACT=PASS')
+          PY
+
+      - name: Verify execution environment boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import importlib.util
+          import sys
+          from pathlib import Path
+
+          root = Path.cwd().resolve()
+          print(f'REPOSITORY_ROOT={root}')
+          print(f'PYTHON={sys.executable}')
+          print(f'PYTHON_VERSION={sys.version.split()[0]}')
+          if (root / 'v3' / 'research_os_v3').is_dir():
+              v3 = root / 'v3'
+              sys.path.insert(0, str(v3))
+              if importlib.util.find_spec('research_os_v3') is None:
+                  raise SystemExit('v3_package_not_importable_from_v3_boundary')
+              print(f'V3_PACKAGE_BOUNDARY={v3}')
+          print('EXECUTION_BOUNDARIES=PASS')
+          PY
+
       - name: Verify protected canonical boundary
         if: github.event_name == 'pull_request'
         shell: bash
@@ -70,6 +129,13 @@ jobs:
           echo '--- changed files ---'
           git diff --name-status "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA"
 
+      - name: Record pre-control source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AEOS_EXPECTED_SHA"
+          echo "PRE_CONTROL_SHA=$(git rev-parse HEAD)"
+
       - name: Run AEOS master assurance controls
         env:
           AEOS_PREVIOUS_MANIFEST: ${{ inputs.previous_manifest || '' }}
@@ -82,26 +148,61 @@ jobs:
             python tools/aeos_master_assurance.py --output aeos_master_assurance_manifest.json
           fi
 
-      - name: Verify assurance manifest integrity
+      - name: Verify post-control source identity
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          if [ "$actual" != "$AEOS_EXPECTED_SHA" ]; then
+            echo "Source changed during assurance: expected=$AEOS_EXPECTED_SHA actual=$actual" >&2
+            exit 1
+          fi
+          echo "POST_CONTROL_SHA=$actual"
+
+      - name: Verify assurance manifest integrity and control completeness
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
-          from pathlib import Path
           import subprocess
+          from pathlib import Path
 
           path = Path('aeos_master_assurance_manifest.json')
+          if not path.is_file():
+              raise SystemExit('missing_assurance_manifest')
           data = json.loads(path.read_text(encoding='utf-8'))
           actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
           required = ('schema', 'assurance_run_id', 'source_sha', 'timestamp_utc', 'control_count', 'passed', 'failed', 'decision', 'decision_reasons', 'change_scope', 'fix_verification', 'controls')
           missing = [key for key in required if key not in data]
           if missing:
               raise SystemExit(f'missing_manifest_fields:{missing}')
+          if data['schema'] != 'AEOS_MASTER_ASSURANCE_V2':
+              raise SystemExit(f'unsupported_manifest_schema:{data["schema"]}')
           if data['source_sha'] != actual:
               raise SystemExit(f'manifest_sha_mismatch:{data["source_sha"]}:{actual}')
-          if data['control_count'] != len(data['controls']):
+          controls = data['controls']
+          if not isinstance(controls, list):
+              raise SystemExit('controls_not_list')
+          if data['control_count'] != len(controls):
               raise SystemExit('manifest_control_count_mismatch')
+          ids = [item.get('control_id') for item in controls if isinstance(item, dict)]
+          if len(ids) != len(set(ids)):
+              raise SystemExit('duplicate_control_id')
+          control_fields = ('control_id', 'class_name', 'status', 'command', 'cwd', 'returncode', 'duration_seconds', 'evidence_id')
+          for item in controls:
+              if not isinstance(item, dict):
+                  raise SystemExit('invalid_control_record')
+              missing_fields = [key for key in control_fields if key not in item]
+              if missing_fields:
+                  raise SystemExit(f'missing_control_fields:{item.get("control_id")}:{missing_fields}')
+              if not item['command']:
+                  raise SystemExit(f'empty_control_command:{item["control_id"]}')
+              cwd = Path(item['cwd']) if item['cwd'] else Path('.')
+              if not (Path.cwd() / cwd).is_dir():
+                  raise SystemExit(f'missing_control_cwd:{item["control_id"]}:{item["cwd"]}')
           if data['passed'] + data['failed'] != data['control_count']:
               raise SystemExit('manifest_result_count_mismatch')
           expected = 'FAIL' if data['failed'] else 'PASS'
@@ -112,6 +213,7 @@ jobs:
           if data['decision'] != expected:
               raise SystemExit(f'manifest_decision_mismatch:{data["decision"]}:{expected}')
           print('MANIFEST_INTEGRITY=PASS')
+          print('CONTROL_COMPLETENESS=PASS')
           print(f'CONTROL_COUNT={data["control_count"]}')
           print(f'PASSED={data["passed"]}')
           print(f'FAILED={data["failed"]}')
@@ -119,10 +221,33 @@ jobs:
           print(f'FIX_VERIFICATION={data["fix_verification"]["status"]}')
           PY
 
-      - name: Generate provenance digest
+      - name: Verify fail-closed primitives
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('tools/aeos_master_assurance.py')
+          tree = ast.parse(path.read_text(encoding='utf-8'))
+          source = path.read_text(encoding='utf-8')
+          if 'return 1 if decision != "PASS" else 0' not in source:
+              raise SystemExit('missing_non_pass_exit_contract')
+          if 'control_execution_error:' not in source:
+              raise SystemExit('missing_control_execution_fail_closed')
+          if 'regressions' not in source or 'resolved_failures' not in source:
+              raise SystemExit('missing_fix_verification_contract')
+          print('FAIL_CLOSED_PRIMITIVES=PASS')
+          PY
+
+      - name: Generate provenance digest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AEOS_EXPECTED_SHA"
           sha256sum aeos_master_assurance_manifest.json > aeos_master_assurance_manifest.json.sha256
           sha256sum tools/aeos_master_assurance.py .github/workflows/aeos-master-assurance.yml >> aeos_master_assurance_manifest.json.sha256
           cat aeos_master_assurance_manifest.json.sha256
