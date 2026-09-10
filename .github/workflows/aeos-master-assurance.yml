@@ -203,6 +203,12 @@ jobs:
               cwd = Path(item['cwd']) if item['cwd'] else Path('.')
               if not (Path.cwd() / cwd).is_dir():
                   raise SystemExit(f'missing_control_cwd:{item["control_id"]}:{item["cwd"]}')
+              if item['status'] == 'PASS' and item['returncode'] != 0:
+                  raise SystemExit(f'pass_returncode_mismatch:{item["control_id"]}')
+              if item['status'] != 'PASS' and item['returncode'] == 0:
+                  raise SystemExit(f'failure_returncode_mismatch:{item["control_id"]}')
+              if not isinstance(item['evidence_id'], str) or len(item['evidence_id']) != 64:
+                  raise SystemExit(f'invalid_evidence_id:{item["control_id"]}')
           if data['passed'] + data['failed'] != data['control_count']:
               raise SystemExit('manifest_result_count_mismatch')
           expected = 'FAIL' if data['failed'] else 'PASS'
@@ -214,6 +220,7 @@ jobs:
               raise SystemExit(f'manifest_decision_mismatch:{data["decision"]}:{expected}')
           print('MANIFEST_INTEGRITY=PASS')
           print('CONTROL_COMPLETENESS=PASS')
+          print('MANIFEST_SEMANTIC_INVARIANTS=PASS')
           print(f'CONTROL_COUNT={data["control_count"]}')
           print(f'PASSED={data["passed"]}')
           print(f'FAILED={data["failed"]}')
@@ -251,6 +258,13 @@ jobs:
           sha256sum aeos_master_assurance_manifest.json > aeos_master_assurance_manifest.json.sha256
           sha256sum tools/aeos_master_assurance.py .github/workflows/aeos-master-assurance.yml >> aeos_master_assurance_manifest.json.sha256
           cat aeos_master_assurance_manifest.json.sha256
+
+      - name: Verify manifest provenance and semantic contract
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/validate_aeos_manifest.py aeos_master_assurance_manifest.json --repo .
 
       - name: Upload assurance evidence bundle
         if: always()
