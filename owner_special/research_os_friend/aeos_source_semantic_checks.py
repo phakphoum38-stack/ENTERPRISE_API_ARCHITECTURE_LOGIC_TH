@@ -35,6 +35,30 @@ def _semantic(relative: str, *, symbols: Iterable[str] = (), constructs: Iterabl
     return set(symbols).issubset(_names(_tree(relative))) and all(token in source for token in constructs)
 
 
+def _has_attribute_comparison(
+    tree: ast.AST,
+    *,
+    left_attribute: str,
+    operator: type[ast.cmpop],
+    right_attribute: str,
+) -> bool:
+    """Find an attribute-to-attribute comparison without depending on source formatting."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare) or len(node.ops) != 1 or len(node.comparators) != 1:
+            continue
+        left = node.left
+        right = node.comparators[0]
+        if (
+            isinstance(node.ops[0], operator)
+            and isinstance(left, ast.Attribute)
+            and isinstance(right, ast.Attribute)
+            and left.attr == left_attribute
+            and right.attr == right_attribute
+        ):
+            return True
+    return False
+
+
 def dependency_integrity() -> bool:
     return _semantic("owner_special/research_os_friend/aeos_durable_work_graph.py", symbols=("WorkGraph", "WorkItem"), constructs=("_assert_acyclic", "dependency cycle", "self dependency"))
 
@@ -188,7 +212,18 @@ def forward_compatibility() -> bool:
 
 
 def migration_safety() -> bool:
-    return _semantic("owner_special/research_os_friend/aeos_integrity_boundaries.py", symbols=("MigrationPlan", "migration_safety"), constructs=("target_version <= source_version", "preconditions", "postconditions", "reversible"))
+    relative = "owner_special/research_os_friend/aeos_integrity_boundaries.py"
+    tree = _tree(relative)
+    return (
+        {"MigrationPlan", "migration_safety"}.issubset(_names(tree))
+        and _has_attribute_comparison(
+            tree,
+            left_attribute="target_version",
+            operator=ast.LtE,
+            right_attribute="source_version",
+        )
+        and all(token in _source(relative) for token in ("preconditions", "postconditions", "reversible"))
+    )
 
 
 def rollback_migration() -> bool:
