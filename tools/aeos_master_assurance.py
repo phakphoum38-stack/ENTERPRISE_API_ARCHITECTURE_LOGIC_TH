@@ -45,7 +45,7 @@ def _normalize_failure_detail(detail: str) -> str:
     normalized = re.sub(r"\baeos-[0-9]+-[0-9]+\b", "<run-id>", normalized)
     normalized = re.sub(r"\b[0-9a-f]{40}\b", "<sha>", normalized)
     normalized = re.sub(r"\b[0-9a-f]{64}\b", "<digest>", normalized)
-    normalized = re.sub(r"\b(?:duration|elapsed|time)[=:][0-9.]+s?\b", r"\1=<time>", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\b(?:duration|elapsed|time)[=:][0-9.]+s?\b", lambda match: f"{match.group(0).split('=')[0].split(':')[0]}=<time>", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"(?<!\w)(?:line|lineno)[=:][0-9]+", "line=<number>", normalized, flags=re.IGNORECASE)
     return normalized
 
@@ -75,9 +75,6 @@ def run_control(
     cwd = control_cwd or ROOT
     env = None
     if control_id == "V3_REGRESSION":
-        # V3 tests intentionally use both import forms: v3.<module> and
-        # research_os_v3.<module>. Running with cwd=v3 supplies the latter,
-        # but removes the repository root from sys.path and breaks the former.
         env = os.environ.copy()
         pythonpath = [str(ROOT), str(cwd)]
         existing = env.get("PYTHONPATH", "").strip()
@@ -85,13 +82,7 @@ def run_control(
             pythonpath.append(existing)
         env["PYTHONPATH"] = os.pathsep.join(pythonpath)
     try:
-        proc = subprocess.run(
-            command,
-            cwd=cwd,
-            env=env,
-            text=True,
-            capture_output=True,
-        )
+        proc = subprocess.run(command, cwd=cwd, env=env, text=True, capture_output=True)
         returncode = proc.returncode
         output = (proc.stdout + "\n" + proc.stderr).strip()
     except Exception as exc:
@@ -126,23 +117,13 @@ def git_base_sha() -> str:
 def git_sha_exists(sha: str) -> bool:
     if not SHA_RE.fullmatch(sha):
         return False
-    return subprocess.run(
-        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
-        cwd=ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).returncode == 0
+    return subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
 def git_is_ancestor(old_sha: str, new_sha: str) -> bool:
     if not SHA_RE.fullmatch(old_sha) or not SHA_RE.fullmatch(new_sha):
         return False
-    return subprocess.run(
-        ["git", "merge-base", "--is-ancestor", old_sha, new_sha],
-        cwd=ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).returncode == 0
+    return subprocess.run(["git", "merge-base", "--is-ancestor", old_sha, new_sha], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
 def git_scope(base_sha: str, source_sha: str) -> dict[str, object]:
@@ -230,7 +211,6 @@ def load_previous_manifest(path: str) -> dict[str, object] | None:
 def verify_fix(current: list[ControlResult], previous: dict[str, object] | None) -> dict[str, object]:
     if previous is None:
         return {"status": "NOT_REQUESTED", "mode": "none", "old_sha": None, "new_sha": git_sha(), "regressions": [], "resolved_failures": []}
-
     old_sha = str(previous["source_sha"])
     new_sha = git_sha()
     old_controls = previous["controls"]
