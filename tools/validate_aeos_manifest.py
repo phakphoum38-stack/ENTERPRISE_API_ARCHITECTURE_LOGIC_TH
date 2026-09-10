@@ -42,6 +42,12 @@ def _git_is_ancestor(old_sha: str, new_sha: str, repo: Path) -> bool:
     return subprocess.run(["git", "merge-base", "--is-ancestor", old_sha, new_sha], cwd=repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
+def _failure_event_id(control_id: str, returncode: int, detail: str) -> str:
+    """Recompute the exact event identity claimed by a control record."""
+    payload = f"{control_id}|{returncode}|{detail}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _verify_sidecar(manifest: Path) -> str:
     sidecar = Path(str(manifest) + ".sha256")
     if not sidecar.is_file():
@@ -57,7 +63,7 @@ def _verify_sidecar(manifest: Path) -> str:
 def _validate_control(item: object) -> None:
     if not isinstance(item, dict):
         _die("invalid_control_record")
-    required = ("control_id", "class_name", "status", "command", "cwd", "returncode", "duration_seconds", "evidence_id")
+    required = ("control_id", "class_name", "status", "command", "cwd", "returncode", "duration_seconds", "detail", "evidence_id")
     missing = [key for key in required if key not in item]
     if missing:
         _die(f"missing_control_fields:{missing}")
@@ -71,8 +77,15 @@ def _validate_control(item: object) -> None:
         _die(f"invalid_control_cwd:{item['control_id']}")
     if not isinstance(item["returncode"], int):
         _die(f"invalid_control_returncode:{item['control_id']}")
+    if not isinstance(item["duration_seconds"], (int, float)):
+        _die(f"invalid_control_duration:{item['control_id']}")
+    if not isinstance(item["detail"], str):
+        _die(f"invalid_control_detail:{item['control_id']}")
     if not isinstance(item["evidence_id"], str) or not DIGEST_RE.fullmatch(item["evidence_id"]):
         _die(f"invalid_evidence_id:{item['control_id']}")
+    expected_evidence_id = _failure_event_id(item["control_id"], item["returncode"], item["detail"])
+    if item["evidence_id"] != expected_evidence_id:
+        _die(f"evidence_id_mismatch:{item['control_id']}")
     if item["status"] == "PASS" and item["returncode"] != 0:
         _die(f"pass_returncode_mismatch:{item['control_id']}")
     if item["status"] != "PASS":
