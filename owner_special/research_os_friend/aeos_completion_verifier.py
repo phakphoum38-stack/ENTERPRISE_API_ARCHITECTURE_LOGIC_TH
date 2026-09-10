@@ -66,14 +66,19 @@ class VerifiedCompletionObservation:
     evidence_digest: str
     _verification_seal: object = field(repr=False, compare=False)
 
+    @property
+    def verified(self) -> bool:
+        """Compatibility view; truth comes only from the private verifier seal."""
+        return self.is_verifier_issued()
+
     def is_verifier_issued(self) -> bool:
         """Return true only for an object minted by this verification boundary."""
-        return self._verification_seal is _VERIFICATION_SEAL
+        return getattr(self, "_verification_seal", None) is _VERIFICATION_SEAL
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "schema": "research-os-aeos-completion-observation/v1",
-            "verified": True,
+            "verified": self.verified,
             "baseline_sha": self.baseline_sha,
             "scan_order": list(self.scan_order),
             "observations": dict(self.observations),
