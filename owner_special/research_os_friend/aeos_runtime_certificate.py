@@ -2,7 +2,9 @@
 
 A runtime result is not a certificate merely because its JSON shape is valid.
 This module binds the result to the exact baseline, contract, policy, evidence,
-and provenance supplied by an independent verifier.
+and provenance supplied by an independent verifier. The verification proof is
+an externally produced artifact; a caller-supplied boolean is never accepted
+as evidence of independent verification.
 """
 from __future__ import annotations
 
@@ -26,7 +28,7 @@ def _sha(value: str, *, length: int) -> None:
 
 
 def _digest(value: Mapping[str, Any]) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -41,21 +43,22 @@ class RuntimeCertificate:
     test_manifest_sha256: str
     result_digest: str
     evidence_refs: tuple[str, ...]
-    independently_verified: bool = True
+    verification_proof: str
 
     def __post_init__(self) -> None:
-        if not self.certificate_id or not isinstance(self.certificate_id, str):
+        if not isinstance(self.certificate_id, str) or not self.certificate_id:
             raise RuntimeCertificateError("certificate_id required")
         _sha(self.baseline_sha, length=_GIT_SHA)
         for value in (self.contract_sha256, self.policy_sha256, self.evidence_root,
-                      self.provenance_root, self.test_manifest_sha256, self.result_digest):
+                      self.provenance_root, self.test_manifest_sha256, self.result_digest,
+                      self.verification_proof):
             _sha(value, length=_SHA256_HEX)
         if not isinstance(self.evidence_refs, tuple) or not self.evidence_refs:
             raise RuntimeCertificateError("evidence_refs required")
-        if any(not isinstance(ref, str) or not ref for ref in self.evidence_refs):
+        if len(set(self.evidence_refs)) != len(self.evidence_refs):
+            raise RuntimeCertificateError("duplicate evidence reference")
+        if any(not isinstance(ref, str) or not ref.strip() for ref in self.evidence_refs):
             raise RuntimeCertificateError("invalid evidence reference")
-        if type(self.independently_verified) is not bool or not self.independently_verified:
-            raise RuntimeCertificateError("certificate requires independent verification")
 
 
 def certify_runtime_result(
@@ -70,23 +73,28 @@ def certify_runtime_result(
     test_manifest_sha256: str,
     result: Mapping[str, Any],
     evidence_refs: tuple[str, ...],
-    independently_verified: bool,
+    verification_proof: str,
 ) -> RuntimeCertificate:
     """Bind a runtime result to immutable identity/proof inputs.
 
-    The function performs no repository, CI, or authority lookup. Callers must
-    obtain those observations from an independent verification boundary first.
+    ``verification_proof`` must be issued by the independent verification
+    boundary. This function deliberately does not accept a boolean such as
+    ``independently_verified=True`` because that would let the subject attest
+    to its own trust status.
     """
     _sha(baseline_sha, length=_GIT_SHA)
     _sha(observed_sha, length=_GIT_SHA)
     if observed_sha != baseline_sha:
         raise RuntimeCertificateError("runtime result is stale")
-    if type(independently_verified) is not bool or not independently_verified:
-        raise RuntimeCertificateError("runtime result is not independently verified")
+    _sha(verification_proof, length=_SHA256_HEX)
     for value in (contract_sha256, policy_sha256, evidence_root, provenance_root, test_manifest_sha256):
         _sha(value, length=_SHA256_HEX)
     if not isinstance(result, Mapping) or not result:
         raise RuntimeCertificateError("runtime result required")
+    if type(evidence_refs) is not tuple or not evidence_refs:
+        raise RuntimeCertificateError("evidence_refs required")
+    if len(set(evidence_refs)) != len(evidence_refs) or any(not isinstance(ref, str) or not ref.strip() for ref in evidence_refs):
+        raise RuntimeCertificateError("invalid evidence references")
     result_digest = _digest(result)
     return RuntimeCertificate(
         certificate_id=certificate_id,
@@ -97,6 +105,6 @@ def certify_runtime_result(
         provenance_root=provenance_root,
         test_manifest_sha256=test_manifest_sha256,
         result_digest=result_digest,
-        evidence_refs=tuple(evidence_refs),
-        independently_verified=True,
+        evidence_refs=evidence_refs,
+        verification_proof=verification_proof,
     )
