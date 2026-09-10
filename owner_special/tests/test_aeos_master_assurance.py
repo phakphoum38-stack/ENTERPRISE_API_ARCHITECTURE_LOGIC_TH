@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.aeos_master_assurance import ControlResult, failure_signature, verify_fix
+from tools.aeos_master_assurance import ControlResult, failure_event_id, failure_signature, verify_fix
 from tools.validate_aeos_manifest import validate_manifest
 
 
@@ -21,16 +21,17 @@ NEW_SHA = "2" * 40
 
 
 def _result(*, status: str, detail: str = "known_failure") -> ControlResult:
+    returncode = 1 if status != "PASS" else 0
     return ControlResult(
         control_id=CONTROL_ID,
         class_name=CLASS_NAME,
         status=status,
         command=COMMAND,
         cwd=".",
-        returncode=1 if status != "PASS" else 0,
+        returncode=returncode,
         duration_seconds=0.001,
         detail=detail,
-        evidence_id=hashlib.sha256(detail.encode("utf-8")).hexdigest(),
+        evidence_id=failure_event_id(CONTROL_ID, returncode, detail),
         failure_signature=(
             failure_signature(CONTROL_ID, CLASS_NAME, COMMAND, detail)
             if status != "PASS"
@@ -94,9 +95,19 @@ class TestAeosDifferentialAssurance(unittest.TestCase):
         self.assertEqual(result["status"], "INSUFFICIENT_EVIDENCE")
 
 
+class TestAeosEvidenceIdentity(unittest.TestCase):
+    def test_event_id_is_bound_to_exact_payload(self) -> None:
+        detail = "known_failure"
+        expected = hashlib.sha256(f"{CONTROL_ID}|1|{detail}".encode("utf-8")).hexdigest()
+        self.assertEqual(failure_event_id(CONTROL_ID, 1, detail), expected)
+        self.assertNotEqual(failure_event_id(CONTROL_ID, 1, "changed_failure"), expected)
+        self.assertNotEqual(failure_event_id("OTHER_CONTROL", 1, detail), expected)
+
+
 class TestAeosManifestTamperDefense(unittest.TestCase):
     def _manifest(self, directory: Path) -> tuple[Path, Path]:
         manifest = directory / "previous.json"
+        detail = "known_failure"
         payload = {
             "schema": "AEOS_MASTER_ASSURANCE_V2",
             "source_sha": OLD_SHA,
@@ -109,9 +120,9 @@ class TestAeosManifestTamperDefense(unittest.TestCase):
                     "cwd": ".",
                     "returncode": 1,
                     "duration_seconds": 0.001,
-                    "detail": "known_failure",
-                    "evidence_id": hashlib.sha256(b"known_failure").hexdigest(),
-                    "failure_signature": failure_signature(CONTROL_ID, CLASS_NAME, COMMAND, "known_failure"),
+                    "detail": detail,
+                    "evidence_id": failure_event_id(CONTROL_ID, 1, detail),
+                    "failure_signature": failure_signature(CONTROL_ID, CLASS_NAME, COMMAND, detail),
                 }
             ],
             "control_count": 1,
@@ -148,6 +159,21 @@ class TestAeosManifestTamperDefense(unittest.TestCase):
                 ):
                     validate_manifest(manifest, repo=Path(temp), require_commit=True)
             self.assertIn("manifest_digest_mismatch", str(raised.exception))
+
+    def test_tampered_evidence_id_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            manifest, _ = self._manifest(Path(temp))
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload["controls"][0]["evidence_id"] = "0" * 64
+            manifest.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+            digest = hashlib.sha256(manifest.read_bytes()).hexdigest()
+            Path(str(manifest) + ".sha256").write_text(f"{digest}  {manifest.name}\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                with patch("tools.validate_aeos_manifest._git_commit_exists", return_value=True), patch(
+                    "tools.validate_aeos_manifest._git_is_ancestor", return_value=True
+                ):
+                    validate_manifest(manifest, repo=Path(temp), require_commit=True)
+            self.assertIn("evidence_id_mismatch", str(raised.exception))
 
 
 if __name__ == "__main__":
