@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "tools" / "validate_aeos_source_checks.py"
 REGISTRY = ROOT / "current" / "AEOS_ASSURANCE_CHECK_REGISTRY.json"
 EXTENDED = ROOT / "owner_special" / "research_os_friend" / "aeos_extended_assurance_checks.py"
+SEMANTIC = ROOT / "owner_special" / "research_os_friend" / "aeos_source_semantic_checks.py"
 
 
 class AeosSourceCheckAuditTests(unittest.TestCase):
@@ -36,18 +37,25 @@ class AeosSourceCheckAuditTests(unittest.TestCase):
         )
         self.assertEqual(check["required_symbols"], ["contract_conformance"])
 
-    def test_extended_checks_have_registered_executable_symbols(self):
+    def test_extended_observation_wrappers_are_not_certifying_boundaries(self):
         payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
         module_path = "owner_special/research_os_friend/aeos_extended_assurance_checks.py"
         checks = [item for item in payload["checks"] if item.get("boundary") == module_path]
+        self.assertEqual(checks, [])
+        self.assertTrue(EXTENDED.is_file())
+
+    def test_source_semantic_boundary_is_registered(self):
+        payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+        module_path = "owner_special/research_os_friend/aeos_source_semantic_checks.py"
+        checks = [item for item in payload["checks"] if item.get("boundary") == module_path]
         self.assertEqual(len(checks), 40)
-        source = EXTENDED.read_text(encoding="utf-8")
+        source = SEMANTIC.read_text(encoding="utf-8")
         for check in checks:
             symbols = check.get("required_symbols")
             self.assertEqual(len(symbols), 1, check["id"])
             self.assertIn(f"def {symbols[0]}(", source, check["id"])
 
-    def test_source_audit_is_clean(self):
+    def test_source_audit_is_fail_closed_on_semantic_gaps(self):
         proc = subprocess.run(
             [sys.executable, str(TOOL)],
             cwd=ROOT,
@@ -56,12 +64,13 @@ class AeosSourceCheckAuditTests(unittest.TestCase):
             check=False,
         )
         report = json.loads(proc.stdout.strip().splitlines()[-1])
-        self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        self.assertEqual(report["status"], "FAIL")
         self.assertEqual(report["checks"], 83)
         self.assertEqual(report["executable_source_checks"], 83)
         self.assertEqual(report["external_evidence_checks"], 0)
-        self.assertEqual(report["errors"], [])
+        self.assertTrue(any(error.startswith("source_semantic_gap:") for error in report["errors"]))
+        self.assertTrue(any(error.startswith("source_semantic_gap:SEMANTIC_COMPATIBILITY:") for error in report["errors"]))
 
 
 if __name__ == "__main__":
