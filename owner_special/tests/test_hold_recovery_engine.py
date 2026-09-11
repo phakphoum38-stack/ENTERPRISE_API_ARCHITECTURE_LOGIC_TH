@@ -5,6 +5,7 @@ from owner_special.research_os_friend.hold_recovery_engine import (
     Hold,
     HoldClass,
     HoldDisposition,
+    RecoveryAttempt,
     RecoveryEngine,
     RecoveryError,
     RecoveryPlan,
@@ -206,10 +207,6 @@ class HoldRecoveryEngineTests(unittest.TestCase):
     def test_unknown_attempt_cannot_release_even_with_authoritative_pass(self):
         engine = RecoveryEngine()
         hold = make_hold()
-        plan = RecoveryPlan(HOLD, ITER, SHA, HoldClass.UNKNOWN, 1)
-        attempt = engine.execute.__self__ if False else None
-        # Construct the impossible state directly to prove the final gate is defensive.
-        from owner_special.research_os_friend.hold_recovery_engine import RecoveryAttempt
         unknown_attempt = RecoveryAttempt(HOLD, ITER, SHA, 1, HoldClass.UNKNOWN, "PASS", 1, {}, FINGERPRINT)
         self.assertEqual(
             engine.reverify(hold, unknown_attempt, {
@@ -282,7 +279,7 @@ class HoldRecoveryEngineTests(unittest.TestCase):
         self.assertEqual(exhausted.classification, HoldClass.EXHAUSTED_ATTEMPTS)
         with self.assertRaises(RecoveryError):
             engine.execute(exhausted, make_auth(exhausted), lambda _: {"status": "PASS"})
-        self.assertEqual(engine.rejections[-1].reason, "unauthorized_or_never_pass_class")
+        self.assertEqual(engine.rejections[-1].reason, "protected_hold_classification")
 
     def test_attempt_binding_cannot_be_crossed(self):
         engine = RecoveryEngine()
