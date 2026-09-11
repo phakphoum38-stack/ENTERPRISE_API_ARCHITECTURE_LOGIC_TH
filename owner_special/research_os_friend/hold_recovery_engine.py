@@ -230,8 +230,11 @@ class RecoveryEngine:
         authorization: Authorization,
         executor: Callable[[RecoveryPlan], Mapping[str, Any]],
     ) -> RecoveryAttempt:
+        if plan.classification in NEVER_PASS_CLASSES:
+            self._record_rejection(plan, authorization, "protected_hold_classification")
+            raise RecoveryError("recovery classification is PROTECTED_HOLD")
         if not self.authorize(plan, authorization):
-            self._record_rejection(plan, authorization, "unauthorized_or_never_pass_class")
+            self._record_rejection(plan, authorization, "unauthorized recovery")
             raise RecoveryError("unauthorized recovery is PROTECTED_HOLD")
         if plan.attempt > self.max_attempts:
             self._record_rejection(plan, authorization, "recovery attempts exhausted")
