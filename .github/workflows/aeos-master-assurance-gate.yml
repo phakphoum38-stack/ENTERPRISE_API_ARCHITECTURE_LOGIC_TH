@@ -41,14 +41,11 @@ jobs:
 
       - name: Execute AEOS Master platform
         shell: bash
-        env:
-          TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha }}
         run: |
           set -euo pipefail
           python tools/aeos_autobot_platform.py \
             --canonical current/AEOS_AUTOBOT_ASSURANCE_SET_REGISTRY.json \
-            --registry current/AEOS_AUTOBOT_SET_REGISTRY.json \
-            --target-sha "$TARGET_SHA"
+            --registry current/AEOS_AUTOBOT_SET_REGISTRY.json
 
       - name: Validate Master manifest contract
         shell: bash
@@ -66,8 +63,8 @@ jobs:
           data = json.loads(manifest.read_text(encoding='utf-8'))
           if data.get('decision') != 'READY_FOR_OWNER_AUTHORITY':
               raise SystemExit(f"MASTER_DECISION_NOT_READY:{data.get('decision')}")
-          if data.get('target_sha') != os.environ['TARGET_SHA']:
-              raise SystemExit('MANIFEST_TARGET_SHA_MISMATCH')
+          if data.get('source_sha') != os.environ['TARGET_SHA']:
+              raise SystemExit('MANIFEST_SOURCE_SHA_MISMATCH')
           actual = hashlib.sha256(manifest.read_bytes()).hexdigest()
           declared = digest_file.read_text(encoding='utf-8').strip().split()[0]
           if actual != declared:
