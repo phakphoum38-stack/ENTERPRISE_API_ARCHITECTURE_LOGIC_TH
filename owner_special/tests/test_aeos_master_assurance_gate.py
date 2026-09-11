@@ -44,11 +44,11 @@ class TestMasterAssuranceGate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manifest = self._manifest(root)
-            proof = root / "missing-proof.json"
             output = root / "composition.json"
-            with patch("tools.aeos_master_assurance_gate.load_proof", side_effect=FileNotFoundError("missing")):
-                self.assertEqual(run_gate(manifest, proof, output), 2)
-            self.assertFalse(output.exists())
+            with patch("tools.aeos_master_assurance_gate.load_proof", return_value={}):
+                self.assertEqual(run_gate(manifest, root / "missing-proof.json", output), 2)
+            self.assertTrue(output.exists())
+            self.assertIn('"decision": "HOLD"', output.read_text(encoding="utf-8"))
 
     def test_execution_identity_mismatch_is_hold(self):
         with tempfile.TemporaryDirectory() as tmp:
