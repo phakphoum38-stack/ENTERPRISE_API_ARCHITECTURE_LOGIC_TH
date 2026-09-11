@@ -38,6 +38,22 @@
     "hold_id",
     "plan_fingerprint"
   ],
+  "protected_classifications": [
+    "STALE_SOURCE",
+    "WRONG_ITERATION",
+    "MISSING_BLOCKER_EVIDENCE",
+    "CONFLICTING_EVIDENCE",
+    "UNAUTHORIZED",
+    "EXHAUSTED_ATTEMPTS",
+    "UNKNOWN"
+  ],
+  "recoverable_blocker_classifications": [
+    "RUNNING",
+    "TIMEOUT",
+    "INFRA_FAILED",
+    "INCOMPLETE",
+    "FAILED_RECOVERY"
+  ],
   "never_pass_states": [
     "INCOMPLETE",
     "STALE",
@@ -46,11 +62,9 @@
     "TIMEOUT",
     "INFRA_FAILED",
     "CONFLICT",
-    "UNKNOWN",
-    "MISSING_BLOCKER_EVIDENCE",
-    "UNAUTHORIZED",
-    "EXHAUSTED_ATTEMPTS"
+    "UNKNOWN"
   ],
+  "never_pass_state_semantics": "A never_pass_state may initiate bounded recovery when its classification is recoverable, but that state itself can never satisfy RELEASE_HOLD; release requires a separate authoritative PASS re-verification with exact identity and plan provenance.",
   "negative_assurance": {
     "stale_source_sha": "REJECT",
     "wrong_iteration": "REJECT",
@@ -61,6 +75,7 @@
     "conflicting_evidence": "PROTECTED_HOLD",
     "unknown_classification": "PROTECTED_HOLD",
     "plan_fingerprint_mismatch": "PROTECTED_HOLD",
+    "verification_never_pass_state": "PROTECTED_HOLD",
     "successful_reverification": "RELEASE_HOLD"
   },
   "rejection_evidence": {
