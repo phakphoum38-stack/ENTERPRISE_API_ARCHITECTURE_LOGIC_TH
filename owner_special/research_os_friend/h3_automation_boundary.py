@@ -22,6 +22,7 @@ class H3AutomationBoundary:
     SCHEMA = "research-os-h3-mission-control-automation/v1"
     SNAPSHOT_SCHEMA = "research-os-mission-control-unified-snapshot/v1"
     H2_EVIDENCE_SCHEMA = "research-os-mission-control-evidence/v1"
+    EVIDENCE_ATTESTATION_SCHEMA = "research-os-h3-evidence-attestation/v1"
     MAX_BYTES = 64 * 1024
     MAX_DEPTH = 8
     MAX_ITEMS = 100
@@ -79,7 +80,33 @@ class H3AutomationBoundary:
             raise H3AutomationBoundaryError("source_versions is required")
         if versions.get("evidence") != self.H2_EVIDENCE_SCHEMA:
             raise H3AutomationBoundaryError("H2 evidence schema is not bound")
+        self._validate_evidence_attestation(snapshot.get("evidence_verification"), expected_sha, owner_id)
         self._walk(snapshot, expected_sha, 0)
+
+    def _validate_evidence_attestation(
+        self, attestation: Any, expected_sha: str, owner_id: str
+    ) -> None:
+        if not isinstance(attestation, Mapping):
+            raise H3AutomationBoundaryError("authoritative evidence verification is required")
+        if attestation.get("schema") != self.EVIDENCE_ATTESTATION_SCHEMA:
+            raise H3AutomationBoundaryError("unsupported evidence attestation schema")
+        if attestation.get("status") != "PASS":
+            raise H3AutomationBoundaryError("evidence verification must be PASS")
+        if attestation.get("authoritative") is not True:
+            raise H3AutomationBoundaryError("evidence verification is not authoritative")
+        if attestation.get("owner_id") != owner_id:
+            raise H3AutomationBoundaryError("evidence verification owner mismatch")
+        if attestation.get("target_sha") != expected_sha:
+            raise H3AutomationBoundaryError("evidence verification SHA does not match expected SHA")
+        provenance = attestation.get("provenance")
+        if not isinstance(provenance, Mapping):
+            raise H3AutomationBoundaryError("evidence verification provenance is required")
+        if provenance.get("exact_sha") != expected_sha:
+            raise H3AutomationBoundaryError("evidence provenance SHA does not match expected SHA")
+        if provenance.get("status") != "PASS":
+            raise H3AutomationBoundaryError("evidence provenance must be PASS")
+        if provenance.get("authoritative") is not True:
+            raise H3AutomationBoundaryError("evidence provenance is not authoritative")
 
     def _walk(self, value: Any, expected_sha: str, depth: int) -> None:
         if depth > self.MAX_DEPTH:
@@ -95,6 +122,10 @@ class H3AutomationBoundary:
                 self._walk(child, expected_sha, depth + 1)
             if "source_sha" in value and value["source_sha"] != expected_sha:
                 raise H3AutomationBoundaryError("stale or conflicting source SHA")
+            if "target_sha" in value and value["target_sha"] != expected_sha:
+                raise H3AutomationBoundaryError("stale or conflicting target SHA")
+            if "exact_sha" in value and value["exact_sha"] != expected_sha:
+                raise H3AutomationBoundaryError("stale or conflicting provenance SHA")
         elif isinstance(value, list):
             if len(value) > self.MAX_ITEMS:
                 raise H3AutomationBoundaryError("collection exceeds bound")
