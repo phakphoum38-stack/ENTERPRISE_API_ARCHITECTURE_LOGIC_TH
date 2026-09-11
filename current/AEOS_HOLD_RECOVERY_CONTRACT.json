@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "contract": "research-os-aeos-hold-recovery/v1",
   "purpose": "Bounded fail-closed recovery for held assurance states",
   "protocol": [
@@ -15,7 +15,9 @@
     "pass": "RELEASE_HOLD",
     "fail": "RECLASSIFY_OR_BOUNDED_RETRY",
     "conflict": "PROTECTED_HOLD",
-    "exhausted_attempts": "PROTECTED_HOLD"
+    "exhausted_attempts": "PROTECTED_HOLD",
+    "protected_classification": "PROTECTED_HOLD",
+    "rejected_execution": "PROTECTED_HOLD_WITH_AUDIT_EVIDENCE"
   },
   "constitutional_constraints": {
     "merge_authority": false,
@@ -30,6 +32,12 @@
     "source_sha",
     "hold_id"
   ],
+  "reverification_binding": [
+    "iteration_id",
+    "source_sha",
+    "hold_id",
+    "plan_fingerprint"
+  ],
   "never_pass_states": [
     "INCOMPLETE",
     "STALE",
@@ -38,7 +46,10 @@
     "TIMEOUT",
     "INFRA_FAILED",
     "CONFLICT",
-    "UNKNOWN"
+    "UNKNOWN",
+    "MISSING_BLOCKER_EVIDENCE",
+    "UNAUTHORIZED",
+    "EXHAUSTED_ATTEMPTS"
   ],
   "negative_assurance": {
     "stale_source_sha": "REJECT",
@@ -48,7 +59,24 @@
     "failed_recovery": "RECLASSIFY",
     "exhausted_retries": "PROTECTED_HOLD",
     "conflicting_evidence": "PROTECTED_HOLD",
+    "unknown_classification": "PROTECTED_HOLD",
+    "plan_fingerprint_mismatch": "PROTECTED_HOLD",
     "successful_reverification": "RELEASE_HOLD"
   },
-  "evidence_policy": "Every attempt emits auditable evidence bound to hold_id, iteration_id, and source_sha; evidence never grants merge authority."
+  "rejection_evidence": {
+    "required": true,
+    "binding": [
+      "hold_id",
+      "iteration_id",
+      "source_sha",
+      "attempt",
+      "classification",
+      "plan_fingerprint",
+      "actor"
+    ],
+    "status": "REJECTED",
+    "merge_authority": false,
+    "self_certification": false
+  },
+  "evidence_policy": "Every execution attempt, including protected or rejected execution, emits auditable evidence bound to hold_id, iteration_id, source_sha, attempt identity, and authorization provenance; evidence never grants merge authority."
 }
