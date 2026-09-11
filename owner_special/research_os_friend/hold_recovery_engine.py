@@ -42,20 +42,23 @@ class HoldClass(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-NEVER_PASS_CLASSES = frozenset(
+# These classifications cannot authorize a recovery path or release a hold.
+# Recoverable blocker states such as TIMEOUT may execute a bounded re-verification;
+# their original state must never itself be treated as PASS.
+PROTECTED_CLASSIFICATIONS = frozenset(
     {
-        HoldClass.INCOMPLETE,
         HoldClass.STALE_SOURCE,
         HoldClass.WRONG_ITERATION,
-        HoldClass.RUNNING,
-        HoldClass.TIMEOUT,
-        HoldClass.INFRA_FAILED,
-        HoldClass.CONFLICTING_EVIDENCE,
-        HoldClass.UNKNOWN,
         HoldClass.MISSING_BLOCKER_EVIDENCE,
+        HoldClass.CONFLICTING_EVIDENCE,
         HoldClass.UNAUTHORIZED,
         HoldClass.EXHAUSTED_ATTEMPTS,
+        HoldClass.UNKNOWN,
     }
+)
+
+NEVER_PASS_STATES = frozenset(
+    {"INCOMPLETE", "STALE", "MISMATCHED", "RUNNING", "TIMEOUT", "INFRA_FAILED", "CONFLICT", "UNKNOWN"}
 )
 
 
@@ -177,7 +180,7 @@ class RecoveryEngine:
         attempt = len(prior) + 1
         if attempt > self.max_attempts:
             classification = HoldClass.EXHAUSTED_ATTEMPTS
-        if classification in NEVER_PASS_CLASSES:
+        if classification in PROTECTED_CLASSIFICATIONS:
             action = "protected_hold"
         else:
             action = "reverify"
@@ -194,7 +197,7 @@ class RecoveryEngine:
 
     @staticmethod
     def authorize(plan: RecoveryPlan, authorization: Authorization) -> bool:
-        if plan.classification in NEVER_PASS_CLASSES:
+        if plan.classification in PROTECTED_CLASSIFICATIONS:
             return False
         return bool(
             authorization.authorized
@@ -230,7 +233,7 @@ class RecoveryEngine:
         authorization: Authorization,
         executor: Callable[[RecoveryPlan], Mapping[str, Any]],
     ) -> RecoveryAttempt:
-        if plan.classification in NEVER_PASS_CLASSES:
+        if plan.classification in PROTECTED_CLASSIFICATIONS:
             self._record_rejection(plan, authorization, "protected_hold_classification")
             raise RecoveryError("recovery classification is PROTECTED_HOLD")
         if not self.authorize(plan, authorization):
@@ -273,7 +276,7 @@ class RecoveryEngine:
             hold.source_sha,
         ):
             return HoldDisposition.PROTECTED_HOLD
-        if attempt.classification in NEVER_PASS_CLASSES:
+        if attempt.classification in PROTECTED_CLASSIFICATIONS:
             return HoldDisposition.PROTECTED_HOLD
         if verification.get("conflict") is True:
             return HoldDisposition.PROTECTED_HOLD
@@ -284,6 +287,9 @@ class RecoveryEngine:
         if verification.get("hold_id") != hold.hold_id:
             return HoldDisposition.PROTECTED_HOLD
         if verification.get("plan_fingerprint") != attempt.plan_fingerprint:
+            return HoldDisposition.PROTECTED_HOLD
+        verification_state = verification.get("state")
+        if verification_state in NEVER_PASS_STATES:
             return HoldDisposition.PROTECTED_HOLD
         if verification.get("status") == "PASS" and verification.get("authoritative") is True:
             return HoldDisposition.RELEASE_HOLD
