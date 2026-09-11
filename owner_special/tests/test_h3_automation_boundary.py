@@ -18,7 +18,18 @@ def snapshot(**updates):
         "authorization_authority": "OwnerPolicy",
         "approval_authority": "ApprovalGate",
         "source_versions": {"evidence": "research-os-mission-control-evidence/v1"},
-        "status": "PASS",
+        "evidence_verification": {
+            "schema": "research-os-h3-evidence-attestation/v1",
+            "status": "PASS",
+            "authoritative": True,
+            "owner_id": "owner-001",
+            "target_sha": SHA,
+            "provenance": {
+                "exact_sha": SHA,
+                "status": "PASS",
+                "authoritative": True,
+            },
+        },
         "source_sha": SHA,
     }
     value.update(updates)
@@ -58,6 +69,34 @@ class H3AutomationBoundaryTests(unittest.TestCase):
     def test_requires_h2_evidence_binding(self):
         with self.assertRaises(H3AutomationBoundaryError):
             self.boundary.assess(snapshot(source_versions={}), expected_sha=SHA, owner_id="owner-001")
+
+    def test_requires_authoritative_evidence_verification(self):
+        with self.assertRaises(H3AutomationBoundaryError):
+            self.boundary.assess(snapshot(evidence_verification=None), expected_sha=SHA, owner_id="owner-001")
+
+    def test_rejects_pending_evidence_verification(self):
+        attestation = dict(snapshot()["evidence_verification"])
+        attestation["status"] = "PENDING"
+        with self.assertRaises(H3AutomationBoundaryError):
+            self.boundary.assess(snapshot(evidence_verification=attestation), expected_sha=SHA, owner_id="owner-001")
+
+    def test_rejects_non_authoritative_evidence_verification(self):
+        attestation = dict(snapshot()["evidence_verification"])
+        attestation["authoritative"] = False
+        with self.assertRaises(H3AutomationBoundaryError):
+            self.boundary.assess(snapshot(evidence_verification=attestation), expected_sha=SHA, owner_id="owner-001")
+
+    def test_rejects_evidence_target_sha_mismatch(self):
+        attestation = dict(snapshot()["evidence_verification"])
+        attestation["target_sha"] = "b" * 40
+        with self.assertRaises(H3AutomationBoundaryError):
+            self.boundary.assess(snapshot(evidence_verification=attestation), expected_sha=SHA, owner_id="owner-001")
+
+    def test_rejects_provenance_sha_mismatch(self):
+        attestation = dict(snapshot()["evidence_verification"])
+        attestation["provenance"] = dict(attestation["provenance"], exact_sha="b" * 40)
+        with self.assertRaises(H3AutomationBoundaryError):
+            self.boundary.assess(snapshot(evidence_verification=attestation), expected_sha=SHA, owner_id="owner-001")
 
     def test_rejects_action_like_fields(self):
         with self.assertRaises(H3AutomationBoundaryError):
