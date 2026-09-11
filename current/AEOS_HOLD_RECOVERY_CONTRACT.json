@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0",
+  "contract": "research-os-aeos-hold-recovery/v1",
+  "purpose": "Bounded fail-closed recovery for held assurance states",
+  "protocol": [
+    "HOLD",
+    "CLASSIFY",
+    "RECOVERY_PLAN",
+    "AUTHORIZATION",
+    "EXECUTE",
+    "RE-VERIFY"
+  ],
+  "outcomes": {
+    "pass": "RELEASE_HOLD",
+    "fail": "RECLASSIFY_OR_BOUNDED_RETRY",
+    "conflict": "PROTECTED_HOLD",
+    "exhausted_attempts": "PROTECTED_HOLD"
+  },
+  "constitutional_constraints": {
+    "merge_authority": false,
+    "self_certification": false,
+    "autonomous_source_mutation": false,
+    "fail_closed": true,
+    "max_attempts": 3,
+    "max_execution_steps": 5
+  },
+  "attempt_binding": [
+    "iteration_id",
+    "source_sha",
+    "hold_id"
+  ],
+  "never_pass_states": [
+    "INCOMPLETE",
+    "STALE",
+    "MISMATCHED",
+    "RUNNING",
+    "TIMEOUT",
+    "INFRA_FAILED",
+    "CONFLICT",
+    "UNKNOWN"
+  ],
+  "negative_assurance": {
+    "stale_source_sha": "REJECT",
+    "wrong_iteration": "REJECT",
+    "missing_blocker_evidence": "PROTECTED_HOLD",
+    "unauthorized_recovery": "PROTECTED_HOLD",
+    "failed_recovery": "RECLASSIFY",
+    "exhausted_retries": "PROTECTED_HOLD",
+    "conflicting_evidence": "PROTECTED_HOLD",
+    "successful_reverification": "RELEASE_HOLD"
+  },
+  "evidence_policy": "Every attempt emits auditable evidence bound to hold_id, iteration_id, and source_sha; evidence never grants merge authority."
+}
