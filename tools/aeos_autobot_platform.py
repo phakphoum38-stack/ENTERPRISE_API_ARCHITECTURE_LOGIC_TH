@@ -101,7 +101,7 @@ def _validate_registry(registry: dict[str, Any], canonical: dict[str, Any]) -> d
         raise ValueError("canonical_registry_contract_invalid")
     if not isinstance(canonical_sets, list) or len(canonical_sets) != int(canonical.get("set_count", -1)):
         raise ValueError("canonical_registry_set_count_invalid")
-    if not isinstance(sets, list) or not sets:
+    if not isinstance(sets, list):
         raise ValueError("registry_empty")
     if len(sets) > int(registry.get("max_sets", 100)) or len(sets) > 100:
         raise ValueError("registry_exceeds_100_sets")
@@ -151,6 +151,8 @@ def _validate_registry(registry: dict[str, Any], canonical: dict[str, Any]) -> d
     if not required_ids.issubset(projection_ids):
         missing = sorted(required_ids - projection_ids)
         raise ValueError(f"canonical_required_set_missing:{','.join(missing)}")
+    if not sets:
+        raise ValueError("registry_empty")
     return projection_by_id
 
 
