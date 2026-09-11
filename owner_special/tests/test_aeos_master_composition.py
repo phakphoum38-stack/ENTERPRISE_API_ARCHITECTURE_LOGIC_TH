@@ -132,6 +132,46 @@ class MasterAssuranceCompositionTests(unittest.TestCase):
         self.assertEqual(composition.decision, "HOLD")
         self.assertTrue(composition.reason.startswith("pre_authority:"))
 
+    def test_string_false_cannot_become_true(self):
+        composition = compose_master_assurance(
+            snapshot=snapshot(),
+            proof=proof(pre_authority_packet=pre_authority_packet(provenance_verified="false")),
+        )
+        self.assertEqual(composition.decision, "HOLD")
+        self.assertIn("provenance_verified_invalid_boolean", composition.reason)
+
+    def test_string_true_cannot_become_true(self):
+        composition = compose_master_assurance(
+            snapshot=snapshot(),
+            proof=proof(pre_authority_packet=pre_authority_packet(independent_review_verified="true")),
+        )
+        self.assertEqual(composition.decision, "HOLD")
+        self.assertIn("independent_review_verified_invalid_boolean", composition.reason)
+
+    def test_integer_one_cannot_become_true(self):
+        composition = compose_master_assurance(
+            snapshot=snapshot(),
+            proof=proof(pre_authority_packet=pre_authority_packet(scope_verified=1)),
+        )
+        self.assertEqual(composition.decision, "HOLD")
+        self.assertIn("scope_verified_invalid_boolean", composition.reason)
+
+    def test_integer_zero_cannot_become_false_silently(self):
+        composition = compose_master_assurance(
+            snapshot=snapshot(),
+            proof=proof(pre_authority_packet=pre_authority_packet(root_cause_verified=0)),
+        )
+        self.assertEqual(composition.decision, "HOLD")
+        self.assertIn("root_cause_verified_invalid_boolean", composition.reason)
+
+    def test_null_cannot_become_false_silently(self):
+        composition = compose_master_assurance(
+            snapshot=snapshot(),
+            proof=proof(pre_authority_packet=pre_authority_packet(evidence_integrity_verified=None)),
+        )
+        self.assertEqual(composition.decision, "HOLD")
+        self.assertIn("evidence_integrity_verified_invalid_boolean", composition.reason)
+
     def test_snapshot_binds_execution_identity(self):
         built = snapshot_from_results(
             iteration_id="iter-1",
