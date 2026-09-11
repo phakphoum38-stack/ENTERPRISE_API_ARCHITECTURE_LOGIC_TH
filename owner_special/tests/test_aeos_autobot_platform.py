@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.aeos_autobot_platform import _validate_registry, run_platform
+from tools.aeos_autobot_platform import SetResult, _run_set, _validate_registry, run_platform
 
 
 class PlatformContractTests(unittest.TestCase):
@@ -119,6 +119,71 @@ class PlatformContractTests(unittest.TestCase):
             self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["results"][0]["state"], "HOLD")
             run.assert_not_called()
 
+    def test_runtime_watchdog_converts_timeout_to_timed_out(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            item = self.active_entry(tmp, timeout_seconds=99)
+            limits = {"max_scope": 100, "max_changed_files": 100, "max_risk_level": 4}
+            timeout = __import__("subprocess").TimeoutExpired("pwsh", 0.5)
+            with patch("tools.aeos_autobot_platform.subprocess.run", side_effect=timeout) as run:
+                result = _run_set(item, "iteration", "a" * 40, __import__("time").monotonic() + 1, limits)
+            self.assertEqual(result.state, "TIMED_OUT")
+            self.assertIsNone(result.returncode)
+            run.assert_called_once()
+
+    def test_canonical_implemented_sets_drive_required_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = Path(tmp) / "registry.json"
+            canonical = Path(tmp) / "canonical.json"
+            output = Path(tmp) / "manifest.json"
+            first = self.active_entry(tmp, set_id="SET-001", name="A", wave="IDENTITY")
+            second = self.active_entry(tmp, set_id="SET-002", name="B", wave="SOURCE_CONTRACT")
+            registry.write_text(json.dumps(self.projection(first, second)), encoding="utf-8")
+            canonical.write_text(json.dumps(self.canonical(
+                {"set_id": "SET-001", "name": "A", "wave": "W0", "status": "IMPLEMENTED"},
+                {"set_id": "SET-002", "name": "B", "wave": "W1", "status": "IMPLEMENTED"},
+            )), encoding="utf-8")
+            calls: list[str] = []
+
+            def fake_run(item, iteration_id, source_sha, deadline, limits):
+                calls.append(item["set_id"])
+                return SetResult(item["set_id"], item["name"], item["wave"], "PASSED", 0,
+                                 item["command"], item["cwd"], 0.0, source_sha, iteration_id,
+                                 "evidence", "ok")
+
+            with patch("tools.aeos_autobot_platform._git_sha", return_value="a" * 40), \
+                 patch("tools.aeos_autobot_platform._run_set", side_effect=fake_run):
+                result = run_platform(registry, output, 2, canonical_registry_path=canonical, max_runtime_seconds=30)
+            self.assertEqual(result, 0)
+            self.assertEqual(calls, ["SET-001", "SET-002"])
+
+    def test_terminal_barrier_stops_after_failed_wave(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = Path(tmp) / "registry.json"
+            canonical = Path(tmp) / "canonical.json"
+            output = Path(tmp) / "manifest.json"
+            first = self.active_entry(tmp, set_id="SET-001", name="A", wave="IDENTITY")
+            second = self.active_entry(tmp, set_id="SET-002", name="B", wave="SOURCE_CONTRACT")
+            registry.write_text(json.dumps(self.projection(first, second)), encoding="utf-8")
+            canonical.write_text(json.dumps(self.canonical(
+                {"set_id": "SET-001", "name": "A", "wave": "W0", "status": "IMPLEMENTED"},
+                {"set_id": "SET-002", "name": "B", "wave": "W1", "status": "IMPLEMENTED"},
+            )), encoding="utf-8")
+            calls: list[str] = []
+
+            def fake_run(item, iteration_id, source_sha, deadline, limits):
+                calls.append(item["set_id"])
+                state = "FAILED" if item["set_id"] == "SET-001" else "PASSED"
+                return SetResult(item["set_id"], item["name"], item["wave"], state, 1 if state == "FAILED" else 0,
+                                 item["command"], item["cwd"], 0.0, source_sha, iteration_id,
+                                 "evidence", state.lower())
+
+            with patch("tools.aeos_autobot_platform._git_sha", return_value="a" * 40), \
+                 patch("tools.aeos_autobot_platform._run_set", side_effect=fake_run):
+                result = run_platform(registry, output, 2, canonical_registry_path=canonical, max_runtime_seconds=30)
+            self.assertEqual(result, 2)
+            self.assertEqual(calls, ["SET-001"])
+            self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["decision"], "HOLD")
+
     def test_owner_authority_decision_is_not_merge(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             registry = Path(tmp) / "registry.json"
@@ -136,6 +201,8 @@ class PlatformContractTests(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(manifest["decision"], "READY_FOR_OWNER_AUTHORITY")
             self.assertEqual(manifest["authority"], "OWNER_ONLY")
+            self.assertNotIn("merge", manifest)
+            self.assertNotIn("approve", manifest)
 
 
 if __name__ == "__main__":
