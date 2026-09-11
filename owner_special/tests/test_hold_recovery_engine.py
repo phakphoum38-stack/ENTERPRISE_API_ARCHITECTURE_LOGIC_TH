@@ -62,12 +62,20 @@ class HoldRecoveryEngineTests(unittest.TestCase):
         with self.assertRaises(RecoveryError):
             engine.execute(plan, make_auth(plan, authorized=False), lambda _: {"status": "PASS"})
 
+    def test_unauthorized_recovery_requires_actor_and_fingerprint(self):
+        engine = RecoveryEngine()
+        plan = RecoveryPlan(HOLD, ITER, SHA, HoldClass.TIMEOUT, 1)
+        bad = Authorization(HOLD, ITER, SHA, True, "", "")
+        with self.assertRaises(RecoveryError):
+            engine.execute(plan, bad, lambda _: {"status": "PASS"})
+
     def test_failed_recovery_reclassifies_and_never_passes(self):
         engine = RecoveryEngine()
         hold = make_hold()
         plan = engine.recovery_plan(hold, HoldClass.TIMEOUT)
         attempt = engine.execute(plan, make_auth(plan), lambda _: {"status": "FAIL", "source_sha": SHA})
         self.assertEqual(attempt.status, "FAIL")
+        self.assertEqual(engine.reclassify(attempt), HoldClass.FAILED_RECOVERY)
         self.assertEqual(
             engine.reverify(hold, attempt, {"status": "FAIL", "source_sha": SHA, "iteration_id": ITER, "hold_id": HOLD}),
             HoldDisposition.HOLD,
