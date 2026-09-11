@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           python tools/aeos_autobot_platform.py \
-            --canonical current/AEOS_AUTOBOT_ASSURANCE_SET_REGISTRY.json \
+            --canonical-registry current/AEOS_AUTOBOT_ASSURANCE_SET_REGISTRY.json \
             --registry current/AEOS_AUTOBOT_SET_REGISTRY.json
 
       - name: Validate Master manifest contract
