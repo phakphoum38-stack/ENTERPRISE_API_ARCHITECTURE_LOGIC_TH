@@ -100,23 +100,30 @@ class HoldRecoveryEngineTests(unittest.TestCase):
         self.assertEqual(len(engine.rejections), 1)
         self.assertEqual(engine.rejections[0].classification, HoldClass.UNKNOWN)
 
-    def test_never_pass_classifications_are_rejected(self):
+    def test_protected_classifications_are_rejected(self):
         engine = RecoveryEngine()
         for classification in (
-            HoldClass.INCOMPLETE,
-            HoldClass.RUNNING,
-            HoldClass.TIMEOUT,
-            HoldClass.INFRA_FAILED,
-            HoldClass.UNKNOWN,
             HoldClass.STALE_SOURCE,
             HoldClass.WRONG_ITERATION,
             HoldClass.MISSING_BLOCKER_EVIDENCE,
             HoldClass.CONFLICTING_EVIDENCE,
             HoldClass.UNAUTHORIZED,
             HoldClass.EXHAUSTED_ATTEMPTS,
+            HoldClass.UNKNOWN,
         ):
             plan = RecoveryPlan(HOLD, ITER, SHA, classification, 1)
             self.assertFalse(engine.authorize(plan, make_auth(plan)))
+
+    def test_retryable_blocker_states_can_be_reverified_but_cannot_directly_pass(self):
+        engine = RecoveryEngine()
+        for classification in (HoldClass.RUNNING, HoldClass.TIMEOUT, HoldClass.INFRA_FAILED, HoldClass.INCOMPLETE):
+            plan = RecoveryPlan(HOLD, ITER, SHA, classification, 1)
+            self.assertTrue(engine.authorize(plan, make_auth(plan)))
+            attempt = engine.execute(plan, make_auth(plan), lambda _: {"status": "FAIL"})
+            self.assertEqual(
+                engine.reverify(make_hold(), attempt, verify(attempt, status="FAIL")),
+                HoldDisposition.HOLD,
+            )
 
     def test_unauthorized_recovery_is_protected_hold_and_emits_evidence(self):
         engine = RecoveryEngine()
@@ -237,6 +244,16 @@ class HoldRecoveryEngineTests(unittest.TestCase):
         attempt = engine.execute(plan, make_auth(plan), lambda _: {"status": "PASS"})
         self.assertEqual(
             engine.reverify(hold, attempt, verify(attempt, iteration_id="iteration-999")),
+            HoldDisposition.PROTECTED_HOLD,
+        )
+
+    def test_reverification_rejects_never_pass_state(self):
+        engine = RecoveryEngine()
+        hold = make_hold()
+        plan = engine.recovery_plan(hold, HoldClass.TIMEOUT)
+        attempt = engine.execute(plan, make_auth(plan), lambda _: {"status": "PASS"})
+        self.assertEqual(
+            engine.reverify(hold, attempt, verify(attempt, state="TIMEOUT")),
             HoldDisposition.PROTECTED_HOLD,
         )
 
