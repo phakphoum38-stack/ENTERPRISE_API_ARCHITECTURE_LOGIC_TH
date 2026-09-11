@@ -86,6 +86,12 @@ def _tuple_strings(value: Any, field: str) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _strict_bool(value: Any, field: str) -> bool:
+    if type(value) is not bool:
+        raise ValueError(f"proof_{field}_invalid_boolean")
+    return value
+
+
 def _owner_packet(payload: Mapping[str, Any]) -> OwnerAuthorityPacket:
     fields = {
         "original_change", "original_failure", "root_cause", "root_cause_proof",
@@ -144,12 +150,12 @@ def _pre_authority_packet(payload: Mapping[str, Any]) -> PreAuthorityPacket:
         wave_results=tuple((str(item[0]), str(item[1])) for item in wave_results),
         holds=_tuple_strings(payload["holds"], "holds"),
         evidence_ids=_tuple_strings(payload["evidence_ids"], "evidence_ids"),
-        provenance_verified=bool(payload["provenance_verified"]),
-        evidence_integrity_verified=bool(payload["evidence_integrity_verified"]),
-        scope_verified=bool(payload["scope_verified"]),
-        root_cause_verified=bool(payload["root_cause_verified"]),
-        independent_review_verified=bool(payload["independent_review_verified"]),
-        assurance_self_check_verified=bool(payload["assurance_self_check_verified"]),
+        provenance_verified=_strict_bool(payload["provenance_verified"], "provenance_verified"),
+        evidence_integrity_verified=_strict_bool(payload["evidence_integrity_verified"], "evidence_integrity_verified"),
+        scope_verified=_strict_bool(payload["scope_verified"], "scope_verified"),
+        root_cause_verified=_strict_bool(payload["root_cause_verified"], "root_cause_verified"),
+        independent_review_verified=_strict_bool(payload["independent_review_verified"], "independent_review_verified"),
+        assurance_self_check_verified=_strict_bool(payload["assurance_self_check_verified"], "assurance_self_check_verified"),
         remaining_risks=_tuple_strings(payload["remaining_risks"], "remaining_risks"),
         remaining_assumptions=_tuple_strings(payload["remaining_assumptions"], "remaining_assumptions"),
         assurance_debt=_tuple_strings(payload["assurance_debt"], "assurance_debt"),
