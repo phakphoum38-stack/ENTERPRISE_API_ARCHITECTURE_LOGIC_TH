@@ -126,6 +126,14 @@ class RecoveryEngine:
             return HoldClass.UNAUTHORIZED
         return HoldClass.UNKNOWN
 
+    def reclassify(self, attempt: RecoveryAttempt) -> HoldClass:
+        """Classify a non-PASS recovery result without ever upgrading it."""
+        if attempt.status == "PASS":
+            return attempt.classification
+        if attempt.evidence.get("conflict") is True:
+            return HoldClass.CONFLICTING_EVIDENCE
+        return HoldClass.FAILED_RECOVERY
+
     def recovery_plan(self, hold: Hold, classification: HoldClass) -> RecoveryPlan:
         self._binding(hold.hold_id, hold.iteration_id, hold.source_sha)
         prior = [a for a in self.attempts if a.hold_id == hold.hold_id]
@@ -165,14 +173,14 @@ class RecoveryEngine:
             HoldClass.UNAUTHORIZED,
         }:
             return False
-        if not authorization.authorized:
-            return False
-        return (
-            authorization.hold_id == plan.hold_id
+        return bool(
+            authorization.authorized
+            and authorization.actor
+            and authorization.plan_fingerprint
+            and authorization.hold_id == plan.hold_id
             and authorization.iteration_id == plan.iteration_id
             and authorization.source_sha == plan.source_sha
-            and authorization.plan_fingerprint
-        ) is not False
+        )
 
     def execute(
         self,
@@ -236,7 +244,7 @@ class RecoveryEngine:
             "iteration_id": hold.iteration_id,
             "source_sha": hold.source_sha,
             "attempt": attempt.attempt,
-            "classification": attempt.classification.value,
+            "classification": self.reclassify(attempt).value,
             "status": attempt.status,
             "execution_steps": attempt.execution_steps,
             "evidence": dict(attempt.evidence),
