@@ -3,7 +3,8 @@
 This module is deliberately side-effect free with respect to repository/source
 mutation. Recovery execution is delegated to an explicitly authorized caller.
 Every attempt is bound to iteration_id + source_sha + hold_id and every release
-requires an independent successful re-verification bound to the same identity.
+requires an independent successful re-verification bound to the same identity
+and authorization plan provenance.
 """
 
 from __future__ import annotations
@@ -39,6 +40,23 @@ class HoldClass(str, Enum):
     INFRA_FAILED = "INFRA_FAILED"
     INCOMPLETE = "INCOMPLETE"
     UNKNOWN = "UNKNOWN"
+
+
+NEVER_PASS_CLASSES = frozenset(
+    {
+        HoldClass.INCOMPLETE,
+        HoldClass.STALE_SOURCE,
+        HoldClass.WRONG_ITERATION,
+        HoldClass.RUNNING,
+        HoldClass.TIMEOUT,
+        HoldClass.INFRA_FAILED,
+        HoldClass.CONFLICTING_EVIDENCE,
+        HoldClass.UNKNOWN,
+        HoldClass.MISSING_BLOCKER_EVIDENCE,
+        HoldClass.UNAUTHORIZED,
+        HoldClass.EXHAUSTED_ATTEMPTS,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -82,6 +100,19 @@ class RecoveryAttempt:
     status: str
     execution_steps: int
     evidence: Mapping[str, Any]
+    plan_fingerprint: str
+
+
+@dataclass(frozen=True)
+class RecoveryRejection:
+    hold_id: str
+    iteration_id: str
+    source_sha: str
+    attempt: int
+    classification: HoldClass
+    reason: str
+    plan_fingerprint: str
+    actor: str
 
 
 @dataclass
@@ -89,6 +120,7 @@ class RecoveryEngine:
     max_attempts: int = MAX_ATTEMPTS
     max_execution_steps: int = MAX_EXECUTION_STEPS
     attempts: list[RecoveryAttempt] = field(default_factory=list)
+    rejections: list[RecoveryRejection] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not 1 <= self.max_attempts <= MAX_ATTEMPTS:
@@ -136,18 +168,16 @@ class RecoveryEngine:
 
     def recovery_plan(self, hold: Hold, classification: HoldClass) -> RecoveryPlan:
         self._binding(hold.hold_id, hold.iteration_id, hold.source_sha)
-        prior = [a for a in self.attempts if a.hold_id == hold.hold_id]
+        identity = (hold.hold_id, hold.iteration_id, hold.source_sha)
+        prior = [
+            a
+            for a in self.attempts
+            if (a.hold_id, a.iteration_id, a.source_sha) == identity
+        ]
         attempt = len(prior) + 1
         if attempt > self.max_attempts:
             classification = HoldClass.EXHAUSTED_ATTEMPTS
-        if classification in {
-            HoldClass.STALE_SOURCE,
-            HoldClass.WRONG_ITERATION,
-            HoldClass.MISSING_BLOCKER_EVIDENCE,
-            HoldClass.CONFLICTING_EVIDENCE,
-            HoldClass.EXHAUSTED_ATTEMPTS,
-            HoldClass.UNAUTHORIZED,
-        }:
+        if classification in NEVER_PASS_CLASSES:
             action = "protected_hold"
         else:
             action = "reverify"
@@ -164,14 +194,7 @@ class RecoveryEngine:
 
     @staticmethod
     def authorize(plan: RecoveryPlan, authorization: Authorization) -> bool:
-        if plan.classification in {
-            HoldClass.STALE_SOURCE,
-            HoldClass.WRONG_ITERATION,
-            HoldClass.MISSING_BLOCKER_EVIDENCE,
-            HoldClass.CONFLICTING_EVIDENCE,
-            HoldClass.EXHAUSTED_ATTEMPTS,
-            HoldClass.UNAUTHORIZED,
-        }:
+        if plan.classification in NEVER_PASS_CLASSES:
             return False
         return bool(
             authorization.authorized
@@ -182,6 +205,25 @@ class RecoveryEngine:
             and authorization.source_sha == plan.source_sha
         )
 
+    def _record_rejection(
+        self,
+        plan: RecoveryPlan,
+        authorization: Authorization,
+        reason: str,
+    ) -> None:
+        self.rejections.append(
+            RecoveryRejection(
+                plan.hold_id,
+                plan.iteration_id,
+                plan.source_sha,
+                plan.attempt,
+                plan.classification,
+                reason,
+                authorization.plan_fingerprint,
+                authorization.actor,
+            )
+        )
+
     def execute(
         self,
         plan: RecoveryPlan,
@@ -189,13 +231,17 @@ class RecoveryEngine:
         executor: Callable[[RecoveryPlan], Mapping[str, Any]],
     ) -> RecoveryAttempt:
         if not self.authorize(plan, authorization):
+            self._record_rejection(plan, authorization, "unauthorized_or_never_pass_class")
             raise RecoveryError("unauthorized recovery is PROTECTED_HOLD")
         if plan.attempt > self.max_attempts:
+            self._record_rejection(plan, authorization, "recovery attempts exhausted")
             raise RecoveryError("recovery attempts exhausted")
         if plan.execution_steps > self.max_execution_steps:
+            self._record_rejection(plan, authorization, "execution limit exceeded")
             raise RecoveryError("execution limit exceeded")
         result = executor(plan)
         if not isinstance(result, Mapping):
+            self._record_rejection(plan, authorization, "recovery executor must return evidence mapping")
             raise RecoveryError("recovery executor must return evidence mapping")
         attempt = RecoveryAttempt(
             plan.hold_id,
@@ -206,6 +252,7 @@ class RecoveryEngine:
             str(result.get("status", "FAIL")),
             plan.execution_steps,
             dict(result),
+            authorization.plan_fingerprint,
         )
         self.attempts.append(attempt)
         return attempt
@@ -223,6 +270,8 @@ class RecoveryEngine:
             hold.source_sha,
         ):
             return HoldDisposition.PROTECTED_HOLD
+        if attempt.classification in NEVER_PASS_CLASSES:
+            return HoldDisposition.PROTECTED_HOLD
         if verification.get("conflict") is True:
             return HoldDisposition.PROTECTED_HOLD
         if verification.get("source_sha") != hold.source_sha:
@@ -230,6 +279,8 @@ class RecoveryEngine:
         if verification.get("iteration_id") != hold.iteration_id:
             return HoldDisposition.PROTECTED_HOLD
         if verification.get("hold_id") != hold.hold_id:
+            return HoldDisposition.PROTECTED_HOLD
+        if verification.get("plan_fingerprint") != attempt.plan_fingerprint:
             return HoldDisposition.PROTECTED_HOLD
         if verification.get("status") == "PASS" and verification.get("authoritative") is True:
             return HoldDisposition.RELEASE_HOLD
@@ -247,7 +298,25 @@ class RecoveryEngine:
             "classification": self.reclassify(attempt).value,
             "status": attempt.status,
             "execution_steps": attempt.execution_steps,
+            "plan_fingerprint": attempt.plan_fingerprint,
             "evidence": dict(attempt.evidence),
+            "merge_authority": False,
+            "self_certification": False,
+        }
+
+    @staticmethod
+    def rejection_audit_record(rejection: RecoveryRejection) -> dict[str, Any]:
+        return {
+            "schema": "research-os-aeos-hold-recovery/v1",
+            "hold_id": rejection.hold_id,
+            "iteration_id": rejection.iteration_id,
+            "source_sha": rejection.source_sha,
+            "attempt": rejection.attempt,
+            "classification": rejection.classification.value,
+            "status": "REJECTED",
+            "reason": rejection.reason,
+            "plan_fingerprint": rejection.plan_fingerprint,
+            "actor": rejection.actor,
             "merge_authority": False,
             "self_certification": False,
         }
