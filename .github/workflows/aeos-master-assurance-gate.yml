@@ -42,12 +42,26 @@ jobs:
       - name: Execute AEOS Master platform
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
+          : > aeos_master_platform.log
           python tools/aeos_autobot_platform.py \
             --canonical-registry current/AEOS_AUTOBOT_ASSURANCE_SET_REGISTRY.json \
-            --registry current/AEOS_AUTOBOT_SET_REGISTRY.json
+            --registry current/AEOS_AUTOBOT_SET_REGISTRY.json \
+            2>&1 | tee aeos_master_platform.log
+          rc=${PIPESTATUS[0]}
+          echo "AEOS_PLATFORM_EXIT_CODE=$rc" | tee -a aeos_master_platform.log
+          if [ -f aeos_autobot_manifest.json ]; then
+            echo "=== AEOS MANIFEST ===" | tee -a aeos_master_platform.log
+            cat aeos_autobot_manifest.json | tee -a aeos_master_platform.log
+          fi
+          if [ -f aeos_autobot_manifest.json.sha256 ]; then
+            echo "=== AEOS MANIFEST SHA256 ===" | tee -a aeos_master_platform.log
+            cat aeos_autobot_manifest.json.sha256 | tee -a aeos_master_platform.log
+          fi
+          exit "$rc"
 
       - name: Validate Master manifest contract
+        if: success()
         shell: bash
         env:
           TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha }}
@@ -73,11 +87,13 @@ jobs:
           PY
 
       - name: Upload single Master evidence artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: aeos-master-evidence-${{ github.event.pull_request.head.sha || inputs.target_sha }}
           if-no-files-found: error
           retention-days: 14
           path: |
+            aeos_master_platform.log
             aeos_autobot_manifest.json
             aeos_autobot_manifest.json.sha256
