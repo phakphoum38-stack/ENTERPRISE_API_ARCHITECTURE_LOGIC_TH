@@ -24,7 +24,8 @@
     "owner_special/research_os_friend/hold_recovery_engine.py",
     "owner_special/tests/test_hold_recovery_engine.py"
   ],
-  "accepted_payload_digest": "2aaaa7c6f0d3c5f8d2dce9bfa2a0b1c2d3e4f5a6",
+  "accepted_payload_digest": "14750f63b0c1871b768874f36f6b7ee32e48cc99",
+  "accepted_payload_digest_algorithm": "git_commit_sha",
   "independent_forensic_status": "PENDING",
   "merge_authority": false,
   "self_certification": false
