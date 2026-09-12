@@ -36,7 +36,7 @@ def main() -> int:
     required = {
         "schema", "pr_number", "base_sha", "head_sha", "merge_sha",
         "merge_parent_sha", "divergent_paths", "canonical_conflict_evidence",
-        "accepted_payload_paths", "accepted_payload_digest",
+        "accepted_payload_paths", "accepted_payload_digest", "accepted_payload_digest_algorithm",
         "independent_forensic_status", "merge_authority", "self_certification",
     }
     missing = sorted(required - data.keys())
@@ -44,6 +44,8 @@ def main() -> int:
         raise SystemExit(f"FAIL: missing reconciliation fields: {missing}")
     if data["schema"] != "aeos.squash-reconciliation.v1":
         raise SystemExit("FAIL: unsupported reconciliation schema")
+    if data["accepted_payload_digest_algorithm"] != "git_commit_sha":
+        raise SystemExit("FAIL: unsupported accepted payload digest algorithm")
     if data["merge_authority"] is not False or data["self_certification"] is not False:
         raise SystemExit("FAIL: reconciliation evidence cannot grant authority or self-certify")
     if stage == "forensic" and data["independent_forensic_status"] != "VERIFIED":
@@ -78,9 +80,10 @@ def main() -> int:
     if accepted != merge_paths:
         raise SystemExit(f"FAIL: accepted payload inventory mismatch: actual={sorted(merge_paths)} declared={sorted(accepted)}")
 
-    merge_tree = run("git", "rev-parse", f"{merge}^{{tree}}")
-    if merge_tree != data["accepted_payload_digest"]:
-        raise SystemExit("FAIL: accepted payload digest/tree identity mismatch")
+    if merge != data["accepted_payload_digest"]:
+        raise SystemExit("FAIL: accepted payload digest does not equal merge commit SHA")
+    if run("git", "rev-parse", merge) != merge:
+        raise SystemExit("FAIL: merge commit cannot be resolved")
     if run("git", "merge-base", base, merge) != base:
         raise SystemExit("FAIL: merge is not based on canonical BASE")
 
@@ -94,7 +97,7 @@ def main() -> int:
         "merge_sha": merge,
         "divergent_paths": sorted(declared),
         "accepted_payload_paths": sorted(accepted),
-        "accepted_payload_digest": merge_tree,
+        "accepted_payload_digest": data["accepted_payload_digest"],
         "independent_forensic_status": data["independent_forensic_status"],
         "merge_authority": data["merge_authority"],
         "self_certification": data["self_certification"],
