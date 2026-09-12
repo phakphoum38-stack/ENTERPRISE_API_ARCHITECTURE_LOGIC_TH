@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Validate explicit AEOS squash-reconciliation provenance.
-
-The validator never decides that a divergent path is stale by itself. The
-manifest must enumerate the divergence and provide externally reviewable
-reasons/evidence. The validator proves structural/path/digest constraints and
-fails closed on missing or inconsistent evidence.
-"""
+"""Validate explicit AEOS squash-reconciliation provenance."""
 from __future__ import annotations
 
 import json
@@ -23,8 +17,7 @@ def run(*args: str) -> str:
 
 
 def changed_paths(a: str, b: str) -> set[str]:
-    out = run("git", "diff", "--name-only", a, b)
-    return {line for line in out.splitlines() if line}
+    return {line for line in run("git", "diff", "--name-only", a, b).splitlines() if line}
 
 
 def path_patch(a: str, b: str, path: str) -> bytes:
@@ -32,12 +25,14 @@ def path_patch(a: str, b: str, path: str) -> bytes:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: validate_squash_reconciliation.py MANIFEST.json", file=sys.stderr)
+    if len(sys.argv) not in (2, 3):
+        print("usage: validate_squash_reconciliation.py MANIFEST.json [source|forensic]", file=sys.stderr)
         return 2
+    stage = sys.argv[2] if len(sys.argv) == 3 else "forensic"
+    if stage not in {"source", "forensic"}:
+        raise SystemExit("FAIL: unsupported validation stage")
 
-    manifest_path = Path(sys.argv[1])
-    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     required = {
         "schema", "pr_number", "base_sha", "head_sha", "merge_sha",
         "merge_parent_sha", "divergent_paths", "canonical_conflict_evidence",
@@ -51,14 +46,14 @@ def main() -> int:
         raise SystemExit("FAIL: unsupported reconciliation schema")
     if data["merge_authority"] is not False or data["self_certification"] is not False:
         raise SystemExit("FAIL: reconciliation evidence cannot grant authority or self-certify")
-    if data["independent_forensic_status"] != "VERIFIED":
+    if stage == "forensic" and data["independent_forensic_status"] != "VERIFIED":
         raise SystemExit("FAIL: independent forensic verification is required")
 
     base = data["base_sha"]
     head = data["head_sha"]
     merge = data["merge_sha"]
-    merge_parents = run("git", "rev-list", "--parents", "-n", "1", merge).split()[1:]
-    if merge_parents != [data["merge_parent_sha"]] or merge_parents != [base]:
+    parents = run("git", "rev-list", "--parents", "-n", "1", merge).split()[1:]
+    if parents != [data["merge_parent_sha"]] or parents != [base]:
         raise SystemExit("FAIL: squash merge must have exactly BASE as its only parent")
 
     head_paths = changed_paths(base, head)
@@ -69,37 +64,29 @@ def main() -> int:
     }
     declared = set(data["divergent_paths"])
     if divergent != declared:
-        raise SystemExit(
-            "FAIL: divergent path inventory mismatch: "
-            f"actual={sorted(divergent)} declared={sorted(declared)}"
-        )
+        raise SystemExit(f"FAIL: divergent path inventory mismatch: actual={sorted(divergent)} declared={sorted(declared)}")
 
-    conflict_evidence = data["canonical_conflict_evidence"]
-    if set(conflict_evidence) != declared:
+    evidence = data["canonical_conflict_evidence"]
+    if set(evidence) != declared:
         raise SystemExit("FAIL: every divergent path needs canonical conflict evidence")
     for path in sorted(declared):
-        item = conflict_evidence[path]
-        if not item.get("stale_or_conflicting"):
-            raise SystemExit(f"FAIL: path is not proven stale/conflicting: {path}")
-        if not item.get("evidence"):
-            raise SystemExit(f"FAIL: missing evidence reference for divergent path: {path}")
+        item = evidence[path]
+        if not item.get("stale_or_conflicting") or not item.get("evidence"):
+            raise SystemExit(f"FAIL: incomplete stale/conflict proof for divergent path: {path}")
 
     accepted = set(data["accepted_payload_paths"])
     if accepted != merge_paths:
-        raise SystemExit(
-            "FAIL: accepted payload inventory mismatch: "
-            f"actual={sorted(merge_paths)} declared={sorted(accepted)}"
-        )
+        raise SystemExit(f"FAIL: accepted payload inventory mismatch: actual={sorted(merge_paths)} declared={sorted(accepted)}")
 
     merge_tree = run("git", "rev-parse", f"{merge}^{{tree}}")
     if merge_tree != data["accepted_payload_digest"]:
         raise SystemExit("FAIL: accepted payload digest/tree identity mismatch")
-
     if run("git", "merge-base", base, merge) != base:
         raise SystemExit("FAIL: merge is not based on canonical BASE")
 
-    print("PASS: squash reconciliation provenance is structurally valid and fail-closed")
     print(json.dumps({
+        "status": "PASS",
+        "stage": stage,
         "schema": data["schema"],
         "pr_number": data["pr_number"],
         "base_sha": base,
@@ -109,6 +96,8 @@ def main() -> int:
         "accepted_payload_paths": sorted(accepted),
         "accepted_payload_digest": merge_tree,
         "independent_forensic_status": data["independent_forensic_status"],
+        "merge_authority": data["merge_authority"],
+        "self_certification": data["self_certification"],
     }, indent=2))
     return 0
 
