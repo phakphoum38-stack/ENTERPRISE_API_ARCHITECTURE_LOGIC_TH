@@ -53,7 +53,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 | GitHub Pro                        | 20 GB-month      | 180 hrs               |
 
 > [!NOTE]
-> GitHub Codespaces ใช้งานไม่ได้กับ repository ที่เป็นเจ้าของโดย managed user accounts ดูเพิ่มที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
+> GitHub Codespaces ใช้งานไม่ได้กับ repository ที่เป็นเจ้าของโดย managed user accounts โดยตรง อย่างไรก็ตาม ในกรณีของ template repository ที่เรียกเก็บเงินผ่าน organization ผู้ใช้แบบ managed user account อาจสร้าง codespace ได้ภายใต้เงื่อนไขของ organization นั้น ดูเพิ่มที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
 
 หากต้องการใช้โควตาที่รวมมาให้คุ้มขึ้น ดู [Getting the most out of your included usage](https://docs.github.com/en/codespaces/troubleshooting/troubleshooting-included-usage)
 
@@ -82,16 +82,16 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 ค่า compute จะแปรผันตามจำนวน processor cores ของ machine type ที่เลือก ยิ่ง core มาก ราคาต่อชั่วโมงยิ่งสูง ตัวอย่างเช่น 16-core จะมีค่า compute สูงกว่า 2-core อยู่ 8 เท่า
 
 > [!IMPORTANT]
-> ตารางด้านล่างเป็นตัวอย่างราคาที่อ้างอิงข้อมูลช่วงเดือนกันยายน 2026 เพื่ออธิบายสัดส่วนการคิดราคาเท่านั้น ราคาปัจจุบันอาจเปลี่ยนแปลงได้ ควรตรวจสอบตัวเลขล่าสุดจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
+> ตารางด้านล่างแสดงมิติการคิดราคาและตัวคูณการใช้งานที่คงอยู่ได้ยาวกว่า ส่วนตัวเลขราคาเงินจริงอาจเปลี่ยนแปลงได้ ควรตรวจสอบราคาปัจจุบันจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
 
-| Component          | Machine type | Unit of measure | Included usage multiplier | Price |
-| ------------------ | ------------ | --------------- | ------------------------- | ----- |
-| Codespaces compute | 2 core       | 1 hour          | 2                         | $0.18 |
-| Codespaces compute | 4 core       | 1 hour          | 4                         | $0.36 |
-| Codespaces compute | 8 core       | 1 hour          | 8                         | $0.72 |
-| Codespaces compute | 16 core      | 1 hour          | 16                        | $1.44 |
-| Codespaces compute | 32 core      | 1 hour          | 32                        | $2.88 |
-| Codespaces storage | Storage      | 1 GB-month      | Not applicable            | $0.07 |
+| Component          | Machine type | Unit of measure | Included usage multiplier |
+| ------------------ | ------------ | --------------- | ------------------------- |
+| Codespaces compute | 2 core       | 1 hour          | 2                         |
+| Codespaces compute | 4 core       | 1 hour          | 4                         |
+| Codespaces compute | 8 core       | 1 hour          | 8                         |
+| Codespaces compute | 16 core      | 1 hour          | 16                        |
+| Codespaces compute | 32 core      | 1 hour          | 32                        |
+| Codespaces storage | Storage      | 1 GB-month      | Not applicable            |
 
 ## วิธีระบุบัญชีที่ต้องรับผิดชอบค่าใช้จ่าย
 
