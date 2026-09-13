@@ -47,13 +47,13 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 บัญชี GitHub ส่วนบุคคลทุกบัญชีจะมีโควตา compute time และ storage สำหรับ GitHub Codespaces หากใช้งานเกินจากที่รวมมา ระบบจะคิดเงินกับบัญชีส่วนบุคคลนั้น
 
-| Account plan                      | Storage ต่อเดือน | Compute time ต่อเดือน |
-| --------------------------------- | ---------------- | --------------------- |
-| GitHub Free for personal accounts | 15 GB-month      | 120 hrs               |
-| GitHub Pro                        | 20 GB-month      | 180 hrs               |
-
 > [!IMPORTANT]
 > โควตาฟรีอาจเปลี่ยนแปลงได้ตามแพ็กเกจและนโยบายล่าสุดของ GitHub ควรตรวจสอบข้อมูลปัจจุบันจาก [View and manage paid use of GitHub products](https://docs.github.com/en/billing/how-tos/products) หรือ [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces)
+
+โดยสรุป:
+
+* แผน GitHub Free สำหรับบัญชีส่วนบุคคลมี included usage สำหรับ Codespaces
+* แผน GitHub Pro สำหรับบัญชีส่วนบุคคลมี included usage มากกว่าแผน Free
 
 > [!NOTE]
 > GitHub Codespaces ใช้งานไม่ได้กับ repository ที่เป็นเจ้าของโดยบัญชี `managed user account` โดยตรง อย่างไรก็ตาม ในกรณีของ template repository ที่เรียกเก็บเงินผ่าน organization ผู้ใช้ที่เป็น `managed user account` อาจสร้าง codespace ได้ภายใต้เงื่อนไขของ organization นั้น ดูเพิ่มที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
