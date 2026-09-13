@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
+import 'mission_control_desktop_page.dart';
 import 'owner_api.dart';
 import 'runtime_status_pill.dart';
 
 class FriendAppShell extends StatelessWidget {
-  const FriendAppShell({required this.index, required this.onIndexChanged, required this.pages, required this.teamCenter, required this.status, super.key});
+  const FriendAppShell({required this.index, required this.onIndexChanged, required this.pages, required this.teamCenter, required this.status, this.missionControlProjection, super.key});
   final int index;
   final ValueChanged<int> onIndexChanged;
   final List<Widget> pages;
   final Widget teamCenter;
   final Widget status;
+  final Map<String, dynamic>? missionControlProjection;
 
   static const items = <({IconData icon, String label})>[
+    (icon: Icons.dashboard_outlined, label: 'Mission Control'),
     (icon: Icons.chat_bubble_outline, label: 'Friend'),
     (icon: Icons.rocket_launch_outlined, label: 'Launch Desk'),
     (icon: Icons.auto_awesome_outlined, label: 'Capabilities'),
@@ -32,6 +35,9 @@ class FriendAppShell extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 900;
+            final content = index == 0
+                ? MissionControlDesktopPage(projection: missionControlProjection)
+                : pages[index - 1];
             return Row(
               children: [
                 _Sidebar(index: index, onIndexChanged: onIndexChanged, compact: compact),
@@ -43,7 +49,7 @@ class FriendAppShell extends StatelessWidget {
                       children: [
                         _Header(teamCenter: teamCenter, status: headerStatus, compact: compact),
                         const SizedBox(height: 12),
-                        Expanded(child: pages[index]),
+                        Expanded(child: content),
                       ],
                     ),
                   ),

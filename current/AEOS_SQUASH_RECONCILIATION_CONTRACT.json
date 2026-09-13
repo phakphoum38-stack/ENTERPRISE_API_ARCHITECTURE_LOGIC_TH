@@ -1,0 +1,51 @@
+{
+  "schema": "aeos.squash-reconciliation.v1",
+  "purpose": "Fail-closed provenance contract for intentional squash-merge divergence",
+  "lineage_modes": [
+    "direct_parent_lineage",
+    "squash_diff_equivalent",
+    "squash_reconciliation"
+  ],
+  "requirements": {
+    "identity": [
+      "pr_number",
+      "base_sha",
+      "head_sha",
+      "merge_sha"
+    ],
+    "merge_parent": "merge must have exactly one parent and that parent must equal base_sha",
+    "divergence": "BASE->PR_HEAD and BASE->MERGE may differ only when reconciliation evidence explicitly enumerates the complete divergent path set",
+    "dropped_or_changed_paths": "every divergent path must be enumerated",
+    "canonical_conflict_proof": "each divergent path must be proven stale or conflicting against canonical BASE",
+    "accepted_payload": "the post-reconciliation merge payload must be independently identified and verified",
+    "unauthorized_change_check": "no change outside the accepted payload or enumerated reconciliation set is permitted",
+    "independent_forensic": "reconciliation requires independent forensic verification",
+    "authority": "reconciliation evidence has merge_authority=false and self_certification=false"
+  },
+  "fail_closed": true,
+  "invalid_states": [
+    "missing_identity",
+    "wrong_base_parent",
+    "incomplete_divergence_inventory",
+    "unproven_stale_or_conflicting_path",
+    "unverified_accepted_payload",
+    "unauthorized_change",
+    "missing_independent_forensic",
+    "self_certification",
+    "merge_authority"
+  ],
+  "required_evidence_fields": [
+    "pr_number",
+    "base_sha",
+    "head_sha",
+    "merge_sha",
+    "merge_parent_sha",
+    "divergent_paths",
+    "canonical_conflict_evidence",
+    "accepted_payload_paths",
+    "accepted_payload_digest",
+    "independent_forensic_status",
+    "merge_authority",
+    "self_certification"
+  ]
+}

@@ -8,13 +8,15 @@ from .bundle import OwnerBundleBuilder
 from .capabilities import Capability, CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
 from .context import FriendContext
+from .controlled_automation_contract import AutomationDecision, AutomationRequest, ControlledAutomationContract, ControlledAutomationError
 from .evidence import EvidenceRecorder
+from .friend_runtime_contract import FriendRuntimeContract, FriendRuntimeContractError
 from .helpers import HelperAllocation, HelperScheduler
 from .identity import OwnerIdentity
 from .memory import ScopedMemory
-from .models import FriendDecision, FriendRequest, FriendResponse, ScaleProfile
 from .mission_control import MissionControl
 from .mission_control_capabilities import MissionControlCapabilities
+from .models import FriendDecision, FriendRequest, FriendResponse, ScaleProfile
 from .orchestrator import FriendOrchestrator
 from .persistent_memory import PersistentScopedMemory
 from .policy import OwnerPolicy
@@ -22,12 +24,15 @@ from .provider_settings import MemorySecretStore, OpenAICompatibleProvider, Prov
 from .providers import MockProvider, ProviderRouter
 from .reasoning import DecisionPlanner
 from .runtime import FriendRuntime
+from .self_learning_contract import SelfLearningContract, SelfLearningContractError
 from .service import OWNER_HEADER, PROFILE_HEADER, SESSION_HEADER, OwnerFriendService, default_owner_data_root
 from .skills import Skill, SkillRegistry
 from .tool_search import ToolSearch, ToolSearchResult
 from .tools import Tool, ToolRegistry
 from .unified_tool_catalog import TOOL_CATALOG, ToolDescriptor, ToolState, UnifiedToolCatalog
 from .v3_bridge import V3Bridge, V3BridgeStatus
+from .autobot_execution_loop import AutobotExecutionError, ExecutionEvent, ExecutionJob, ExecutionState, validate_job_payload
+from .trusted_web_research import MatchState, ResearchError, ResearchRecord, SourceKind, classify_source, match_environment, validate_research_finding
 
 __all__ = [
     "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalProof", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
