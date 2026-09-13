@@ -1,0 +1,59 @@
+RESEARCH OS — AGENT TRACE PERSISTENCE PHASE 2A
+
+Purpose
+-------
+Persist high-level Friend agent run lifecycle state so an Owner can inspect
+completed runs after the Friend process restarts.
+
+Storage boundary
+----------------
+owner_special/research_os_friend/agent_trace_store.py
+
+When FriendRuntime is created with data_root, durable traces are stored at:
+owners/<owner_id>/agent/traces.json
+
+When data_root is absent, agent traces remain in-process only.
+
+Persisted fields
+----------------
+- run id
+- owner/profile/session identity
+- goal text
+- lifecycle status
+- ordered lifecycle events
+- high-level event data
+- error state when applicable
+
+Explicitly NOT persisted
+------------------------
+- model hidden reasoning / chain of thought
+- full provider response bodies
+- API keys or bearer credentials
+- core SkillRegistry mutations
+- arbitrary tool payloads
+
+Safety invariants
+-----------------
+1. Owner isolation is enforced by the owner-scoped storage path and lookup.
+2. FriendOrchestrator remains execution authority.
+3. OwnerPolicy remains authorization authority.
+4. Trace persistence is observational; it does not grant new tool permissions.
+5. Restart recovery returns trace state without reconstructing a live provider
+   response object.
+6. Atomic replace is used for writes so partially written JSON is not promoted
+   as the current trace store.
+7. This phase does not enable MCP, Computer Use, destructive automation, or
+   Agents SDK execution.
+
+Recovery contract
+-----------------
+A restarted runtime created for the same owner and data_root can recover prior
+AgentRun metadata/events by run_id. The recovered response field is None because
+response bodies are intentionally not durable trace material.
+
+Next phase candidates
+---------------------
+- trace filtering / pagination
+- explicit approval state for side-effecting tools
+- Tool Search over UnifiedToolCatalog
+- Agents SDK adapter

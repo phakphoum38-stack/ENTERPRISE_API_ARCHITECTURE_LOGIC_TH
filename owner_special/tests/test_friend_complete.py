@@ -27,8 +27,12 @@ class FriendCompleteTests(unittest.TestCase):
         )
         self.assertNotIn("fast-1m", architecture["brain_profiles"])
         self.assertEqual(architecture["helper_scheduler"]["max_active_workers"], 128)
-        self.assertGreaterEqual(len(architecture["skills"]), 10)
+        self.assertGreaterEqual(len(architecture["skills"]), 12)
+        self.assertIn("codex", architecture["skills"])
+        self.assertIn("vscode", architecture["skills"])
         self.assertEqual(architecture["memory_scope"], "owner/profile/session")
+        self.assertEqual(architecture["tool_health_gate"]["overall"], "READY")
+        self.assertEqual(architecture["tool_health_gate"]["counts"]["MISSING"], 0)
 
     def test_adaptive_brain_reaches_6_to_6_logical_capacity(self) -> None:
         runtime = FriendRuntime.create_owner_special("phakphum")
@@ -66,6 +70,28 @@ class FriendCompleteTests(unittest.TestCase):
         self.assertEqual(response.decision.selected_skills, ("analysis", "security"))
         self.assertEqual(response.decision.selected_tools, ("echo",))
         self.assertEqual(response.provider, "owner-mock")
+
+    def test_codex_and_vscode_skills_are_routable(self) -> None:
+        runtime = FriendRuntime.create_owner_special("phakphum")
+        response = runtime.ask(
+            FriendRequest(
+                owner_id="phakphum",
+                text="inspect the VS Code workspace and prepare a Codex software-engineering plan",
+                requested_skills=("codex", "vscode"),
+            )
+        )
+        self.assertEqual(response.decision.selected_skills, ("codex", "vscode"))
+        self.assertEqual(response.provider, "owner-mock")
+
+    def test_natural_language_routes_github_tool(self) -> None:
+        runtime = FriendRuntime.create_owner_special("phakphum")
+        response = runtime.ask(
+            FriendRequest(
+                owner_id="phakphum",
+                text="show GitHub repository status",
+            )
+        )
+        self.assertEqual(response.decision.selected_tools, ("github.repository_status",))
 
     def test_evidence_redacts_credential_like_values(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

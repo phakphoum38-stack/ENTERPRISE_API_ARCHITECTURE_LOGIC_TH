@@ -1,0 +1,30 @@
+Research OS Friend — Agents SDK Boundary Phase 2D
+
+Purpose
+=======
+Prepare a stable adapter contract for a future OpenAI Agents SDK execution layer without replacing the existing Friend runtime authority.
+
+Current scope
+=============
+- build a deterministic Agents SDK contract from FriendRequest
+- describe requested tools and their current approval state
+- preserve OwnerPolicy and ApprovalGate locally
+- keep FriendOrchestrator as execution authority
+- keep the adapter API-call free and credential-free in this phase
+
+Why a boundary first
+====================
+The current Friend runtime already owns routing, policy, memory, evidence, tool execution, and durable traces. The SDK adapter should translate that contract instead of creating a competing authority.
+
+Safety
+======
+- no live OpenAI API calls
+- no OPENAI_API_KEY requirement for the adapter tests
+- no automatic tool execution
+- no approval bypass
+- no sandbox / Computer Use activation
+- no release / installer / provenance changes
+
+Next increment
+==============
+After local CI validates this boundary, a dedicated SDK runner can be added using the current Agents SDK contract, with credentials gated separately and with local approval enforcement preserved around side-effecting tools.

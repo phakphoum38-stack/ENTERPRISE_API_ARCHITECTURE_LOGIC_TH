@@ -27,6 +27,7 @@ RestartApplications=no
 
 [Files]
 Source: "package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "scripts\research-os-owner-runtime-quiesce.ps1"; Flags: dontcopy
 
 [Dirs]
 Name: "{commonappdata}\ResearchOSOwnerSpecial"
@@ -50,31 +51,16 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPo
 
 [Code]
 function OwnerFriendServiceIsStopped(): Boolean;
-var
-  ResultCode: Integer;
-  CmdExe: String;
+var ResultCode: Integer; CmdExe: String;
 begin
   CmdExe := ExpandConstant('{cmd}');
-  Result := Exec(
-    CmdExe,
-    '/C sc.exe query ResearchOSOwnerFriendService | findstr /C:"STOPPED" >nul',
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode) and (ResultCode = 0);
+  Result := Exec(CmdExe, '/C sc.exe query ResearchOSOwnerFriendService | findstr /C:"STOPPED" >nul', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
 function QuiesceOwnerRuntime(): Boolean;
-var
-  ResultCode: Integer;
-  PowerShellExe: String;
-  PythonPath: String;
-  AppPath: String;
-  ServiceHostPath: String;
-  GuardPath: String;
-  GuardScript: String;
-  Parameters: String;
+var ResultCode: Integer; PowerShellExe, PythonPath, AppPath, ServiceHostPath, GuardPath, QuiesceLogPath, Parameters: String;
 begin
+  Result := False;
   PythonPath := ExpandConstant('{app}\runtime\python\python.exe');
   AppPath := ExpandConstant('{app}\app\{#MyAppExeName}');
   ServiceHostPath := ExpandConstant('{app}\service_host\ResearchOS.Owner.ServiceHost.exe');
@@ -183,17 +169,9 @@ begin
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var
-  ScExe: String;
-  QueryCode: Integer;
-  StopCode: Integer;
-  I: Integer;
-  ServiceStopped: Boolean;
+var ScExe: String; QueryCode, StopCode, I: Integer; ServiceStopped: Boolean;
 begin
-  Result := '';
-  ScExe := ExpandConstant('{sys}\sc.exe');
-  ServiceStopped := False;
-
+  Result := ''; ScExe := ExpandConstant('{sys}\sc.exe'); ServiceStopped := False;
   Log('Checking Owner Friend Service before installer file replacement.');
   if not Exec(ScExe, 'query ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, QueryCode) then
   begin
@@ -243,13 +221,11 @@ begin
     Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log for the quiesce helper exit code.';
     Exit;
   end;
+  if not QuiesceOwnerRuntime() then begin Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log and detailed quiesce diagnostic.'; Exit; end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssInstall then Log('Owner Special install/upgrade preserves ProgramData\ResearchOSOwnerSpecial.');
-end;
-
+begin if CurStep = ssInstall then Log('Owner Special install/upgrade preserves ProgramData\ResearchOSOwnerSpecial.'); end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if (CurUninstallStep = usPostUninstall) and (not UninstallSilent) then

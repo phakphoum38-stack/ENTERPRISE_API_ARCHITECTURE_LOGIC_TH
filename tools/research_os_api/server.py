@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from api_auth import require_session
+from api_auth import extract_session_token, require_session
+from auth_session import clear_cookie_header, revoke_session, verify_session
 from conversation_store import (
     authorize as authorize_sync,
     delete_session as delete_cloud_session,
@@ -29,7 +30,11 @@ from github_status import GitHubStatusError, dashboard as github_dashboard
 from google_identity import GoogleIdentityBroker
 from google_oauth import GoogleOAuthBroker, GoogleOAuthError
 from google_workspace import GoogleWorkspaceConfig, get_google_workspace_dashboard
+from identity_providers import provider_catalog
 from memory import build_context, search_memory
+from multi_login import MultiLoginError, begin_login
+from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
+from oauth_handoff import consume_handoff
 from providers import ProviderError, build_provider
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -57,17 +62,7 @@ FRIEND_OWNER_ID = os.getenv("RESEARCH_OS_FRIEND_OWNER", "owner")
 
 def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 3, risk: int = 1, parallelism: int = 2, helper_budget: int = 0) -> dict[str, Any]:
     payload = {"text": text, "complexity": max(1, int(complexity)), "risk": max(1, int(risk)), "parallelism": max(1, int(parallelism)), "helper_budget": max(0, int(helper_budget))}
-    request = urllib.request.Request(
-        f"{FRIEND_BASE_URL}/owner/chat",
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json; charset=utf-8",
-            "X-Research-OS-Owner": FRIEND_OWNER_ID,
-            "X-Research-OS-Profile": "default",
-            "X-Research-OS-Session": session_id or "main-api",
-        },
-        method="POST",
-    )
+    request = urllib.request.Request(f"{FRIEND_BASE_URL}/owner/chat", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers={"Content-Type": "application/json; charset=utf-8", "X-Research-OS-Owner": FRIEND_OWNER_ID, "X-Research-OS-Profile": "default", "X-Research-OS-Session": session_id or "main-api"}, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             value = json.loads(response.read().decode("utf-8"))
@@ -86,7 +81,7 @@ def _json_bytes(payload: Any) -> bytes:
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
-    server_version = "ResearchOSAPI/0.6"
+    server_version = "ResearchOSAPI/0.8"
 
     def _send(self, status: int, payload: Any) -> None:
         body = _json_bytes(payload)
@@ -105,6 +100,15 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _redirect(self, location: str, cookie: str | None = None) -> None:
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", location)
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _send_static(self, filename: str) -> None:
         path = (WEB_DIR / filename).resolve()
@@ -136,10 +140,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
 
     def _authorize_sync_key(self) -> bool:
         if not sync_configured():
-            self._send(HTTPStatus.SERVICE_UNAVAILABLE, {
-                "error": "cloud_sync_not_configured",
-                "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using protected cloud operations.",
-            })
+            self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "cloud_sync_not_configured", "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using protected cloud operations."})
             return False
         candidate = self.headers.get("X-Research-OS-Sync-Key")
         if not authorize_sync(candidate):
@@ -148,7 +149,6 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         return True
 
     def _authorize_cloud_sync(self) -> dict[str, Any] | None:
-        """Require both the server capability and the verified per-user session."""
         if not self._authorize_sync_key():
             return None
         try:
@@ -161,6 +161,26 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             self._send(HTTPStatus.UNAUTHORIZED, {"error": "invalid_session", "detail": "Verified session identity is incomplete."})
             return None
         return principal
+
+    def _multi_login_redirect(self, provider: str) -> str:
+        explicit = (os.getenv("RESEARCH_OS_LOGIN_REDIRECT_URI") or "").strip()
+        if explicit:
+            return explicit.rstrip("/") + f"/v1/auth/{provider}/callback"
+        public_base = (os.getenv("RESEARCH_OS_PUBLIC_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+        if public_base:
+            return f"{public_base}/v1/auth/{provider}/callback"
+        port = int(os.getenv("RESEARCH_OS_API_PORT", "8787"))
+        return f"http://127.0.0.1:{port}/v1/auth/{provider}/callback"
+
+    def _auth_status(self) -> dict[str, Any]:
+        token = extract_session_token(self.headers)
+        if not token:
+            return {"connected": False, "account": None}
+        try:
+            session = verify_session(token)
+        except ValueError:
+            return {"connected": False, "account": None}
+        return {"connected": True, "account": {"user_id": session["user_id"], "email": session["email"], "role": session["role"]}}
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
@@ -176,18 +196,16 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     google_workspace_connected = bool(workspace.get("connected"))
                 except Exception:
                     pass
-                self._send(HTTPStatus.OK, {
-                    "status": "ok", "service": "research-os-api", "version": "0.6.0",
-                    "ui": WEB_DIR.is_dir(), "memory": True, "memory_commit": sync_configured(),
-                    "github": True, "cloud_sync": sync_configured(), "google_workspace": True,
-                    "google_workspace_connected": google_workspace_connected,
-                })
+                self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-api", "version": "0.8.0", "ui": WEB_DIR.is_dir(), "memory": True, "memory_commit": sync_configured(), "github": True, "cloud_sync": sync_configured(), "google_workspace": True, "google_workspace_connected": google_workspace_connected})
                 return
             if path == "/v1/providers":
                 self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})
                 return
-            if path == "/v1/auth/google/status":
-                self._send(HTTPStatus.OK, GoogleIdentityBroker().status())
+            if path == "/v1/auth/providers":
+                self._send(HTTPStatus.OK, {"providers": provider_catalog()})
+                return
+            if path in {"/v1/auth/status", "/v1/auth/google/status"}:
+                self._send(HTTPStatus.OK, self._auth_status())
                 return
             if path == "/v1/auth/google/callback":
                 params = parse_qs(parsed.query)
@@ -203,6 +221,11 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 email = ((result.get("account") or {}).get("email") or "Google account")
                 self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
                 return
+            for provider in ("microsoft", "github"):
+                if path == f"/v1/auth/{provider}/callback":
+                    result, cookie = __import__("server_auth_routes").auth_callback(provider, parsed.query)
+                    self._redirect("/", cookie)
+                    return
             if path == "/v1/google-workspace/dashboard":
                 self._send(HTTPStatus.OK, get_google_workspace_dashboard())
                 return
@@ -235,10 +258,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 query = str(params.get("q", [""])[0]).strip()
                 if not query:
                     raise ValueError("q is required")
-                try:
-                    limit = int(params.get("limit", ["5"])[0])
-                except ValueError as exc:
-                    raise ValueError("limit must be an integer") from exc
+                limit = int(params.get("limit", ["5"])[0])
                 hits = search_memory(ARTIFACT_DIR, query, limit)
                 self._send(HTTPStatus.OK, {"query": query, "count": len(hits), "hits": hits, "source": "research/artifacts"})
                 return
@@ -256,7 +276,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, github_dashboard(repository))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (ValueError, GoogleOAuthError) as exc:
+        except (ValueError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except GitHubStatusError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
@@ -267,11 +287,45 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = self._read_json()
+            if path == "/v1/auth/providers/login":
+                provider = str(body.get("provider", "")).strip().lower()
+                if provider == "google":
+                    self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
+                    return
+                redirect_uri = self._multi_login_redirect(provider)
+                _, authorization_url = begin_runtime_login(provider, redirect_uri)
+                self._send(HTTPStatus.OK, {"provider": provider, "authorization_url": authorization_url, "redirect_uri": redirect_uri, "token_storage": "backend_only"})
+                return
             if path == "/v1/auth/google/start":
                 self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
                 return
-            if path == "/v1/auth/google/signout":
-                self._send(HTTPStatus.OK, GoogleIdentityBroker().disconnect())
+            if path == "/v1/auth/google/handoff":
+                handoff_code = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()
+                if not handoff_code:
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "oauth_handoff_required", "detail": "A one-time Google OAuth handoff state is required."})
+                    return
+                session = consume_handoff(GoogleIdentityBroker().root, handoff_code)
+                if not session:
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "oauth_handoff_invalid", "detail": "The Google OAuth handoff is missing, expired, or already consumed."})
+                    return
+                principal = verify_session(session)
+                self._send(HTTPStatus.OK, {"connected": True, "session": session, "account": {"user_id": principal["user_id"], "email": principal["email"], "role": principal["role"]}, "token_type": "research_os_session"})
+                return
+            if path in {"/v1/auth/signout", "/v1/auth/google/signout"}:
+                token = extract_session_token(self.headers)
+                if token:
+                    try:
+                        revoke_session(token)
+                    except ValueError:
+                        pass
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Set-Cookie", clear_cookie_header())
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                body_bytes = _json_bytes({"signed_out": True})
+                self.send_header("Content-Length", str(len(body_bytes)))
+                self.end_headers()
+                self.wfile.write(body_bytes)
                 return
             if path == "/v1/google-workspace/oauth/start":
                 self._send(HTTPStatus.OK, GoogleOAuthBroker().begin())
@@ -301,9 +355,9 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 principal = self._authorize_cloud_sync()
                 if principal is None:
                     return
-                session_id = str(body.get("session_id", "")).strip()
-                deleted = delete_cloud_session(session_id, user_id=str(principal["user_id"]))
-                self._send(HTTPStatus.OK, {"session_id": session_id, "deleted": deleted})
+                session_id_value = str(body.get("session_id", "")).strip()
+                deleted = delete_cloud_session(session_id_value, user_id=str(principal["user_id"]))
+                self._send(HTTPStatus.OK, {"session_id": session_id_value, "deleted": deleted})
                 return
             if path == "/v1/ai/generate":
                 prompt = str(body.get("prompt", "")).strip()
@@ -343,7 +397,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, self._commit_memory(body))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (TypeError, ValueError, GoogleOAuthError) as exc:
+        except (TypeError, ValueError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
@@ -413,10 +467,9 @@ def main() -> int:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        pass
+        return 0
     finally:
         server.server_close()
-    return 0
 
 
 if __name__ == "__main__":

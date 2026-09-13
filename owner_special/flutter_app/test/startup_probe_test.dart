@@ -2,11 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 import 'package:research_os_owner_special/src/startup_probe.dart';
 
-class FakeApi implements OwnerFriendApi {
+class FakeApi extends OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> health() async => <String, dynamic>{'status': 'ok'};
   @override
-  Future<Map<String, dynamic>> status() async => <String, dynamic>{'version': '1.3.0-owner'};
+  Future<Map<String, dynamic>> status() async => <String, dynamic>{'version': '1.3.1-owner'};
   @override
   Future<Map<String, dynamic>> providerStatus() async => <String, dynamic>{'enabled': false};
   @override
@@ -23,7 +23,7 @@ void main() {
   test('startup probe proves health status and provider boundary', () async {
     final result = await OwnerStartupProbe(FakeApi()).run();
     expect((result['health'] as Map)['status'], 'ok');
-    expect((result['status'] as Map)['version'], '1.3.0-owner');
+    expect((result['status'] as Map)['version'], '1.3.1-owner');
     expect(result.containsKey('provider'), isTrue);
   });
 }

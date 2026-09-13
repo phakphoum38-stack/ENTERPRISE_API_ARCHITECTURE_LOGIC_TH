@@ -68,17 +68,22 @@ jobs:
           $env:RESEARCH_OS_V3_HOST='127.0.0.1'
           $env:RESEARCH_OS_V3_PORT='8788'
           $env:PYTHONPATH="$PWD\v3"
-          python -c 'import research_os_v3.service as svc; print("V3_IMPORT=PASS"); print("V3_SERVICE=" + str(svc.__file__))'
-          if($LASTEXITCODE -ne 0){throw 'V3 service import failed'}
+          $python=Join-Path $env:pythonLocation 'python.exe'
+          if(-not (Test-Path $python)){throw "Python executable not found: $python"}
+          $pythonInfo=& $python -c 'import sys,platform; print("PYTHON_EXE=" + sys.executable); print("PYTHON_VERSION=" + platform.python_version()); print("PYTHON_ARCH=" + platform.machine())'
+          if($LASTEXITCODE -ne 0){throw "Exact Python runtime validation failed with exit code $LASTEXITCODE"}
+          $pythonInfo | ForEach-Object {Write-Host $_}
+          $importInfo=& $python -c 'import research_os_v3.service as svc; print("V3_IMPORT=PASS"); print("V3_SERVICE=" + str(svc.__file__))'
+          if($LASTEXITCODE -ne 0){throw "V3 service import failed with exit code $LASTEXITCODE"}
+          $importInfo | ForEach-Object {Write-Host $_}
           $out="$data\v3.out.log";$err="$data\v3.err.log"
           $launcher="$data\start-v3-master.py"
           @'
           import os
-          from pathlib import Path
           from v3.scripts.run_service import main
           raise SystemExit(main())
           '@ | Set-Content $launcher -Encoding utf8
-          $p=Start-Process python -ArgumentList @('v3/scripts/run_service.py') -WorkingDirectory $PWD -Environment @{PYTHONPATH="$PWD\v3";RESEARCH_OS_DATA_DIR=$data;RESEARCH_OS_V3_HOST='127.0.0.1';RESEARCH_OS_V3_PORT='8788'} -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          $p=Start-Process $python -ArgumentList @('-u','v3/scripts/run_service.py') -WorkingDirectory $PWD -Environment @{PYTHONPATH="$PWD\v3";RESEARCH_OS_DATA_DIR=$data;RESEARCH_OS_V3_HOST='127.0.0.1';RESEARCH_OS_V3_PORT='8788'} -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
           $p.Id | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
           $ready=$false
           for($i=0;$i-lt 40;$i++){

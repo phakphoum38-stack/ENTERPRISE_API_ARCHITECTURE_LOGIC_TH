@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "status": "CANONICAL",
+  "entities": [
+    "requirement","decision","architecture","contract","code","commit","build","artifact","test","evidence","gate","release","installation","runtime","incident","root_cause","knowledge"
+  ],
+  "relationships": [
+    "derived_from","decides","architects","constrains","implements","committed_as","built_by","produces","verified_by","supported_by","enforced_by","released_as","installed_as","runs_as","observed_by","caused_by","learns_from"
+  ],
+  "required_entity_fields": ["id","type","state","created_at","valid_from"],
+  "required_relationship_fields": ["id","type","from","to","valid_from"],
+  "lifecycle_states": ["proposed","approved","implemented","verified","released","installed","running","incident","root_caused","learned","superseded","retired"],
+  "rules": {
+    "ids_are_unique": true,
+    "relationship_endpoints_must_exist": true,
+    "entity_type_must_be_declared": true,
+    "relationship_type_must_be_declared": true,
+    "valid_from_must_be_iso8601": true,
+    "temporal_history_is_append_only": true,
+    "production_artifact_requires_backward_lineage": true,
+    "runtime_evidence_requires_forward_lineage": true
+  }
+}

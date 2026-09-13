@@ -57,11 +57,56 @@ def _repo_path(repository: str, suffix: str = "") -> str:
     return f"/repos/{encoded_owner}/{encoded_name}{suffix}"
 
 
+def _artifact_items(artifacts: Any) -> list[dict[str, Any]]:
+    items = artifacts.get("artifacts", []) if isinstance(artifacts, dict) else []
+    result = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        workflow_run = item.get("workflow_run") or {}
+        result.append(
+            {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "size_in_bytes": item.get("size_in_bytes"),
+                "created_at": item.get("created_at"),
+                "expires_at": item.get("expires_at"),
+                "expired": bool(item.get("expired")),
+                "archive_download_url": item.get("archive_download_url"),
+                "digest": item.get("digest"),
+                "workflow_run_id": workflow_run.get("id"),
+                "workflow_run_name": workflow_run.get("name"),
+                "workflow_run_head_branch": workflow_run.get("head_branch"),
+                "workflow_run_conclusion": workflow_run.get("conclusion"),
+                "workflow_run_url": workflow_run.get("html_url"),
+            }
+        )
+    return result
+
+
+def artifacts(repository: str, *, name: str | None = None, per_page: int = 30) -> dict[str, Any]:
+    per_page = max(1, min(int(per_page), 100))
+    suffix = f"/actions/artifacts?per_page={per_page}"
+    if name and name.strip():
+        suffix += "&name=" + urllib.parse.quote(name.strip(), safe="")
+    payload = _get_json(_repo_path(repository, suffix))
+    return {
+        "repository": repository,
+        "artifacts": _artifact_items(payload),
+        "total_count": payload.get("total_count", 0) if isinstance(payload, dict) else 0,
+        "credential_configured": bool(
+            os.getenv("RESEARCH_OS_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
+        ),
+        "read_only": True,
+    }
+
+
 def dashboard(repository: str) -> dict[str, Any]:
     repo = _get_json(_repo_path(repository))
     commits = _get_json(_repo_path(repository, "/commits?per_page=5"))
     pulls = _get_json(_repo_path(repository, "/pulls?state=open&per_page=5"))
     runs = _get_json(_repo_path(repository, "/actions/runs?per_page=5"))
+    repo_artifacts = _get_json(_repo_path(repository, "/actions/artifacts?per_page=30"))
 
     if not isinstance(repo, dict):
         raise GitHubStatusError("GitHub repository response has an invalid shape")
@@ -119,6 +164,7 @@ def dashboard(repository: str) -> dict[str, Any]:
         "commits": commit_items,
         "pull_requests": pull_items,
         "workflow_runs": run_items,
+        "artifacts": _artifact_items(repo_artifacts),
         "credential_configured": bool(
             os.getenv("RESEARCH_OS_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
         ),

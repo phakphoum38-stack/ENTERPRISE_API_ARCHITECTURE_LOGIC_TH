@@ -24,11 +24,27 @@ services:
         value: https://research-os-api-phakphoum.onrender.com/v1/auth/google/callback
       - key: RESEARCH_OS_GOOGLE_REDIRECT_URI
         value: https://research-os-api-phakphoum.onrender.com/v1/google-workspace/oauth/callback
+      - key: RESEARCH_OS_LOGIN_GOOGLE_ENABLED
+        value: "true"
+      - key: RESEARCH_OS_LOGIN_MICROSOFT_ENABLED
+        value: "false"
+      - key: RESEARCH_OS_LOGIN_GITHUB_ENABLED
+        value: "false"
       - key: GEMINI_API_KEY
         sync: false
       - key: RESEARCH_OS_SYNC_KEY
         sync: false
+      - key: RESEARCH_OS_SESSION_SECRET
+        sync: false
       - key: RESEARCH_OS_GOOGLE_CLIENT_ID
         sync: false
       - key: RESEARCH_OS_GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: RESEARCH_OS_MICROSOFT_CLIENT_ID
+        sync: false
+      - key: RESEARCH_OS_MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: RESEARCH_OS_GITHUB_CLIENT_ID
+        sync: false
+      - key: RESEARCH_OS_GITHUB_CLIENT_SECRET
         sync: false

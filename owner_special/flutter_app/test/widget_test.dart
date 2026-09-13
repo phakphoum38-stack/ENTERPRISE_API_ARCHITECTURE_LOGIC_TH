@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_owner_special/src/friend_app.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 
-class FakeOwnerFriendApi implements OwnerFriendApi {
+class FakeOwnerFriendApi extends OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> health() async => <String, dynamic>{'status': 'ok'};
 

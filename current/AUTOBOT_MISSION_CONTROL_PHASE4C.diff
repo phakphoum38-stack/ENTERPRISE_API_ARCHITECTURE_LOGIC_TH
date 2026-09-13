@@ -1,0 +1,127 @@
+diff --git a/owner_special/research_os_friend/mission_control_capabilities.py b/owner_special/research_os_friend/mission_control_capabilities.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/research_os_friend/mission_control_capabilities.py
+@@ -0,0 +1,45 @@
++from __future__ import annotations
++
++from typing import Any
++
++
++class MissionControlCapabilities:
++    """Read-only projection of the existing capability/tool health surfaces.
++
++    This class is presentation-only: it consumes FriendRuntime's existing
++    catalog and health snapshots and never executes, registers, or authorizes.
++    """
++
++    VERSION = 1
++    MAX_ROWS = 100
++
++    def __init__(self, runtime: Any) -> None:
++        self.runtime = runtime
++
++    def snapshot(self, *, limit: int = 25) -> dict[str, object]:
++        if limit < 1 or limit > self.MAX_ROWS:
++            raise ValueError(f"limit must be between 1 and {self.MAX_ROWS}")
++
++        health = self.runtime.tool_health()
++        rows = tuple(health.get("rows", ()))
++        ordered = sorted(rows, key=lambda row: str(row.get("name", "")))[:limit]
++        return {
++            "schema": "research-os-mission-control-capabilities/v1",
++            "owner_id": self.runtime.owner.owner_id,
++            "read_only": True,
++            "execution_authority": "FriendOrchestrator",
++            "authorization_authority": "OwnerPolicy",
++            "approval_authority": "ApprovalGate",
++            "source": "UnifiedToolCatalog+ToolHealthMatrix+ToolHealthGate",
++            "total": len(rows),
++            "healthy": int(health.get("healthy", 0)),
++            "counts": dict(health.get("counts", {})),
++            "gate": dict(health.get("gate", {})),
++            "rows": [dict(row) for row in ordered],
++            "limit": limit,
++            "truncated": len(rows) > len(ordered),
++        }
+diff --git a/owner_special/research_os_friend/__init__.py b/owner_special/research_os_friend/__init__.py
+--- a/owner_special/research_os_friend/__init__.py
++++ b/owner_special/research_os_friend/__init__.py
+@@ -17,6 +17,7 @@
+ from .models import FriendDecision, FriendRequest, FriendResponse, ScaleProfile
+ from .mission_control import MissionControl
++from .mission_control_capabilities import MissionControlCapabilities
+ from .orchestrator import FriendOrchestrator
+@@ -31,6 +32,7 @@
+-    "HelperScheduler", "MemorySecretStore", "MissionControl", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
++    "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
+diff --git a/owner_special/tests/test_mission_control_capabilities.py b/owner_special/tests/test_mission_control_capabilities.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/tests/test_mission_control_capabilities.py
+@@ -0,0 +1,43 @@
++import unittest
++
++from owner_special.research_os_friend.mission_control_capabilities import MissionControlCapabilities
++from owner_special.research_os_friend.runtime import FriendRuntime
++
++
++class MissionControlCapabilitiesTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self.runtime = FriendRuntime.create_owner_special("owner-capabilities", data_root=None)
++        self.control = MissionControlCapabilities(self.runtime)
++
++    def test_snapshot_is_read_only_and_bounded(self) -> None:
++        snapshot = self.control.snapshot(limit=5)
++        self.assertEqual(snapshot["schema"], "research-os-mission-control-capabilities/v1")
++        self.assertEqual(snapshot["owner_id"], "owner-capabilities")
++        self.assertTrue(snapshot["read_only"])
++        self.assertEqual(snapshot["execution_authority"], "FriendOrchestrator")
++        self.assertEqual(snapshot["authorization_authority"], "OwnerPolicy")
++        self.assertEqual(snapshot["approval_authority"], "ApprovalGate")
++        self.assertEqual(snapshot["total"], 15)
++        self.assertEqual(snapshot["healthy"], 7)
++        self.assertEqual(snapshot["limit"], 5)
++        self.assertTrue(snapshot["truncated"])
++        self.assertEqual(
++            [row["name"] for row in snapshot["rows"]],
++            ["echo", "file", "github", "github-actions", "github-repository"],
++        )
++
++    def test_limit_is_bounded(self) -> None:
++        with self.assertRaises(ValueError):
++            self.control.snapshot(limit=0)
++        with self.assertRaises(ValueError):
++            self.control.snapshot(limit=MissionControlCapabilities.MAX_ROWS + 1)
+diff --git a/RESEARCH_OS_MISSION_CONTROL_PHASE4C.md b/RESEARCH_OS_MISSION_CONTROL_PHASE4C.md
+new file mode 100644
+--- /dev/null
++++ b/RESEARCH_OS_MISSION_CONTROL_PHASE4C.md
+@@ -0,0 +1,43 @@
++# Research OS — Mission Control Phase 4C
++
++## Purpose
++
++Project the existing `UnifiedToolCatalog`, `ToolHealthMatrix`, and
++`ToolHealthGate` into a bounded, read-only Mission Control capability panel
++contract.
++
++## Contract
++
++`MissionControlCapabilities.snapshot(limit=25)` returns a stable schema,
++owner identity, read-only state, existing authority declarations, health
++counts, readiness-gate data, deterministic rows, and explicit truncation.
++
++The projection is bounded to a maximum of 100 rows.
++
++## Safety
++
++This panel is observational only. It does not execute, register, unregister,
++authorize, approve, mutate catalog state, invoke MCP, or invoke Computer Use.
++It consumes the existing runtime health surfaces without creating another
++execution authority.
++
++## Next increment
++
++Bind this schema into the desktop shell as a read-only capability/tool-health
++panel. UI rendering must not gain direct mutation or execution authority.

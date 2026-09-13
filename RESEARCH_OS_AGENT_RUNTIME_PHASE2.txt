@@ -1,0 +1,55 @@
+RESEARCH OS — AGENT RUNTIME PHASE 2
+
+Purpose
+-------
+Add a thin, deterministic agent-runtime boundary around the existing Friend
+orchestrator without replacing current policy, skills, tools, memory, evidence,
+or provider ownership.
+
+Current contract
+----------------
+FriendRuntime.run_agent(request)
+    -> AgentRun
+
+AgentRun contains:
+- stable run_id derived from owner/profile/session/goal
+- owner/profile/session identity
+- goal
+- lifecycle status
+- ordered immutable trace events
+- final FriendResponse or failure
+
+Lifecycle
+---------
+created -> planning -> executing -> verifying -> completed
+                              \-> failed
+
+Trace
+-----
+Trace events are high-level operational evidence only. They do not expose
+hidden model reasoning or credentials.
+
+Authority boundaries
+--------------------
+- FriendOrchestrator remains execution authority.
+- OwnerPolicy remains authorization authority.
+- ToolRegistry / SkillRegistry remain execution registries.
+- EvidenceRecorder remains evidence authority.
+- SelfLearningEngine remains separate from Core SkillRegistry.
+
+Safety invariants
+-----------------
+- No OPENAI_API_KEY is required for the runtime foundation itself.
+- No Computer Use is enabled.
+- No MCP server is enabled.
+- No automatic destructive action approval is added.
+- No core skill mutation is introduced.
+- No release / installer / provenance workflow changes are introduced.
+
+Next increments
+---------------
+1. Durable Agent Trace persistence, owner-scoped and credential-redacted.
+2. Tool Search over UnifiedToolCatalog.
+3. Explicit approval/permission state for side-effecting tools.
+4. Agents SDK adapter after the deterministic runtime contract is proven.
+5. Computer Use behind sandbox + permission gates.

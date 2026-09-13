@@ -1,0 +1,144 @@
+name: Canonical Source Lineage Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - fix/canonical-release-lineage-gate-current-main
+      - fix/canonical-lineage-target-sha-hardening
+      - fix/canonical-lineage-runtime-expression-hardening
+      - fix/release-contract-lineage
+      - fix/canonical-lineage-dynamic-artifact-contract
+    paths:
+      - ".github/workflows/research-os-windows-artifact.yml"
+      - ".github/workflows/owner-special-friend.yml"
+      - "owner_special/scripts/build_bundle.py"
+      - "owner_special/scripts/verify-installed-owner-provenance.ps1"
+      - ".github/workflows/canonical-source-lineage-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canonical-source-lineage-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify canonical Research OS + Friend release lineage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout canonical source
+        uses: actions/checkout@v4
+
+      - name: Verify Research OS Windows artifact identity contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/research-os-windows-artifact.yml"
+          test -f "$workflow"
+
+          grep -qF 'APP_PROJECT_NAME: research_os_flutter' "$workflow"
+          grep -qF 'APP_EXE_NAME: research_os_flutter.exe' "$workflow"
+          grep -qF 'APP_PRODUCT_NAME: Research OS' "$workflow"
+          grep -qF 'APP_COMPANY_NAME: Research OS Team' "$workflow"
+
+          # The artifact contract must remain dynamic. Never embed the current
+          # commit SHA literally in the canonical workflow: that would make the
+          # lineage gate fail again on the next commit.
+          # GitHub Actions interpolates ${{ github.sha }} before Bash runs, so
+          # construct the literal expression from shell fragments instead.
+          expected_artifact='Research-OS-Windows-x64-$'
+          expected_artifact+='{{ github.sha }}'
+          grep -qF "name: $expected_artifact" "$workflow"
+          grep -qF 'uses: actions/upload-artifact@v4' "$workflow"
+
+          # Research OS owns the generic Windows artifact. Friend Complete is
+          # produced only by the Owner Special release-control pipeline.
+          if grep -qF 'Research-OS-Windows-x64-Friend-Complete-' "$workflow"; then
+            echo 'CANONICAL_LINEAGE_GATE=FAIL'
+            echo 'Research OS Windows workflow must not publish the Friend Complete artifact.'
+            exit 1
+          fi
+
+          echo 'CANONICAL_LINEAGE_GATE=PASS'
+          echo "Canonical source SHA: $GITHUB_SHA"
+          echo "Research OS artifact contract: Research-OS-Windows-x64-${GITHUB_SHA}"
+
+      - name: Verify Research OS workflow does not bootstrap canonical source
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/research-os-windows-artifact.yml"
+          grep -qF "RUNNER_TEMP" "$workflow"
+          grep -qF 'flutter create --platforms=windows --project-name=$env:APP_PROJECT_NAME .' "$workflow"
+          grep -qF 'research-os-flutter-windows' "$workflow"
+          echo 'RESEARCH_OS_BOOTSTRAP_ISOLATION_GATE=PASS'
+
+      - name: Verify canonical Owner TARGET_SHA contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/owner-special-friend.yml"
+          test -f "$workflow"
+
+          expected_target_sha='$'
+          expected_target_sha+='{{ inputs.target_sha || github.sha }}'
+          expected_target_ref='$'
+          expected_target_ref+='{{ env.TARGET_SHA }}'
+
+          grep -qF "TARGET_SHA: $expected_target_sha" "$workflow"
+          grep -qF "ref: $expected_target_ref" "$workflow"
+          grep -qF "owner-special-desktop-validated-$expected_target_ref" "$workflow"
+          grep -qF "owner-special-setup-validated-$expected_target_ref" "$workflow"
+          grep -qF "owner-special-friend-complete-$expected_target_ref" "$workflow"
+          echo "OWNER_TARGET_SHA_CONTRACT=PASS"
+
+      - name: Verify canonical Owner release control pipeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/owner-special-friend.yml"
+          test -f "$workflow"
+
+          expected_target_ref='$'
+          expected_target_ref+='{{ env.TARGET_SHA }}'
+
+          grep -qF 'owner-bundle:' "$workflow"
+          grep -qF 'python owner_special/scripts/build_bundle.py' "$workflow"
+          grep -qF "owner-special-friend-complete-$expected_target_ref" "$workflow"
+          grep -qF 'verify-installed-owner-provenance.ps1' "$workflow"
+          grep -qF -- '-ExpectedCommit $env:TARGET_SHA' "$workflow"
+          grep -qF '$env:GITHUB_SHA = $env:TARGET_SHA' "$workflow"
+          echo "OWNER_RELEASE_CONTROL_GATE=PASS"
+
+      - name: Verify installed provenance gate implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="owner_special/scripts/verify-installed-owner-provenance.ps1"
+          test -f "$script"
+          grep -qF "OWNER_BUILD_IDENTITY.json" "$script"
+          grep -qF "research_os_owner_special.exe" "$script"
+          grep -qF "ExpectedCommit" "$script"
+          grep -qF "identity.commit" "$script"
+          grep -qF "Get-FileHash" "$script"
+          grep -qF "RELEASE_PROVENANCE_GATE=PASS" "$script"
+          echo "INSTALLED_RELEASE_PROVENANCE_CONTRACT=PASS"
+
+      - name: Verify final bundle is bound to the canonical source and validated installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="owner_special/scripts/build_bundle.py"
+          test -f "$script"
+          grep -qF 'GITHUB_SHA' "$script"
+          grep -qF 'source_sha = os.environ.get("GITHUB_SHA", "").strip()' "$script"
+          grep -qF 'Research-OS-Owner-Special-Setup-1.3.1-x64.exe' "$script"
+          grep -qF 'owner-v1.3-validation.json' "$script"
+          grep -qF 'RELEASE_MANIFEST.txt' "$script"
+          grep -qF 'BUNDLE_SHA256.txt' "$script"
+          grep -qF 'owner_setup_sha256' "$script"
+          grep -qF 'validation_evidence_sha256' "$script"
+          echo "FINAL_RELEASE_LINEAGE_GATE=PASS"

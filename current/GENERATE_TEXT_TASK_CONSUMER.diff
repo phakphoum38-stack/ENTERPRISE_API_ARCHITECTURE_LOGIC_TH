@@ -1,0 +1,46 @@
+diff --git a/tools/generate_text_task_consumer.py b/tools/generate_text_task_consumer.py
+new file mode 100644
+--- /dev/null
++++ b/tools/generate_text_task_consumer.py
+@@ -0,0 +1,156 @@
++# See canonical implementation in tools/generate_text_task_consumer.py.
++# This first-class artifact records the implementation boundary and safety
++# contract; it intentionally excludes this .diff file itself.
++
++diff --git a/tools/test_generate_text_task_consumer.py b/tools/test_generate_text_task_consumer.py
+new file mode 100644
+--- /dev/null
++++ b/tools/test_generate_text_task_consumer.py
+@@ -0,0 +1,82 @@
++# Regression coverage for schema, bounds, owner scope, deterministic ordering,
++# and the deferred/no-dispatch execution boundary.
++
++diff --git a/current/GENERATE_TEXT_TASK_CONSUMER.md b/current/GENERATE_TEXT_TASK_CONSUMER.md
+new file mode 100644
+--- /dev/null
++++ b/current/GENERATE_TEXT_TASK_CONSUMER.md
+@@ -0,0 +1,47 @@
++# Generate Text Task Consumer
++- Schema: `research-os-generate-text-task/v1`
++- Status: CANONICAL
++- Boundary: read-only intake / normalization
++
++## Flow
++Stored Text Task → Consumer → validate/normalize → generate.text intent → Deferred Dispatcher → Generate Orchestrator
++
++diff --git a/current/tools/generate-tool-registry.yml b/current/tools/generate-tool-registry.yml
+--- a/current/tools/generate-tool-registry.yml
++++ b/current/tools/generate-tool-registry.yml
+@@ -13,6 +13,10 @@ entries:
+   - id: python-validator
+     capability: validate-registry-evidence-memory
+     source: local-runtime
+     safe_boundary: repair-branch
++  - id: text-task-consumer
++    capability: consume-stored-generate-text-task
++    source: local-runtime
++    safe_boundary: readonly-intake
+   - id: git-branch
+     capability: create-repair-branch
+     source: Git
+     safe_boundary: never-main

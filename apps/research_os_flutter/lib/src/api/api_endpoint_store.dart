@@ -9,13 +9,23 @@ class ApiEndpointStore {
 
   static const buildDefault = String.fromEnvironment(
     'RESEARCH_OS_API_BASE_URL',
-    defaultValue: localDefault,
+    defaultValue: renderDefault,
   );
 
   static Future<String> load() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_storageKey)?.trim();
-    return normalize(saved == null || saved.isEmpty ? buildDefault : saved);
+    if (saved == null || saved.isEmpty) return normalize(buildDefault);
+
+    final normalized = normalize(saved);
+    // Older Windows builds persisted the development loopback endpoint.
+    // Release builds should migrate that stale value to the public API so a
+    // fresh install can start without a locally running Research OS server.
+    if (normalized == localDefault && buildDefault != localDefault) {
+      await prefs.setString(_storageKey, buildDefault);
+      return normalize(buildDefault);
+    }
+    return normalized;
   }
 
   static Future<void> save(String value) async {

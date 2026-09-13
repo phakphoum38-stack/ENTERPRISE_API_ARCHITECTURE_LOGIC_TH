@@ -1,0 +1,77 @@
+version: 2
+name: Research OS Golden Release Contract
+
+release_spine:
+  - SOURCE
+  - QUALITY
+  - BUILD
+  - IDENTITY
+  - PACKAGE
+  - INSTALL_E2E
+  - PROVENANCE
+  - LINEAGE
+  - CANDIDATE
+  - CERTIFICATION
+  - RELEASE
+
+protected_gates:
+  - TARGET_SHA
+  - OWNER_BUILD_IDENTITY
+  - SHA256
+  - INSTALLED_PROVENANCE
+  - CANONICAL_LINEAGE
+  - RELEASE_CERTIFICATION
+
+rules:
+  target_sha:
+    immutable: true
+    accepted_sources:
+      - workflow_dispatch.inputs.target_sha
+      - workflow_call.inputs.target_sha
+      - propagated_target_sha
+    forbidden_as_release_source:
+      - github.sha
+      - GITHUB_SHA
+
+  provenance:
+    required: true
+    must_compare_commit: true
+    must_compare_exe_sha256: true
+
+  evidence:
+    immutable: true
+    bind_to:
+      - source_commit
+      - workflow_run_id
+      - sha256
+    tamper_detection: manifest_sha256
+
+  intelligence:
+    trusted_tooling_ref: main
+    failed_source_is_data_only: true
+    auto_heal_is_auto_trust: false
+    auto_apply_to_main: false
+    auto_merge: false
+    investigation_issue_deduplication: true
+    max_investigation_issues_per_hour: 3
+    failure_memory_only_verified: true
+
+  repair:
+    auto_apply_to_main: false
+    auto_merge: false
+    protected_gate_changes_require_human_approval: true
+    max_changed_workflows: 2
+    max_changed_lines: 250
+
+  certification:
+    required_before_release: true
+    self_asserted_certification_forbidden: true
+    all_release_spine_invariants_required: true
+    release_only_after_certification: true
+
+  release:
+    requires:
+      - CANDIDATE
+      - CERTIFICATION
+      - PROVENANCE
+      - LINEAGE

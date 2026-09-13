@@ -1,0 +1,29 @@
+Research OS — Tool Search Phase 2B
+
+Purpose
+- Add deterministic, read-only tool discovery over UnifiedToolCatalog.
+- Keep FriendOrchestrator as the only execution authority.
+- Keep OwnerPolicy as the authorization authority.
+- Search must never execute, register, mutate, or authorize a tool.
+
+Scope
+- ToolSearch query ranking and bounded results.
+- Optional filtering by catalog state and source.
+- FriendRuntime exposes tool_search() as a discovery surface only.
+- No MCP execution.
+- No Computer Use.
+- No side-effect authorization.
+- No release / installer / provenance changes.
+
+Safety invariants
+- Discovery is observational only.
+- Tool handlers are never called by search.
+- Core SkillRegistry and ToolRegistry are never mutated by search.
+- Catalog descriptors are immutable.
+- Results are deterministic for the same catalog/query/filter/limit.
+- Tool Search does not bypass OwnerPolicy.
+
+Follow-up increments
+- explicit approval state for side-effecting tools
+- Agents SDK adapter
+- MCP / remote tool discovery after approval boundaries are established

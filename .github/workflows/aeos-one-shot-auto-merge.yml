@@ -1,0 +1,146 @@
+name: AEOS One-Shot Comprehensive Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+      expected_head_sha:
+        description: Exact PR HEAD SHA to review
+        required: true
+        type: string
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  comprehensive-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target identity
+        id: target
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ inputs.pr_number }}
+          INPUT_HEAD: ${{ inputs.expected_head_sha }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR="$INPUT_PR"
+            HEAD="$INPUT_HEAD"
+          else
+            PR="$EVENT_PR"
+            HEAD="$EVENT_HEAD"
+          fi
+          test -n "$PR"
+          test -n "$HEAD"
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch exact PR HEAD without executing PR workflow code
+        env:
+          PR_NUMBER: ${{ steps.target.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/aeos-target"
+          ACTUAL_HEAD="$(git rev-parse refs/remotes/origin/aeos-target)"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+          git cat-file -e "$EXPECTED_HEAD^{commit}"
+
+      - name: Verify PR checks are green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.target.outputs.pr }}
+          CURRENT_WORKFLOW: AEOS One-Shot Comprehensive Review
+        run: |
+          set -euo pipefail
+
+          # `--required` is intentionally not used. A repository can have
+          # zero branch-protection-required checks while still reporting a
+          # complete and passing CI set. That configuration state must not be
+          # misclassified as source failure.
+          checks_json="$(gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --json name,state,bucket)"
+          CHECKS_JSON="$checks_json" CURRENT_WORKFLOW="$CURRENT_WORKFLOW" python3 - <<'PY'
+          import json
+          import os
+
+          checks = json.loads(os.environ["CHECKS_JSON"])
+          current_workflow = os.environ["CURRENT_WORKFLOW"]
+
+          if not checks:
+              raise SystemExit("no CI checks reported for PR HEAD")
+
+          def is_self_check(check):
+              name = check.get("name") or ""
+              return name == current_workflow or name.startswith(current_workflow + " /")
+
+          external = [c for c in checks if not is_self_check(c)]
+          if not external:
+              raise SystemExit("no external CI checks reported for PR HEAD")
+
+          bad = [
+              c for c in external
+              if c.get("bucket") != "pass" or c.get("state") not in {"SUCCESS", "NEUTRAL", "SKIPPED"}
+          ]
+          if bad:
+              print(json.dumps({"failing_or_pending_checks": bad}, indent=2))
+              raise SystemExit("one or more external PR checks are not passing")
+
+          print(json.dumps({
+              "status": "ALL_EXTERNAL_CHECKS_PASS",
+              "check_count": len(external),
+              "checks": [
+                  {"name": c.get("name"), "state": c.get("state"), "bucket": c.get("bucket")}
+                  for c in external
+              ],
+          }, indent=2))
+          PY
+
+      - name: Run one-shot comprehensive review
+        env:
+          PR_NUMBER: ${{ steps.target.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
+        run: |
+          set -euo pipefail
+          python3 tools/aeos/comprehensive_review.py \
+            --pr-number "$PR_NUMBER" \
+            --head-sha "$EXPECTED_HEAD" \
+            --ci-passed
+
+      - name: Verify review certificate is non-authorizing
+        env:
+          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          d = json.loads(Path("aeos-comprehensive-review.json").read_text())
+          assert d["status"] == "VERIFIED"
+          assert d["reviewed_head_sha"] == os.environ["EXPECTED_HEAD"]
+          assert d["merge_allowed"] is False
+          assert d["merge_authority"] is False
+          assert d["self_certification"] is False
+          PY
+
+      - name: Publish immutable review certificate
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeos-one-shot-review
+          path: aeos-comprehensive-review.json
+          if-no-files-found: error
+          retention-days: 90

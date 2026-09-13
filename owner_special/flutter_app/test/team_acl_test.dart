@@ -16,7 +16,6 @@ void main() {
   "services": {
     "8787": "workspace",
     "8788": "team",
-    "8789": "owner",
     "8790": "friend-internal"
   }
 }
@@ -44,11 +43,12 @@ void main() {
     expect(viewer['admin'], isFalse);
   });
 
-  test('friend service is internal-only', () {
+  test('owner service topology contains only implemented contracts', () {
     final services = Map<String, dynamic>.from(contract['services'] as Map);
-    expect(services['8790'], 'friend-internal');
+    expect(services.keys.toSet(), {'8787', '8788', '8790'});
     expect(services['8787'], 'workspace');
     expect(services['8788'], 'team');
-    expect(services['8789'], 'owner');
+    expect(services['8790'], 'friend-internal');
+    expect(services.containsKey('8789'), isFalse);
   });
 }

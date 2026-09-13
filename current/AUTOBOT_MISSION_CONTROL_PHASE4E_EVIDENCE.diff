@@ -1,0 +1,18 @@
+diff --git a/owner_special/research_os_friend/mission_control_evidence.py b/owner_special/research_os_friend/mission_control_evidence.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/research_os_friend/mission_control_evidence.py
+@@ -1,0 +1,70 @@
++# Deterministic, bounded, owner-scoped projection of existing AgentRuntime evidence.
++# No evidence is manufactured and no execution/approval/authorization authority is added.
++
++class MissionControlEvidenceProjection:
++    """Project existing AgentRuntime evidence without creating new evidence."""
++
++diff --git a/owner_special/research_os_friend/test_mission_control_evidence.py b/owner_special/research_os_friend/test_mission_control_evidence.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/research_os_friend/test_mission_control_evidence.py
+@@ -1,0 +1,80 @@
++# Regression coverage for owner isolation, bounds, immutability,
++# unsupported evidence, secret-like content, and authority safety.

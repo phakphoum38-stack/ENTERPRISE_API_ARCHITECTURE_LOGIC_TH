@@ -34,9 +34,14 @@
           <button type="button" class="run-btn" id="startWork">เริ่มงาน <span>→</span></button>
         </div>
 
-        <section class="account-card" aria-label="Google account and role">
+        <section class="account-card" aria-label="Research OS account">
           <div><span class="eyebrow">ACCOUNT</span><strong id="accountEmail">Not signed in</strong><span id="accountRole" class="role-badge role-user">USER</span></div>
-          <div class="account-actions"><button type="button" class="tool-chip" id="authButton">Sign in with Google</button><span id="ownerTools" data-min-role="OWNER" hidden>OWNER controls</span></div>
+          <div class="account-actions">
+            <button type="button" class="tool-chip" id="authButton">Sign in</button>
+            <button type="button" class="tool-chip" id="loginOptionsButton">Login options</button>
+            <span id="ownerTools" data-min-role="OWNER" hidden>OWNER controls</span>
+          </div>
+          <div id="loginOptions" class="login-options" hidden aria-label="Login providers"></div>
         </section>
 
         <form id="researchForm" class="research-composer">

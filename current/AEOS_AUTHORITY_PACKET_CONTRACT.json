@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0",
+  "contract": "AEOS_AUTHORITY_PACKET",
+  "purpose": "Immutable evidence package presented to owner authority after pre-authority assurance.",
+  "required_sections": [
+    "original_change",
+    "original_failure",
+    "root_cause",
+    "root_cause_proof",
+    "fix_attempts",
+    "final_fix",
+    "failed_controls_history",
+    "resolved_failures",
+    "new_regressions",
+    "exact_sha",
+    "provenance",
+    "evidence_integrity",
+    "forensic_result",
+    "independent_review",
+    "remaining_risks",
+    "remaining_assumptions",
+    "assurance_debt",
+    "recommended_decision"
+  ],
+  "recommended_decisions": ["APPROVE", "REJECT", "HOLD"],
+  "authority_boundary": {
+    "autobot_may_prepare": true,
+    "autobot_may_recommend": true,
+    "autobot_may_approve": false,
+    "autobot_may_merge": false
+  },
+  "fail_closed": true
+}

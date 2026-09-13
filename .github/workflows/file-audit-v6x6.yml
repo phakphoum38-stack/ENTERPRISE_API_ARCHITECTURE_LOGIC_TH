@@ -33,6 +33,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Validate architecture invariant enforcement matrix
+        run: python tools/validate_architecture_invariants.py
+
       - name: Run adaptive 6^6 full repository audit
         run: python -m unittest discover -s tools/research_os_api -p "test_file_audit_v6x6_gate.py" -v
 
@@ -44,5 +47,6 @@ jobs:
             echo "- Logical capacity: 46,656"
             echo "- Scope: complete checked-out repository"
             echo "- Target SHA: $TARGET_SHA"
+            echo "- Architecture invariant matrix: validated"
             echo "- Result: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"

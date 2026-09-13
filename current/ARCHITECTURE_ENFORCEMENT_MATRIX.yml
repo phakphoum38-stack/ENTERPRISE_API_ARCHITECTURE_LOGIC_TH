@@ -1,0 +1,102 @@
+version: 1
+status: CANONICAL
+purpose: >-
+  Evidence matrix for Research OS architecture invariants. This matrix is an
+  enforcement map, not proof by documentation alone. Each invariant must name
+  its narrowest enforcement mechanism and current evidence state.
+
+statuses:
+  - implemented
+  - partial
+  - not-yet-enforced
+
+invariants:
+  - id: INV-001
+    status: implemented
+    mechanism: runtime
+    evidence: owner_special/research_os_friend/orchestrator.py
+  - id: INV-002
+    status: implemented
+    mechanism: runtime
+    evidence: owner_special/research_os_friend/policy.py
+  - id: INV-003
+    status: implemented
+    mechanism: runtime-test
+    evidence: owner_special/tests/test_approval.py
+  - id: INV-004
+    status: implemented
+    mechanism: runtime-test
+    evidence: owner_special/tests/test_tool_search.py
+  - id: INV-005
+    status: partial
+    mechanism: boundary-test
+    evidence: PR-254 safe MCP boundary
+  - id: INV-006
+    status: implemented
+    mechanism: runtime-test
+    evidence: owner_special/tests/test_approval.py
+  - id: INV-007
+    status: partial
+    mechanism: persistence-test
+    evidence: PR-252 durable approval persistence
+  - id: INV-008
+    status: partial
+    mechanism: execution-contract
+    evidence: PR-252 durable approval persistence
+  - id: INV-009
+    status: partial
+    mechanism: trace-contract
+    evidence: PR-253 trace filter/pagination
+  - id: INV-010
+    status: implemented
+    mechanism: generator-contract
+    evidence: current/GENERATE_WORKFLOW_REGISTRY.yml
+  - id: INV-011
+    status: partial
+    mechanism: deterministic-input-gate
+    evidence: tools/validate_generate_determinism.py + Generate Orchestrator validation step
+  - id: INV-012
+    status: implemented
+    mechanism: validator-audit
+    evidence: .github/workflows/file-audit-v6x6.yml
+  - id: INV-013
+    status: implemented
+    mechanism: validation-policy
+    evidence: current/tools/docs-validation-generate.md
+  - id: INV-014
+    status: implemented
+    mechanism: exact-sha-gate
+    evidence: .github/workflows/generate-orchestrator.yml
+  - id: INV-015
+    status: implemented
+    mechanism: artifact-identity-gate
+    evidence: owner_special build identity gate
+  - id: INV-016
+    status: implemented
+    mechanism: installed-provenance-gate
+    evidence: owner_special installed provenance gate
+  - id: INV-017
+    status: implemented
+    mechanism: build-identity-gate
+    evidence: four-user isolated EXE release path
+  - id: INV-018
+    status: implemented
+    mechanism: branch-isolated-repair
+    evidence: .github/workflows/generate-orchestrator.yml
+  - id: INV-019
+    status: partial
+    mechanism: change-control
+    evidence: stacked PR dependency rule: #250 → #251 → #252 → #253 → #254 → #255
+  - id: INV-020
+    status: implemented
+    mechanism: change-control
+    evidence: independent infrastructure PR #257
+
+rules:
+  - every_invariant_has_one_status: true
+  - every_invariant_has_one_mechanism: true
+  - every_invariant_has_one_evidence_reference: true
+  - implemented_requires_concrete_evidence: true
+  - partial_requires_follow_up_boundary: true
+  - not_yet_enforced_requires_explicit_plan: true
+  - matrix_does_not_replace_runtime_or_ci_evidence: true

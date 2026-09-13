@@ -1,0 +1,20 @@
+{
+  "schema": "research-os-mission-control-ui-evidence/v1",
+  "phase": "4D",
+  "base_sha": "a53890c6bc71efb22d4a045182742e314bfc02d2",
+  "branch": "feat/mission-control-ui-schema-phase4d-main",
+  "implementation_head": "0fd92974a6a7d7f03cf0bea5e15a656f147dd618",
+  "read_only": true,
+  "execution_authority": "FriendOrchestrator",
+  "authorization_authority": "OwnerPolicy",
+  "approval_authority": "ApprovalGate",
+  "validator": "owner_special.research_os_friend.mission_control_ui_schema.MissionControlUISchemaValidator",
+  "network_calls": false,
+  "execution_added": false,
+  "mutation_authority_added": false,
+  "persistence_authority_added": false,
+  "bounds": {"max_bytes": 65536, "max_panels": 32, "max_items": 100, "max_depth": 8, "max_string": 2048},
+  "tests": "owner_special/tests/test_mission_control_ui_schema.py",
+  "diff_artifact": "current/AUTOBOT_MISSION_CONTROL_PHASE4D_UI_SCHEMA.diff",
+  "verification": "PENDING_CI"
+}
