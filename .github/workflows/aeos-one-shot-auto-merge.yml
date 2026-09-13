@@ -73,7 +73,7 @@ jobs:
           # zero branch-protection-required checks while still reporting a
           # complete and passing CI set. That configuration state must not be
           # misclassified as source failure.
-          checks_json="$(gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --json name,state,bucket,workflow)"
+          checks_json="$(gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --json name,state,bucket)"
           CHECKS_JSON="$checks_json" CURRENT_WORKFLOW="$CURRENT_WORKFLOW" python3 - <<'PY'
           import json
           import os
@@ -85,9 +85,8 @@ jobs:
               raise SystemExit("no CI checks reported for PR HEAD")
 
           def is_self_check(check):
-              workflow = check.get("workflow") or ""
               name = check.get("name") or ""
-              return workflow == current_workflow or name == current_workflow or name.startswith(current_workflow + " /")
+              return name == current_workflow or name.startswith(current_workflow + " /")
 
           external = [c for c in checks if not is_self_check(c)]
           if not external:
@@ -105,7 +104,7 @@ jobs:
               "status": "ALL_EXTERNAL_CHECKS_PASS",
               "check_count": len(external),
               "checks": [
-                  {"name": c.get("name"), "workflow": c.get("workflow"), "state": c.get("state"), "bucket": c.get("bucket")}
+                  {"name": c.get("name"), "state": c.get("state"), "bucket": c.get("bucket")}
                   for c in external
               ],
           }, indent=2))
