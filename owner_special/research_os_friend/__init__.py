@@ -23,6 +23,7 @@ from .provider_settings import MemorySecretStore, OpenAICompatibleProvider, Prov
 from .providers import MockProvider, ProviderRouter
 from .reasoning import DecisionPlanner
 from .runtime import FriendRuntime
+from .self_learning_contract import SelfLearningContract, SelfLearningContractError
 from .service import OWNER_HEADER, PROFILE_HEADER, SESSION_HEADER, OwnerFriendService, default_owner_data_root
 from .skills import Skill, SkillRegistry
 from .tool_search import ToolSearch, ToolSearchResult
@@ -35,7 +36,7 @@ __all__ = [
     "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "FriendRuntimeContract", "FriendRuntimeContractError", "HelperAllocation",
     "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
-    "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
+    "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "SelfLearningContract", "SelfLearningContractError", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
     "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
     "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
     "install_friend_complete_capabilities",
