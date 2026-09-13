@@ -61,14 +61,54 @@ jobs:
           test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
           git cat-file -e "$EXPECTED_HEAD^{commit}"
 
-      - name: Verify all PR checks are green
+      - name: Verify PR checks are green
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.target.outputs.pr }}
+          CURRENT_WORKFLOW: AEOS One-Shot Comprehensive Review
         run: |
           set -euo pipefail
-          gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --required
-          gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --json name,state,bucket --jq 'if length == 0 then error("no checks reported") elif any(.[]; .bucket != "pass") then error("one or more checks are not passing") else "ALL_CHECKS_PASS" end'
+
+          # Do not use `gh pr checks --required` here. A repository may have
+          # zero branch-protection-required checks while still having many
+          # successful CI checks. Treating "no required checks configured" as
+          # a CI failure is a configuration error, not evidence of bad code.
+          # This gate therefore evaluates the actual check set reported for
+          # the exact PR HEAD and fails closed on missing, pending, cancelled,
+          # or failed checks.
+          checks_json="$(gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --json name,state,bucket)"
+          CHECKS_JSON="$checks_json" CURRENT_WORKFLOW="$CURRENT_WORKFLOW" python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          checks = json.loads(os.environ["CHECKS_JSON"])
+          current_workflow = os.environ["CURRENT_WORKFLOW"]
+
+          if not checks:
+              raise SystemExit("no CI checks reported for PR HEAD")
+
+          # The review workflow cannot wait for its own check result. Exclude
+          # only this exact workflow name; every other reported check must be
+          # terminal and passing.
+          external = [c for c in checks if c.get("name") != current_workflow]
+          if not external:
+              raise SystemExit("no external CI checks reported for PR HEAD")
+
+          bad = [
+              c for c in external
+              if c.get("bucket") != "pass" or c.get("state") not in {"SUCCESS", "NEUTRAL", "SKIPPED"}
+          ]
+          if bad:
+              print(json.dumps({"failing_or_pending_checks": bad}, indent=2))
+              raise SystemExit("one or more external PR checks are not passing")
+
+          print(json.dumps({
+              "status": "ALL_EXTERNAL_CHECKS_PASS",
+              "check_count": len(external),
+              "checks": [{"name": c.get("name"), "state": c.get("state"), "bucket": c.get("bucket")} for c in external],
+          }, indent=2))
+          PY
 
       - name: Run one-shot comprehensive review
         env:
