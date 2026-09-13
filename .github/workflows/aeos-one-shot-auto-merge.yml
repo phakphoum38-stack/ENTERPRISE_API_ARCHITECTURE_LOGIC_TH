@@ -61,14 +61,43 @@ jobs:
           test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
           git cat-file -e "$EXPECTED_HEAD^{commit}"
 
-      - name: Verify all PR checks are green
+      - name: Verify external PR checks are green
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.target.outputs.pr }}
         run: |
           set -euo pipefail
-          gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --required
-          gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --json name,state,bucket --jq 'if length == 0 then error("no checks reported") elif any(.[]; .bucket != "pass") then error("one or more checks are not passing") else "ALL_CHECKS_PASS" end'
+          checks_json="$(gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --json name,state,bucket)"
+          CHECKS_JSON="$checks_json" python3 - <<'PY'
+          import json
+          import os
+
+          checks = json.loads(os.environ["CHECKS_JSON"])
+          self_prefixes = (
+              "AEOS One-Shot Comprehensive Review",
+          )
+
+          external = [
+              c for c in checks
+              if not any(str(c.get("name", "")).startswith(prefix) for prefix in self_prefixes)
+          ]
+
+          if not checks:
+              raise SystemExit("no checks reported")
+          if not external:
+              raise SystemExit("no external checks reported")
+
+          bad = [
+              c for c in external
+              if c.get("bucket") != "pass"
+              or c.get("state") not in {"SUCCESS", "NEUTRAL", "SKIPPED"}
+          ]
+          if bad:
+              names = ", ".join(str(c.get("name", "<unnamed>")) for c in bad)
+              raise SystemExit(f"one or more external checks are not passing: {names}")
+
+          print("ALL_EXTERNAL_CHECKS_PASS")
+          PY
 
       - name: Run one-shot comprehensive review
         env:
