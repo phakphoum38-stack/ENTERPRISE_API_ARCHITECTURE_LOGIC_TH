@@ -1,0 +1,64 @@
+{
+  "schema": "research-os-aeos-work-item/v1",
+  "required": [
+    "mission_id",
+    "work_id",
+    "intent",
+    "baseline_sha",
+    "state",
+    "risk",
+    "dependencies",
+    "acceptance_criteria",
+    "evidence_requirements",
+    "created_at"
+  ],
+  "states": [
+    "MISSION_CREATED",
+    "CONTRACTED",
+    "PLANNED",
+    "QUEUED",
+    "LEASED",
+    "BRANCHED",
+    "DOCUMENTED",
+    "IMPLEMENTED",
+    "DIFF_CAPTURED",
+    "TESTED",
+    "CI_VERIFIED",
+    "FORENSIC_VERIFIED",
+    "REGRESSION_VERIFIED",
+    "EVIDENCE_VERIFIED",
+    "PROVENANCE_VERIFIED",
+    "AUTHORITY_VERIFIED",
+    "CERTIFIED",
+    "INTEGRATED",
+    "MAIN_VERIFIED",
+    "REANCHORED",
+    "COMPLETED",
+    "BLOCKED",
+    "QUARANTINED",
+    "CANCELLED"
+  ],
+  "required_invariants": {
+    "baseline_sha_is_exact": true,
+    "lease_before_mutation": true,
+    "evidence_before_certification": true,
+    "main_verification_before_reanchor": true,
+    "unknown_is_not_pass": true,
+    "failed_state_requires_recovery_or_escalation": true
+  },
+  "failure_fields": [
+    "failure_id",
+    "failure_fingerprint",
+    "failure_class",
+    "evidence_refs",
+    "root_cause_status",
+    "attempt_count",
+    "recovery_state"
+  ],
+  "completion_fields": [
+    "certification_id",
+    "integrated_sha",
+    "main_verified_sha",
+    "completion_proof"
+  ]
+}

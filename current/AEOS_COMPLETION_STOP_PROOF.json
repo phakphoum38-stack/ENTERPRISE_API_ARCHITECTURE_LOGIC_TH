@@ -1,0 +1,38 @@
+{
+  "schema": "research-os-aeos-stop-proof/v1",
+  "status": "TEMPLATE",
+  "requirements": {
+    "mission_queue_empty": true,
+    "dependency_queue_empty": true,
+    "recovery_queue_empty": true,
+    "required_work_open": 0,
+    "unresolved_failures": 0,
+    "unknown": 0,
+    "stale": 0,
+    "unverified_changes": 0,
+    "blocked_required_dependencies": 0,
+    "uncertified_integrations": 0,
+    "orphan_required_branches": 0,
+    "main_verified": true,
+    "final_rescan_pass": true
+  },
+  "verification_order": [
+    "mission_scan",
+    "dependency_scan",
+    "queue_scan",
+    "recovery_scan",
+    "pull_request_scan",
+    "branch_scan",
+    "ci_scan",
+    "failure_scan",
+    "unknown_scan",
+    "stale_scan",
+    "evidence_scan",
+    "provenance_scan",
+    "governance_scan",
+    "main_scan",
+    "final_rescan"
+  ],
+  "terminal_result": "CERTIFIED_IDLE",
+  "rule": "Never stop because a queue appears empty; stop only after independently verified final rescan proves all required work is complete."
+}
