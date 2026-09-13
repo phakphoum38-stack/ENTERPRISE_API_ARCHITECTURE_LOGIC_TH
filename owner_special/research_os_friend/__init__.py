@@ -9,6 +9,7 @@ from .capabilities import Capability, CapabilityRegistry, install_friend_complet
 from .catalog import install_builtin_skills, install_builtin_tools
 from .context import FriendContext
 from .evidence import EvidenceRecorder
+from .friend_runtime_contract import FriendRuntimeContract, FriendRuntimeContractError
 from .helpers import HelperAllocation, HelperScheduler
 from .identity import OwnerIdentity
 from .memory import ScopedMemory
@@ -31,7 +32,7 @@ from .v3_bridge import V3Bridge, V3BridgeStatus
 
 __all__ = [
     "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
-    "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "HelperAllocation",
+    "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "FriendRuntimeContract", "FriendRuntimeContractError", "HelperAllocation",
     "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
     "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
