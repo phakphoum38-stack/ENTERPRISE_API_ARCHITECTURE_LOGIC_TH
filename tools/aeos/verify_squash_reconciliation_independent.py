@@ -53,6 +53,16 @@ def file_at(commit: str, path: str) -> bytes:
     return git_bytes("show", f"{commit}:{path}")
 
 
+def exists_at(commit: str, path: str) -> bool:
+    return subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}:{path}"],
+        cwd=REPO,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    ).returncode == 0
+
+
 def fail(reason: str) -> int:
     result = {
         "schema": "aeos.squash-reconciliation.independent-forensic.v1",
@@ -150,8 +160,10 @@ def main() -> int:
     if team != expected_int_ports | {8789} or team_base != expected_int_ports or team_merge != expected_int_ports:
         return fail(f"Team Center divergence does not match the declared stale 8789 evidence: head={sorted(team)}, base={sorted(team_base)}, merge={sorted(team_merge)}")
 
+    # The topology test is historical lineage evidence, not BASE->MERGE payload.
+    # BASE and MERGE contain the canonical test; the stale #366 HEAD does not.
     topo = "owner_special/tests/test_port_topology_contract.py"
-    if topo in head_paths or topo not in paths(base, merge):
+    if not exists_at(base, topo) or not exists_at(merge, topo) or exists_at(head, topo):
         return fail("topology contract historical divergence does not match BASE/MERGE lineage")
 
     result = {
