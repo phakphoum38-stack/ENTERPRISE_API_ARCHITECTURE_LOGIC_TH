@@ -90,6 +90,87 @@ jobs:
             test -n "${HEAD_SHA}" || { echo 'HEAD_SHA is required'; exit 1; }
             test -n "${MERGE_SHA}" || { echo 'MERGE_SHA is required'; exit 1; }
           fi
+      - name: Wait for exact PR-head CI to become terminal
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time
+
+          owner = os.environ['OWNER']
+          repo = os.environ['REPO']
+          pr = os.environ['PR_NUMBER']
+          expected_head = os.environ['HEAD_SHA']
+          token = os.environ['GH_TOKEN']
+          max_polls = 60
+          poll_seconds = 15
+          success_states = {'success', 'neutral', 'skipped'}
+
+          def gh(path):
+              return json.loads(subprocess.check_output([
+                  'curl', '-fsSL',
+                  '-H', f'Authorization: Bearer {token}',
+                  '-H', 'Accept: application/vnd.github+json',
+                  '-H', 'X-GitHub-Api-Version: 2022-11-28',
+                  f'https://api.github.com{path}',
+              ], text=True))
+
+          for attempt in range(1, max_polls + 1):
+              pr_data = gh(f'/repos/{owner}/{repo}/pulls/{pr}')
+              actual_head = pr_data.get('head', {}).get('sha', '')
+              if actual_head != expected_head:
+                  raise SystemExit(
+                      f'PR HEAD changed during post-merge reconciliation: expected {expected_head}, got {actual_head}'
+                  )
+
+              checks = gh(f'/repos/{owner}/{repo}/commits/{expected_head}/check-runs?per_page=100')
+              latest = {}
+              for check in checks.get('check_runs', []):
+                  key = (str(check.get('name') or ''), str((check.get('app') or {}).get('id') or ''))
+                  current_id = int(check.get('id') or 0)
+                  previous = latest.get(key)
+                  if previous is None or current_id > int(previous.get('id') or 0):
+                      latest[key] = check
+
+              external = list(latest.values())
+              pending = [c for c in external if c.get('status') != 'completed']
+              failed = [
+                  c for c in external
+                  if c.get('status') == 'completed'
+                  and c.get('conclusion') not in success_states
+              ]
+
+              print(json.dumps({
+                  'poll': attempt,
+                  'head_sha': expected_head,
+                  'check_count': len(external),
+                  'pending_count': len(pending),
+                  'failed_count': len(failed),
+                  'pending_checks': [
+                      {'name': c.get('name'), 'status': c.get('status')}
+                      for c in pending
+                  ],
+                  'failed_checks': [
+                      {'name': c.get('name'), 'conclusion': c.get('conclusion')}
+                      for c in failed
+                  ],
+              }, indent=2, sort_keys=True))
+
+              if not external:
+                  if attempt == max_polls:
+                      raise SystemExit('no PR-head CI check-runs reported before verifier timeout')
+              elif failed:
+                  raise SystemExit('one or more latest PR-head CI check-runs failed')
+              elif not pending:
+                  print('PR_HEAD_CI=TERMINAL_GREEN')
+                  break
+
+              if attempt == max_polls:
+                  raise SystemExit('PR-head CI remained pending until verifier timeout')
+              time.sleep(poll_seconds)
+          PY
       - name: Checkout merge target
         uses: actions/checkout@v4
         with:
