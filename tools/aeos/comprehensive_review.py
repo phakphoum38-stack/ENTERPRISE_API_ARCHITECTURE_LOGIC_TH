@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """AEOS one-shot comprehensive review engine.
 
-This is a read-only, fail-closed reviewer. It binds the decision to an exact
-PR HEAD SHA and emits one certificate containing the complete review result.
-It does not modify the PR, source tree, or evidence manifests and never grants
-merge authority by itself; the trusted workflow/policy consumes its certificate.
+Read-only and fail-closed. The decision is bound to an exact PR HEAD and to
+an externally established CI-pass assertion. The trusted workflow/policy is
+the only component that may consume the certificate for auto-merge.
 """
 from __future__ import annotations
 
@@ -84,10 +83,15 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pr-number", type=int, required=True)
     ap.add_argument("--head-sha", required=True)
-    ap.add_argument("--base-sha", required=False)
-    ap.add_argument("--merge-sha", required=False)
+    ap.add_argument("--base-sha")
+    ap.add_argument("--merge-sha")
+    ap.add_argument("--ci-passed", action="store_true")
     args = ap.parse_args()
     checks: dict[str, str] = {}
+
+    if not args.ci_passed:
+        return fail(checks, "trusted CI-pass assertion is missing")
+    checks["ci"] = "PASS"
 
     head = args.head_sha
     try:
@@ -98,9 +102,11 @@ def main() -> int:
     if checks["identity"] != "PASS":
         return fail(checks, "target HEAD identity mismatch")
 
+    base = args.base_sha
+    merge = args.merge_sha
     if args.pr_number == 372:
-        base = args.base_sha or EXPECTED_PR372_BASE
-        merge = args.merge_sha or EXPECTED_PR372_MERGE
+        base = base or EXPECTED_PR372_BASE
+        merge = merge or EXPECTED_PR372_MERGE
         if head != EXPECTED_PR372_HEAD:
             return fail(checks, "PR #372 target HEAD is not the reviewed exact SHA")
         if base != EXPECTED_PR372_BASE or merge != EXPECTED_PR372_MERGE:
@@ -138,8 +144,15 @@ def main() -> int:
         if not exists_at(base, topo) or not exists_at(merge, topo) or exists_at(head, topo):
             return fail(checks, "topology test tree-existence lineage proof failed")
         checks["semantic_contracts"] = "PASS"
+    else:
+        # Generic PRs still require explicit base/head identity; specialized
+        # reconciliation checks are added by policy profiles as they mature.
+        if not base:
+            base = git("rev-parse", "origin/main")
+        if git("rev-parse", base) != base:
+            return fail(checks, "base SHA does not resolve exactly")
+        checks["lineage"] = "PASS"
 
-    checks.setdefault("lineage", "PASS")
     checks["provenance_binding"] = "PASS"
     checks["negative_proof"] = "PASS"
     checks["anti_self_certification"] = "PASS"
@@ -152,8 +165,8 @@ def main() -> int:
         "status": "VERIFIED",
         "pr_number": args.pr_number,
         "reviewed_head_sha": head,
-        "base_sha": args.base_sha,
-        "merge_sha": args.merge_sha,
+        "base_sha": base,
+        "merge_sha": merge,
         "checks": checks,
         "review_mode": "one_shot_fail_closed",
         "merge_allowed": True,
