@@ -95,6 +95,8 @@ Chat endpoint requires the Owner identity headers and is consumed internally by 
 | GET | `/health` | ตรวจสถานะ API |
 | GET | `/v1/providers` | รายชื่อ Provider Adapters |
 | POST | `/v1/ai/generate` | เรียก AI ผ่าน Adapter หรือ Friend route |
+| GET | `/v1/copilot/context` | อ่าน repository + memory context ภายใต้ trusted user scope |
+| POST | `/v1/copilot/chat` | ส่งข้อความไป Enterprise Copilot Chat gateway พร้อม context และ audit |
 | POST | `/v1/conversations/analyze` | สร้าง Artifact Preview |
 | GET | `/v1/knowledge/artifacts` | อ่าน Artifact Index |
 | GET | `/v1/knowledge/graph` | อ่าน Knowledge Graph |
@@ -137,6 +139,38 @@ export RESEARCH_OS_GEMINI_MODEL="..."
 ```
 
 ชื่อโมเดลจริงต้องกำหนดผ่าน Environment Variable เพื่อไม่ฝัง dependency กับรุ่นใดใน Core
+
+## Copilot Chat Integration
+
+Copilot Chat bridge ใช้โมดูล `tools/copilot_chat/` และต้องการ trusted session ของ Research OS เพื่อคง user/profile isolation:
+
+```bash
+export RESEARCH_OS_SESSION_SECRET="dev-session-secret"
+export RESEARCH_OS_COPILOT_API_URL="https://enterprise-gateway.example.com/copilot/chat"
+export RESEARCH_OS_COPILOT_API_KEY="..."
+export RESEARCH_OS_COPILOT_MODEL="copilot-enterprise"
+```
+
+อ่าน context ที่ backend จะส่งให้ Copilot:
+
+```bash
+curl "http://127.0.0.1:8787/v1/copilot/context?query=architecture&path=README.md" \
+  -H "X-Research-OS-Session: <trusted-session-token>"
+```
+
+คุยกับ Copilot ผ่าน `/v1` service layer:
+
+```bash
+curl -X POST http://127.0.0.1:8787/v1/copilot/chat \
+  -H 'Content-Type: application/json' \
+  -H "X-Research-OS-Session: <trusted-session-token>" \
+  -d '{
+    "message": "สรุป enterprise API architecture และความเสี่ยงหลัก",
+    "paths": ["README.md", "tools/research_os_api/README.md"]
+  }'
+```
+
+Audit จะถูกเขียนแบบ append-only ไปที่ `evidence/copilot_chat/audit.jsonl` หรือ directory ที่กำหนดผ่าน `RESEARCH_OS_COPILOT_AUDIT_DIR` โดยไม่บันทึก API key หรือ response ดิบลง log
 
 ## Security Boundary
 

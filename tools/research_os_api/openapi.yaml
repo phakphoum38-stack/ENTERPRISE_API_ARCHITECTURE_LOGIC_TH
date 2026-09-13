@@ -43,6 +43,81 @@ paths:
           description: Generated output
         "502":
           description: Provider failure
+  /v1/copilot/context:
+    get:
+      summary: Build the trusted repository and memory context for Enterprise Copilot Chat
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - name: memory_limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Trusted Copilot context payload
+        "400":
+          description: Invalid session or invalid context request
+  /v1/copilot/chat:
+    post:
+      summary: Send a Copilot Chat turn through the Enterprise API service layer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Provide either `message` for a single-turn request or `messages` for a multi-turn transcript.
+              additionalProperties: false
+              properties:
+                message:
+                  type: string
+                system:
+                  type: string
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role:
+                        type: string
+                        enum: [system, user, assistant]
+                      content:
+                        type: string
+                paths:
+                  type: array
+                  items:
+                    type: string
+                context_query:
+                  type: string
+                memory_limit:
+                  type: integer
+                  minimum: 1
+                model:
+                  type: string
+      responses:
+        "200":
+          description: Copilot reply with trusted context and audit metadata
+        "400":
+          description: Invalid request or forbidden user-scope override
+        "502":
+          description: Copilot gateway failure
   /v1/conversations/analyze:
     post:
       summary: Analyze a conversation and return a preview Research Artifact

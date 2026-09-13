@@ -8,6 +8,7 @@
 - Home dashboard
 - Research OS API health/provider client
 - AI Memory client methods
+- Copilot Chat widget + `/v1/copilot/*` client methods
 - Widget test
 - GitHub Actions สำหรับ analyze, test และ build web
 
@@ -29,6 +30,18 @@ flutter run --dart-define=RESEARCH_OS_API_BASE_URL=http://127.0.0.1:8787
 ```
 
 สำหรับ Android emulator ให้ใช้ API base URL เป็น `http://10.0.2.2:8787`
+
+## Copilot Chat Widget
+
+มี component พร้อมใช้ที่ `lib/src/features/chat/copilot_chat_widget.dart`
+
+```dart
+CopilotChatWidget(
+  apiClient: ResearchOSApiClient(baseUrl: 'http://127.0.0.1:8787'),
+)
+```
+
+Widget นี้จะเรียก `/v1/copilot/chat` endpoint เดียว โดย backend จะสร้าง trusted repository context และส่งกลับมาใน chat response เพื่อหลีกเลี่ยงการ query context ซ้ำจาก client
 
 ## Security
 
