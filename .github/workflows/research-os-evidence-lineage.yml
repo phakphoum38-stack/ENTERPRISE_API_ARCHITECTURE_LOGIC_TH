@@ -67,15 +67,9 @@ jobs:
               ], text=True))
 
           prs = gh(f'/repos/{owner}/{repo}/commits/{merge}/pulls')
-          candidates = [
-              p for p in prs
-              if p.get('merged_at') and p.get('merge_commit_sha') == merge
-          ]
+          candidates = [p for p in prs if p.get('merged_at') and p.get('merge_commit_sha') == merge]
           if len(candidates) != 1:
-              raise SystemExit(
-                  f'Cannot resolve exactly one merged PR for main push {merge}: '
-                  f'found {len(candidates)} candidates'
-              )
+              raise SystemExit(f'Cannot resolve exactly one merged PR for main push {merge}: found {len(candidates)} candidates')
 
           pr = gh(f"/repos/{owner}/{repo}/pulls/{candidates[0]['number']}")
           base = pr.get('base', {}).get('sha', '')
@@ -113,7 +107,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PYTHONPATH=tools/aeos python -m unittest tools/aeos/test_evidence_lineage.py -v
+          python -m unittest discover -s tools/aeos -p 'test_evidence_lineage.py' -v
 
       - name: Reconcile commit lineage and CI evidence
         env:
@@ -148,10 +142,7 @@ jobs:
               ], text=True))
 
           def is_ancestor(ancestor, descendant):
-              return subprocess.run(
-                  ['git', 'merge-base', '--is-ancestor', ancestor, descendant],
-                  check=False,
-              ).returncode == 0
+              return subprocess.run(['git', 'merge-base', '--is-ancestor', ancestor, descendant], check=False).returncode == 0
 
           pr_data = gh(f'/repos/{owner}/{repo}/pulls/{pr}')
           head_data = gh(f'/repos/{owner}/{repo}/commits/{head}')
@@ -174,9 +165,7 @@ jobs:
           head_matches_pr = bool(pr_head_sha) and (pr_head_sha == head or pr_head_sha.startswith(head))
           merge_matches_pr = bool(pr_merge_sha) and (pr_merge_sha == merge or pr_merge_sha.startswith(merge))
           base_matches_merge_parent = any(parent == base or parent.startswith(base) for parent in parents)
-          original_base_is_ancestor_of_merge_parent = bool(
-              merge_parent_sha and is_ancestor(base, merge_parent_sha)
-          )
+          original_base_is_ancestor_of_merge_parent = bool(merge_parent_sha and is_ancestor(base, merge_parent_sha))
           direct_parent_lineage = head_matches_pr and merge_matches_pr and head_data.get('sha') in parents
 
           workflow_runs = []
@@ -199,11 +188,7 @@ jobs:
               'aeos.squash-reconciliation.v1' in pr_data.get('body', '')
               and 'squash_reconciliation' in pr_data.get('body', '')
           )
-          reconciliation_verified = bool(
-              reconciliation_contract_present
-              and reconciliation_declared
-              and independent_reconciliation_runs
-          )
+          reconciliation_verified = bool(reconciliation_contract_present and reconciliation_declared and independent_reconciliation_runs)
 
           lineage_mode, lineage_ok = classify_lineage(
               pr_merged=bool(pr_data.get('merged')),
@@ -265,9 +250,7 @@ jobs:
               'generated_at': run_started_at,
           }
 
-          Path('evidence/lineage/canonical-evidence.json').write_text(
-              json.dumps(evidence, indent=2) + '\n', encoding='utf-8'
-          )
+          Path('evidence/lineage/canonical-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n', encoding='utf-8')
           print(json.dumps(evidence, indent=2))
           if not lineage_ok:
               raise SystemExit('Evidence lineage GAP: keep #111 open; do not advance to FINAL')
