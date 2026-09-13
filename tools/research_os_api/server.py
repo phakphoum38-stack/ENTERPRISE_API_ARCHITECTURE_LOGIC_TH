@@ -31,11 +31,13 @@ from google_identity import GoogleIdentityBroker
 from google_oauth import GoogleOAuthBroker, GoogleOAuthError
 from google_workspace import GoogleWorkspaceConfig, get_google_workspace_dashboard
 from identity_providers import provider_catalog
+from identity_context import resolve_identity_context
 from memory import build_context, search_memory
 from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 from oauth_handoff import consume_handoff
 from providers import ProviderError, build_provider
+import copilot_service
 
 ROOT = Path(__file__).resolve().parents[2]
 CURATOR_PATH = ROOT / "tools" / "research_curator" / "curator.py"
@@ -219,7 +221,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     raise ValueError("Google sign-in callback requires code and state")
                 result = GoogleIdentityBroker().complete(code=code, state=state)
                 email = ((result.get("account") or {}).get("email") or "Google account")
-                self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
+                self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window.</p></body></html>")
                 return
             for provider in ("microsoft", "github"):
                 if path == f"/v1/auth/{provider}/callback":
@@ -269,6 +271,21 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 knowledge_ops = _load_module("research_os_knowledge_ops", KNOWLEDGE_OPS_PATH)
                 artifacts = knowledge_ops.load_all(ARTIFACT_DIR)
                 self._send(HTTPStatus.OK, knowledge_ops.graph_payload(artifacts))
+                return
+            if path == "/v1/copilot/context":
+                identity = resolve_identity_context(self.headers)
+                params = parse_qs(parsed.query)
+                query = str(params.get("query", [""])[0]).strip()
+                paths = params.get("path", [])
+                self._send(
+                    HTTPStatus.OK,
+                    copilot_service.build_copilot_context(
+                        identity,
+                        query=query,
+                        paths=paths,
+                        memory_limit=copilot_service.normalize_memory_limit(params.get("memory_limit", ["5"])[0]),
+                    ),
+                )
                 return
             if path == "/v1/github/dashboard":
                 params = parse_qs(parsed.query)
@@ -388,6 +405,10 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 friend = _friend_chat(f"{system}\n\n{prompt}", session_id=str(body.get("session_id") or "main-api-memory"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)))
                 self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers")})
                 return
+            if path == "/v1/copilot/chat":
+                identity = resolve_identity_context(self.headers)
+                self._send(HTTPStatus.OK, copilot_service.chat_with_copilot(identity, body))
+                return
             if path == "/v1/conversations/analyze":
                 self._send(HTTPStatus.OK, self._analyze_conversation(body))
                 return
@@ -401,6 +422,10 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
+        except copilot_service.CopilotChatConfigError as exc:
+            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "copilot_config_error", "detail": str(exc)})
+        except copilot_service.CopilotChatError as exc:
+            self._send(HTTPStatus.BAD_GATEWAY, {"error": "copilot_error", "detail": str(exc)})
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
