@@ -10,8 +10,8 @@ It never mutates the reconciliation manifest and never grants merge authority.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -29,6 +29,7 @@ EXPECTED_ACCEPTED = {
     "owner_special/research_os_friend/hold_recovery_engine.py",
     "owner_special/tests/test_hold_recovery_engine.py",
 }
+EXPECTED_PORTS = {"8787", "8788", "8790"}
 
 
 def git(*args: str) -> str:
@@ -63,6 +64,19 @@ def fail(reason: str) -> int:
     OUTPUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
     return 1
+
+
+def parse_acl_services(content: bytes) -> set[str]:
+    text = content.decode("utf-8")
+    match = re.search(r'"services"\s*:\s*\{(?P<body>.*?)\n\s*\}\s*\n\s*\}', text, re.DOTALL)
+    if not match:
+        raise ValueError("ACL services object not found")
+    return set(re.findall(r'"(\d{4})"\s*:', match.group("body")))
+
+
+def parse_team_services(content: bytes) -> set[int]:
+    data = json.loads(content.decode("utf-8"))
+    return set(data["owner"]["services"])
 
 
 def main() -> int:
@@ -123,17 +137,18 @@ def main() -> int:
             return fail(f"missing stale/conflict evidence for {p}")
 
     # Independent semantic spot-checks for the known historical divergence.
-    acl = file_at(head, "owner_special/flutter_app/test/team_acl_test.dart")
-    acl_base = file_at(base, "owner_special/flutter_app/test/team_acl_test.dart")
-    acl_merge = file_at(merge, "owner_special/flutter_app/test/team_acl_test.dart")
-    if b"8789" not in acl or b"8789" in acl_base or b"8789" in acl_merge:
-        return fail("ACL topology divergence does not match the declared stale 8789 evidence")
+    acl = parse_acl_services(file_at(head, "owner_special/flutter_app/test/team_acl_test.dart"))
+    acl_base = parse_acl_services(file_at(base, "owner_special/flutter_app/test/team_acl_test.dart"))
+    acl_merge = parse_acl_services(file_at(merge, "owner_special/flutter_app/test/team_acl_test.dart"))
+    if acl != EXPECTED_PORTS | {"8789"} or acl_base != EXPECTED_PORTS or acl_merge != EXPECTED_PORTS:
+        return fail(f"ACL topology divergence does not match the declared stale 8789 evidence: head={sorted(acl)}, base={sorted(acl_base)}, merge={sorted(acl_merge)}")
 
-    team = file_at(head, "owner_special/team_center_contract.json")
-    team_base = file_at(base, "owner_special/team_center_contract.json")
-    team_merge = file_at(merge, "owner_special/team_center_contract.json")
-    if b"8789" not in team or b"8789" in team_base or b"8789" in team_merge:
-        return fail("Team Center divergence does not match the declared stale 8789 evidence")
+    team = parse_team_services(file_at(head, "owner_special/team_center_contract.json"))
+    team_base = parse_team_services(file_at(base, "owner_special/team_center_contract.json"))
+    team_merge = parse_team_services(file_at(merge, "owner_special/team_center_contract.json"))
+    expected_int_ports = {8787, 8788, 8790}
+    if team != expected_int_ports | {8789} or team_base != expected_int_ports or team_merge != expected_int_ports:
+        return fail(f"Team Center divergence does not match the declared stale 8789 evidence: head={sorted(team)}, base={sorted(team_base)}, merge={sorted(team_merge)}")
 
     topo = "owner_special/tests/test_port_topology_contract.py"
     if topo in head_paths or topo not in paths(base, merge):
