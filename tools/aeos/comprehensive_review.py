@@ -2,8 +2,8 @@
 """AEOS one-shot comprehensive review engine.
 
 Read-only and fail-closed. The decision is bound to an exact PR HEAD and to
-an externally established CI-pass assertion. The trusted workflow/policy is
-the only component that may consume the certificate for auto-merge.
+an externally established CI-pass assertion. This certificate is evidence of
+review only; it never grants merge authority or performs self-approval.
 """
 from __future__ import annotations
 
@@ -145,8 +145,6 @@ def main() -> int:
             return fail(checks, "topology test tree-existence lineage proof failed")
         checks["semantic_contracts"] = "PASS"
     else:
-        # Generic PRs still require explicit base/head identity; specialized
-        # reconciliation checks are added by policy profiles as they mature.
         if not base:
             base = git("rev-parse", "origin/main")
         if git("rev-parse", base) != base:
@@ -169,8 +167,8 @@ def main() -> int:
         "merge_sha": merge,
         "checks": checks,
         "review_mode": "one_shot_fail_closed",
-        "merge_allowed": True,
-        "merge_authority": True,
+        "merge_allowed": False,
+        "merge_authority": False,
         "self_certification": False,
     }
     canonical_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
