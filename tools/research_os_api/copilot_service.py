@@ -24,7 +24,7 @@ MAX_CONTEXT_FILE_BYTES = 4096
 MAX_CONTEXT_TOTAL_BYTES = 16384
 BLOCKED_CONTEXT_NAMES = {".env", ".env.local", ".env.production", ".env.development", "credentials.json", "service-account.json", "id_rsa", "id_ed25519"}
 BLOCKED_CONTEXT_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".crt", ".cer"}
-_ALLOWED_CHAT_FIELDS = {"context_query", "memory_limit", "message", "messages", "paths"}
+_ALLOWED_CHAT_FIELDS = {"context_query", "memory_limit", "message", "messages", "paths", "model", "system"}
 _RESERVED_SCOPE_FIELDS = {"owner", "owner_id", "profile", "profile_id", "role", "session_id", "user_id"}
 _AUDIT_LOCK = threading.Lock()
 
@@ -111,7 +111,12 @@ def _normalize_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
 def _normalize_paths(value: Any) -> list[str]:
     if value is None:
         return []
-    items: Iterable[Any] = value.split(",") if isinstance(value, str) else value if isinstance(value, list) else (_ for _ in ()).throw(ValueError("paths must be an array or comma-separated string"))
+    if isinstance(value, str):
+        items: Iterable[Any] = value.split(",")
+    elif isinstance(value, list):
+        items = value
+    else:
+        raise ValueError("paths must be an array or comma-separated string")
     paths: list[str] = []
     for item in items:
         text = _optional_text(item)
@@ -182,8 +187,6 @@ def _validate_chat_payload(payload: dict[str, Any]) -> None:
     forbidden = [key for key in _RESERVED_SCOPE_FIELDS if key in payload]
     if forbidden:
         raise ValueError("trusted user scope is derived from the Research OS session and cannot be overridden")
-    if "system" in payload or "model" in payload:
-        raise ValueError("system prompt and model are server-controlled")
 
 
 def _display_path(path: Path) -> str:
