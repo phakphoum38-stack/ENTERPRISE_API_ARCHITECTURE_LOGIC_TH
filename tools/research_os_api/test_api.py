@@ -4,17 +4,20 @@ import tempfile
 import threading
 import unittest
 import urllib.parse
+import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
 import server
+from auth_session import issue_session
 
 
 class ResearchOSAPITests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-only-research-os-api-secret"
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.ResearchOSHandler)
         cls.port = cls.httpd.server_address[1]
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
@@ -37,8 +40,16 @@ class ResearchOSAPITests(unittest.TestCase):
             headers=request_headers,
             method=method,
         )
-        with urllib.request.urlopen(request, timeout=5) as response:
-            return response.status, json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                return response.status, json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            return exc.code, json.loads(exc.read().decode("utf-8"))
+
+    def issue_session(self, user_id: str = "copilot-user") -> str:
+        return issue_session(
+            {"sub": user_id, "email": f"{user_id}@example.test", "role": "user"}
+        )
 
     def test_health(self):
         status, payload = self.request("GET", "/health")
@@ -195,6 +206,63 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertIn("mock", payload["providers"])
         self.assertIn("anthropic", payload["providers"])
+
+    def test_copilot_context_requires_session(self):
+        status, payload = self.request("GET", "/v1/copilot/context")
+        self.assertEqual(400, status)
+        self.assertEqual("bad_request", payload["error"])
+
+    @patch("server.copilot_service._git_branch", return_value="feature/copilot")
+    def test_copilot_context_returns_repo_scope_and_memory(self, _branch):
+        status, payload = self.request(
+            "GET",
+            "/v1/copilot/context?query=conversation&path=README.md",
+            headers={"X-Research-OS-Session": self.issue_session("alice")},
+        )
+        self.assertEqual(200, status)
+        self.assertEqual(
+            "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH",
+            payload["repository"],
+        )
+        self.assertEqual("feature/copilot", payload["branch"])
+        self.assertEqual("user-alice", payload["scope"]["profile_id"])
+        self.assertEqual("README.md", payload["files"][0]["path"])
+        self.assertGreaterEqual(payload["memory_count"], 1)
+
+    @patch("server.copilot_service.CopilotChatClient")
+    def test_copilot_chat_routes_through_service_and_audits(self, client_cls):
+        client_cls.return_value.chat.return_value = {
+            "reply": "Copilot enterprise response",
+            "model": "copilot-enterprise",
+            "raw": {"reply": "Copilot enterprise response"},
+        }
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(
+            os.environ,
+            {"RESEARCH_OS_COPILOT_AUDIT_DIR": tmp},
+            clear=False,
+        ):
+            status, payload = self.request(
+                "POST",
+                "/v1/copilot/chat",
+                {"message": "ช่วยสรุป architecture นี้"},
+                headers={"X-Research-OS-Session": self.issue_session("bob")},
+            )
+            self.assertTrue(Path(tmp, "audit.jsonl").exists())
+        self.assertEqual(200, status)
+        self.assertEqual("copilot-chat", payload["provider"])
+        self.assertEqual("Copilot enterprise response", payload["reply"])
+        self.assertEqual("user-bob", payload["context"]["scope"]["profile_id"])
+        self.assertTrue(payload["audit"]["written"])
+
+    def test_copilot_chat_rejects_scope_override(self):
+        status, payload = self.request(
+            "POST",
+            "/v1/copilot/chat",
+            {"message": "hello", "user_id": "mallory"},
+            headers={"X-Research-OS-Session": self.issue_session("carol")},
+        )
+        self.assertEqual(400, status)
+        self.assertIn("cannot be overridden", payload["detail"])
 
 
 if __name__ == "__main__":
