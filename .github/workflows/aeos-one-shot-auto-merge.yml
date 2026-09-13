@@ -15,8 +15,10 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
+  checks: read
   contents: read
   pull-requests: read
+  statuses: read
 
 jobs:
   comprehensive-review:
@@ -64,113 +66,13 @@ jobs:
       - name: Verify PR checks are green
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.target.outputs.pr }}
           EXPECTED_HEAD: ${{ steps.target.outputs.head }}
-          CURRENT_WORKFLOW: AEOS One-Shot Comprehensive Review
-          POLL_SECONDS: 15
-          MAX_POLLS: 80
+          INITIAL_POLL_SECONDS: 5
+          MAX_POLL_SECONDS: 30
+          MAX_WAIT_SECONDS: 900
         run: |
           set -euo pipefail
-
-          # `--required` is intentionally not used. A repository can have
-          # zero branch-protection-required checks while still reporting a
-          # complete and passing CI set. That configuration state must not be
-          # misclassified as source failure.
-          PR_NUMBER="$PR_NUMBER" CURRENT_WORKFLOW="$CURRENT_WORKFLOW" POLL_SECONDS="$POLL_SECONDS" MAX_POLLS="$MAX_POLLS" python3 - <<'PY'
-          import json
-          import os
-          import subprocess
-          import time
-
-          pr_number = os.environ["PR_NUMBER"]
-          repo = os.environ["GITHUB_REPOSITORY"]
-          current_workflow = os.environ["CURRENT_WORKFLOW"]
-          poll_seconds = int(os.environ.get("POLL_SECONDS", "15"))
-          max_polls = int(os.environ.get("MAX_POLLS", "80"))
-
-          def fetch_checks():
-              cp = subprocess.run(
-                  [
-                      "gh",
-                      "pr",
-                      "checks",
-                      pr_number,
-                      "--repo",
-                      repo,
-                      "--json",
-                      "name,state,bucket,workflow",
-                  ],
-                  check=True,
-                  capture_output=True,
-                  text=True,
-              )
-              return json.loads(cp.stdout or "[]")
-
-          success_states = {"SUCCESS", "NEUTRAL", "SKIPPED"}
-          pending_states = {"QUEUED", "IN_PROGRESS", "PENDING", "REQUESTED", "WAITING"}
-
-          for attempt in range(1, max_polls + 1):
-              checks = fetch_checks()
-              if not checks:
-                  raise SystemExit("no CI checks reported for PR HEAD")
-
-              def is_self_check(check):
-                  name = check.get("name") or ""
-                  return name == current_workflow or name.startswith(current_workflow + " /")
-
-              external = [c for c in checks if not is_self_check(c)]
-              if not external:
-                  raise SystemExit("no external CI checks reported for PR HEAD")
-
-              pending = [
-                  c for c in external
-                  if c.get("bucket") == "pending" or c.get("state") in pending_states
-              ]
-
-              bad = [
-                  c for c in external
-                  if c not in pending and (c.get("bucket") != "pass" or c.get("state") not in success_states)
-              ]
-              if bad:
-                  print(json.dumps({"failing_checks": bad}, indent=2))
-                  raise SystemExit("one or more external PR checks are not passing")
-
-              if pending:
-                  print(json.dumps({
-                      "status": "WAITING_FOR_EXTERNAL_CI",
-                      "poll": attempt,
-                      "max_polls": max_polls,
-                      "pending_count": len(pending),
-                      "pending_checks": [
-                          {
-                              "workflow": c.get("workflow"),
-                              "name": c.get("name"),
-                              "state": c.get("state"),
-                              "bucket": c.get("bucket"),
-                          }
-                          for c in pending
-                      ],
-                  }, indent=2))
-                  if attempt == max_polls:
-                      raise SystemExit("external PR checks remained pending until verifier timeout")
-                  time.sleep(poll_seconds)
-                  continue
-
-              print(json.dumps({
-                  "status": "ALL_EXTERNAL_CHECKS_PASS",
-                  "check_count": len(external),
-                  "checks": [
-                      {
-                          "workflow": c.get("workflow"),
-                          "name": c.get("name"),
-                          "state": c.get("state"),
-                          "bucket": c.get("bucket"),
-                      }
-                      for c in external
-                  ],
-              }, indent=2))
-              break
-          PY
+          python3 tools/aeos/verify_pr_checks.py --head-sha "$EXPECTED_HEAD"
 
       - name: Run one-shot comprehensive review
         env:
