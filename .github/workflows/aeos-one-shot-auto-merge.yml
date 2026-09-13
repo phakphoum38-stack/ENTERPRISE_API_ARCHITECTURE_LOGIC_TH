@@ -45,13 +45,11 @@ jobs:
           test -n "$HEAD"
           echo "pr=$PR" >> "$GITHUB_OUTPUT"
           echo "head=$HEAD" >> "$GITHUB_OUTPUT"
-
       - name: Checkout trusted main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-
       - name: Fetch exact PR HEAD without executing PR workflow code
         env:
           PR_NUMBER: ${{ steps.target.outputs.pr }}
@@ -62,29 +60,24 @@ jobs:
           ACTUAL_HEAD="$(git rev-parse refs/remotes/origin/aeos-target)"
           test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
           git cat-file -e "$EXPECTED_HEAD^{commit}"
-
       - name: Verify PR checks are green
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.target.outputs.pr }}
           EXPECTED_HEAD: ${{ steps.target.outputs.head }}
           INITIAL_POLL_SECONDS: 5
           MAX_POLL_SECONDS: 30
           MAX_WAIT_SECONDS: 900
         run: |
           set -euo pipefail
-          python3 tools/aeos/verify_pr_checks.py --head-sha "$EXPECTED_HEAD"
-
+          python3 tools/aeos/verify_pr_checks.py --pr-number "$PR_NUMBER" --head-sha "$EXPECTED_HEAD"
       - name: Run one-shot comprehensive review
         env:
           PR_NUMBER: ${{ steps.target.outputs.pr }}
           EXPECTED_HEAD: ${{ steps.target.outputs.head }}
         run: |
           set -euo pipefail
-          python3 tools/aeos/comprehensive_review.py \
-            --pr-number "$PR_NUMBER" \
-            --head-sha "$EXPECTED_HEAD" \
-            --ci-passed
-
+          python3 tools/aeos/comprehensive_review.py --pr-number "$PR_NUMBER" --head-sha "$EXPECTED_HEAD" --ci-passed
       - name: Verify review certificate is non-authorizing
         env:
           EXPECTED_HEAD: ${{ steps.target.outputs.head }}
@@ -100,7 +93,6 @@ jobs:
           assert d["merge_authority"] is False
           assert d["self_certification"] is False
           PY
-
       - name: Publish immutable review certificate
         uses: actions/upload-artifact@v4
         with:
