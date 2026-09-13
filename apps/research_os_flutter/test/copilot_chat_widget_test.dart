@@ -29,7 +29,7 @@ class FakeCopilotApiClient extends ResearchOSApiClient {
     int memoryLimit = 5,
   }) async {
     this.message = message;
-    this.contextPaths = paths;
+    contextPaths = paths;
     this.contextQuery = contextQuery;
     return <String, dynamic>{
       'reply': 'Copilot พร้อมบริบท enterprise แล้ว',
