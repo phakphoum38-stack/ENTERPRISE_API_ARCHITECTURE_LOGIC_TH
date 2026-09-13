@@ -65,107 +65,18 @@ begin
   AppPath := ExpandConstant('{app}\app\{#MyAppExeName}');
   ServiceHostPath := ExpandConstant('{app}\service_host\ResearchOS.Owner.ServiceHost.exe');
   GuardPath := ExpandConstant('{tmp}\research-os-owner-runtime-quiesce.ps1');
-  GuardScript :=
-    'param([Parameter(Mandatory=$true)][string]$PythonTarget,[Parameter(Mandatory=$true)][string]$AppTarget,[Parameter(Mandatory=$true)][string]$ServiceHostTarget,[int]$Port=8790)' + #13#10 +
-    '$ErrorActionPreference = ''Stop''' + #13#10 +
-    'function Normalize-Path([string]$Path) {' + #13#10 +
-    '  if ([string]::IsNullOrWhiteSpace($Path)) { return $null }' + #13#10 +
-    '  try { return [IO.Path]::GetFullPath($Path) } catch { return $null }' + #13#10 +
-    '}' + #13#10 +
-    '$targets = @($PythonTarget,$AppTarget,$ServiceHostTarget) | ForEach-Object { Normalize-Path $_ } | Where-Object { $_ }' + #13#10 +
-    'function Get-OwnerProcesses {' + #13#10 +
-    '  return @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {' + #13#10 +
-    '    if (-not $_.ExecutablePath) { return $false }' + #13#10 +
-    '    $full = Normalize-Path $_.ExecutablePath' + #13#10 +
-    '    return $full -and ($targets -icontains $full)' + #13#10 +
-    '  })' + #13#10 +
-    '}' + #13#10 +
-    'function Get-OwnerListeners {' + #13#10 +
-    '  return @(Get-NetTCPConnection -ErrorAction Stop | Where-Object { $_.LocalPort -eq $Port -and $_.State -eq ''Listen'' })' + #13#10 +
-    '}' + #13#10 +
-    'function Stop-OwnerProcess([int]$ProcessId) {' + #13#10 +
-    '  if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return }' + #13#10 +
-    '  Write-Host "Stopping Owner process PID $ProcessId"' + #13#10 +
-    '  $taskkill = Join-Path $env:SystemRoot ''System32\taskkill.exe''' + #13#10 +
-    '  $killOutput = & $taskkill /PID $ProcessId /T /F 2>&1 | Out-String' + #13#10 +
-    '  $killCode = $LASTEXITCODE' + #13#10 +
-    '  Write-Host $killOutput.Trim()' + #13#10 +
-    '  if ($killCode -ne 0 -and (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {' + #13#10 +
-    '    try { Stop-Process -Id $ProcessId -Force -ErrorAction Stop } catch {' + #13#10 +
-    '      throw "Unable to terminate Owner PID $ProcessId. taskkill exit $killCode. $($_.Exception.Message)"' + #13#10 +
-    '    }' + #13#10 +
-    '  }' + #13#10 +
-    '}' + #13#10 +
-    'try {' + #13#10 +
-    '  $running = @()' + #13#10 +
-    '  for ($i = 0; $i -lt 20; $i++) {' + #13#10 +
-    '    $running = @(Get-OwnerProcesses)' + #13#10 +
-    '    if ($running.Count -eq 0) { break }' + #13#10 +
-    '    Start-Sleep -Milliseconds 500' + #13#10 +
-    '  }' + #13#10 +
-    '  $running = @(Get-OwnerProcesses)' + #13#10 +
-    '  foreach ($p in $running) { Stop-OwnerProcess -ProcessId $p.ProcessId }' + #13#10 +
-    '  for ($i = 0; $i -lt 20; $i++) {' + #13#10 +
-    '    $running = @(Get-OwnerProcesses)' + #13#10 +
-    '    if ($running.Count -eq 0) { break }' + #13#10 +
-    '    Start-Sleep -Milliseconds 250' + #13#10 +
-    '  }' + #13#10 +
-    '  $running = @(Get-OwnerProcesses)' + #13#10 +
-    '  if ($running.Count -gt 0) {' + #13#10 +
-    '    $details = ($running | ForEach-Object { "$($_.ProcessId):$($_.ExecutablePath)" }) -join '';''' + #13#10 +
-    '    Write-Error "Owner process(es) remained alive after forced shutdown: $details"' + #13#10 +
-    '    exit 11' + #13#10 +
-    '  }' + #13#10 +
-    '  $listeners = @()' + #13#10 +
-    '  for ($i = 0; $i -lt 20; $i++) {' + #13#10 +
-    '    $listeners = @(Get-OwnerListeners)' + #13#10 +
-    '    if ($listeners.Count -eq 0) { break }' + #13#10 +
-    '    Start-Sleep -Milliseconds 250' + #13#10 +
-    '  }' + #13#10 +
-    '  $listeners = @(Get-OwnerListeners)' + #13#10 +
-    '  if ($listeners.Count -gt 0) {' + #13#10 +
-    '    $pids = ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique) -join '',''' + #13#10 +
-    '    foreach ($pid in ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique)) { Stop-OwnerProcess -ProcessId $pid }' + #13#10 +
-    '    Start-Sleep -Milliseconds 500' + #13#10 +
-    '    $remaining = @(Get-OwnerListeners)' + #13#10 +
-    '    if ($remaining.Count -gt 0) { Write-Error "Owner port $Port remained in LISTEN state. PID(s): $pids"; exit 12 }' + #13#10 +
-    '  }' + #13#10 +
-    '  Start-Sleep -Milliseconds 500' + #13#10 +
-    '  exit 0' + #13#10 +
-    '} catch {' + #13#10 +
-    '  Write-Error $_' + #13#10 +
-    '  exit 20' + #13#10 +
-    '}' + #13#10;
-
-  if not SaveStringToFile(GuardPath, GuardScript, False) then
-  begin
-    Log('Could not create Owner runtime quiesce helper; refusing file replacement.');
-    Result := False;
-    Exit;
-  end;
-
+  QuiesceLogPath := ExpandConstant('{%TEMP}') + '\ResearchOS-Owner-Quiesce.log';
+  Log('Extracting Owner runtime quiesce helper.');
+  Log('Owner quiesce diagnostic log: ' + QuiesceLogPath);
+  ExtractTemporaryFile('research-os-owner-runtime-quiesce.ps1');
+  if not FileExists(GuardPath) then begin Log('Could not extract Owner runtime quiesce helper; refusing file replacement.'); Exit; end;
   PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-  Parameters :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath +
-    '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath +
-    '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790';
-
-  if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-  begin
-    Log('Could not launch Owner runtime quiesce helper; refusing file replacement.');
-    Result := False;
-    Exit;
-  end;
-
-  if ResultCode = 0 then
-  begin
-    Log('Owner runtime quiesced: desktop app, service host, bundled Python, and port 8790 are released.');
-    Result := True;
-    Exit;
-  end;
-
-  Log('Owner runtime quiesce helper failed with exit code ' + IntToStr(ResultCode) + '.');
-  Result := False;
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + GuardPath + '" -PythonTarget "' + PythonPath + '" -AppTarget "' + AppPath + '" -ServiceHostTarget "' + ServiceHostPath + '" -Port 8790' + ' -LogPath "' + QuiesceLogPath + '"';
+  Log('Launching Owner runtime quiesce helper.');
+  if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then begin Log('Could not launch Owner runtime quiesce helper; refusing file replacement.'); Exit; end;
+  Log('Owner runtime quiesce helper exit code: ' + IntToStr(ResultCode));
+  if ResultCode = 0 then begin Result := True; Exit; end;
+  Log('Owner runtime quiesce helper failed with exit code ' + IntToStr(ResultCode) + '. Detailed diagnostic: ' + QuiesceLogPath);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -173,53 +84,13 @@ var ScExe: String; QueryCode, StopCode, I: Integer; ServiceStopped: Boolean;
 begin
   Result := ''; ScExe := ExpandConstant('{sys}\sc.exe'); ServiceStopped := False;
   Log('Checking Owner Friend Service before installer file replacement.');
-  if not Exec(ScExe, 'query ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, QueryCode) then
-  begin
-    Result := 'Failed to query ResearchOSOwnerFriendService before install/upgrade.';
-    Exit;
-  end;
-
-  if QueryCode <> 0 then
-  begin
-    Log('ResearchOSOwnerFriendService is not registered; checking for orphaned Owner runtime processes.');
-    ServiceStopped := True;
-  end
-  else if OwnerFriendServiceIsStopped() then
-  begin
-    Log('ResearchOSOwnerFriendService is already stopped; checking Owner runtime ownership.');
-    ServiceStopped := True;
-  end
-  else
-  begin
-    Log('Stopping ResearchOSOwnerFriendService before installer file replacement.');
-    if not Exec(ScExe, 'stop ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, StopCode) then
-    begin
-      Result := 'Failed to launch service stop command for ResearchOSOwnerFriendService.';
-      Exit;
-    end;
-
-    for I := 1 to 60 do
-    begin
-      if OwnerFriendServiceIsStopped() then
-      begin
-        Log('ResearchOSOwnerFriendService reached STOPPED state; quiescing bundled runtime.');
-        ServiceStopped := True;
-        Break;
-      end;
-      Sleep(500);
-    end;
-
-    if not ServiceStopped then
-    begin
-      Result := 'ResearchOSOwnerFriendService did not reach STOPPED state within 30 seconds. sc.exe stop exit code: ' + IntToStr(StopCode);
-      Exit;
-    end;
-  end;
-
-  if not QuiesceOwnerRuntime() then
-  begin
-    Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log for the quiesce helper exit code.';
-    Exit;
+  if not Exec(ScExe, 'query ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, QueryCode) then begin Result := 'Failed to query ResearchOSOwnerFriendService before install/upgrade.'; Exit; end;
+  if QueryCode <> 0 then ServiceStopped := True
+  else if OwnerFriendServiceIsStopped() then ServiceStopped := True
+  else begin
+    if not Exec(ScExe, 'stop ResearchOSOwnerFriendService', '', SW_HIDE, ewWaitUntilTerminated, StopCode) then begin Result := 'Failed to launch service stop command for ResearchOSOwnerFriendService.'; Exit; end;
+    for I := 1 to 60 do begin if OwnerFriendServiceIsStopped() then begin ServiceStopped := True; Break; end; Sleep(500); end;
+    if not ServiceStopped then begin Result := 'ResearchOSOwnerFriendService did not reach STOPPED state within 30 seconds. sc.exe stop exit code: ' + IntToStr(StopCode); Exit; end;
   end;
   if not QuiesceOwnerRuntime() then begin Result := 'Owner runtime could not be safely quiesced. Setup refused file replacement. See setup log and detailed quiesce diagnostic.'; Exit; end;
 end;
@@ -227,7 +98,4 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 begin if CurStep = ssInstall then Log('Owner Special install/upgrade preserves ProgramData\ResearchOSOwnerSpecial.'); end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-begin
-  if (CurUninstallStep = usPostUninstall) and (not UninstallSilent) then
-    MsgBox('Research OS Owner Special was removed. Owner memory and provider configuration in ProgramData\ResearchOSOwnerSpecial were preserved.', mbInformation, MB_OK);
-end;
+begin if (CurUninstallStep = usPostUninstall) and (not UninstallSilent) then MsgBox('Research OS Owner Special was removed. Owner memory and provider configuration in ProgramData\ResearchOSOwnerSpecial were preserved.', mbInformation, MB_OK); end;
