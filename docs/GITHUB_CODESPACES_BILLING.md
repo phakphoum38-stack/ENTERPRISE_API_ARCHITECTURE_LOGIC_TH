@@ -62,7 +62,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 ### เมื่อใช้งานเกินโควตาที่รวมมา
 
-หากบัญชีไม่มี valid payment method การใช้งานจะถูก block ทันทีเมื่อใช้โควตาครบ
+หากบัญชีไม่มี valid payment method การใช้งานจะถูก block ทันทีเมื่อใช้โควตาครบ ส่วนบัญชีที่มี payment method อยู่แล้วจะยังใช้งานต่อได้หรือไม่ขึ้นอยู่กับ budget และ spending limit ที่กำหนดไว้
 
 หากคุณถูก block จากการ resume codespace แต่ยังต้องทำงานต่อ คุณสามารถเลือกได้ดังนี้:
 
@@ -119,7 +119,7 @@ Organization ใดก็ได้สามารถดูแล template reposi
 
 ## การจัดการ budget สำหรับ GitHub Codespaces
 
-หากบัญชีไม่มี valid payment method ระบบจะ block การใช้งานเมื่อใช้โควตาครบ ส่วนบัญชีที่มี payment method อยู่แล้ว การใช้งานอาจยังถูกจำกัดได้เมื่อ budget หรือ spending limit ถึงขีดจำกัดที่กำหนดไว้ ดู [Setting up budgets to control spending on metered products](https://docs.github.com/en/billing/how-tos/set-up-budgets) และ [Budgets and alerts](https://docs.github.com/en/billing/concepts/budgets-and-alerts#included-usage-alerts)
+เมื่อใช้โควตาครบแล้ว บัญชีที่ไม่มี valid payment method จะถูก block ทันที ส่วนบัญชีที่มี payment method อยู่แล้ว การใช้งานอาจยังถูกจำกัดได้เมื่อ budget หรือ spending limit ถึงขีดจำกัดที่กำหนดไว้ ดู [Setting up budgets to control spending on metered products](https://docs.github.com/en/billing/how-tos/set-up-budgets) และ [Budgets and alerts](https://docs.github.com/en/billing/concepts/budgets-and-alerts#included-usage-alerts)
 
 คุณยังสามารถรับอีเมลแจ้งเตือนเมื่อ included usage ของ GitHub Codespaces ใช้ไปถึง 90% และ 100% ของรอบ billing ปัจจุบันได้ ดู [Budgets and alerts](https://docs.github.com/en/billing/concepts/budgets-and-alerts#included-usage-alerts)
 
