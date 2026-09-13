@@ -80,9 +80,9 @@ void main() {
       status: const Text('status'),
     )));
 
-    expect(find.text('Mission Control'), findsOneWidget);
+    expect(find.byKey(const Key('mission-control-nav-item')), findsOneWidget);
     expect(find.text('Mission Control is waiting for validated state.'), findsOneWidget);
-    await tester.tap(find.text('Mission Control'));
+    await tester.tap(find.byKey(const Key('mission-control-nav-item')));
     await tester.pump();
     expect(selected, 0);
   });
