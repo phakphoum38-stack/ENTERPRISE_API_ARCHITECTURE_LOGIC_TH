@@ -53,7 +53,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 | GitHub Pro                        | 20 GB-month      | 180 hrs               |
 
 > [!NOTE]
-> GitHub Codespaces ใช้งานไม่ได้กับ repository ที่ owned โดย managed user accounts ดูเพิ่มที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
+> GitHub Codespaces ใช้งานไม่ได้กับ repository ที่เป็นเจ้าของโดย managed user accounts ดูเพิ่มที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
 
 หากต้องการใช้โควตาที่รวมมาให้คุ้มขึ้น ดู [Getting the most out of your included usage](https://docs.github.com/en/codespaces/troubleshooting/troubleshooting-included-usage)
 
@@ -97,7 +97,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 การใช้งานทั้งหมดจะถูกคิดเงินให้กับเจ้าของ codespace หรือ organization เจ้าของ repository ตามนโยบาย billing ของ organization นั้น ดู [Choosing who owns and pays for codespaces in your organization](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/choosing-who-owns-and-pays-for-codespaces-in-your-organization)
 
-หาก repository ถูกย้ายไปยัง organization อื่น ownership และ billing responsibility ของ codespace ที่เกี่ยวข้องจะเปลี่ยนตาม settings ของ organization ใหม่
+หาก repository ถูกย้ายไปยัง organization อื่น ความเป็นเจ้าของและความรับผิดชอบด้านการเรียกเก็บเงินของ codespace ที่เกี่ยวข้องจะเปลี่ยนตามการตั้งค่าของ organization ใหม่
 
 หากผู้ใช้ถูกลบออกจาก organization หรือ repository, codespaces ของผู้ใช้นั้นจะถูกลบโดยอัตโนมัติ
 
@@ -105,7 +105,9 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 Codespace ที่สร้างจาก fork จะถูกคิดกับบัญชีส่วนบุคคลโดยค่าเริ่มต้น เว้นแต่ upstream หรือ parent repository จะอยู่ใน organization ที่อนุญาตให้คุณใช้ Codespaces โดยคิดค่าใช้จ่ายกับ organization ได้
 
-ตัวอย่างเช่น หากสมาชิกหรือ outside collaborator ของ organization ได้รับสิทธิ์ใช้ Codespaces โดยคิดกับ organization และผู้ใช้นั้นมีสิทธิ์ fork private repository ของ organization ผู้ใช้จะสามารถสร้างและใช้งาน codespace ของ repository ที่ fork มาโดยคิดค่าใช้จ่ายกับ organization ได้ เพราะ parent repository ยังคงเป็นของ organization เดิม อย่างไรก็ตาม owner ของ organization สามารถเพิกถอนสิทธิ์เข้าถึง repository ต้นทาง, forked repository และ codespace ที่เกี่ยวข้องได้ รวมถึงสามารถลบ parent repository ซึ่งจะทำให้ forked repository ถูกลบตามไปด้วย โดยอ้างอิงแนวทางในหัวข้อ **Managing the forking policy for your repository** บน GitHub Docs
+ตัวอย่างเช่น หากสมาชิกหรือผู้ร่วมงานภายนอกของ organization ได้รับสิทธิ์ใช้ Codespaces โดยคิดกับ organization และผู้ใช้นั้นมีสิทธิ์ fork private repository ของ organization ผู้ใช้จะสามารถสร้างและใช้งาน codespace ของ repository ที่ fork มาโดยคิดค่าใช้จ่ายกับ organization ได้ เนื่องจาก parent repository ยังคงเป็นของ organization เดิม
+
+อย่างไรก็ตาม เจ้าของ organization สามารถเพิกถอนสิทธิ์เข้าถึง repository ต้นทาง, repository ที่ fork และ codespace ที่เกี่ยวข้องได้ นอกจากนี้ยังสามารถลบ parent repository ซึ่งจะทำให้ repository ที่ fork ถูกลบตามไปด้วย โดยอ้างอิงแนวทางในหัวข้อ **Managing the forking policy for your repository** บน GitHub Docs
 
 หากคุณสร้าง prebuilds สำหรับ forked repository ค่า storage ของ prebuilds เหล่านั้นจะถูกหักจาก included storage รายเดือนของบัญชีคุณก่อน และหากใช้ครบแล้วพร้อมเปิด billing อยู่ ระบบจะคิดเงินกับบัญชีส่วนบุคคล แม้ codespaces สำหรับ fork นั้นจะถูก organization เจ้าของ parent repository เป็นผู้จ่ายก็ตาม
 
