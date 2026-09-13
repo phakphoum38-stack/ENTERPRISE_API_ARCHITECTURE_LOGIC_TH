@@ -52,6 +52,9 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 | GitHub Free for personal accounts | 15 GB-month      | 120 hrs               |
 | GitHub Pro                        | 20 GB-month      | 180 hrs               |
 
+> [!IMPORTANT]
+> โควตาฟรีอาจเปลี่ยนแปลงได้ตามแพ็กเกจและนโยบายล่าสุดของ GitHub ควรตรวจสอบข้อมูลปัจจุบันจาก [View and manage paid use of GitHub products](https://docs.github.com/en/billing/how-tos/products) หรือ [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces)
+
 > [!NOTE]
 > GitHub Codespaces ใช้งานไม่ได้กับ repository ที่เป็นเจ้าของโดยบัญชี `managed user account` โดยตรง อย่างไรก็ตาม ในกรณีของ template repository ที่เรียกเก็บเงินผ่าน organization ผู้ใช้ที่เป็น `managed user account` อาจสร้าง codespace ได้ภายใต้เงื่อนไขของ organization นั้น ดูเพิ่มที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
 
@@ -79,7 +82,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 ### Pricing
 
-ค่า compute จะแปรผันตามจำนวน processor cores ของ machine type ที่เลือก ยิ่ง core มาก ราคาต่อชั่วโมงยิ่งสูง ตัวอย่างเช่น 16-core จะมีค่า compute สูงกว่า 2-core อยู่ 8 เท่า
+ค่า compute จะแปรผันตามจำนวน processor cores ของ machine type ที่เลือก โดยทั่วไปยิ่งเลือกเครื่องที่มีทรัพยากรมาก ราคาต่อชั่วโมงก็ยิ่งสูงขึ้น
 
 > [!IMPORTANT]
 > ราคาจริงและตัวเลือก machine type อาจเปลี่ยนแปลงได้ ควรตรวจสอบราคาปัจจุบันจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
@@ -107,7 +110,7 @@ Codespace ที่สร้างจาก fork จะถูกคิดกั�
 
 Organization ใดก็ได้สามารถดูแล template repository สำหรับ GitHub Codespaces โดย codespace ที่สร้างจาก template repository จะถูกคิดค่าใช้จ่ายกับ organization หาก organization อนุญาตให้ผู้ใช้คนนั้นใช้งานในนาม organization มิฉะนั้นจะคิดกับผู้สร้าง codespace เอง
 
-หากผู้ใช้ publish codespace ที่สร้างจาก template ไปยัง repository ใหม่ repository นั้นจะเป็นของบัญชีส่วนบุคคลของผู้ใช้ และหาก codespace เดิมคิดค่าใช้จ่ายกับ organization ownership และ billing จะย้ายมาที่ผู้ใช้ผู้สร้าง codespace ทันที
+หากผู้ใช้ publish codespace ที่สร้างจาก template ไปยัง repository ใหม่ repository นั้นจะเป็นของบัญชีส่วนบุคคลของผู้ใช้ และหาก codespace เดิมคิดค่าใช้จ่ายกับ organization ทั้งความเป็นเจ้าของ repository ใหม่และความรับผิดชอบด้านการเรียกเก็บเงินของ codespace จะย้ายมาที่ผู้ใช้ผู้สร้างทันที
 
 บัญชี `managed user account` ไม่สามารถเป็น billable owner ของ codespace ได้ ดังนั้น:
 
