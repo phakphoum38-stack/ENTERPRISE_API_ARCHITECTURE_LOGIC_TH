@@ -1,7 +1,7 @@
 from .agent_runtime import AgentRun, AgentRuntime, AgentRunStatus, AgentTraceEvent
 from .agent_trace_store import PersistentAgentTraceStore
 from .agents_sdk_adapter import AgentsSdkAdapter, AgentsSdkContract, AgentsSdkToolContract
-from .approval import ApprovalGate, ApprovalRecord, ApprovalState, SIDE_EFFECT_TOOLS
+from .approval import ApprovalGate, ApprovalProof, ApprovalRecord, ApprovalState, SIDE_EFFECT_TOOLS
 from .approval_store import PersistentApprovalStore
 from .brain import FriendBrain
 from .bundle import OwnerBundleBuilder
@@ -35,8 +35,12 @@ from .autobot_execution_loop import AutobotExecutionError, ExecutionEvent, Execu
 from .trusted_web_research import MatchState, ResearchError, ResearchRecord, SourceKind, classify_source, match_environment, validate_research_finding
 
 __all__ = [
-    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "ControlledAutomationContract", "ControlledAutomationError", "AutomationDecision", "AutomationRequest", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
-    "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "FriendRuntimeContract", "FriendRuntimeContractError", "HelperAllocation", "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
-    "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager", "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "SelfLearningContract", "SelfLearningContractError", "Skill", "SkillRegistry", "Tool", "ToolRegistry", "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
-    "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools", "install_friend_complete_capabilities", "AutobotExecutionError", "ExecutionEvent", "ExecutionJob", "ExecutionState", "validate_job_payload", "MatchState", "ResearchError", "ResearchRecord", "SourceKind", "classify_source", "match_environment", "validate_research_finding",
+    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalProof", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
+    "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "HelperAllocation",
+    "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
+    "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
+    "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
+    "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
+    "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
+    "install_friend_complete_capabilities",
 ]

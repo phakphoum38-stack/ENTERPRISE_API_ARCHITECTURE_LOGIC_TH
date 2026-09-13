@@ -2,6 +2,7 @@ import unittest
 
 from owner_special.research_os_friend.aeos_completion_verifier import (
     CompletionVerificationError,
+    VerifiedCompletionObservation,
     verify_completion_observation,
 )
 from owner_special.research_os_friend.aeos_stop_controller import (
@@ -49,9 +50,23 @@ class CompletionVerifierTests(unittest.TestCase):
             scan_results=valid_payload(),
             evidence_refs=("EV-ROOT",),
         )
-        self.assertTrue(result.verified)
+        self.assertTrue(result.is_verifier_issued())
         self.assertEqual(result.baseline_sha, BASELINE)
         self.assertEqual(len(result.evidence_digest), 64)
+
+    def test_direct_observation_construction_is_blocked(self):
+        with self.assertRaises(TypeError):
+            VerifiedCompletionObservation(
+                baseline_sha=BASELINE,
+                scan_order=SCAN_ORDER,
+                observations=dict(COUNTS),
+                evidence_digest="b" * 64,
+            )
+
+    def test_unsealed_observation_cannot_reach_stop_proof(self):
+        forged = object.__new__(VerifiedCompletionObservation)
+        with self.assertRaises(TypeError):
+            build_authoritative_stop_proof(forged)
 
     def test_stale_observation_is_rejected(self):
         with self.assertRaises(CompletionVerificationError):
