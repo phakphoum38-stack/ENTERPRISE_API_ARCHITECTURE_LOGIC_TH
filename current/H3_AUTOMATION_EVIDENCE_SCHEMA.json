@@ -1,0 +1,8 @@
+{
+  "schema": "research-os-h3-automation-evidence/v1",
+  "states": ["CAPTURED", "PENDING", "PASS", "FAIL", "UNKNOWN"],
+  "certification_requires": ["PASS", "exact_sha_match", "authoritative_ci"],
+  "forbidden_as_authority": ["CAPTURED", "PENDING", "UNKNOWN"],
+  "unknown_policy": "FAIL_CLOSED",
+  "self_attestation": false
+}
