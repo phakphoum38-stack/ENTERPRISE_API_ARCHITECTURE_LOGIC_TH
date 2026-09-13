@@ -12,13 +12,22 @@ class FakeCopilotApiClient extends ResearchOSApiClient {
   bool contextRequested = false;
 
   @override
-  Future<Map<String, dynamic>> getCopilotContext({String? query, List<String> paths = const <String>[], int memoryLimit = 5}) async {
+  Future<Map<String, dynamic>> getCopilotContext({
+    String? query,
+    List<String> paths = const <String>[],
+    int memoryLimit = 5,
+  }) async {
     contextRequested = true;
     return const <String, dynamic>{};
   }
 
   @override
-  Future<Map<String, dynamic>> chatWithCopilot({required String message, List<String> paths = const <String>[], String? contextQuery, int memoryLimit = 5}) async {
+  Future<Map<String, dynamic>> chatWithCopilot({
+    required String message,
+    List<String> paths = const <String>[],
+    String? contextQuery,
+    int memoryLimit = 5,
+  }) async {
     this.message = message;
     this.contextPaths = paths;
     this.contextQuery = contextQuery;
@@ -40,18 +49,40 @@ class FakeCopilotApiClient extends ResearchOSApiClient {
 }
 
 void main() {
-  testWidgets('copilot chat widget sends chat and shows returned context', (tester) async {
+  testWidgets('copilot chat widget sends chat and shows returned context',
+      (tester) async {
     final apiClient = FakeCopilotApiClient();
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SizedBox(height: 600, child: CopilotChatWidget(apiClient: apiClient))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 600,
+            child: CopilotChatWidget(apiClient: apiClient),
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('copilot-chat-input')), 'ช่วยอธิบาย architecture นี้');
+    await tester.enterText(
+      find.byKey(const Key('copilot-chat-input')),
+      'ช่วยอธิบาย architecture นี้',
+    );
     await tester.tap(find.byKey(const Key('copilot-chat-send')));
     await tester.pumpAndSettle();
+
     expect(apiClient.contextRequested, isFalse);
     expect(apiClient.contextQuery, 'ช่วยอธิบาย architecture นี้');
     expect(apiClient.message, 'ช่วยอธิบาย architecture นี้');
-    expect(apiClient.contextPaths, <String>['README.md', 'tools/research_os_api/README.md']);
+    expect(apiClient.contextPaths, <String>[
+      'README.md',
+      'tools/research_os_api/README.md',
+    ]);
     expect(find.text('Copilot พร้อมบริบท enterprise แล้ว'), findsOneWidget);
-    expect(find.text('phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH • 2 files • 2 memory hits'), findsOneWidget);
+    expect(
+      find.text(
+        'phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH • 2 files • 2 memory hits',
+      ),
+      findsOneWidget,
+    );
   });
 }
