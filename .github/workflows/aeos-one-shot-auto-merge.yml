@@ -1,4 +1,4 @@
-name: AEOS One-Shot Comprehensive Review + Auto Merge
+name: AEOS One-Shot Comprehensive Review
 
 on:
   workflow_dispatch:
@@ -11,17 +11,12 @@ on:
         description: Exact PR HEAD SHA to review
         required: true
         type: string
-      auto_merge:
-        description: Permit automatic merge after verified review
-        required: true
-        default: true
-        type: boolean
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 jobs:
   comprehensive-review:
@@ -40,17 +35,14 @@ jobs:
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             PR="$INPUT_PR"
             HEAD="$INPUT_HEAD"
-            AUTO_MERGE="true"
           else
             PR="$EVENT_PR"
             HEAD="$EVENT_HEAD"
-            AUTO_MERGE="true"
           fi
           test -n "$PR"
           test -n "$HEAD"
           echo "pr=$PR" >> "$GITHUB_OUTPUT"
           echo "head=$HEAD" >> "$GITHUB_OUTPUT"
-          echo "auto_merge=$AUTO_MERGE" >> "$GITHUB_OUTPUT"
 
       - name: Checkout trusted main
         uses: actions/checkout@v4
@@ -58,7 +50,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Fetch exact PR HEAD
+      - name: Fetch exact PR HEAD without executing PR workflow code
         env:
           PR_NUMBER: ${{ steps.target.outputs.pr }}
           EXPECTED_HEAD: ${{ steps.target.outputs.head }}
@@ -89,26 +81,8 @@ jobs:
             --head-sha "$EXPECTED_HEAD" \
             --ci-passed
 
-      - name: Publish immutable review certificate
-        uses: actions/upload-artifact@v4
-        with:
-          name: aeos-one-shot-review
-          path: aeos-comprehensive-review.json
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Auto approve by authority policy
+      - name: Verify review certificate is non-authorizing
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.target.outputs.pr }}
-        run: |
-          set -euo pipefail
-          gh pr review "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --approve --body "AEOS One-Shot Comprehensive Review VERIFIED. Exact reviewed HEAD is bound by certificate; merge authority is policy-controlled and self-certification is false."
-
-      - name: Auto merge exact reviewed SHA
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.target.outputs.pr }}
           EXPECTED_HEAD: ${{ steps.target.outputs.head }}
         run: |
           set -euo pipefail
@@ -117,50 +91,16 @@ jobs:
           from pathlib import Path
           d = json.loads(Path("aeos-comprehensive-review.json").read_text())
           assert d["status"] == "VERIFIED"
-          assert d["merge_allowed"] is True
-          assert d["self_certification"] is False
           assert d["reviewed_head_sha"] == os.environ["EXPECTED_HEAD"]
-          PY
-          gh pr merge "$PR_NUMBER" --squash --delete-branch --repo "${GITHUB_REPOSITORY}" --match-head-commit "$EXPECTED_HEAD"
-
-      - name: Post-merge forensic and rebaseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.target.outputs.pr }}
-          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin main
-          python3 - <<'PY'
-          import json, os, subprocess
-          from pathlib import Path
-          def run(*a): return subprocess.check_output(a, text=True).strip()
-          pr = os.environ["PR_NUMBER"]
-          head = os.environ["EXPECTED_HEAD"]
-          info = json.loads(run("gh", "pr", "view", pr, "--repo", os.environ["GITHUB_REPOSITORY"], "--json", "state,mergedAt,mergeCommit,headRefOid"))
-          assert info["state"] == "MERGED"
-          assert info["mergedAt"]
-          assert info["headRefOid"] == head
-          merge_sha = info["mergeCommit"]["oid"]
-          head_tree = run("git", "rev-parse", f"{head}^{{tree}}")
-          merge_tree = run("git", "rev-parse", f"{merge_sha}^{{tree}}")
-          assert head_tree == merge_tree
-          result = {
-              "schema": "aeos.post-merge-forensic.v1",
-              "status": "VERIFIED",
-              "reviewed_head_sha": head,
-              "merge_sha": merge_sha,
-              "merged_head_tree_equals_pr_head_tree": True,
-              "rebaseline_sha": run("git", "rev-parse", "origin/main"),
-          }
-          Path("aeos-post-merge-forensic.json").write_text(json.dumps(result, indent=2) + "\n")
-          print(json.dumps(result, indent=2))
+          assert d["merge_allowed"] is False
+          assert d["merge_authority"] is False
+          assert d["self_certification"] is False
           PY
 
-      - name: Publish post-merge forensic
+      - name: Publish immutable review certificate
         uses: actions/upload-artifact@v4
         with:
-          name: aeos-post-merge-forensic
-          path: aeos-post-merge-forensic.json
+          name: aeos-one-shot-review
+          path: aeos-comprehensive-review.json
           if-no-files-found: error
           retention-days: 90
