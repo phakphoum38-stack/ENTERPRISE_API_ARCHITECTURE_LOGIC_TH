@@ -14,7 +14,7 @@ from typing import Any
 from local_storage import conversation_store_path, ensure_layout
 
 _LOCK = threading.RLock()
-_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+_SAFE_USER_ID = re.compile(r"^[^\x00-\x1f\x7f]{1,128}$")
 
 
 def _store_path() -> Path:
@@ -35,9 +35,15 @@ def authorize(candidate: str | None) -> bool:
 
 def _validate_user_id(user_id: str) -> str:
     value = str(user_id or "").strip()
-    if not value or not _SAFE_USER_ID.fullmatch(value) or value in {".", ".."}:
+    if (
+        not value
+        or not _SAFE_USER_ID.fullmatch(value)
+        or value in {".", ".."}
+        or "/" in value
+        or "\\" in value
+    ):
         raise ValueError("invalid user_id")
-    return value[:128]
+    return value
 
 
 def _read_all() -> dict[str, Any]:
