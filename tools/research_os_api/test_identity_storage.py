@@ -21,6 +21,12 @@ class IdentityStorageTests(unittest.TestCase):
             self.assertNotIn("\\", key)
             self.assertEqual(key, storage_key(user_id))
 
+    def test_storage_key_does_not_rewrite_canonical_identity(self):
+        canonical = "google:123"
+        self.assertNotEqual(storage_key(canonical), storage_key(" google:123 "))
+        with self.assertRaisesRegex(ValueError, "canonical"):
+            storage_key(" google:123 ")
+
     def test_session_revocation_works_for_windows_invalid_identity(self):
         with tempfile.TemporaryDirectory() as data_dir, patch.dict(
             os.environ,
