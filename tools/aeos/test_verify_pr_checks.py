@@ -1,11 +1,17 @@
 import unittest
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
 
-from verify_pr_checks import (
-    classify,
-    normalize_check_run,
-    normalize_status_context,
-    poll_interval,
-)
+MODULE_PATH = Path(__file__).with_name("verify_pr_checks.py")
+SPEC = spec_from_file_location("verify_pr_checks", MODULE_PATH)
+VERIFY_PR_CHECKS = module_from_spec(SPEC)
+assert SPEC and SPEC.loader
+SPEC.loader.exec_module(VERIFY_PR_CHECKS)
+
+classify = VERIFY_PR_CHECKS.classify
+normalize_check_run = VERIFY_PR_CHECKS.normalize_check_run
+normalize_status_context = VERIFY_PR_CHECKS.normalize_status_context
+poll_interval = VERIFY_PR_CHECKS.poll_interval
 
 
 class VerifyPrChecksTests(unittest.TestCase):

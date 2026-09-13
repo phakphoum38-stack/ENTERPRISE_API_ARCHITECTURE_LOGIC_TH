@@ -29,6 +29,14 @@ def headers() -> dict[str, str]:
     return result
 
 
+def permission_hint(url: str) -> str | None:
+    if "/check-runs" in url:
+        return "ensure the workflow token has checks: read permission"
+    if "/status" in url:
+        return "ensure the workflow token has statuses: read permission"
+    return None
+
+
 def request_json(url: str, *, retries: int = 3, timeout: int = 20) -> tuple[Any, dict[str, str]]:
     last_error: Exception | None = None
     for attempt in range(1, retries + 1):
@@ -39,10 +47,13 @@ def request_json(url: str, *, retries: int = 3, timeout: int = 20) -> tuple[Any,
                 return payload, dict(response.headers.items())
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
+            hint = permission_hint(url)
             if exc.code in TRANSIENT_HTTP_STATUS and attempt < retries:
                 time.sleep(attempt)
                 last_error = RuntimeError(f"transient GitHub HTTP {exc.code}: {body[:300]}")
                 continue
+            if exc.code == 403 and hint:
+                raise RuntimeError(f"GitHub HTTP 403: {hint}. Response: {body[:300]}") from exc
             raise RuntimeError(f"GitHub HTTP {exc.code}: {body[:300]}") from exc
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             if attempt < retries:
