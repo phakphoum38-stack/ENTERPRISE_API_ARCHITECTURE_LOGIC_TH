@@ -65,6 +65,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.target.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
           CURRENT_WORKFLOW: AEOS One-Shot Comprehensive Review
           POLL_SECONDS: 15
           MAX_POLLS: 80
