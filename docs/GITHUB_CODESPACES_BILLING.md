@@ -37,7 +37,7 @@ Storage วัดแบบ time-based เป็นหน่วย GB-hours แ�
 * **Default Linux image:** คิดเฉพาะไฟล์ใน repository และไฟล์ที่เพิ่มเข้าไปใน codespace
 * **Custom base image:** คิดรวม custom dev container เพิ่มจากไฟล์ใน repository และไฟล์ใน codespace
 
-Container ที่อ้างอิง default image จะไม่ถูกรวมใน storage volume แม้จะเพิ่ม features ใน `devcontainer.json` ก็ตาม ดูเพิ่มที่ [Adding features to a devcontainer.json file](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/configuring-dev-containers/adding-features-to-a-devcontainer-file)
+Container ที่อ้างอิง default image จะไม่ถูกรวมใน storage volume แม้จะเพิ่ม features ใน `devcontainer.json` ก็ตาม ดูเพิ่มที่ [Adding features to a devcontainer file](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/configuring-dev-containers/adding-features-to-a-devcontainer-file)
 
 ## การใช้งานฟรีและการเรียกเก็บเงินสำหรับบัญชีส่วนบุคคล
 
