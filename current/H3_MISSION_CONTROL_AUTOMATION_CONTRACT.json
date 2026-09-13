@@ -1,0 +1,33 @@
+{
+  "contract": "research-os-h3-mission-control-automation/v1",
+  "status": "IMPLEMENTATION_DRAFT",
+  "base_sha": "c04d60b36d51eb8529a4c65a61c7d5a411e5fe85",
+  "purpose": "Bind the existing read-only Mission Control path to an exact H3 verification boundary without introducing execution or release authority.",
+  "pipeline": [
+    "EXACT_SHA",
+    "H2_EVIDENCE_PROVENANCE",
+    "4H_UNIFIED_SNAPSHOT",
+    "4I_UI_PROJECTION",
+    "5A_DESKTOP_SURFACE",
+    "NEGATIVE_TESTS",
+    "AUTHORITY_AUDIT",
+    "CERTIFICATION"
+  ],
+  "required_invariants": {
+    "read_only": true,
+    "execution_authority": "FriendOrchestrator",
+    "authorization_authority": "OwnerPolicy",
+    "approval_authority": "ApprovalGate",
+    "auto_merge": false,
+    "manual_workflow_dispatch": false,
+    "evidence_authority": false,
+    "release_authority": false
+  },
+  "unknown_policy": "FAIL_CLOSED_AT_AUTHORITY_BOUNDARY",
+  "stale_sha_policy": "REJECT",
+  "owner_mismatch_policy": "REJECT",
+  "evidence_mismatch_policy": "REJECT",
+  "auto_mode": "AUTO_GUARDED",
+  "promotion_rule": "H3_MAY_PROPOSE_AND_VERIFY;_RELEASE_OR_MERGE_REMAINS_OUTSIDE_H3",
+  "certification_rule": "CERTIFY_ONLY_AFTER_EXACT_SHA_VERIFICATION_AND_AUTHORITATIVE_CI"
+}

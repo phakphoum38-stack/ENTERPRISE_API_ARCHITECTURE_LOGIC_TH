@@ -45,6 +45,14 @@ class ApprovalGateTests(unittest.TestCase):
         with self.assertRaisesRegex(PermissionError, "approval required"):
             self.gate.enforce(self.owner, changed, "shell.run")
 
+    def test_approval_proof_is_integrity_bound(self):
+        request = self.request()
+        self.gate.approve(self.owner, request, "shell.run", reason="owner approved")
+        proof = self.gate.issue_proof(self.owner, request, "shell.run")
+        self.assertTrue(proof.is_integrity_valid())
+        self.assertEqual(proof.state, ApprovalState.APPROVED)
+        self.assertEqual(proof.request_fingerprint, self.gate.inspect(self.owner, request, "shell.run").request_fingerprint)
+
     def test_denial_is_terminal_for_exact_request(self):
         request = self.request()
         denied = self.gate.deny(self.owner, request, "shell.run", reason="unsafe")

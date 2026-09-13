@@ -65,6 +65,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.target.outputs.pr }}
+          CURRENT_WORKFLOW: AEOS One-Shot Comprehensive Review
         run: |
           set -euo pipefail
           checks_json="$(gh pr checks "$PR_NUMBER" --repo "${GITHUB_REPOSITORY}" --json name,state,bucket)"

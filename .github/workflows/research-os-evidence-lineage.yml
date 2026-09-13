@@ -10,7 +10,7 @@ on:
         required: true
         type: string
       base_sha:
-        description: Base commit SHA
+        description: Original PR base commit SHA
         required: true
         type: string
       head_sha:
@@ -51,41 +51,27 @@ jobs:
           python - <<'PY'
           import json, os, subprocess
           from pathlib import Path
-
-          owner = os.environ['OWNER']
-          repo = os.environ['REPO']
-          merge = os.environ['MERGE_SHA']
-          token = os.environ['GH_TOKEN']
-
+          owner=os.environ['OWNER']; repo=os.environ['REPO']; merge=os.environ['MERGE_SHA']; token=os.environ['GH_TOKEN']
           def gh(path):
-              out = subprocess.check_output([
+              return json.loads(subprocess.check_output([
                   'curl', '-fsSL',
                   '-H', f'Authorization: Bearer {token}',
                   '-H', 'Accept: application/vnd.github+json',
                   '-H', 'X-GitHub-Api-Version: 2022-11-28',
                   f'https://api.github.com{path}'
-              ], text=True)
-              return json.loads(out)
+              ], text=True))
 
           prs = gh(f'/repos/{owner}/{repo}/commits/{merge}/pulls')
-          candidates = [
-              p for p in prs
-              if p.get('merged_at') and p.get('merge_commit_sha') == merge
-          ]
+          candidates = [p for p in prs if p.get('merged_at') and p.get('merge_commit_sha') == merge]
           if len(candidates) != 1:
-              raise SystemExit(
-                  f'Cannot resolve exactly one merged PR for main push {merge}: '
-                  f'found {len(candidates)} candidates'
-              )
+              raise SystemExit(f'Cannot resolve exactly one merged PR for main push {merge}: found {len(candidates)} candidates')
 
           pr = gh(f"/repos/{owner}/{repo}/pulls/{candidates[0]['number']}")
           base = pr.get('base', {}).get('sha', '')
           head = pr.get('head', {}).get('sha', '')
           merge_from_pr = pr.get('merge_commit_sha', '')
           if not base or not head or merge_from_pr != merge:
-              raise SystemExit(
-                  'Resolved PR metadata is incomplete or does not match the pushed merge commit'
-              )
+              raise SystemExit('Resolved PR metadata is incomplete or does not match the pushed merge commit')
 
           Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8').write(
               f"PR_NUMBER={pr['number']}\n"
@@ -94,7 +80,6 @@ jobs:
               f"MERGE_SHA={merge}\n"
           )
           PY
-
       - name: Validate explicit reconciliation inputs
         shell: bash
         run: |
@@ -105,12 +90,17 @@ jobs:
             test -n "${HEAD_SHA}" || { echo 'HEAD_SHA is required'; exit 1; }
             test -n "${MERGE_SHA}" || { echo 'MERGE_SHA is required'; exit 1; }
           fi
-
       - name: Checkout merge target
         uses: actions/checkout@v4
         with:
           ref: ${{ env.MERGE_SHA }}
           fetch-depth: 0
+
+      - name: Test lineage classifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tools/aeos -p 'test_evidence_lineage.py' -v
 
       - name: Reconcile commit lineage and CI evidence
         env:
@@ -120,8 +110,11 @@ jobs:
           set -euo pipefail
           mkdir -p evidence/lineage
           python - <<'PY'
-          import json, os, subprocess
+          import json, os, subprocess, sys
           from pathlib import Path
+
+          sys.path.insert(0, 'tools/aeos')
+          from evidence_lineage import classify_lineage
 
           owner = os.environ['OWNER']
           repo = os.environ['REPO']
@@ -133,14 +126,16 @@ jobs:
           run_id = os.environ['GITHUB_RUN_ID']
 
           def gh(path):
-              out = subprocess.check_output([
+              return json.loads(subprocess.check_output([
                   'curl','-fsSL',
                   '-H', f'Authorization: Bearer {token}',
                   '-H', 'Accept: application/vnd.github+json',
                   '-H', 'X-GitHub-Api-Version: 2022-11-28',
                   f'https://api.github.com{path}'
-              ], text=True)
-              return json.loads(out)
+              ], text=True))
+
+          def is_ancestor(ancestor, descendant):
+              return subprocess.run(['git', 'merge-base', '--is-ancestor', ancestor, descendant], check=False).returncode == 0
 
           pr_data = gh(f'/repos/{owner}/{repo}/pulls/{pr}')
           head_data = gh(f'/repos/{owner}/{repo}/commits/{head}')
@@ -151,64 +146,70 @@ jobs:
           current_run = gh(f'/repos/{owner}/{repo}/actions/runs/{run_id}')
           run_started_at = current_run.get('run_started_at', '')
           if not run_started_at:
-              raise SystemExit(
-                  f'Current Actions run {run_id} has no run_started_at in the Actions API'
-              )
+              raise SystemExit(f'Current Actions run {run_id} has no run_started_at in the Actions API')
 
           parents = [p['sha'] for p in merge_data.get('parents', [])]
+          merge_parent_sha = parents[0] if len(parents) == 1 else None
           pr_head_sha = pr_data.get('head', {}).get('sha', '')
           pr_merge_sha = pr_data.get('merge_commit_sha', '')
           head_tree_sha = head_data.get('commit', {}).get('tree', {}).get('sha')
           merge_tree_sha = merge_data.get('commit', {}).get('tree', {}).get('sha')
 
-          head_matches_pr = bool(pr_head_sha) and (
-              pr_head_sha == head or pr_head_sha.startswith(head)
-          )
-          merge_matches_pr = bool(pr_merge_sha) and (
-              pr_merge_sha == merge or pr_merge_sha.startswith(merge)
-          )
-          base_matches_merge_parent = any(
-              parent == base or parent.startswith(base) for parent in parents
-          )
-
+          head_matches_pr = bool(pr_head_sha) and (pr_head_sha == head or pr_head_sha.startswith(head))
+          merge_matches_pr = bool(pr_merge_sha) and (pr_merge_sha == merge or pr_merge_sha.startswith(merge))
+          base_matches_merge_parent = any(parent == base or parent.startswith(base) for parent in parents)
+          original_base_is_ancestor_of_merge_parent = bool(merge_parent_sha and is_ancestor(base, merge_parent_sha))
           direct_parent_lineage = head_matches_pr and merge_matches_pr and head_data.get('sha') in parents
-          squash_lineage = (
-              head_matches_pr
-              and merge_matches_pr
-              and base_matches_merge_parent
-              and len(parents) == 1
-              and head_tree_sha is not None
-              and head_tree_sha == merge_tree_sha
-          )
-          lineage_ok = bool(pr_data.get('merged')) and (direct_parent_lineage or squash_lineage)
 
           workflow_runs = []
           for r in runs.get('workflow_runs', []):
               workflow_runs.append({
-                  'id': r['id'],
-                  'name': r['name'],
-                  'status': r['status'],
-                  'conclusion': r['conclusion'],
-                  'head_sha': r['head_sha'],
-                  'event': r['event'],
-                  'url': r['html_url'],
+                  'id': r['id'], 'name': r['name'], 'status': r['status'],
+                  'conclusion': r['conclusion'], 'head_sha': r['head_sha'],
+                  'event': r['event'], 'url': r['html_url'],
               })
 
-          passed = [
-              c for c in checks.get('check_runs', [])
-              if c.get('conclusion') == 'success'
+          independent_reconciliation_runs = [
+              r for r in workflow_runs
+              if r['name'] == 'AEOS Independent Forensic — Squash Reconciliation'
+              and r['head_sha'] == head
+              and r['status'] == 'completed'
+              and r['conclusion'] == 'success'
           ]
-          failed = [
-              c for c in checks.get('check_runs', [])
-              if c.get('conclusion') not in (None, 'success', 'neutral', 'skipped')
-          ]
+          reconciliation_contract_present = Path('current/AEOS_SQUASH_RECONCILIATION_CONTRACT.json').is_file()
+          reconciliation_declared = (
+              'aeos.squash-reconciliation.v1' in pr_data.get('body', '')
+              and 'squash_reconciliation' in pr_data.get('body', '')
+          )
+          reconciliation_verified = bool(reconciliation_contract_present and reconciliation_declared and independent_reconciliation_runs)
+
+          lineage_mode, lineage_ok = classify_lineage(
+              pr_merged=bool(pr_data.get('merged')),
+              head_matches_pr=head_matches_pr,
+              merge_matches_pr=merge_matches_pr,
+              parents=parents,
+              head_sha=head_data.get('sha', ''),
+              original_base_sha=base,
+              merge_parent_sha=merge_parent_sha,
+              original_base_is_ancestor_of_merge_parent=original_base_is_ancestor_of_merge_parent,
+              head_tree_sha=head_tree_sha,
+              merge_tree_sha=merge_tree_sha,
+              reconciliation_verified=reconciliation_verified,
+          )
+
+          passed = [c for c in checks.get('check_runs', []) if c.get('conclusion') == 'success']
+          failed = [c for c in checks.get('check_runs', []) if c.get('conclusion') not in (None, 'success', 'neutral', 'skipped')]
+          squash_lineage = lineage_mode in {'SQUASH_EQUIVALENT', 'SQUASH_RECONCILIATION'}
 
           evidence = {
-              'schema': 'research-os.canonical-evidence.v1',
+              'schema': 'research-os.canonical-evidence.v2',
               'plan': '#111 -> existing-compatible-tools -> canonical-evidence -> #115 -> #116 -> FINAL -> LOCK',
               'stage': '#111',
               'status': 'GREEN' if lineage_ok else 'GAP',
               'base_sha': base,
+              'original_pr_base_sha': base,
+              'merge_parent_sha': merge_parent_sha,
+              'merge_target_sha': merge_parent_sha,
               'pr_number': int(pr),
               'head_sha': head,
               'merge_sha': merge,
@@ -217,10 +218,18 @@ jobs:
               'merge_matches_pr': merge_matches_pr,
               'head_is_merge_parent': head_data.get('sha') in parents,
               'base_matches_merge_parent': base_matches_merge_parent,
+              'original_base_is_ancestor_of_merge_parent': original_base_is_ancestor_of_merge_parent,
               'head_tree_sha': head_tree_sha,
               'merge_tree_sha': merge_tree_sha,
               'direct_parent_lineage': direct_parent_lineage,
               'squash_lineage': squash_lineage,
+              'squash_equivalent': lineage_mode == 'SQUASH_EQUIVALENT',
+              'squash_reconciliation': lineage_mode == 'SQUASH_RECONCILIATION',
+              'lineage_mode': lineage_mode,
+              'reconciliation_verified': reconciliation_verified,
+              'reconciliation_contract_present': reconciliation_contract_present,
+              'reconciliation_declared': reconciliation_declared,
+              'independent_reconciliation_runs': independent_reconciliation_runs,
               'pr_merged': bool(pr_data.get('merged')),
               'head_commit_status': status.get('state'),
               'check_run_count': len(checks.get('check_runs', [])),
@@ -234,27 +243,19 @@ jobs:
               'generated_at': run_started_at,
           }
 
-          Path('evidence/lineage/canonical-evidence.json').write_text(
-              json.dumps(evidence, indent=2) + '\n', encoding='utf-8'
-          )
-
+          Path('evidence/lineage/canonical-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n', encoding='utf-8')
           print(json.dumps(evidence, indent=2))
           if not lineage_ok:
               raise SystemExit('Evidence lineage GAP: keep #111 open; do not advance to FINAL')
           PY
-
       - name: Publish evidence to job summary
         if: always()
         shell: bash
         run: |
           if [ -f evidence/lineage/canonical-evidence.json ]; then
             echo '## Canonical Evidence — #111' >> "$GITHUB_STEP_SUMMARY"
-            echo '### Plan' >> "$GITHUB_STEP_SUMMARY"
-            echo '#111 → Existing Compatible Tools → Canonical Evidence → #115 → #116 → FINAL → 🔒 LOCK' >> "$GITHUB_STEP_SUMMARY"
-            echo '### Evidence' >> "$GITHUB_STEP_SUMMARY"
             cat evidence/lineage/canonical-evidence.json >> "$GITHUB_STEP_SUMMARY"
           fi
-
       - name: Upload canonical evidence
         if: always()
         uses: actions/upload-artifact@v4
