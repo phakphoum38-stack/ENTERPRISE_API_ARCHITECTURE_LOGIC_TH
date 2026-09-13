@@ -120,6 +120,8 @@ Organization ใดก็ได้สามารถดูแล template reposi
 * บัญชี `managed user account` จะสร้าง codespace จาก template ได้ต่อเมื่อ codespace นั้นถูกคิดกับ organization
 * บัญชี `managed user account` ไม่สามารถ publish codespace จาก template ไปยัง repository ใหม่ได้
 
+ดูข้อจำกัดเพิ่มเติมได้ที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
+
 ## การจัดการ budget สำหรับ GitHub Codespaces
 
 หากบัญชีไม่มี valid payment method ระบบจะ block การใช้งานเมื่อใช้โควตาครบ ส่วนบัญชีที่มี payment method อยู่แล้ว การใช้งานอาจยังถูกจำกัดได้เมื่อ budget หรือ spending limit ถึงขีดจำกัดที่กำหนดไว้ ดู [Setting up budgets to control spending on metered products](https://docs.github.com/en/billing/how-tos/set-up-budgets) และ [Budgets and alerts](https://docs.github.com/en/billing/concepts/budgets-and-alerts#included-usage-alerts)
