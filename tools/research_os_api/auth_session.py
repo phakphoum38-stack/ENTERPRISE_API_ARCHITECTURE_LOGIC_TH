@@ -1,6 +1,6 @@
 """Per-user Research OS session primitives.
 
-This module deliberately contains no Google OAuth exchange logic.  Google
+This module deliberately contains no Google OAuth exchange logic. Google
 Identity establishes the principal; this module binds that principal to a
 short-lived, signed Research OS session that API handlers can verify.
 """
@@ -11,15 +11,18 @@ import hashlib
 import hmac
 import json
 import os
-import re
 import secrets
 import time
 from pathlib import Path
 from typing import Any
 
+try:
+    from .identity_storage import storage_key
+except ImportError:  # pragma: no cover - supports direct script/test imports
+    from identity_storage import storage_key
+
 SESSION_COOKIE = "research_os_session"
 DEFAULT_TTL_SECONDS = 8 * 60 * 60
-_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
 def _secret() -> bytes:
@@ -42,10 +45,7 @@ def _data_root() -> Path:
 
 
 def _user_scope(user_id: str) -> Path:
-    value = str(user_id or "").strip()
-    if not value or not _SAFE_USER_ID.fullmatch(value) or value in {".", ".."}:
-        raise ValueError("invalid user id for session state")
-    return _data_root() / "users" / value / "profiles" / "default" / "sessions"
+    return _data_root() / "users" / storage_key(user_id) / "profiles" / "default" / "sessions"
 
 
 def _encode(payload: dict[str, Any]) -> str:
