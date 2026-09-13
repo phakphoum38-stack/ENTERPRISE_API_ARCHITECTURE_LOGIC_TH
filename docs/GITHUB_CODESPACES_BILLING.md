@@ -122,15 +122,9 @@ Organization ใดก็ได้สามารถดูแล template reposi
 
 ## การจัดการ budget สำหรับ GitHub Codespaces
 
-หากบัญชีไม่มี valid payment method ระบบจะ block การใช้งานเมื่อใช้โควตาครบ
-
-หากบัญชีมี valid payment method อยู่แล้ว การใช้จ่ายยังอาจถูกจำกัดด้วย budgets หนึ่งรายการหรือมากกว่า จึงควรตรวจสอบว่า budget ที่ตั้งไว้สอดคล้องกับรูปแบบการใช้งาน ดู [Setting up budgets to control spending on metered products](https://docs.github.com/en/billing/how-tos/set-up-budgets)
+หากบัญชีไม่มี valid payment method ระบบจะ block การใช้งานเมื่อใช้โควตาครบ ส่วนบัญชีที่มี payment method อยู่แล้ว การใช้งานอาจยังถูกจำกัดได้เมื่อ budget หรือ spending limit ถึงขีดจำกัดที่กำหนดไว้ ดู [Setting up budgets to control spending on metered products](https://docs.github.com/en/billing/how-tos/set-up-budgets) และ [Budgets and alerts](https://docs.github.com/en/billing/concepts/budgets-and-alerts#included-usage-alerts)
 
 คุณยังสามารถรับอีเมลแจ้งเตือนเมื่อ included usage ของ GitHub Codespaces ใช้ไปถึง 90% และ 100% ของรอบ billing ปัจจุบันได้ ดู [Budgets and alerts](https://docs.github.com/en/billing/concepts/budgets-and-alerts#included-usage-alerts)
-
-หากโควตาฟรีถูกใช้จนหมดและบัญชีไม่มี valid payment method ระบบจะ block การสร้างหรือ resume codespace ตามที่อธิบายไว้ในหัวข้อก่อนหน้า
-
-สำหรับบัญชีที่มี payment method อยู่แล้ว การใช้งานอาจยังถูกจำกัดได้เมื่อ budget หรือ spending limit ถึงขีดจำกัดที่กำหนดไว้ ดู [Setting up budgets to control spending on metered products](https://docs.github.com/en/billing/how-tos/set-up-budgets) และ [Budgets and alerts](https://docs.github.com/en/billing/concepts/budgets-and-alerts#included-usage-alerts)
 
 หากคุณยังต้องการเก็บงานที่กำลังทำอยู่ สามารถ export การเปลี่ยนแปลงไปยัง branch ใหม่ได้ ดู [Exporting changes to a branch](https://docs.github.com/en/codespaces/troubleshooting/exporting-changes-to-a-branch)
 
