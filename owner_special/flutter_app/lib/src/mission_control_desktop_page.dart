@@ -34,22 +34,25 @@ class MissionControlDesktopPage extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 900;
-        return ListView(
+        return SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(compact ? 2 : 8, 2, compact ? 2 : 8, 20),
-          children: [
-            _PageHeader(owner: owner, readOnly: readOnly, compact: compact),
-            const SizedBox(height: 14),
-            _StateSummary(summary: summary),
-            const SizedBox(height: 14),
-            if (panels.isEmpty)
-              const _EmptyProjectionState()
-            else
-              ...panels.whereType<Map>().map((panel) => _PanelCard(panel: Map<String, dynamic>.from(panel))),
-            if (truncation.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _TruncationNotice(value: truncation),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _PageHeader(owner: owner, readOnly: readOnly, compact: compact),
+              const SizedBox(height: 14),
+              _StateSummary(summary: summary),
+              const SizedBox(height: 14),
+              if (panels.isEmpty)
+                const _EmptyProjectionState()
+              else
+                ...panels.whereType<Map>().map((panel) => _PanelCard(panel: Map<String, dynamic>.from(panel))),
+              if (truncation.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                _TruncationNotice(value: truncation),
+              ],
             ],
-          ],
+          ),
         );
       },
     );
