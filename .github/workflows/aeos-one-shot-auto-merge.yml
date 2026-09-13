@@ -67,6 +67,7 @@ jobs:
           PR_NUMBER: ${{ steps.target.outputs.pr }}
           EXPECTED_HEAD: ${{ steps.target.outputs.head }}
           CURRENT_WORKFLOW: AEOS One-Shot Comprehensive Review
+          CURRENT_JOB: comprehensive-review
           POLL_SECONDS: 15
           MAX_POLLS: 80
         run: |
@@ -76,49 +77,71 @@ jobs:
           # zero branch-protection-required checks while still reporting a
           # complete and passing CI set. That configuration state must not be
           # misclassified as source failure.
-          PR_NUMBER="$PR_NUMBER" CURRENT_WORKFLOW="$CURRENT_WORKFLOW" POLL_SECONDS="$POLL_SECONDS" MAX_POLLS="$MAX_POLLS" python3 - <<'PY'
+          EXPECTED_HEAD="$EXPECTED_HEAD" PR_NUMBER="$PR_NUMBER" CURRENT_WORKFLOW="$CURRENT_WORKFLOW" CURRENT_JOB="$CURRENT_JOB" POLL_SECONDS="$POLL_SECONDS" MAX_POLLS="$MAX_POLLS" python3 - <<'PY'
           import json
           import os
           import subprocess
           import time
 
           pr_number = os.environ["PR_NUMBER"]
+          expected_head = os.environ["EXPECTED_HEAD"]
           repo = os.environ["GITHUB_REPOSITORY"]
           current_workflow = os.environ["CURRENT_WORKFLOW"]
+          current_job = os.environ["CURRENT_JOB"]
           poll_seconds = int(os.environ.get("POLL_SECONDS", "15"))
           max_polls = int(os.environ.get("MAX_POLLS", "80"))
 
-          def fetch_checks():
+          def run_gh(args):
               cp = subprocess.run(
-                  [
-                      "gh",
-                      "pr",
-                      "checks",
-                      pr_number,
-                      "--repo",
-                      repo,
-                      "--json",
-                      "name,state,bucket,workflow",
-                  ],
+                  ["gh", *args],
                   check=True,
                   capture_output=True,
                   text=True,
               )
-              return json.loads(cp.stdout or "[]")
+              return cp.stdout
+
+          def current_pr_head():
+              return run_gh([
+                  "pr", "view", pr_number, "--repo", repo,
+                  "--json", "headRefOid", "--jq", ".headRefOid",
+              ]).strip()
+
+          def fetch_checks():
+              return json.loads(run_gh([
+                  "pr", "checks", pr_number, "--repo", repo,
+                  "--json", "name,state,bucket,workflow",
+              ]) or "[]")
 
           success_states = {"SUCCESS", "NEUTRAL", "SKIPPED"}
           pending_states = {"QUEUED", "IN_PROGRESS", "PENDING", "REQUESTED", "WAITING"}
 
+          def is_self_check(check):
+              name = str(check.get("name") or "")
+              workflow = str(check.get("workflow") or "")
+              return (
+                  name == current_workflow
+                  or name.startswith(current_workflow + " /")
+                  or name == current_job
+                  or name.startswith(current_job + " /")
+                  or workflow == current_workflow
+              )
+
           for attempt in range(1, max_polls + 1):
+              actual_head = current_pr_head()
+              if actual_head != expected_head:
+                  raise SystemExit(
+                      f"PR HEAD changed during verification: expected {expected_head}, got {actual_head}"
+                  )
+
               checks = fetch_checks()
               if not checks:
                   raise SystemExit("no CI checks reported for PR HEAD")
 
-              def is_self_check(check):
-                  name = check.get("name") or ""
-                  return name == current_workflow or name.startswith(current_workflow + " /")
-
+              self_checks = [c for c in checks if is_self_check(c)]
               external = [c for c in checks if not is_self_check(c)]
+
+              if not self_checks:
+                  raise SystemExit("verifier self-check identity not observed")
               if not external:
                   raise SystemExit("no external CI checks reported for PR HEAD")
 
@@ -129,17 +152,20 @@ jobs:
 
               bad = [
                   c for c in external
-                  if c not in pending and (c.get("bucket") != "pass" or c.get("state") not in success_states)
+                  if c not in pending
+                  and (c.get("bucket") != "pass" or c.get("state") not in success_states)
               ]
               if bad:
-                  print(json.dumps({"failing_checks": bad}, indent=2))
-                  raise SystemExit("one or more external PR checks are not passing")
+                  print(json.dumps({"failing_checks": bad}, indent=2, sort_keys=True))
+                  raise SystemExit("one or more external PR checks failed")
 
               if pending:
                   print(json.dumps({
                       "status": "WAITING_FOR_EXTERNAL_CI",
                       "poll": attempt,
                       "max_polls": max_polls,
+                      "self_check_count": len(self_checks),
+                      "external_check_count": len(external),
                       "pending_count": len(pending),
                       "pending_checks": [
                           {
@@ -150,7 +176,7 @@ jobs:
                           }
                           for c in pending
                       ],
-                  }, indent=2))
+                  }, indent=2, sort_keys=True))
                   if attempt == max_polls:
                       raise SystemExit("external PR checks remained pending until verifier timeout")
                   time.sleep(poll_seconds)
@@ -158,6 +184,7 @@ jobs:
 
               print(json.dumps({
                   "status": "ALL_EXTERNAL_CHECKS_PASS",
+                  "self_check_count": len(self_checks),
                   "check_count": len(external),
                   "checks": [
                       {
@@ -168,7 +195,7 @@ jobs:
                       }
                       for c in external
                   ],
-              }, indent=2))
+              }, indent=2, sort_keys=True))
               break
           PY
 
