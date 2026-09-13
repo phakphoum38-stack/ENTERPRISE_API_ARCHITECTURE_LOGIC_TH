@@ -16,7 +16,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .identity_storage import storage_key
+try:
+    from .identity_storage import storage_key
+except ImportError:  # pragma: no cover - supports direct script/test imports
+    from identity_storage import storage_key
 
 SESSION_COOKIE = "research_os_session"
 DEFAULT_TTL_SECONDS = 8 * 60 * 60
