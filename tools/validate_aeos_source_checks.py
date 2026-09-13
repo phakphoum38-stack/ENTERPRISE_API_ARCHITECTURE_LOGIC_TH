@@ -1,25 +1,20 @@
 #!/usr/bin/env python3
-"""Fail-closed source-level audit for the AEOS assurance-check registry.
-
-A registry entry is not a test merely because it has an id or a boundary path.
-For a check to qualify as source-level executable verification, the boundary
-must exist, parse as Python when applicable, and expose executable logic that
-can be traced to a callable symbol or a concrete validator entry point.
-
-Entries explicitly marked external are evidence requirements, not executable
-source tests. They remain non-certifying until independently supplied proof is
-bound and verified by the assurance fabric.
-"""
+"""Fail-closed source-level audit for the AEOS assurance-check registry."""
 from __future__ import annotations
 
 import ast
+import importlib
 import json
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 REGISTRY = ROOT / "current" / "AEOS_ASSURANCE_CHECK_REGISTRY.json"
+SEMANTIC_BOUNDARY = "owner_special/research_os_friend/aeos_source_semantic_checks.py"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -30,7 +25,7 @@ class SourceCheckError(RuntimeError):
 def load_registry() -> dict:
     try:
         payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    except Exception as exc:  # pragma: no cover - exercised by CI on corruption
+    except Exception as exc:
         raise SourceCheckError(f"registry_unreadable:{exc}") from exc
     if payload.get("policy") != "fail_closed":
         raise SourceCheckError("registry_policy_not_fail_closed")
@@ -47,11 +42,15 @@ def source_symbols(path: Path) -> set[str]:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except SyntaxError as exc:
         raise SourceCheckError(f"syntax_error:{path}:{exc}") from exc
-    symbols: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            symbols.add(node.name)
-    return symbols
+    return {node.name for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+
+
+def _semantic_result(check_id: str) -> bool:
+    try:
+        module = importlib.import_module("owner_special.research_os_friend.aeos_source_semantic_checks")
+        return bool(module.evaluate(check_id))
+    except Exception as exc:
+        raise SourceCheckError(f"semantic_evaluation_error:{check_id}:{exc}") from exc
 
 
 def audit(registry: dict) -> tuple[int, list[str]]:
@@ -59,7 +58,6 @@ def audit(registry: dict) -> tuple[int, list[str]]:
     checks = registry["checks"]
     seen: set[str] = set()
     executable = 0
-    external = 0
 
     for item in checks:
         check_id = item.get("id")
@@ -72,13 +70,10 @@ def audit(registry: dict) -> tuple[int, list[str]]:
 
         mode = item.get("verification_mode", "source")
         boundary = item.get("boundary")
-
         if mode == "external_evidence":
-            external += 1
             if boundary is not None:
                 errors.append(f"external_check_has_boundary:{check_id}")
             continue
-
         if mode != "source":
             errors.append(f"unknown_verification_mode:{check_id}:{mode}")
             continue
@@ -90,15 +85,7 @@ def audit(registry: dict) -> tuple[int, list[str]]:
         if not path.is_file():
             errors.append(f"source_boundary_missing:{check_id}:{boundary}")
             continue
-
-        try:
-            symbols = source_symbols(path)
-        except SourceCheckError as exc:
-            errors.append(str(exc))
-            continue
-
-        # A non-Python boundary must be explicitly declared as external or
-        # composite; file existence alone is never sufficient for TEST.
+        symbols = source_symbols(path)
         if path.suffix != ".py":
             errors.append(f"source_boundary_not_executable:{check_id}:{boundary}")
             continue
@@ -106,8 +93,6 @@ def audit(registry: dict) -> tuple[int, list[str]]:
             errors.append(f"source_boundary_has_no_callable_logic:{check_id}:{boundary}")
             continue
 
-        # Optional symbol contract: when present, the named symbol must really
-        # exist in the boundary source. This prevents check-name-only assurance.
         required = item.get("required_symbols", [])
         if not isinstance(required, list):
             errors.append(f"required_symbols_not_list:{check_id}")
@@ -117,6 +102,17 @@ def audit(registry: dict) -> tuple[int, list[str]]:
                 errors.append(f"required_symbol_missing:{check_id}:{symbol}")
 
         executable += 1
+
+        # The semantic boundary is an executable source auditor over the actual
+        # implementation module. A false result is a real SOURCE_GAP and must
+        # remain non-certifying; this prevents boolean observation wrappers from
+        # manufacturing PASS.
+        if boundary == SEMANTIC_BOUNDARY:
+            try:
+                if not _semantic_result(check_id):
+                    errors.append(f"source_semantic_gap:{check_id}:{boundary}")
+            except SourceCheckError as exc:
+                errors.append(str(exc))
 
     if len(seen) != len(checks):
         errors.append("registry_identity_not_unique")
@@ -133,10 +129,7 @@ def main() -> int:
     print(json.dumps({
         "checks": len(registry["checks"]),
         "executable_source_checks": executable,
-        "external_evidence_checks": sum(
-            1 for item in registry["checks"]
-            if item.get("verification_mode", "source") == "external_evidence"
-        ),
+        "external_evidence_checks": sum(1 for item in registry["checks"] if item.get("verification_mode", "source") == "external_evidence"),
         "errors": errors,
         "status": "PASS" if not errors else "FAIL",
     }, sort_keys=True))
