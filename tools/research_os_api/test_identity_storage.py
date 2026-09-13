@@ -23,7 +23,8 @@ class IdentityStorageTests(unittest.TestCase):
 
     def test_storage_key_does_not_rewrite_canonical_identity(self):
         canonical = "google:123"
-        self.assertNotEqual(storage_key(canonical), storage_key(" google:123 "))
+        key = storage_key(canonical)
+        self.assertEqual(key, storage_key(canonical))
         with self.assertRaisesRegex(ValueError, "canonical"):
             storage_key(" google:123 ")
 
