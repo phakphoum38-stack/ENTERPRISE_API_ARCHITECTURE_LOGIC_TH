@@ -81,6 +81,9 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 ค่า compute จะแปรผันตามจำนวน processor cores ของ machine type ที่เลือก ยิ่ง core มาก ราคาต่อชั่วโมงยิ่งสูง ตัวอย่างเช่น 16-core จะมีค่า compute สูงกว่า 2-core อยู่ 8 เท่า
 
+> [!IMPORTANT]
+> ตารางด้านล่างเป็นตัวอย่างราคาจาก snapshot ของ issue นี้ในเดือนกันยายน 2026 เพื่ออธิบายสัดส่วนการคิดราคาเท่านั้น ราคาปัจจุบันอาจเปลี่ยนแปลงได้ ควรตรวจสอบตัวเลขล่าสุดจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
+
 | Component          | Machine type | Unit of measure | Included usage multiplier | Price |
 | ------------------ | ------------ | --------------- | ------------------------- | ----- |
 | Codespaces compute | 2 core       | 1 hour          | 2                         | $0.18 |
