@@ -82,16 +82,12 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 ค่า compute จะแปรผันตามจำนวน processor cores ของ machine type ที่เลือก ยิ่ง core มาก ราคาต่อชั่วโมงยิ่งสูง ตัวอย่างเช่น 16-core จะมีค่า compute สูงกว่า 2-core อยู่ 8 เท่า
 
 > [!IMPORTANT]
-> ตารางด้านล่างแสดงมิติการคิดราคาแบบคงที่ ส่วนตัวเลขราคาเงินจริงอาจเปลี่ยนแปลงได้ ควรตรวจสอบราคาปัจจุบันจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
+> ราคาจริงและตัวเลือก machine type อาจเปลี่ยนแปลงได้ ควรตรวจสอบราคาปัจจุบันจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
 
-| องค์ประกอบ         | ประเภทเครื่อง | หน่วยวัด   |
-| ------------------ | ------------ | ---------- |
-| Codespaces compute | 2 core       | 1 ชั่วโมง  |
-| Codespaces compute | 4 core       | 1 ชั่วโมง  |
-| Codespaces compute | 8 core       | 1 ชั่วโมง  |
-| Codespaces compute | 16 core      | 1 ชั่วโมง  |
-| Codespaces compute | 32 core      | 1 ชั่วโมง  |
-| Codespaces storage | Storage      | 1 GB-month |
+สรุปมิติการคิดราคา:
+
+* **Codespaces compute:** คิดตามระยะเวลาการใช้งานและ machine type หรือ processor type ที่เลือก
+* **Codespaces storage:** คิดตามการใช้พื้นที่จัดเก็บแบบ time-based ตามปริมาณ storage ที่ถูกใช้งาน
 
 ## วิธีระบุบัญชีที่ต้องรับผิดชอบค่าใช้จ่าย
 
