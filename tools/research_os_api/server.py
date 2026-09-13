@@ -283,7 +283,9 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                         identity,
                         query=query,
                         paths=paths,
-                        memory_limit=int(params.get("memory_limit", ["5"])[0]),
+                        memory_limit=copilot_service.normalize_memory_limit(
+                            params.get("memory_limit", ["5"])[0]
+                        ),
                     ),
                 )
                 return
@@ -422,6 +424,8 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
+        except copilot_service.CopilotChatConfigError as exc:
+            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "copilot_config_error", "detail": str(exc)})
         except copilot_service.CopilotChatError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "copilot_error", "detail": str(exc)})
         except Exception as exc:

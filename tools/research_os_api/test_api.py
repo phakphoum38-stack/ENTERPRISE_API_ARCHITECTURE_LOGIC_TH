@@ -229,6 +229,15 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertEqual("README.md", payload["files"][0]["path"])
         self.assertGreaterEqual(payload["memory_count"], 1)
 
+    def test_copilot_context_rejects_out_of_contract_memory_limit(self):
+        status, payload = self.request(
+            "GET",
+            "/v1/copilot/context?memory_limit=51",
+            headers={"X-Research-OS-Session": self.issue_session("erin")},
+        )
+        self.assertEqual(400, status)
+        self.assertIn("memory_limit must be between 1 and 50", payload["detail"])
+
     @patch("server.copilot_service.CopilotChatClient")
     def test_copilot_chat_routes_through_service_and_audits(self, client_cls):
         client_cls.return_value.chat.return_value = {
@@ -263,6 +272,45 @@ class ResearchOSAPITests(unittest.TestCase):
         )
         self.assertEqual(400, status)
         self.assertIn("cannot be overridden", payload["detail"])
+
+    def test_copilot_chat_rejects_scope_override_even_with_falsey_values(self):
+        status, payload = self.request(
+            "POST",
+            "/v1/copilot/chat",
+            {"message": "hello", "role": False},
+            headers={"X-Research-OS-Session": self.issue_session("grace")},
+        )
+        self.assertEqual(400, status)
+        self.assertIn("cannot be overridden", payload["detail"])
+
+    def test_copilot_chat_rejects_unknown_fields(self):
+        status, payload = self.request(
+            "POST",
+            "/v1/copilot/chat",
+            {"message": "hello", "unexpected": True},
+            headers={"X-Research-OS-Session": self.issue_session("frank")},
+        )
+        self.assertEqual(400, status)
+        self.assertIn("unsupported copilot chat fields", payload["detail"])
+
+    @patch("server.copilot_service.CopilotChatClient")
+    def test_copilot_chat_gateway_failures_return_502(self, client_cls):
+        client_cls.return_value.chat.side_effect = server.copilot_service.CopilotChatError(
+            "gateway unavailable"
+        )
+        with patch.dict(
+            os.environ,
+            {"RESEARCH_OS_COPILOT_AUDIT_DIR": tempfile.gettempdir()},
+            clear=False,
+        ):
+            status, payload = self.request(
+                "POST",
+                "/v1/copilot/chat",
+                {"message": "hello"},
+                headers={"X-Research-OS-Session": self.issue_session("dave")},
+            )
+        self.assertEqual(502, status)
+        self.assertEqual("copilot_error", payload["error"])
 
 
 if __name__ == "__main__":

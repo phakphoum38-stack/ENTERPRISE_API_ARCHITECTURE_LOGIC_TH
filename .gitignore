@@ -19,6 +19,11 @@ downloads/
 eggs/
 .eggs/
 lib/
+!apps/research_os_flutter/lib/
+!apps/research_os_flutter/lib/src/
+!apps/research_os_flutter/lib/src/features/
+!apps/research_os_flutter/lib/src/features/chat/
+!apps/research_os_flutter/lib/src/features/chat/copilot_chat_widget.dart
 lib64/
 parts/
 sdist/

@@ -1,3 +1,3 @@
-from .client import CopilotChatClient, CopilotChatError
+from .client import CopilotChatClient, CopilotChatConfigError, CopilotChatError
 
-__all__ = ["CopilotChatClient", "CopilotChatError"]
+__all__ = ["CopilotChatClient", "CopilotChatConfigError", "CopilotChatError"]

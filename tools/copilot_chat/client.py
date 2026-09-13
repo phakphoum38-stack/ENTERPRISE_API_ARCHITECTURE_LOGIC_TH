@@ -11,6 +11,10 @@ class CopilotChatError(RuntimeError):
     """Raised when the enterprise Copilot Chat bridge cannot complete."""
 
 
+class CopilotChatConfigError(CopilotChatError):
+    """Raised when the local Copilot Chat integration is misconfigured."""
+
+
 class CopilotChatClient:
     """Minimal stdlib client for an enterprise Copilot Chat-compatible gateway."""
 
@@ -35,7 +39,7 @@ class CopilotChatClient:
             else os.getenv("RESEARCH_OS_COPILOT_TIMEOUT", "30")
         )
         if not self.api_url:
-            raise CopilotChatError(
+            raise CopilotChatConfigError(
                 "RESEARCH_OS_COPILOT_API_URL is required for Copilot Chat integration"
             )
 
@@ -90,7 +94,7 @@ class CopilotChatClient:
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json; charset=utf-8"}
         if self.api_key:
-            headers["Authorization"] = f"******"
+            headers["Authorization"] = "Bearer " + self.api_key
         return headers
 
     @staticmethod

@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -16,6 +17,15 @@ ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT_DIR = ROOT / "research" / "artifacts"
 DEFAULT_GITHUB_REPOSITORY = "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH"
 DEFAULT_CONTEXT_PATHS = ("README.md", "tools/research_os_api/README.md")
+_ALLOWED_CHAT_FIELDS = {
+    "context_query",
+    "memory_limit",
+    "message",
+    "messages",
+    "model",
+    "paths",
+    "system",
+}
 _RESERVED_SCOPE_FIELDS = {
     "owner",
     "owner_id",
@@ -25,11 +35,16 @@ _RESERVED_SCOPE_FIELDS = {
     "session_id",
     "user_id",
 }
+_AUDIT_LOCK = threading.Lock()
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.copilot_chat.client import CopilotChatClient, CopilotChatError
+from tools.copilot_chat.client import (
+    CopilotChatClient,
+    CopilotChatConfigError,
+    CopilotChatError,
+)
 
 
 def build_copilot_context(
@@ -65,7 +80,7 @@ def chat_with_copilot(
     identity: IdentityContext,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    _validate_scope_payload(payload)
+    _validate_chat_payload(payload)
     messages = _normalize_messages(payload)
     last_user_message = next(
         (
@@ -81,7 +96,7 @@ def chat_with_copilot(
         identity,
         query=str(payload.get("context_query") or last_user_message),
         paths=payload.get("paths"),
-        memory_limit=int(payload.get("memory_limit", 5)),
+        memory_limit=normalize_memory_limit(payload.get("memory_limit", 5)),
     )
     result = CopilotChatClient().chat(
         messages=messages,
@@ -127,8 +142,9 @@ def write_audit_record(record: dict[str, Any]) -> Path:
     )
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "audit.jsonl"
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    with _AUDIT_LOCK:
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
     return path
 
 
@@ -173,7 +189,10 @@ def _normalize_paths(value: Any) -> list[str]:
         text = _optional_text(item)
         if not text:
             continue
-        paths.append(text)
+        for part in text.split(","):
+            normalized = _optional_text(part)
+            if normalized:
+                paths.append(normalized)
     return paths[:10]
 
 
@@ -181,7 +200,15 @@ def _snapshot_file(raw_path: str) -> dict[str, Any]:
     relative = str(raw_path or "").strip().replace("\\", "/").lstrip("/")
     if not relative:
         raise ValueError("context path cannot be empty")
-    resolved = (ROOT / relative).resolve()
+    candidate = ROOT / Path(relative)
+    if any(part == ".." for part in Path(relative).parts):
+        raise ValueError(f"context path escapes repository root: {relative}")
+    current = ROOT
+    for part in Path(relative).parts:
+        current = current / part
+        if current.exists() and current.is_symlink():
+            raise ValueError(f"context symlinks are not allowed: {relative}")
+    resolved = candidate.resolve()
     if ROOT not in resolved.parents and resolved != ROOT:
         raise ValueError(f"context path escapes repository root: {relative}")
     if not resolved.is_file():
@@ -227,12 +254,13 @@ def _stable_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _validate_scope_payload(payload: dict[str, Any]) -> None:
-    forbidden = [
-        key
-        for key in _RESERVED_SCOPE_FIELDS
-        if key in payload and _optional_text(payload.get(key))
-    ]
+def _validate_chat_payload(payload: dict[str, Any]) -> None:
+    unexpected = sorted(set(payload) - _ALLOWED_CHAT_FIELDS - _RESERVED_SCOPE_FIELDS)
+    if unexpected:
+        raise ValueError(
+            "unsupported copilot chat fields: " + ", ".join(unexpected)
+        )
+    forbidden = [key for key in _RESERVED_SCOPE_FIELDS if key in payload]
     if forbidden:
         raise ValueError(
             "trusted user scope is derived from the Research OS session and cannot be overridden"
@@ -244,3 +272,10 @@ def _display_path(path: Path) -> str:
         return str(path.relative_to(ROOT))
     except ValueError:
         return str(path)
+
+
+def normalize_memory_limit(value: Any) -> int:
+    limit = int(value)
+    if limit < 1 or limit > 50:
+        raise ValueError("memory_limit must be between 1 and 50")
+    return limit
