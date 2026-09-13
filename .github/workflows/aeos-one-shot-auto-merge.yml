@@ -153,7 +153,7 @@ jobs:
               bad = [
                   c for c in external
                   if c not in pending
-                  and (c.get("bucket") != "pass" or c.get("state") not in success_states)
+                  and c.get("state") not in success_states
               ]
               if bad:
                   print(json.dumps({"failing_checks": bad}, indent=2, sort_keys=True))
