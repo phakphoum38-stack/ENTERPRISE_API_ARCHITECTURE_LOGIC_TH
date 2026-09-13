@@ -148,10 +148,10 @@ def fetch_external_checks(repository: str, head_sha: str, current_run_id: str) -
         f"https://api.github.com/repos/{repo_path}/commits/{ref}/check-runs?per_page=100",
         "check_runs",
     )
-    statuses_payload, _ = request_json(
-        f"https://api.github.com/repos/{repo_path}/commits/{ref}/status?per_page=100"
+    statuses = paginate(
+        f"https://api.github.com/repos/{repo_path}/commits/{ref}/status?per_page=100",
+        "statuses",
     )
-    statuses = statuses_payload.get("statuses", []) if isinstance(statuses_payload, dict) else []
     external: list[dict[str, Any]] = []
     for item in check_runs:
         normalized = normalize_check_run(item, current_run_id)

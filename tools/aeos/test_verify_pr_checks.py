@@ -47,6 +47,18 @@ class VerifyPrChecksTests(unittest.TestCase):
         self.assertEqual(check["bucket"], "pass")
         self.assertEqual(check["state"], "SKIPPED")
 
+    def test_neutral_check_run_is_treated_as_passing(self):
+        check = normalize_check_run(
+            {
+                "name": "non-blocking-note",
+                "status": "completed",
+                "conclusion": "neutral",
+            },
+            "123",
+        )
+        self.assertEqual(check["bucket"], "pass")
+        self.assertEqual(check["state"], "NEUTRAL")
+
     def test_pending_and_failed_checks_are_classified_separately(self):
         pending, bad = classify(
             [
