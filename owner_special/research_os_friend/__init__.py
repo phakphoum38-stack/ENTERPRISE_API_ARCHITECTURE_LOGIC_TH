@@ -8,14 +8,15 @@ from .bundle import OwnerBundleBuilder
 from .capabilities import Capability, CapabilityRegistry, install_friend_complete_capabilities
 from .catalog import install_builtin_skills, install_builtin_tools
 from .context import FriendContext
+from .controlled_automation_contract import AutomationDecision, AutomationRequest, ControlledAutomationContract, ControlledAutomationError
 from .evidence import EvidenceRecorder
 from .friend_runtime_contract import FriendRuntimeContract, FriendRuntimeContractError
 from .helpers import HelperAllocation, HelperScheduler
 from .identity import OwnerIdentity
 from .memory import ScopedMemory
-from .models import FriendDecision, FriendRequest, FriendResponse, ScaleProfile
 from .mission_control import MissionControl
 from .mission_control_capabilities import MissionControlCapabilities
+from .models import FriendDecision, FriendRequest, FriendResponse, ScaleProfile
 from .orchestrator import FriendOrchestrator
 from .persistent_memory import PersistentScopedMemory
 from .policy import OwnerPolicy
@@ -30,14 +31,11 @@ from .tool_search import ToolSearch, ToolSearchResult
 from .tools import Tool, ToolRegistry
 from .unified_tool_catalog import TOOL_CATALOG, ToolDescriptor, ToolState, UnifiedToolCatalog
 from .v3_bridge import V3Bridge, V3BridgeStatus
+from .autobot_execution_loop import AutobotExecutionError, ExecutionEvent, ExecutionJob, ExecutionState, validate_job_payload
 
 __all__ = [
-    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
-    "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "FriendRuntimeContract", "FriendRuntimeContractError", "HelperAllocation",
-    "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
-    "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
-    "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "SelfLearningContract", "SelfLearningContractError", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
-    "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
-    "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
-    "install_friend_complete_capabilities",
+    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "ControlledAutomationContract", "ControlledAutomationError", "AutomationDecision", "AutomationRequest", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
+    "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "FriendRuntimeContract", "FriendRuntimeContractError", "HelperAllocation", "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
+    "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager", "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "SelfLearningContract", "SelfLearningContractError", "Skill", "SkillRegistry", "Tool", "ToolRegistry", "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
+    "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools", "install_friend_complete_capabilities", "AutobotExecutionError", "ExecutionEvent", "ExecutionJob", "ExecutionState", "validate_job_payload",
 ]
