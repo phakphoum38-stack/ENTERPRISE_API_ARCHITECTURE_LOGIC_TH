@@ -1,0 +1,50 @@
+name: AEOS Independent Forensic — Squash Reconciliation
+
+on:
+  pull_request:
+    paths:
+      - current/AEOS_SQUASH_RECONCILIATIONS.json
+      - tools/aeos/verify_squash_reconciliation_independent.py
+      - .github/workflows/aeos-independent-forensic-squash-reconciliation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-forensic:
+    name: Independent Forensic — squash reconciliation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify independent forensic evidence
+        run: |
+          set -euo pipefail
+          python3 tools/aeos/verify_squash_reconciliation_independent.py
+
+      - name: Publish independent forensic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeos-independent-forensic-squash-reconciliation
+          path: independent-forensic-verification.json
+          if-no-files-found: error
+
+      - name: Enforce no authority escalation
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("independent-forensic-verification.json").read_text())
+          assert data["status"] == "VERIFIED"
+          assert data["merge_authority"] is False
+          assert data["self_certification"] is False
+          print("INDEPENDENT_FORENSIC=VERIFIED")
+          print("MERGE_AUTHORITY=false")
+          print("SELF_CERTIFICATION=false")
+          PY
