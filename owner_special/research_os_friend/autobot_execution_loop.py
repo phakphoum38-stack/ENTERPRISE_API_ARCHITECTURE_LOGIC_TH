@@ -135,11 +135,19 @@ class ExecutionJob:
         if commit_sha != expected_sha:
             raise AutobotExecutionError("stale or mismatched CI SHA")
         reason = "CI completed with authoritative result" if passed else "CI completed with failure evidence"
-        return replace(self, ci_run_id=ci_run_id).transition(ExecutionState.EVALUATING, reason)
+        current = replace(self, ci_run_id=ci_run_id)
+        if current.state is ExecutionState.WAITING_FOR_CI:
+            current = current.transition(ExecutionState.CI_COMPLETED, reason)
+            return current.transition(ExecutionState.EVALUATING, "fresh CI result is ready for evaluation")
+        if current.state is ExecutionState.QUEUED and not passed:
+            return current
+        raise AutobotExecutionError(f"CI result cannot be bound from {self.state.value}")
 
     def complete_from_ci(self, *, commit_sha: str, correlation_id: str, ci_run_id: str, passed: bool) -> "ExecutionJob":
         current = self.bind_ci_result(commit_sha=commit_sha, correlation_id=correlation_id, ci_run_id=ci_run_id, passed=passed)
         if not passed:
+            if current.state is ExecutionState.QUEUED:
+                return current.transition(ExecutionState.DIAGNOSING, "fresh CI failure requires diagnosis")
             return current.transition(ExecutionState.DIAGNOSING, "fresh CI failure requires diagnosis")
         return current.transition(ExecutionState.COMPLETED, "fresh CI evidence is authoritative")
 

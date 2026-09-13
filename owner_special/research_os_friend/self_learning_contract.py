@@ -25,6 +25,7 @@ class SelfLearningContract:
     MAX_DEPTH = 6
     SHA_RE = re.compile(r"^[0-9a-f]{40}$")
     CORRELATION_RE = re.compile(r"^[A-Za-z0-9._:-]{1,2048}$")
+    _ALLOWED_STRUCTURAL_KEYS = frozenset({"approved_skills", "approval_required"})
     BLOCKED_KEYS = re.compile(
         r"(?:approval|approve|authorize|permission|release|merge|dispatch|"
         r"credential|secret|token|password|private.?key|callback|callable|"
@@ -33,7 +34,7 @@ class SelfLearningContract:
         re.I,
     )
     BLOCKED_VALUES = re.compile(
-        r"(?:BEGIN PRIVATE KEY|ghp_|sk-proj-|javascript:|data:text/html|"
+        r"(?:BEGIN PRIVATE KEY|ghp_|sk-proj-|api.?key\s*=|javascript:|data:text/html|"
         r"powershell|cmd\.exe|bash\s+-c|os\.system|child_process)",
         re.I,
     )
@@ -121,7 +122,14 @@ class SelfLearningContract:
             if len(value) > self.MAX_EVIDENCE:
                 raise SelfLearningContractError("learning mapping exceeds bound")
             for key, child in value.items():
-                if not isinstance(key, str) or len(key) > self.MAX_TEXT or self.BLOCKED_KEYS.search(key):
+                if (
+                    not isinstance(key, str)
+                    or len(key) > self.MAX_TEXT
+                    or (
+                        self.BLOCKED_KEYS.search(key)
+                        and key not in self._ALLOWED_STRUCTURAL_KEYS
+                    )
+                ):
                     raise SelfLearningContractError("learning payload contains forbidden field")
                 self._walk_safe(child, depth=depth + 1)
             return
