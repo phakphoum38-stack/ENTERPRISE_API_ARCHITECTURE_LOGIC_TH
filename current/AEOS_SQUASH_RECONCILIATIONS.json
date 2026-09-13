@@ -1,0 +1,37 @@
+{
+  "schema": "aeos.squash-reconciliation.v1",
+  "pr_number": 366,
+  "base_sha": "0ea2b391f91ee4878a1bc21d2c5563adfd5bc5b9",
+  "head_sha": "bafeaaf22ad2cc15199fc353af27ac3d2935a586",
+  "merge_sha": "14750f63b0c1871b768874f36f6b7ee32e48cc99",
+  "merge_parent_sha": "0ea2b391f91ee4878a1bc21d2c5563adfd5bc5b9",
+  "divergent_paths": [
+    "owner_special/flutter_app/test/team_acl_test.dart",
+    "owner_special/team_center_contract.json",
+    "owner_special/tests/test_port_topology_contract.py"
+  ],
+  "canonical_conflict_evidence": {
+    "owner_special/flutter_app/test/team_acl_test.dart": {
+      "stale_or_conflicting": true,
+      "evidence": "Canonical #367 merge 0ea2b391 removed 8789 from the ACL contract; #366 head reintroduced 8789 while actual squash merge retained the corrected 8787/8788/8790-only ACL. Independent file-level comparison required before forensic status can become VERIFIED."
+    },
+    "owner_special/team_center_contract.json": {
+      "stale_or_conflicting": true,
+      "evidence": "Canonical #367 merge 0ea2b391 removed 8789 from Team Center topology; #366 head still contained services [8787,8788,8789,8790], while actual squash merge retained [8787,8788,8790]. Independent file-level comparison required before forensic status can become VERIFIED."
+    },
+    "owner_special/tests/test_port_topology_contract.py": {
+      "stale_or_conflicting": true,
+      "evidence": "This topology-contract test belongs to the #367 canonical 8789 removal correction and is absent from the actual #366 squash result. It is therefore a reconciled historical path, not part of the accepted #366 recovery payload. Independent forensic verification must confirm the canonical source already contains the authoritative topology behavior."
+    }
+  },
+  "accepted_payload_paths": [
+    "current/AEOS_HOLD_RECOVERY_CONTRACT.json",
+    "owner_special/research_os_friend/hold_recovery_engine.py",
+    "owner_special/tests/test_hold_recovery_engine.py"
+  ],
+  "accepted_payload_digest": "14750f63b0c1871b768874f36f6b7ee32e48cc99",
+  "accepted_payload_digest_algorithm": "git_commit_sha",
+  "independent_forensic_status": "PENDING",
+  "merge_authority": false,
+  "self_certification": false
+}

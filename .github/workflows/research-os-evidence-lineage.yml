@@ -51,12 +51,7 @@ jobs:
           python - <<'PY'
           import json, os, subprocess
           from pathlib import Path
-
-          owner = os.environ['OWNER']
-          repo = os.environ['REPO']
-          merge = os.environ['MERGE_SHA']
-          token = os.environ['GH_TOKEN']
-
+          owner=os.environ['OWNER']; repo=os.environ['REPO']; merge=os.environ['MERGE_SHA']; token=os.environ['GH_TOKEN']
           def gh(path):
               return json.loads(subprocess.check_output([
                   'curl', '-fsSL',
@@ -85,7 +80,6 @@ jobs:
               f"MERGE_SHA={merge}\n"
           )
           PY
-
       - name: Validate explicit reconciliation inputs
         shell: bash
         run: |
@@ -96,7 +90,6 @@ jobs:
             test -n "${HEAD_SHA}" || { echo 'HEAD_SHA is required'; exit 1; }
             test -n "${MERGE_SHA}" || { echo 'MERGE_SHA is required'; exit 1; }
           fi
-
       - name: Checkout merge target
         uses: actions/checkout@v4
         with:
@@ -255,19 +248,14 @@ jobs:
           if not lineage_ok:
               raise SystemExit('Evidence lineage GAP: keep #111 open; do not advance to FINAL')
           PY
-
       - name: Publish evidence to job summary
         if: always()
         shell: bash
         run: |
           if [ -f evidence/lineage/canonical-evidence.json ]; then
             echo '## Canonical Evidence — #111' >> "$GITHUB_STEP_SUMMARY"
-            echo '### Plan' >> "$GITHUB_STEP_SUMMARY"
-            echo '#111 → Existing Compatible Tools → Canonical Evidence → #115 → #116 → FINAL → 🔒 LOCK' >> "$GITHUB_STEP_SUMMARY"
-            echo '### Evidence' >> "$GITHUB_STEP_SUMMARY"
             cat evidence/lineage/canonical-evidence.json >> "$GITHUB_STEP_SUMMARY"
           fi
-
       - name: Upload canonical evidence
         if: always()
         uses: actions/upload-artifact@v4

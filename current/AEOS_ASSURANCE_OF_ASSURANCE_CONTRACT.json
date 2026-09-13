@@ -1,0 +1,36 @@
+{
+  "contract": "research-os-aeos-assurance-of-assurance/v1",
+  "status": "IMPLEMENTATION_DRAFT",
+  "purpose": "Verify that the assurance system itself is complete, independent, current, and constitutionally bounded.",
+  "layers": ["implementation", "verifier", "assurance", "assurance_of_assurance", "constitution"],
+  "claims": [
+    "verifier is not the implementation under verification",
+    "evidence independence is explicit and common-source correlation is detected",
+    "verification oracle is versioned and itself tested",
+    "assurance controls cannot silently weaken trust anchors",
+    "stale verifier, contract, policy, oracle, or evidence cannot certify current state",
+    "unknown assurance coverage is tracked as debt and never coerced to PASS",
+    "assurance decisions are reproducible from immutable inputs",
+    "assurance failures preserve evidence before recovery",
+    "assurance recovery is separately verified",
+    "assurance certification and merge remain separate governed decisions"
+  ],
+  "required_inputs": ["target_sha", "contract_sha", "policy_sha", "evidence_root", "test_manifest_sha", "verifier_id", "oracle_id", "coverage_snapshot"],
+  "required_checks": ["independence", "freshness", "coverage", "oracle_integrity", "circularity", "correlation", "constitutional_compliance", "reproducibility", "recovery_readiness", "unknowns"],
+  "blocked_states": ["NOT_OBSERVED", "UNKNOWN", "STALE", "CONFLICT", "UNCLASSIFIED", "QUARANTINED"],
+  "hard_rules": [
+    "assurance cannot certify itself without an independent upstream verification boundary",
+    "shared-source evidence is not independent merely because it has multiple records",
+    "unknown coverage is a first-class failure condition",
+    "a verifier change invalidates dependent assurance evidence until reverified",
+    "an oracle change invalidates dependent verification evidence until reverified",
+    "a constitution change requires explicit governance and cannot be autonomously self-approved",
+    "recovery success is not proof of correctness",
+    "no certification from an unresolved assurance gap"
+  ],
+  "failure_classes": [
+    "VERIFIER_BLIND_SPOT","VERIFIER_DRIFT","VERIFIER_COMPROMISE","VALIDATOR_DRIFT","ORACLE_FAILURE","ORACLE_DRIFT","FALSE_INDEPENDENCE","CORRELATED_VERIFICATION","CIRCULAR_ASSURANCE","STALE_ASSURANCE","ASSURANCE_GAP","ASSURANCE_DEBT","CONSTITUTIONAL_DRIFT","ASSURANCE_BYPASS","ASSURANCE_SELF_APPROVAL"
+  ],
+  "lifecycle": ["DECLARE", "IDENTIFY", "VALIDATE", "BIND", "VERIFY", "AUTHORIZE", "EXECUTE", "PROVE", "AUDIT", "LEARN"],
+  "output": "ASSURANCE_OF_ASSURANCE_RESULT"
+}

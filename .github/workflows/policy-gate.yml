@@ -1,0 +1,52 @@
+name: P0-06 Policy Gate
+
+on:
+  pull_request:
+    paths:
+      - 'current/POLICY_GATE_CONTRACT.json'
+      - 'current/POLICY_GATE_FIXTURE.json'
+      - 'tools/compile_policy_gate.py'
+      - 'tools/evaluate_policy_gate.py'
+      - 'tools/validate_policy_gate.py'
+      - 'tools/test_policy_gate.py'
+      - '.github/workflows/policy-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'current/POLICY_GATE_CONTRACT.json'
+      - 'current/POLICY_GATE_FIXTURE.json'
+      - 'tools/compile_policy_gate.py'
+      - 'tools/evaluate_policy_gate.py'
+      - 'tools/validate_policy_gate.py'
+      - 'tools/test_policy_gate.py'
+      - '.github/workflows/policy-gate.yml'
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  policy-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate canonical policy gate contract
+        run: python -m tools.validate_policy_gate
+
+      - name: Run fail-closed and determinism tests
+        run: python -m unittest tools.test_policy_gate -v
+
+      - name: Compile canonical fixture
+        run: python tools/compile_policy_gate.py current/POLICY_GATE_FIXTURE.json > policy-gate-plan.json
+
+      - name: Validate compiled plan is non-authoritative
+        run: python -c "import json; p=json.load(open('policy-gate-plan.json')); assert p['authority_effect']=='NONE'"

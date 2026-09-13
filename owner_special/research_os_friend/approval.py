@@ -52,6 +52,50 @@ class ApprovalRecord:
     reason: str = ""
 
 
+@dataclass(frozen=True)
+class ApprovalProof:
+    """Evidence emitted by the canonical ApprovalGate for AEOS decisions."""
+
+    approval_id: str
+    owner_id: str
+    profile_id: str
+    session_id: str
+    tool_name: str
+    request_fingerprint: str
+    state: ApprovalState
+    decided_at: str | None
+    evidence_digest: str
+
+    def __post_init__(self) -> None:
+        if not self.approval_id or not self.owner_id or not self.profile_id or not self.session_id or not self.tool_name:
+            raise ValueError("approval proof identity fields are required")
+        if not self.request_fingerprint or len(self.request_fingerprint) != 64:
+            raise ValueError("approval proof request fingerprint must be SHA-256")
+        if self.state is not ApprovalState.APPROVED:
+            raise ValueError("AEOS approval proof requires APPROVED state")
+        if not self.decided_at:
+            raise ValueError("approved proof requires decided_at")
+        if not self.evidence_digest or len(self.evidence_digest) != 64:
+            raise ValueError("approval proof evidence digest must be SHA-256")
+
+    def is_integrity_valid(self) -> bool:
+        """Verify the deterministic digest over the approval evidence fields."""
+        payload = {
+            "approval_id": self.approval_id,
+            "owner_id": self.owner_id,
+            "profile_id": self.profile_id,
+            "session_id": self.session_id,
+            "tool_name": self.tool_name,
+            "request_fingerprint": self.request_fingerprint,
+            "state": self.state.value,
+            "decided_at": self.decided_at,
+        }
+        digest = hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        return digest == self.evidence_digest
+
+
 class ApprovalGate:
     """Owner-scoped approval state for explicitly side-effecting tools."""
 
@@ -78,6 +122,22 @@ class ApprovalGate:
         }
         return hashlib.sha256(
             json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+
+    @staticmethod
+    def _proof_digest(record: ApprovalRecord) -> str:
+        payload = {
+            "approval_id": record.approval_id,
+            "owner_id": record.owner_id,
+            "profile_id": record.profile_id,
+            "session_id": record.session_id,
+            "tool_name": record.tool_name,
+            "request_fingerprint": record.request_fingerprint,
+            "state": record.state.value,
+            "decided_at": record.decided_at,
+        }
+        return hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
 
     def _persist(self) -> None:
@@ -174,6 +234,23 @@ class ApprovalGate:
         if record.state is ApprovalState.DENIED:
             raise PermissionError(f"tool execution denied: {tool_name}; approval_id={record.approval_id}")
         return record
+
+    def issue_proof(self, owner: OwnerIdentity, request: FriendRequest, tool_name: str) -> ApprovalProof:
+        """Issue AEOS approval evidence only from the gate's canonical decision."""
+        record = self.enforce(owner, request, tool_name)
+        if record.state is not ApprovalState.APPROVED:
+            raise PermissionError("AEOS approval proof requires an approved gate record")
+        return ApprovalProof(
+            approval_id=record.approval_id,
+            owner_id=record.owner_id,
+            profile_id=record.profile_id,
+            session_id=record.session_id,
+            tool_name=record.tool_name,
+            request_fingerprint=record.request_fingerprint,
+            state=record.state,
+            decided_at=record.decided_at,
+            evidence_digest=self._proof_digest(record),
+        )
 
     def get(self, approval_id: str) -> ApprovalRecord | None:
         with self._lock:

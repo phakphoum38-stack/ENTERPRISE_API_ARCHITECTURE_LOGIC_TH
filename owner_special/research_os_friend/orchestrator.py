@@ -43,15 +43,24 @@ class FriendOrchestrator:
             return ("web.fetch",)
         return ()
 
+    def _authorize_tool_execution(self, request: FriendRequest, tool_name: str) -> None:
+        """Authorize every selected tool immediately before its handler can execute."""
+        if request.requested_tools:
+            self.policy.authorize_tool(self.owner, request, tool_name)
+            self.approval_gate.enforce(self.owner, request, tool_name)
+            return
+        if self.approval_gate.requires_approval(tool_name):
+            raise PermissionError(
+                f"side-effecting tool must be explicitly requested and approved: {tool_name}"
+            )
+
     def handle(self, request: FriendRequest) -> FriendResponse:
         self.policy.authorize_request(self.owner, request)
         selected_skills = self.skills.resolve(request.requested_skills)
         selected_tool_names = self._route_tools(request)
         selected_tools = self.tools.resolve(selected_tool_names)
-        if request.requested_tools:
-            for tool in selected_tools:
-                self.policy.authorize_tool(self.owner, request, tool.name)
-                self.approval_gate.enforce(self.owner, request, tool.name)
+        for tool in selected_tools:
+            self._authorize_tool_execution(request, tool.name)
         context = FriendContext.build(self.owner, request, self.memory)
         scale = self.brain.select_scale(request)
         decision = self.planner.plan(request, scale=scale, skills=tuple(skill.name for skill in selected_skills), tools=tuple(tool.name for tool in selected_tools))
