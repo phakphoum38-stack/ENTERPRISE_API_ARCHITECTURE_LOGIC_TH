@@ -233,4 +233,8 @@ Final Gate
 
 `docs/V3_5_SYSTEM_STRUCTURE.md`
 
+ข้อมูลอ้างอิงเกี่ยวกับค่าใช้จ่ายและโควตา GitHub Codespaces:
+
+`docs/GITHUB_CODESPACES_BILLING.md`
+
 > Design Once. Build Everywhere. Scale Forever.

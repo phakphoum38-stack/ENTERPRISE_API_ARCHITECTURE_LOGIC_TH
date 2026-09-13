@@ -4,6 +4,12 @@
 
 รูปแบบเวอร์ชันใช้ Semantic Versioning และเก็บ Snapshot ทุกเวอร์ชันไว้ใน `versions/`
 
+## [Unreleased]
+
+### Added
+
+- เพิ่มเอกสาร `docs/GITHUB_CODESPACES_BILLING.md` เพื่อสรุปการคิดค่าใช้จ่าย, free quota, pricing และ budget management ของ GitHub Codespaces เป็นภาษาไทย
+
 ## [2.0.0-rc.1] — 2026-08-09
 
 ### Changed
