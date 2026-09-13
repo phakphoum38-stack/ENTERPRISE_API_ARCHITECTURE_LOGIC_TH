@@ -264,6 +264,37 @@ class ResearchOSApiClient {
     return _decode(response);
   }
 
+  Future<Map<String, dynamic>> getCopilotContext({
+    String? query,
+    List<String> paths = const <String>[],
+    int memoryLimit = 5,
+  }) async {
+    final queryParts = <String>[
+      if (query != null && query.trim().isNotEmpty)
+        'query=${Uri.encodeQueryComponent(query.trim())}',
+      for (final path in paths) 'path=${Uri.encodeQueryComponent(path)}',
+      'memory_limit=${Uri.encodeQueryComponent('$memoryLimit')}',
+    ];
+    final uri = _uri('/v1/copilot/context?${queryParts.join('&')}');
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> chatWithCopilot({
+    required String message,
+    List<String> paths = const <String>[],
+    String? contextQuery,
+    int memoryLimit = 5,
+  }) {
+    return _postJson('/v1/copilot/chat', <String, Object?>{
+      'message': message,
+      if (paths.isNotEmpty) 'paths': paths,
+      if (contextQuery != null && contextQuery.trim().isNotEmpty)
+        'context_query': contextQuery.trim(),
+      'memory_limit': memoryLimit,
+    });
+  }
+
   Future<Map<String, dynamic>> _getJson(String path) async {
     final response = await _client.get(_uri(path));
     return _decode(response);
