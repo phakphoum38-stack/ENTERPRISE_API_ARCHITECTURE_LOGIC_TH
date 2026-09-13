@@ -99,7 +99,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 ตามแนวทางที่ GitHub อธิบายไว้ใน [Choosing who owns and pays for codespaces in your organization](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/choosing-who-owns-and-pays-for-codespaces-in-your-organization) หาก repository ถูกย้ายไปยัง organization อื่น ความเป็นเจ้าของและความรับผิดชอบด้านการเรียกเก็บเงินของ codespace ที่เกี่ยวข้องจะถูกประเมินใหม่ตามการตั้งค่าของ organization ใหม่
 
-ตามเอกสารต้นทางของ GitHub หากผู้ใช้ถูกลบออกจาก organization หรือ repository, codespaces ของผู้ใช้นั้นจะถูกลบโดยอัตโนมัติ
+ตามเอกสารต้นทางของ GitHub ในหัวข้อ [Choosing who owns and pays for codespaces in your organization](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/choosing-who-owns-and-pays-for-codespaces-in-your-organization) หากผู้ใช้ถูกลบออกจาก organization หรือ repository, codespaces ของผู้ใช้นั้นจะถูกลบโดยอัตโนมัติ
 
 ### Forked repositories
 
@@ -107,7 +107,7 @@ Codespace ที่สร้างจาก fork จะถูกคิดกั�
 
 ตัวอย่างเช่น หากสมาชิกหรือผู้ร่วมงานภายนอกของ organization ได้รับสิทธิ์ใช้ Codespaces โดยคิดกับ organization และผู้ใช้นั้นมีสิทธิ์ fork private repository ของ organization ผู้ใช้จะสามารถสร้างและใช้งาน codespace ของ repository ที่ fork มาโดยคิดค่าใช้จ่ายกับ organization ได้ เนื่องจาก parent repository ยังคงเป็นของ organization เดิม
 
-อย่างไรก็ตาม เจ้าของ organization สามารถเพิกถอนสิทธิ์เข้าถึง repository ต้นทาง, repository ที่ fork และ codespace ที่เกี่ยวข้องได้ นอกจากนี้ยังสามารถลบ parent repository ซึ่งจะทำให้ repository ที่ fork ถูกลบตามไปด้วย โดยอ้างอิงแนวทางในหัวข้อ [Managing the forking policy for your repository](https://docs.github.com/search?query=Managing%20the%20forking%20policy%20for%20your%20repository) บน GitHub Docs
+อย่างไรก็ตาม เจ้าของ organization สามารถเพิกถอนสิทธิ์เข้าถึง repository ต้นทาง, repository ที่ fork และ codespace ที่เกี่ยวข้องได้ นอกจากนี้ยังสามารถลบ parent repository ซึ่งจะทำให้ repository ที่ fork ถูกลบตามไปด้วย โดยอ้างอิงแนวทางในหัวข้อ [Managing the forking policy for your repository](https://docs.github.com/github/administering-a-repository/managing-the-forking-policy-for-your-repository) บน GitHub Docs
 
 หากคุณสร้าง prebuilds สำหรับ forked repository ค่า storage ของ prebuilds เหล่านั้นจะถูกหักจาก included storage รายเดือนของบัญชีคุณก่อน และหากใช้ครบแล้วพร้อมเปิด billing อยู่ ระบบจะคิดเงินกับบัญชีส่วนบุคคล แม้ codespaces สำหรับ fork นั้นจะถูก organization เจ้าของ parent repository เป็นผู้จ่ายก็ตาม
 
@@ -130,7 +130,7 @@ Organization ใดก็ได้สามารถดูแล template reposi
 
 คุณยังสามารถรับอีเมลแจ้งเตือนเมื่อ included usage ของ GitHub Codespaces ใช้ไปถึง 90% และ 100% ของรอบ billing ปัจจุบันได้ ดู [Budgets and alerts](https://docs.github.com/en/billing/concepts/budgets-and-alerts#included-usage-alerts)
 
-หากบัญชีส่วนบุคคล, organization หรือ enterprise ใช้ quota หรือ budget จนเต็มแล้ว จะไม่สามารถสร้างหรือ resume codespace ที่คิดค่าใช้จ่ายกับบัญชีนั้นได้อีก แต่ยังคง export งานที่ทำค้างอยู่ไปยัง branch ใหม่ได้ ดู [Exporting changes to a branch](https://docs.github.com/en/codespaces/troubleshooting/exporting-changes-to-a-branch)
+หากบัญชีส่วนบุคคล, organization หรือ enterprise ใช้ quota หรือ budget จนเต็มแล้ว ผลที่เกิดขึ้นจะสอดคล้องกับกรณีใช้งานเกินโควตาข้างต้น คือจะไม่สามารถสร้างหรือ resume codespace ที่คิดค่าใช้จ่ายกับบัญชีนั้นได้อีก แต่ยังคง export งานที่ทำค้างอยู่ไปยัง branch ใหม่ได้ ดู [Exporting changes to a branch](https://docs.github.com/en/codespaces/troubleshooting/exporting-changes-to-a-branch)
 
 ## Further reading
 
