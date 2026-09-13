@@ -84,14 +84,14 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 > [!IMPORTANT]
 > ตารางด้านล่างแสดงมิติการคิดราคาและตัวคูณการใช้งานที่คงอยู่ได้ยาวกว่า ส่วนตัวเลขราคาเงินจริงอาจเปลี่ยนแปลงได้ ควรตรวจสอบราคาปัจจุบันจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
 
-| Component          | Machine type | Unit of measure | Included usage multiplier |
-| ------------------ | ------------ | --------------- | ------------------------- |
-| Codespaces compute | 2 core       | 1 hour          | 2                         |
-| Codespaces compute | 4 core       | 1 hour          | 4                         |
-| Codespaces compute | 8 core       | 1 hour          | 8                         |
-| Codespaces compute | 16 core      | 1 hour          | 16                        |
-| Codespaces compute | 32 core      | 1 hour          | 32                        |
-| Codespaces storage | Storage      | 1 GB-month      | Not applicable            |
+| องค์ประกอบ        | ประเภทเครื่อง | หน่วยวัด        | ตัวคูณโควตาที่รวมมา |
+| ----------------- | ------------ | -------------- | ------------------- |
+| Codespaces compute | 2 core       | 1 ชั่วโมง       | 2                   |
+| Codespaces compute | 4 core       | 1 ชั่วโมง       | 4                   |
+| Codespaces compute | 8 core       | 1 ชั่วโมง       | 8                   |
+| Codespaces compute | 16 core      | 1 ชั่วโมง       | 16                  |
+| Codespaces compute | 32 core      | 1 ชั่วโมง       | 32                  |
+| Codespaces storage | Storage      | 1 GB-month      | ไม่ระบุ             |
 
 ## วิธีระบุบัญชีที่ต้องรับผิดชอบค่าใช้จ่าย
 
