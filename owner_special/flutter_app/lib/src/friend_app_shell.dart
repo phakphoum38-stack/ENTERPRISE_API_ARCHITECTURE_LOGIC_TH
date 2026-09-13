@@ -102,6 +102,7 @@ class _Sidebar extends StatelessWidget {
                   child: Tooltip(
                     message: compact ? item.label : '',
                     child: InkWell(
+                      key: i == 0 ? const Key('mission-control-nav-item') : null,
                       borderRadius: BorderRadius.circular(12),
                       onTap: () => onIndexChanged(i),
                       child: AnimatedContainer(
