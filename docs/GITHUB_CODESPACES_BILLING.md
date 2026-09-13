@@ -97,8 +97,6 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 การใช้งานทั้งหมดจะถูกคิดเงินให้กับเจ้าของ codespace หรือ organization เจ้าของ repository ตามนโยบาย billing ของ organization นั้น ดู [Choosing who owns and pays for codespaces in your organization](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/choosing-who-owns-and-pays-for-codespaces-in-your-organization)
 
-ตามแนวทางที่ GitHub อธิบายไว้ใน [Choosing who owns and pays for codespaces in your organization](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/choosing-who-owns-and-pays-for-codespaces-in-your-organization) หาก repository ถูกย้ายไปยัง organization อื่น ความเป็นเจ้าของและความรับผิดชอบด้านการเรียกเก็บเงินของ codespace ที่เกี่ยวข้องจะถูกประเมินใหม่ตามการตั้งค่าของ organization ใหม่
-
 ### Forked repositories
 
 Codespace ที่สร้างจาก fork จะถูกคิดกับบัญชีส่วนบุคคลโดยค่าเริ่มต้น เว้นแต่ upstream หรือ parent repository จะอยู่ใน organization ที่อนุญาตให้คุณใช้ Codespaces โดยคิดค่าใช้จ่ายกับ organization ได้
