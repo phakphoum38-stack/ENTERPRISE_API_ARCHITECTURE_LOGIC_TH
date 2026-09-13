@@ -1,0 +1,125 @@
+name: AEOS One-Shot Comprehensive Review + Auto Merge
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+      expected_head_sha:
+        description: Exact PR HEAD SHA to review
+        required: true
+        type: string
+      auto_merge:
+        description: Permit automatic merge after verified review
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  comprehensive-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch exact PR HEAD
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD: ${{ inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/aeos-target"
+          ACTUAL_HEAD="$(git rev-parse refs/remotes/origin/aeos-target)"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+          git cat-file -e "$EXPECTED_HEAD^{commit}"
+
+      - name: Run one-shot comprehensive review
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD: ${{ inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          python3 tools/aeos/comprehensive_review.py \
+            --pr-number "$PR_NUMBER" \
+            --head-sha "$EXPECTED_HEAD"
+
+      - name: Publish immutable review certificate
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeos-one-shot-review
+          path: aeos-comprehensive-review.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Auto merge exact reviewed SHA
+        if: ${{ inputs.auto_merge == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD: ${{ inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d = json.loads(Path("aeos-comprehensive-review.json").read_text())
+          assert d["status"] == "VERIFIED"
+          assert d["merge_allowed"] is True
+          assert d["self_certification"] is False
+          assert d["reviewed_head_sha"] == __import__("os").environ["EXPECTED_HEAD"]
+          PY
+          gh pr merge "$PR_NUMBER" --squash --delete-branch --repo "${GITHUB_REPOSITORY}" --match-head-commit "$EXPECTED_HEAD"
+
+      - name: Post-merge forensic and rebaseline
+        if: ${{ inputs.auto_merge == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD: ${{ inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          sleep 2
+          git fetch --no-tags origin main
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          def run(*a): return subprocess.check_output(a, text=True).strip()
+          pr = os.environ["PR_NUMBER"]
+          head = os.environ["EXPECTED_HEAD"]
+          info = json.loads(run("gh", "pr", "view", pr, "--repo", os.environ["GITHUB_REPOSITORY"], "--json", "state,mergedAt,mergeCommit,headRefOid"))
+          assert info["state"] == "MERGED"
+          assert info["mergedAt"]
+          assert info["headRefOid"] == head
+          merge_sha = info["mergeCommit"]["oid"]
+          head_tree = run("git", "rev-parse", f"{head}^{{tree}}")
+          merge_tree = run("git", "rev-parse", f"{merge_sha}^{{tree}}")
+          assert head_tree == merge_tree
+          result = {
+              "schema": "aeos.post-merge-forensic.v1",
+              "status": "VERIFIED",
+              "reviewed_head_sha": head,
+              "merge_sha": merge_sha,
+              "merged_head_tree_equals_pr_head_tree": True,
+              "rebaseline_sha": run("git", "rev-parse", "origin/main"),
+          }
+          Path("aeos-post-merge-forensic.json").write_text(json.dumps(result, indent=2) + "\n")
+          print(json.dumps(result, indent=2))
+          PY
+
+      - name: Publish post-merge forensic
+        if: ${{ inputs.auto_merge == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeos-post-merge-forensic
+          path: aeos-post-merge-forensic.json
+          if-no-files-found: error
+          retention-days: 90
