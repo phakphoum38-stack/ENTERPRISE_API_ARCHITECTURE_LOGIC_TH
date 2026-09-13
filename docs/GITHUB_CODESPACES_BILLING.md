@@ -110,12 +110,10 @@ Codespace ที่สร้างจาก fork จะถูกคิดกั�
 
 Organization ใดก็ได้สามารถดูแล template repository สำหรับ GitHub Codespaces โดย codespace ที่สร้างจาก template repository จะถูกคิดค่าใช้จ่ายกับ organization หาก organization อนุญาตให้ผู้ใช้คนนั้นใช้งานในนาม organization มิฉะนั้นจะคิดกับผู้สร้าง codespace เอง
 
-หากผู้ใช้ publish codespace ที่สร้างจาก template ไปยัง repository ใหม่ repository นั้นจะเป็นของบัญชีส่วนบุคคลของผู้ใช้ และหาก codespace เดิมคิดค่าใช้จ่ายกับ organization ทั้งความเป็นเจ้าของ repository ใหม่และความรับผิดชอบด้านการเรียกเก็บเงินของ codespace จะย้ายมาที่ผู้ใช้ผู้สร้างทันที
-
 บัญชี `managed user account` ไม่สามารถเป็น billable owner ของ codespace ได้ ดังนั้น:
 
 * บัญชี `managed user account` จะสร้าง codespace จาก template ได้ต่อเมื่อ codespace นั้นถูกคิดกับ organization
-* บัญชี `managed user account` ไม่สามารถ publish codespace จาก template ไปยัง repository ใหม่ได้
+* บัญชี `managed user account` ไม่สามารถใช้ flow จาก template เพื่อสร้าง repository ใหม่ภายใต้บัญชีส่วนบุคคลของตนได้
 
 ดูข้อจำกัดเพิ่มเติมได้ที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
 
