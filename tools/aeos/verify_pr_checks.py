@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -74,7 +75,9 @@ def paginate(url: str, item_key: str) -> list[dict[str, Any]]:
 
 def is_self_check(check: dict[str, Any], current_run_id: str) -> bool:
     url = str(check.get("details_url") or check.get("html_url") or check.get("target_url") or "")
-    return bool(current_run_id) and f"/actions/runs/{current_run_id}/" in url
+    if not current_run_id:
+        return False
+    return re.search(rf"/actions/runs/{re.escape(current_run_id)}(?:$|[/?#])", url) is not None
 
 
 def normalize_check_run(check: dict[str, Any], current_run_id: str) -> dict[str, Any] | None:

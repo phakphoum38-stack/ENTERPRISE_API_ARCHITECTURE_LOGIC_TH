@@ -21,6 +21,19 @@ class VerifyPrChecksTests(unittest.TestCase):
             )
         )
 
+    def test_self_check_run_is_excluded_by_plain_run_url(self):
+        self.assertIsNone(
+            normalize_check_run(
+                {
+                    "name": "comprehensive-review",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "details_url": "https://github.com/o/r/actions/runs/123",
+                },
+                "123",
+            )
+        )
+
     def test_skipped_check_run_is_treated_as_passing(self):
         check = normalize_check_run(
             {
@@ -61,6 +74,18 @@ class VerifyPrChecksTests(unittest.TestCase):
                     "context": "AEOS One-Shot Comprehensive Review",
                     "state": "pending",
                     "target_url": "https://github.com/o/r/actions/runs/123/job/456",
+                },
+                "123",
+            )
+        )
+
+    def test_status_context_can_be_excluded_by_plain_run_url(self):
+        self.assertIsNone(
+            normalize_status_context(
+                {
+                    "context": "AEOS One-Shot Comprehensive Review",
+                    "state": "pending",
+                    "target_url": "https://github.com/o/r/actions/runs/123",
                 },
                 "123",
             )
