@@ -177,9 +177,10 @@ jobs:
               and r['conclusion'] == 'success'
           ]
           reconciliation_contract_present = Path('current/AEOS_SQUASH_RECONCILIATION_CONTRACT.json').is_file()
+          pr_body = pr_data.get('body') or ''
           reconciliation_declared = (
-              'aeos.squash-reconciliation.v1' in pr_data.get('body', '')
-              and 'squash_reconciliation' in pr_data.get('body', '')
+              'aeos.squash-reconciliation.v1' in pr_body
+              and 'squash_reconciliation' in pr_body
           )
           reconciliation_verified = bool(reconciliation_contract_present and reconciliation_declared and independent_reconciliation_runs)
 
