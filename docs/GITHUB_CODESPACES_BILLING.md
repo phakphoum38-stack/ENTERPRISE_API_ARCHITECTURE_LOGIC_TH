@@ -125,7 +125,7 @@ Organization ใดก็ได้สามารถดูแล template reposi
 
 หากคุณยังต้องการเก็บงานที่กำลังทำอยู่ สามารถ export การเปลี่ยนแปลงไปยัง branch ใหม่ได้ ดู [Exporting changes to a branch](https://docs.github.com/en/codespaces/troubleshooting/exporting-changes-to-a-branch)
 
-## Further reading
+## อ่านเพิ่มเติม
 
 * [Quickstart for GitHub Codespaces](https://docs.github.com/en/codespaces/quickstart)
 * [Enabling or disabling GitHub Codespaces for your organization](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/enabling-or-disabling-github-codespaces-for-your-organization)
