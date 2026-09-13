@@ -53,7 +53,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 | GitHub Pro                        | 20 GB-month      | 180 hrs               |
 
 > [!NOTE]
-> GitHub Codespaces ใช้งานไม่ได้กับ repository ที่เป็นเจ้าของโดย managed user accounts โดยตรง อย่างไรก็ตาม ในกรณีของ template repository ที่เรียกเก็บเงินผ่าน organization ผู้ใช้แบบ managed user account อาจสร้าง codespace ได้ภายใต้เงื่อนไขของ organization นั้น ดูเพิ่มที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
+> GitHub Codespaces ใช้งานไม่ได้กับ repository ที่เป็นเจ้าของโดยบัญชี `managed user account` โดยตรง อย่างไรก็ตาม ในกรณีของ template repository ที่เรียกเก็บเงินผ่าน organization ผู้ใช้ที่เป็น `managed user account` อาจสร้าง codespace ได้ภายใต้เงื่อนไขของ organization นั้น ดูเพิ่มที่ [About Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/concepts/identity-and-access-management/enterprise-managed-users)
 
 หากต้องการใช้โควตาที่รวมมาให้คุ้มขึ้น ดู [Getting the most out of your included usage](https://docs.github.com/en/codespaces/troubleshooting/troubleshooting-included-usage)
 
@@ -97,9 +97,9 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 การใช้งานทั้งหมดจะถูกคิดเงินให้กับเจ้าของ codespace หรือ organization เจ้าของ repository ตามนโยบาย billing ของ organization นั้น ดู [Choosing who owns and pays for codespaces in your organization](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/choosing-who-owns-and-pays-for-codespaces-in-your-organization)
 
-หาก repository ถูกย้ายไปยัง organization อื่น ความเป็นเจ้าของและความรับผิดชอบด้านการเรียกเก็บเงินของ codespace ที่เกี่ยวข้องจะเปลี่ยนตามการตั้งค่าของ organization ใหม่
+ตามแนวทางที่ GitHub อธิบายไว้สำหรับกรณีนี้ หาก repository ถูกย้ายไปยัง organization อื่น ความเป็นเจ้าของและความรับผิดชอบด้านการเรียกเก็บเงินของ codespace ที่เกี่ยวข้องจะถูกประเมินใหม่ตามการตั้งค่าของ organization ใหม่
 
-หากผู้ใช้ถูกลบออกจาก organization หรือ repository, codespaces ของผู้ใช้นั้นจะถูกลบโดยอัตโนมัติ
+ตามเอกสารต้นทางของ GitHub หากผู้ใช้ถูกลบออกจาก organization หรือ repository, codespaces ของผู้ใช้นั้นจะถูกลบโดยอัตโนมัติ
 
 ### Forked repositories
 
@@ -117,10 +117,10 @@ Organization ใดก็ได้สามารถดูแล template reposi
 
 หากผู้ใช้ publish codespace ที่สร้างจาก template ไปยัง repository ใหม่ repository นั้นจะเป็นของบัญชีส่วนบุคคลของผู้ใช้ และหาก codespace เดิมคิดค่าใช้จ่ายกับ organization ownership และ billing จะย้ายมาที่ผู้ใช้ผู้สร้าง codespace ทันที
 
-Managed user account ไม่สามารถเป็น billable owner ของ codespace ได้ ดังนั้น:
+บัญชี `managed user account` ไม่สามารถเป็น billable owner ของ codespace ได้ ดังนั้น:
 
-* Managed user account จะสร้าง codespace จาก template ได้ต่อเมื่อ codespace นั้นถูกคิดกับ organization
-* Managed user account ไม่สามารถ publish codespace จาก template ไปยัง repository ใหม่ได้
+* บัญชี `managed user account` จะสร้าง codespace จาก template ได้ต่อเมื่อ codespace นั้นถูกคิดกับ organization
+* บัญชี `managed user account` ไม่สามารถ publish codespace จาก template ไปยัง repository ใหม่ได้
 
 ## การจัดการ budget สำหรับ GitHub Codespaces
 
