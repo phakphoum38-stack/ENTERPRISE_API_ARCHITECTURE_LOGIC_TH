@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import time
 from pathlib import Path
@@ -46,6 +47,26 @@ def _data_root() -> Path:
 
 def _user_scope(user_id: str) -> Path:
     return _data_root() / "users" / storage_key(user_id) / "profiles" / "default" / "sessions"
+
+
+_LEGACY_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._:-]+$")
+
+
+def _legacy_user_scope(user_id: str) -> Path | None:
+    """Return the pre-storage-key revocation scope for backward-compatible reads."""
+    value = str(user_id or "")
+    if not value or not _LEGACY_SAFE_USER_ID.fullmatch(value):
+        return None
+
+    return (
+        _data_root()
+        / "users"
+        / value
+        / "profiles"
+        / "default"
+        / "sessions"
+        / "revocation"
+    )
 
 
 def _encode(payload: dict[str, Any]) -> str:
@@ -103,15 +124,42 @@ class SessionRevocationStore:
         marker = directory / "all.revoked"
         marker.write_text(str(int(time.time())), encoding="utf-8")
 
-    def is_revoked(self, session_id_value: str, user_id: str, issued_at: int | None = None) -> bool:
+    def is_revoked(
+        self,
+        session_id_value: str,
+        user_id: str,
+        issued_at: int | None = None,
+    ) -> bool:
         marker = self._marker(user_id, session_id_value)
         if marker.exists():
             return True
+
         all_marker = marker.parent / "all.revoked"
-        if not all_marker.exists() or issued_at is None:
+        if all_marker.exists() and issued_at is not None:
+            try:
+                if int(issued_at) <= int(
+                    all_marker.read_text(encoding="utf-8").strip()
+                ):
+                    return True
+            except (OSError, ValueError):
+                pass
+
+        legacy_scope = _legacy_user_scope(user_id)
+        if legacy_scope is None:
             return False
+
+        legacy_marker = legacy_scope / f"{session_id_value}.revoked"
+        if legacy_marker.exists():
+            return True
+
+        legacy_all_marker = legacy_scope / "all.revoked"
+        if not legacy_all_marker.exists() or issued_at is None:
+            return False
+
         try:
-            return int(issued_at) <= int(all_marker.read_text(encoding="utf-8").strip())
+            return int(issued_at) <= int(
+                legacy_all_marker.read_text(encoding="utf-8").strip()
+            )
         except (OSError, ValueError):
             return False
 

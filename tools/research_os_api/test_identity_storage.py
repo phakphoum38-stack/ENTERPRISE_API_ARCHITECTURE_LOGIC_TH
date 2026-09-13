@@ -48,6 +48,82 @@ class IdentityStorageTests(unittest.TestCase):
             self.assertEqual(len(user_dirs), 1)
             self.assertRegex(user_dirs[0].name, r"^u_[0-9a-f]{64}$")
 
+    def test_legacy_session_revocation_marker_is_honored_after_storage_key_upgrade(self):
+        with tempfile.TemporaryDirectory() as data_dir, patch.dict(
+            os.environ,
+            {
+                "RESEARCH_OS_SESSION_SECRET": "test-storage-secret",
+                "RESEARCH_OS_V3_DATA_DIR": data_dir,
+            },
+            clear=False,
+        ):
+            user_id = "google:123"
+            token = issue_session(
+                {"user_id": user_id, "email": "owner@example.com"}
+            )
+            payload = verify_session(token)
+
+            legacy_scope = Path(data_dir) / "legacy-revocation"
+            legacy_scope.mkdir(parents=True, exist_ok=True)
+            (legacy_scope / f"{payload['session_id']}.revoked").write_text(
+                str(payload["iat"]),
+                encoding="utf-8",
+            )
+
+            with patch("auth_session._legacy_user_scope", return_value=legacy_scope):
+                with self.assertRaisesRegex(ValueError, "session revoked"):
+                    verify_session(token)
+
+            canonical_scope = (
+                Path(data_dir)
+                / "users"
+                / storage_key(user_id)
+                / "profiles"
+                / "default"
+                / "sessions"
+                / "revocation"
+            )
+            self.assertFalse(
+                (canonical_scope / f"{payload['session_id']}.revoked").exists()
+            )
+
+    def test_legacy_all_revocation_marker_is_honored_after_storage_key_upgrade(self):
+        with tempfile.TemporaryDirectory() as data_dir, patch.dict(
+            os.environ,
+            {
+                "RESEARCH_OS_SESSION_SECRET": "test-storage-secret",
+                "RESEARCH_OS_V3_DATA_DIR": data_dir,
+            },
+            clear=False,
+        ):
+            user_id = "google:123"
+            token = issue_session(
+                {"user_id": user_id, "email": "owner@example.com"}
+            )
+            payload = verify_session(token)
+
+            legacy_scope = Path(data_dir) / "legacy-revocation"
+            legacy_scope.mkdir(parents=True, exist_ok=True)
+            (legacy_scope / "all.revoked").write_text(
+                str(payload["iat"]),
+                encoding="utf-8",
+            )
+
+            with patch("auth_session._legacy_user_scope", return_value=legacy_scope):
+                with self.assertRaisesRegex(ValueError, "session revoked"):
+                    verify_session(token)
+
+            canonical_scope = (
+                Path(data_dir)
+                / "users"
+                / storage_key(user_id)
+                / "profiles"
+                / "default"
+                / "sessions"
+                / "revocation"
+            )
+            self.assertFalse((canonical_scope / "all.revoked").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
