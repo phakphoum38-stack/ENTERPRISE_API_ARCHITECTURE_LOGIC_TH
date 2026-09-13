@@ -72,7 +72,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 การใช้งาน Codespaces จะคิดผ่าน payment method ที่ตั้งไว้ในบัญชี GitHub ของคุณ ดู [Managing your payment and billing information](https://docs.github.com/en/billing/how-tos/set-up-payment/manage-payment-info)
 
 * ประเมินค่าใช้จ่ายล่วงหน้าได้จาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces)
-* ดู usage ปัจจุบันของ minutes และ storage ได้ที่ [Viewing your usage of metered products and licenses](https://docs.github.com/en/billing/how-tos/products/view-productlicense-use)
+* ดู usage ปัจจุบันของ minutes และ storage ได้จากหมวด [View and manage paid use of GitHub products](https://docs.github.com/en/billing/how-tos/products) ซึ่งรวมลิงก์ไปยังหน้าการใช้งาน metered products และ licenses
 * แนวทางลดค่าใช้จ่าย:
   * บัญชีส่วนบุคคล ดู [Getting the most out of your included usage](https://docs.github.com/en/codespaces/troubleshooting/troubleshooting-included-usage)
   * บัญชี organization ดู [Managing the cost of GitHub Codespaces in your organization](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/managing-the-cost-of-github-codespaces-in-your-organization)
@@ -82,7 +82,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 ค่า compute จะแปรผันตามจำนวน processor cores ของ machine type ที่เลือก ยิ่ง core มาก ราคาต่อชั่วโมงยิ่งสูง ตัวอย่างเช่น 16-core จะมีค่า compute สูงกว่า 2-core อยู่ 8 เท่า
 
 > [!IMPORTANT]
-> ตารางด้านล่างเป็นตัวอย่างราคาจาก snapshot ของ issue นี้ในเดือนกันยายน 2026 เพื่ออธิบายสัดส่วนการคิดราคาเท่านั้น ราคาปัจจุบันอาจเปลี่ยนแปลงได้ ควรตรวจสอบตัวเลขล่าสุดจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
+> ตารางด้านล่างเป็นตัวอย่างราคาที่อ้างอิงข้อมูลช่วงเดือนกันยายน 2026 เพื่ออธิบายสัดส่วนการคิดราคาเท่านั้น ราคาปัจจุบันอาจเปลี่ยนแปลงได้ ควรตรวจสอบตัวเลขล่าสุดจาก [GitHub pricing calculator](https://github.com/pricing/calculator?feature=codespaces) ก่อนตัดสินใจใช้งานจริง
 
 | Component          | Machine type | Unit of measure | Included usage multiplier | Price |
 | ------------------ | ------------ | --------------- | ------------------------- | ----- |
@@ -105,7 +105,7 @@ Container ที่อ้างอิง default image จะไม่ถูก�
 
 Codespace ที่สร้างจาก fork จะถูกคิดกับบัญชีส่วนบุคคลโดยค่าเริ่มต้น เว้นแต่ upstream หรือ parent repository จะอยู่ใน organization ที่อนุญาตให้คุณใช้ Codespaces โดยคิดค่าใช้จ่ายกับ organization ได้
 
-ตัวอย่างเช่น หากสมาชิกหรือ outside collaborator ของ organization ได้รับสิทธิ์ใช้ Codespaces โดยคิดกับ organization และผู้ใช้นั้นมีสิทธิ์ fork private repository ของ organization ผู้ใช้จะสามารถสร้างและใช้งาน codespace ของ repository ที่ fork มาโดยคิดค่าใช้จ่ายกับ organization ได้ เพราะ parent repository ยังคงเป็นของ organization เดิม อย่างไรก็ตาม owner ของ organization สามารถเพิกถอนสิทธิ์เข้าถึง repository ต้นทาง, forked repository และ codespace ที่เกี่ยวข้องได้ รวมถึงสามารถลบ parent repository ซึ่งจะทำให้ forked repository ถูกลบตามไปด้วย ดู [Managing the forking policy for your repository](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/managing-the-forking-policy-for-your-repository)
+ตัวอย่างเช่น หากสมาชิกหรือ outside collaborator ของ organization ได้รับสิทธิ์ใช้ Codespaces โดยคิดกับ organization และผู้ใช้นั้นมีสิทธิ์ fork private repository ของ organization ผู้ใช้จะสามารถสร้างและใช้งาน codespace ของ repository ที่ fork มาโดยคิดค่าใช้จ่ายกับ organization ได้ เพราะ parent repository ยังคงเป็นของ organization เดิม อย่างไรก็ตาม owner ของ organization สามารถเพิกถอนสิทธิ์เข้าถึง repository ต้นทาง, forked repository และ codespace ที่เกี่ยวข้องได้ รวมถึงสามารถลบ parent repository ซึ่งจะทำให้ forked repository ถูกลบตามไปด้วย โดยอ้างอิงแนวทางในหัวข้อ **Managing the forking policy for your repository** บน GitHub Docs
 
 หากคุณสร้าง prebuilds สำหรับ forked repository ค่า storage ของ prebuilds เหล่านั้นจะถูกหักจาก included storage รายเดือนของบัญชีคุณก่อน และหากใช้ครบแล้วพร้อมเปิด billing อยู่ ระบบจะคิดเงินกับบัญชีส่วนบุคคล แม้ codespaces สำหรับ fork นั้นจะถูก organization เจ้าของ parent repository เป็นผู้จ่ายก็ตาม
 
