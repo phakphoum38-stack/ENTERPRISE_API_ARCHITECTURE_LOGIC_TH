@@ -124,7 +124,7 @@ class ResourceAdmissionGate:
                     if reservation is not None:
                         if reservation.status is AdmissionStatus.RESERVED:
                             return self._allow_from_reservation(reservation, now)
-                        return self._allow_from_reservation(reservation, now)
+                        return self._deny(request, f"idempotency_replay:{reservation.status.value}", now)
 
             try:
                 entitlement = self._governance.entitlement(request.principal_id)
@@ -255,7 +255,6 @@ class ResourceAdmissionGate:
     @staticmethod
     def _fingerprint(request: AdmissionRequest) -> str:
         payload = {
-            "request_id": request.request_id,
             "principal_id": request.principal_id,
             "usage": request.usage.__dict__,
             "estimated_cost": str(request.estimated_cost),
