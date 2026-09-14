@@ -1,123 +1,70 @@
-# AEOS H00-H27 Single-Pass Auto-Fix Protocol
+# AEOS Universal Failure-to-Finish Protocol
 
 ## Status
 
-**Proposed implementation contract** — operates on one exact target SHA and one consolidated repair lineage. It does not grant autonomous merge or constitutional authority.
+**Proposed implementation contract** — one guarded failure intake and one causal repair loop for H00-H27 plus CI, tests, contracts, artifacts, provenance, security, runtime, and authority surfaces. It does not grant autonomous merge or constitutional authority.
 
 ## Objective
 
-Inspect the complete H00-H27 horizon in one execution, collect every failure and missing control into one deterministic gap set, collapse symptoms to root causes, apply only bounded repairs through the existing Autobot repair boundary, and repeat verification until the target reaches `FINISHED` or a hard stop is proven.
-
-The desired operating rule is:
+Discover failures across the complete assurance surface in one run, normalize them into evidence-bound records, correlate duplicate symptoms, collapse them to root causes, apply one bounded causal repair batch, and repeat full verification until `FINISHED` or an explicit `HARD_STOP` is proven.
 
 ```text
 DISCOVER ALL
-  -> CLASSIFY ALL
-  -> COLLECT ALL FAILURES
-  -> COLLAPSE TO ROOT CAUSES
-  -> PLAN ONE REPAIR SET
-  -> APPLY BOUNDED REPAIR
-  -> RECHECK H00-H27
+  -> INGEST ALL FAILURES
+  -> NORMALIZE + IDENTITY/EVIDENCE CHECK
+  -> CORRELATE / DEDUPLICATE
+  -> ROOT-CAUSE GRAPH
+  -> ONE CONSOLIDATED REPAIR SET
+  -> REPAIR FIREWALL
+  -> ONE REPAIR PR LINEAGE
+  -> FULL REVALIDATION
+  -> RE-INGEST FAILURES
   -> repeat until FINISHED or HARD_STOP
 ```
 
-## 1. Scope lock
+## 1. Universal scope lock
 
-The protocol treats H00-H27 as one graph, not 28 independent tickets. A run is bound to:
+H00-H27 remains the core assurance horizon, but failures are not limited to H-node labels. Accepted scopes include `H00..H27`, `CI`, `TEST`, `CONTRACT`, `ARTIFACT`, `PROVENANCE`, `SECURITY`, `RUNTIME`, `RECOVERY`, `LINEAGE`, and `AUTHORITY`.
 
-- exact `source_sha`
-- exact `target_sha`
-- protocol version
-- contract version
-- policy version
-- correlation ID
-- iteration ID
+Every record is bound to an exact lowercase 40-character `source_sha` and traceable `evidence_ref`. Stale identity is a hard stop.
 
-Any identity drift invalidates the current evidence set and requires re-anchoring.
+## 2. Universal failure record
 
-## 2. Full-horizon discovery
-
-Every pass evaluates all dimensions of every H node, even when an earlier node fails. The first pass must not stop at the first error because the purpose is to produce one complete gap set.
-
-Required dimensions:
-
-1. existence / identity
-2. ancestry / lineage
-3. source implementation
-4. contracts and schemas
-5. dependency closure
-6. semantic behavior
-7. tests and regression
-8. workflow / CI
-9. evidence / artifact
-10. provenance / freshness
-11. security / authority boundary
-12. runtime / integration
-13. recovery / rollback path
-14. H-to-H compatibility
-15. duplicate / supersession state
-16. final lifecycle composition
-
-## 3. Failure normalization
-
-Every failure is normalized to a machine-readable record:
+Each non-PASS finding is normalized to:
 
 ```text
 failure_id
-horizon
-layer
+scope
+dimension
+status
 symptom
-observed_object
+evidence_ref
 source_sha
-target_sha
-producer
-verifier
-raw_evidence_ref
-fingerprint
+root_cause
 severity
-confidence
+blocking
+repair_required
+verification_required
+fingerprint
 ```
 
-`UNKNOWN` remains `UNKNOWN`; it is never converted to PASS by inference.
+Evidence is mandatory. `UNKNOWN` root cause remains `UNKNOWN`; it is never inferred into PASS.
 
-## 4. Root-cause collapse
+## 3. Discover all before repairing
 
-The Autobot must distinguish:
+The first pass collects the complete known failure set instead of repairing the first error and hiding downstream failures. H00-H27 dimensions include identity, ancestry, source, contracts, dependencies, semantics, tests, CI, evidence, provenance, security, runtime, recovery, cross-horizon compatibility, duplicate/supersession, and final lifecycle. External assurance scopes are ingested into the same ledger.
+
+## 4. Correlation and root-cause collapse
 
 ```text
 symptom != detector != introducer != root cause
 ```
 
-Multiple failures may map to one root cause. One root cause receives one repair intent. The consolidated repair set must not contain redundant fixes for the same causal defect.
+Multiple failures across different scopes may represent one causal defect. They receive one root-cause key and one repair intent. Redundant fixes are rejected.
 
-## 5. Repair firewall
+## 5. One consolidated repair batch
 
-Autobot may:
-
-- inspect
-- classify
-- propose a bounded fix
-- apply a bounded source fix when policy permits
-- add or repair regression tests
-- collect fresh evidence
-- retry verification
-
-Autobot may not:
-
-- weaken a failing gate
-- delete required evidence
-- rewrite canonical history
-- self-approve its own change
-- change constitutional invariants to make the run pass
-- grant itself authority
-- merge merely because a repair passes its own tests
-- fabricate CI, provenance, or forensic evidence
-
-## 6. One consolidated repair set
-
-A pass may produce many file changes, but they belong to one causal repair set and one PR lineage. Do not create one PR per H node.
-
-The repair set must contain:
+The default unit of repair is **one causal batch / one PR lineage**, not one PR per H node or per failing workflow. A batch contains:
 
 ```text
 root_causes[]
@@ -130,186 +77,66 @@ risk_level
 repair_fingerprint
 ```
 
-If a proposed repair is unrelated to the observed root-cause set, it is rejected from the run.
+Unrelated work is excluded rather than silently bundled. A split is permitted only when a hard dependency or governance boundary proves consolidation impossible.
 
-## 7. Loop semantics
+## 6. Repair firewall
 
-The loop is bounded, deterministic, and fail-closed.
+Autobot may inspect, classify, correlate, plan, apply bounded source fixes through an explicit adapter, add regression tests, collect fresh evidence, and reverify.
 
-```text
-PASS  -> continue to next stage
-FAIL  -> diagnose -> repair -> reverify
-STALE -> re-anchor -> reverify
-UNKNOWN -> HOLD
-HARD_STOP -> HOLD
-```
+Autobot may never weaken gates, delete evidence, rewrite canonical history, self-approve, escalate authority, modify constitutional policy to pass, fabricate evidence, change branch protection, or merge as part of the repair stage.
 
-A retry is not a blind rerun. Every retry must produce new evidence and must preserve the meaning of the original failure.
-
-Recommended default limits:
-
-- maximum repair iterations: 10
-- maximum re-anchors per run: 2
-- maximum CI retries per repair iteration: 2
-- maximum unchanged-failure retries: 1
-- maximum total runtime: 2 hours
-
-If the same failure fingerprint survives a bounded repair attempt without a changed causal state, the run enters `HARD_STOP:REPAIR_NOT_EFFECTIVE` rather than looping forever.
-
-## 8. State machine
+## 7. Bounded fail-to-finish loop
 
 ```text
-DISCOVER
-  -> ANALYZE
-  -> GAP_SET_READY
-  -> ROOT_CAUSE_READY
-  -> REPAIR_PLANNED
-  -> REPAIRING
-  -> VERIFYING
-  -> FULL_RESCAN
-       | PASS
-       v
-     FINISHED
-       |
-       | FAIL
-       v
-     ANALYZE
-
-Any state may -> HARD_STOP when a constitutional, identity,
-security, provenance, authority, dependency, or budget invariant fails.
+FAIL
+ -> DIAGNOSE
+ -> ROOT CAUSE
+ -> REPAIR
+ -> VERIFY
+ -> FULL RESCAN
+ -> RE-INGEST
 ```
 
-## 9. Full re-scan after every repair
+Every repair must return a new exact source identity and trigger a complete verification scan. The loop is bounded by iteration, retry, re-anchor, and runtime limits. An unchanged failure fingerprint beyond its retry budget produces `HARD_STOP:REPAIR_NOT_EFFECTIVE`.
 
-After a repair, do not run only the previously failing H. Re-run the complete H00-H27 graph. This catches regressions introduced in a later H by a fix made for an earlier H.
+## 8. Evidence ledger
 
-A repair is successful only if:
+Each iteration records source identity, failure fingerprints before/after, root causes, repair fingerprint, changed files, verification result, and manifest/evidence references. The run ledger is append-only. Superseded evidence is preserved.
+
+## 9. Completion predicate
+
+`FINISHED` requires:
 
 ```text
-new failure set < old failure set
-OR
-root cause is demonstrably eliminated
+all discovered failures ingested
+all non-PASS failures have traceable evidence
+all non-PASS failures have known root causes
+all blocking failures closed
+all required dimensions PASS
+exact SHA identity PASS
+full regression PASS
+exact-head CI PASS
+evidence + provenance PASS
+security + authority boundaries PASS
+independent verification PASS
+final gate PASS
 ```
 
-A green local test for one file is never sufficient for `FINISHED`.
+`READY_FOR_OWNER_AUTHORITY` is not `FINISHED` and is not merge authorization.
 
-## 10. Completion predicate
+## 10. Hard stops
 
-`FINISHED` requires all of the following:
+Hard stop on identity mismatch, stale evidence, unknown root cause, evidence conflict, provenance invalidity, contract drift, dependency cycle, security violation, authority escalation, constitutional modification, ineffective repair, out-of-scope repair, exact-head CI failure, decision replay mismatch, budget exhaustion, or post-merge health failure.
 
-```text
-H00-H27 discovered                    PASS
-identity / exact SHA                   PASS
-ancestry / dependency closure          PASS
-source / contract integrity            PASS
-semantic / blast-radius checks         PASS
-full regression                        PASS
-exact-head CI                          PASS
-evidence integrity                    PASS
-provenance / freshness                 PASS
-security / authority boundary          PASS
-cross-H integration                   PASS
-recovery proof                         PASS
-final lifecycle composition            PASS
-independent verification               PASS
-final gate                             PASS
-```
+Hard stop is terminal for the current run: `HARD_STOP + preserved evidence + explicit recovery condition`.
 
-`READY_FOR_OWNER_AUTHORITY` is not equivalent to `FINISHED` and is not merge authorization.
+## 11. Independent verification
 
-## 11. Evidence ledger
+The repairer cannot be the sole verifier. Fresh post-repair evidence is consumed by an independent verification boundary before `FINISHED`.
 
-Each iteration records:
+## 12. Governance boundary
 
-```text
-iteration_id
-attempt
-source_sha
-target_sha
-failure_fingerprints_before
-root_causes
-repair_fingerprint
-changed_files
-failure_fingerprints_after
-verification_result
-manifest_fingerprint
-```
-
-The ledger is append-only for the run. Previous evidence is preserved when a later attempt supersedes it.
-
-## 12. Main SHA fence
-
-At every mutation boundary:
-
-```text
-OBSERVE MAIN
-  -> PLAN
-  -> BIND
-  -> REPAIR
-  -> VERIFY SAME MAIN
-```
-
-If main changes, dependent evidence is stale. The Autobot must stop, re-anchor, and regenerate the affected evidence before continuing.
-
-## 13. PR consolidation rule
-
-The complete run produces at most one repair PR for the current causal batch. Additional PRs are allowed only when a hard dependency or governance boundary makes consolidation impossible; such a split must itself be evidenced.
-
-The PR description must include:
-
-- exact source/base SHA
-- all discovered H00-H27 failures
-- collapsed root causes
-- changed files
-- regression tests
-- evidence manifest
-- repair fingerprint
-- verification result
-- explicit authority boundary
-
-## 14. Independent verification boundary
-
-The repairer cannot be the sole verifier. The final verification stage must consume fresh evidence independently of the repair operation.
-
-```text
-AUTOBOT REPAIRER
-      |
-      v
-FRESH EVIDENCE
-      |
-      v
-INDEPENDENT VERIFIER
-      |
-      v
-FINAL GATE
-```
-
-## 15. Hard stops
-
-Immediately stop autonomous progression on:
-
-- exact SHA mismatch
-- main SHA drift not successfully re-anchored
-- dependency cycle
-- unknown root cause after bounded analysis
-- provenance invalid or stale
-- evidence conflict
-- contract drift
-- security boundary violation
-- authority escalation
-- constitutional-policy modification attempt
-- repeated ineffective repair
-- repair outside declared scope
-- CI not bound to exact head
-- post-merge health failure
-- decision replay mismatch
-- retry/runtime budget exhaustion
-
-Hard-stop output is `HARD_STOP`, never `PASS`.
-
-## 16. Merge boundary
-
-This protocol automates engineering work, not final authority. Even when H00-H27 reaches `FINISHED`, the established governance sequence remains:
+A successful engineering loop does not merge itself. The established sequence remains:
 
 ```text
 FINISHED
@@ -323,28 +150,12 @@ FINISHED
  -> REBASELINE
 ```
 
-No loop is permitted to bypass these gates.
+No autonomous repair path bypasses these gates.
 
-## 17. Recovery rule
+## 13. Recovery and learning
 
-Every successful repair iteration retains a verified predecessor. If post-repair verification destabilizes the system, recovery returns to the last certified state and records the failed repair as forensic evidence.
+Every successful repair retains a verified predecessor. A destabilizing repair returns to the last certified state and records the failed attempt as evidence. Only forensic-verified failures become regression knowledge. Learning may strengthen detectors and tests but may not alter constitutional policy or merge authority.
 
-## 18. Learning rule
+## 14. Final operating principle
 
-Only forensic-verified failures may become regression knowledge. The learning system may strengthen detectors and tests but may not rewrite constitutional policy or merge authority.
-
-## 19. Final operating principle
-
-> **Fail means diagnose, consolidate, repair, and verify again — not skip, suppress, or weaken the gate.**
-
-The loop ends only at:
-
-```text
-FINISHED
-```
-
-or
-
-```text
-HARD_STOP + PRESERVED EVIDENCE + EXPLICIT RECOVERY CONDITION
-```
+> **Fail means diagnose, consolidate, repair, and verify again — never skip, suppress, or weaken the gate.**
