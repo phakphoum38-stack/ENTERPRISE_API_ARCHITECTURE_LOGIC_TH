@@ -1,95 +1,69 @@
-"""Unified Research OS resource control plane."""
+"""Single Research OS resource-control execution boundary.
+
+This facade composes the existing credential, entitlement, policy, quota,
+budget, routing, accounting, and evidence primitives. It deliberately does
+not replace those primitives or own provider credentials. The goal is one
+runtime boundary that can be embedded by HTTP, Friend, Brain, Factory, or
+other execution surfaces without creating a second quota/policy system.
+"""
 from __future__ import annotations
 
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from hashlib import sha256
+import json
+from enum import Enum
 from threading import RLock
 from typing import Any, Callable, Iterable
-from enum import Enum
-import json
 
-from admission import AdmissionDecision, AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
-from agent_platform import AgentRouter
 from api_keys import APIKeyManager, APIKeyRecord
+from admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
+from agent_platform import AgentRouter
 from budgets import BudgetLedger, BudgetLimit
-from controlled_router import GovernedAgentRouter
+from controlled_router import GovernedAgentRouter, GovernedRoute
 from execution_contract import MeasuredExecution
 from policy import PolicyEngine, PolicyRule
 from resource_governance import Entitlement, ResourceGovernance, Usage
 
 
-class ResourceControlError(ValueError):
-    """Invalid or denied resource-control operation."""
-
-
-class ExecutionResult:
-    def __init__(
-        self,
-        request_id: str,
-        admission: AdmissionRecord,
-        value: Any = None,
-        *,
-        usage: Usage | None = None,
-        provider: str | None = None,
-        model: str | None = None,
-        text: str | None = None,
-        cost: Decimal | None = None,
-        currency: str | None = None,
-        ledger_entry: "UsageLedgerEntry | None" = None,
-        evidence: dict[str, Any] | None = None,
-    ) -> None:
-        self.request_id = request_id
-        self.admission = admission
-        self.value = value
-        self.usage = usage
-        self.provider = provider
-        self.model = model
-        self.text = text
-        self.cost = cost
-        self.currency = currency
-        self.ledger_entry = ledger_entry
-        self.evidence = evidence
-
-
+@dataclass(frozen=True)
 class UsageLedgerEntry:
-    def __init__(
-        self,
-        sequence: int,
-        request_id: str,
-        principal_id: str,
-        admission_id: str,
-        provider: str,
-        model: str,
-        usage: Usage,
-        cost: Decimal,
-        currency: str,
-        status: str,
-        recorded_at: str,
-        previous_hash: str,
-        entry_hash: str,
-    ) -> None:
-        self.sequence = sequence
-        self.request_id = request_id
-        self.principal_id = principal_id
-        self.admission_id = admission_id
-        self.provider = provider
-        self.model = model
-        self.usage = usage
-        self.cost = cost
-        self.currency = currency
-        self.status = status
-        self.recorded_at = recorded_at
-        self.previous_hash = previous_hash
-        self.entry_hash = entry_hash
+    sequence: int
+    request_id: str
+    principal_id: str
+    admission_id: str
+    provider: str
+    model: str
+    usage: Usage
+    cost: Decimal
+    currency: str
+    status: str
+    recorded_at: datetime
+    previous_hash: str
+    entry_hash: str
 
 
+@dataclass(frozen=True)
+class ExecutionResult:
+    request_id: str
+    admission: AdmissionRecord
+    route: dict[str, Any] | None
+    provider: str | None = None
+    model: str | None = None
+    text: str | None = None
+    usage: Usage | None = None
+    cost: Decimal | None = None
+    currency: str | None = None
+    ledger_entry: UsageLedgerEntry | None = None
+    evidence: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
 class _Principal:
-    def __init__(self, principal_id: str, entitlement: Entitlement, budget: BudgetLimit) -> None:
-        self.principal_id = principal_id
-        self.entitlement = entitlement
-        self.budget = budget
+    principal_id: str
+    entitlement: Entitlement
+    budget: BudgetLimit
 
 
 class ResourceControlPlane:
@@ -148,13 +122,63 @@ class ResourceControlPlane:
         self._require_principal(record.principal_id)
         return record
 
-    def admit(self, **kwargs: Any) -> AdmissionRecord:
-        self._require_principal(kwargs["principal_id"])
-        return self.admission.admit(AdmissionRequest(**kwargs))
+    def admit(
+        self,
+        *,
+        request_id: str,
+        principal_id: str,
+        usage: Usage,
+        estimated_cost: Decimal,
+        currency: str,
+        scopes: frozenset[str] = frozenset(),
+        principal_type: str = "user",
+        idempotency_key: str | None = None,
+    ) -> AdmissionRecord:
+        self._require_principal(principal_id)
+        return self.admission.admit(
+            AdmissionRequest(
+                request_id=request_id,
+                principal_id=principal_id,
+                usage=usage,
+                estimated_cost=estimated_cost,
+                currency=currency,
+                scopes=scopes,
+                principal_type=principal_type,
+                idempotency_key=idempotency_key,
+            )
+        )
 
-    def route(self, **kwargs: Any):
-        self._require_principal(kwargs["principal_id"])
-        return self.router.route(**kwargs)
+    def route(
+        self,
+        *,
+        request_id: str,
+        principal_id: str,
+        objective: str,
+        usage: Usage,
+        estimated_cost: Decimal,
+        currency: str,
+        scopes: frozenset[str] = frozenset(),
+        principal_type: str = "user",
+        idempotency_key: str | None = None,
+        available_providers: Iterable[str] | None = None,
+        requested_agent: str | None = None,
+        allow_fallback: bool = True,
+    ) -> GovernedRoute:
+        self._require_principal(principal_id)
+        return self.router.route(
+            request_id=request_id,
+            principal_id=principal_id,
+            objective=objective,
+            usage=usage,
+            estimated_cost=estimated_cost,
+            currency=currency,
+            scopes=scopes,
+            principal_type=principal_type,
+            idempotency_key=idempotency_key,
+            available_providers=available_providers,
+            requested_agent=requested_agent,
+            allow_fallback=allow_fallback,
+        )
 
     def execute(
         self,
@@ -175,7 +199,15 @@ class ResourceControlPlane:
         actual_usage: Usage | None = None,
         actual_cost: Decimal | None = None,
     ) -> ExecutionResult:
-        """Route, execute, and account measured execution."""
+        """Route, execute, and atomically account measured execution.
+
+        A governed executor may return ``MeasuredExecution``. That result is
+        authoritative for post-execution usage/cost/currency and is validated
+        before any reservation is committed. Legacy callers may still supply
+        ``actual_usage``/``actual_cost`` explicitly; new runtime adapters
+        should return ``MeasuredExecution`` so measurement occurs inside the
+        governed execution boundary.
+        """
         governed = self.route(
             request_id=request_id,
             principal_id=principal_id,
@@ -235,19 +267,43 @@ class ResourceControlPlane:
             return ExecutionResult(
                 request_id,
                 governed.admission,
-                execution_value,
-                usage=measured.usage,
-                provider=provider,
-                model=model,
-                text=text,
-                cost=measured.cost,
-                currency=measured.currency,
-                ledger_entry=entry,
-                evidence=evidence,
+                governed.route,
+                provider,
+                model,
+                text,
+                measured.usage,
+                measured.cost,
+                measured.currency,
+                entry,
+                evidence,
             )
         except Exception:
             self.router.release(reservation_id)
             raise
+
+    @staticmethod
+    def _resolve_measurement(
+        value: Any,
+        *,
+        admission_currency: str,
+        estimated_usage: Usage,
+        estimated_cost: Decimal,
+        actual_usage: Usage | None,
+        actual_cost: Decimal | None,
+    ) -> tuple[MeasuredExecution, Any]:
+        if isinstance(value, MeasuredExecution):
+            expected = admission_currency.strip().upper()
+            if value.currency != expected:
+                raise ValueError("measured execution currency does not match admission currency")
+            if actual_usage is not None and actual_usage != value.usage:
+                raise ValueError("explicit actual_usage conflicts with measured execution")
+            if actual_cost is not None and actual_cost != value.cost:
+                raise ValueError("explicit actual_cost conflicts with measured execution")
+            return value, value.value
+
+        resolved_usage = actual_usage or estimated_usage
+        resolved_cost = estimated_cost if actual_cost is None else actual_cost
+        return MeasuredExecution(value, resolved_usage, resolved_cost, admission_currency), value
 
     def release(self, reservation_id: str):
         return self.router.release(reservation_id)
@@ -263,67 +319,55 @@ class ResourceControlPlane:
     def forensic_snapshot(self) -> dict[str, Any]:
         with self._lock:
             return {
-                "principals": tuple(sorted(self._principals)),
-                "ledger_length": len(self._ledger),
-                "ledger_root": self._ledger[-1].entry_hash if self._ledger else "0" * 64,
-                "evidence_length": len(self._evidence),
+                "principals": sorted(self._principals),
+                "ledger_entries": len(self._ledger),
+                "evidence_entries": len(self._evidence),
                 "evidence_root": self._evidence_root,
+                "ledger_hashes": [entry.entry_hash for entry in self._ledger],
             }
 
-    def _require_principal(self, principal_id: str) -> None:
-        with self._lock:
-            if principal_id not in self._principals:
-                raise PermissionError("unknown principal")
-
-    @staticmethod
-    def _resolve_measurement(
-        value: Any,
+    def _record_usage(
+        self,
         *,
-        admission_currency: str,
-        estimated_usage: Usage,
-        estimated_cost: Decimal,
-        actual_usage: Usage | None,
-        actual_cost: Decimal | None,
-    ) -> tuple[MeasuredExecution, Any]:
-        if isinstance(value, MeasuredExecution):
-            measured = value
-            execution_value = value.value
-        else:
-            if actual_usage is None or actual_cost is None:
-                raise TypeError("execution must return MeasuredExecution")
-            measured = MeasuredExecution(value, actual_usage, actual_cost, admission_currency)
-            execution_value = value
-        if measured.currency != admission_currency.strip().upper():
-            raise ValueError("measured currency does not match admission currency")
-        return measured, execution_value
-
-    @staticmethod
-    def _normalize_execution(value: Any, route: dict[str, Any] | None) -> tuple[str, str, str | None]:
-        route = route or {}
-        provider = str((value.get("provider") if isinstance(value, dict) else None) or route.get("provider") or "unknown")
-        model = str((value.get("model") if isinstance(value, dict) else None) or route.get("model") or "unknown")
-        text = value.get("text") if isinstance(value, dict) else (value if isinstance(value, str) else None)
-        return provider, model, text
-
-    def _record_usage(self, **payload: Any) -> UsageLedgerEntry:
+        request_id: str,
+        principal_id: str,
+        admission_id: str,
+        provider: str,
+        model: str,
+        usage: Usage,
+        cost: Decimal,
+        currency: str,
+        status: str,
+    ) -> UsageLedgerEntry:
         with self._lock:
             sequence = len(self._ledger) + 1
-            payload["sequence"] = sequence
-            payload["previous_hash"] = self._ledger[-1].entry_hash if self._ledger else "0" * 64
-            recorded_at = datetime.now(timezone.utc).isoformat()
-            payload["recorded_at"] = recorded_at
-            entry_hash = sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=self._json_default).encode()).hexdigest()
+            recorded_at = datetime.now(timezone.utc)
+            payload = {
+                "sequence": sequence,
+                "request_id": request_id,
+                "principal_id": principal_id,
+                "admission_id": admission_id,
+                "provider": provider,
+                "model": model,
+                "usage": usage.__dict__,
+                "cost": str(cost),
+                "currency": currency.strip().upper(),
+                "status": status,
+                "recorded_at": recorded_at.isoformat(),
+                "previous_hash": self._ledger[-1].entry_hash if self._ledger else "0" * 64,
+            }
+            entry_hash = sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             entry = UsageLedgerEntry(
                 sequence,
-                payload["request_id"],
-                payload["principal_id"],
-                payload["admission_id"],
-                payload["provider"],
-                payload["model"],
-                payload["usage"],
-                payload["cost"],
-                payload["currency"].strip().upper(),
-                payload["status"],
+                request_id,
+                principal_id,
+                admission_id,
+                provider,
+                model,
+                usage,
+                cost,
+                currency.strip().upper(),
+                status,
                 recorded_at,
                 payload["previous_hash"],
                 entry_hash,
@@ -347,13 +391,24 @@ class ResourceControlPlane:
             record["sequence"] = len(self._evidence) + 1
             record["previous_hash"] = self._evidence_root
             record["recorded_at"] = datetime.now(timezone.utc).isoformat()
-            canonical = json.dumps(
-                record,
-                sort_keys=True,
-                separators=(",", ":"),
-                default=self._json_default,
-            ).encode()
+            canonical = json.dumps(record, sort_keys=True, separators=(",", ":"), default=self._json_default).encode()
             record["evidence_hash"] = sha256(canonical).hexdigest()
             self._evidence_root = record["evidence_hash"]
             self._evidence.append(record)
             return dict(record)
+
+    @staticmethod
+    def _normalize_execution(value: Any, route: dict[str, Any] | None) -> tuple[str, str, str | None]:
+        route = route or {}
+        provider = str(route.get("provider") or "unknown")
+        model = str(route.get("model") or "unknown")
+        if isinstance(value, dict):
+            provider = str(value.get("provider") or provider)
+            model = str(value.get("model") or model)
+            return provider, model, value.get("text")
+        return provider, model, str(value) if value is not None else None
+
+    def _require_principal(self, principal_id: str) -> None:
+        with self._lock:
+            if principal_id not in self._principals:
+                raise PermissionError("principal is not registered in the resource control plane")
