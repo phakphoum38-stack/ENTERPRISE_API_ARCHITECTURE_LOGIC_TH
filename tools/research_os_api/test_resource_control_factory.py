@@ -49,6 +49,7 @@ class ResourceControlledFactoryTests(unittest.TestCase):
         workload = FactoryWorkload(
             request_id="factory-2", principal_id="factory-user", objective="build",
             leaf_tasks=4, scopes=frozenset({"agent:run"}),
+            estimated_cost=Decimal("1.25"),
         )
         result = self.factory.execute(
             workload,
