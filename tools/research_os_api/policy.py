@@ -91,7 +91,7 @@ class PolicyEngine:
 
     @staticmethod
     def _matches_dimensions(rule: PolicyRule, usage: Usage) -> bool:
-        return all(usage.get(dimension) >= limit for dimension, limit in rule.dimensions.items())
+        return all(usage.value(dimension) >= limit for dimension, limit in rule.dimensions.items())
 
     def snapshot(self) -> tuple[PolicyRule, ...]:
         return tuple(self._rules)
