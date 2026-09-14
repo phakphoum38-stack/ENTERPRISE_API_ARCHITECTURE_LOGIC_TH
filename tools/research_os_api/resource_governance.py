@@ -6,11 +6,15 @@ HTTP handlers, databases, and provider adapters remain integration layers.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from threading import RLock
 from typing import Mapping
+
+
+class QuotaError(ValueError):
+    pass
 
 
 class QuotaDimension(str, Enum):
@@ -34,10 +38,6 @@ class Decision(str, Enum):
     ALLOW = "allow"
     DENY = "deny"
     THROTTLE = "throttle"
-
-
-class QuotaError(ValueError):
-    """Invalid quota configuration or accounting input."""
 
 
 @dataclass(frozen=True)
@@ -122,7 +122,6 @@ class Reservation:
     usage: Usage
     created_at: datetime
     expires_at: datetime
-    committed: bool = False
 
 
 @dataclass(frozen=True)
@@ -131,15 +130,20 @@ class DecisionRecord:
     principal_id: str
     reason: str
     reservation_id: str | None
-    evaluated_at: datetime
+    timestamp: datetime
     tier: str
 
 
 @dataclass
 class _PrincipalState:
     entitlement: Entitlement
-    usage: dict[tuple[QuotaDimension, Window, datetime], int] = field(default_factory=dict)
-    reservations: dict[str, Reservation] = field(default_factory=dict)
+    usage: dict[tuple[QuotaDimension, Window, datetime], int]
+    reservations: dict[str, Reservation]
+
+    def __init__(self, entitlement: Entitlement) -> None:
+        self.entitlement = entitlement
+        self.usage = {}
+        self.reservations = {}
 
 
 def _window_start(now: datetime, window: Window) -> datetime:
@@ -149,7 +153,7 @@ def _window_start(now: datetime, window: Window) -> datetime:
     if window is Window.HOUR:
         return now.replace(minute=0)
     if window is Window.DAY:
-        return now.replace(hour=0, minute=0)
+        return now.replace(hour=0)
     if window is Window.MONTH:
         return now.replace(day=1, hour=0, minute=0)
     raise QuotaError(f"unsupported quota window: {window}")
@@ -174,6 +178,15 @@ class ResourceGovernance:
             if principal_id in self._principals:
                 raise QuotaError("principal already registered")
             self._principals[principal_id] = _PrincipalState(entitlement=entitlement)
+
+    def update_entitlement(self, principal_id: str, entitlement: Entitlement) -> None:
+        """Update a registered entitlement while preserving usage and reservations."""
+        principal_id = principal_id.strip()
+        if not principal_id:
+            raise QuotaError("principal_id is required")
+        with self._lock:
+            state = self._state(principal_id)
+            state.entitlement = entitlement
 
     def entitlement(self, principal_id: str) -> Entitlement:
         with self._lock:
@@ -264,12 +277,12 @@ class ResourceGovernance:
     def _find_reservation(self, reservation_id: str) -> tuple[str, Reservation]:
         for principal_id, state in self._principals.items():
             reservation = state.reservations.get(reservation_id)
-            if reservation:
+            if reservation is not None:
                 return principal_id, reservation
         raise QuotaError("unknown reservation")
 
     @staticmethod
     def _expire_reservations(state: _PrincipalState, now: datetime) -> None:
-        expired = [key for key, value in state.reservations.items() if value.expires_at <= now]
-        for key in expired:
-            del state.reservations[key]
+        expired = [rid for rid, reservation in state.reservations.items() if reservation.expires_at <= now]
+        for rid in expired:
+            del state.reservations[rid]
