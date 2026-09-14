@@ -54,7 +54,12 @@ class IndependentReviewerTests(unittest.TestCase):
                 result = perform_independent_review(evidence(**{field: False}))
                 self.assertEqual(result.decision, "HOLD")
                 self.assertEqual(result.recommendation, "HARD_STOP")
-                self.assertIn(field.replace("_pass", "").upper().replace("_", "_"), result.findings)
+                expected_finding = (
+                    "ROOT_CAUSE"
+                    if field == "root_cause_verified"
+                    else field.replace("_pass", "").upper().replace("_", "_")
+                )
+                self.assertIn(expected_finding, result.findings)
 
     def test_invalid_identity_fails_closed(self):
         with self.assertRaises(IndependentReviewError):
