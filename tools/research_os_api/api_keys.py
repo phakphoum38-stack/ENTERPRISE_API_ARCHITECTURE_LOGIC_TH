@@ -12,6 +12,8 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from api_key_store import APIKeyStore, InMemoryAPIKeyStore, StoredAPIKey
+
 
 class APIKeyError(ValueError):
     pass
@@ -45,17 +47,34 @@ class APIKeyRecord:
         now = datetime.now(timezone.utc)
         return self.revoked_at is None and (self.expires_at is None or self.expires_at > now)
 
+    @classmethod
+    def from_stored(cls, stored: StoredAPIKey) -> "APIKeyRecord":
+        return cls(
+            stored.key_id,
+            stored.principal_id,
+            stored.fingerprint,
+            stored.scopes,
+            stored.created_at,
+            stored.expires_at,
+            stored.revoked_at,
+        )
+
 
 class APIKeyManager:
-    """In-memory lifecycle manager; persistence belongs to the canonical storage adapter."""
+    """API-key lifecycle manager backed by the canonical storage contract."""
 
     PREFIX = "ro_live_"
 
-    def __init__(self) -> None:
-        self._records: dict[str, APIKeyRecord] = {}
-        self._digests: dict[str, str] = {}
+    def __init__(self, store: APIKeyStore | None = None) -> None:
+        self._store = store or InMemoryAPIKeyStore()
 
-    def create(self, principal_id: str, scopes: set[str] | frozenset[str], *, expires_at: datetime | None = None) -> tuple[APIKeyRecord, str]:
+    def create(
+        self,
+        principal_id: str,
+        scopes: set[str] | frozenset[str],
+        *,
+        expires_at: datetime | None = None,
+    ) -> tuple[APIKeyRecord, str]:
         principal_id = principal_id.strip()
         if not principal_id:
             raise APIKeyError("principal_id is required")
@@ -65,40 +84,44 @@ class APIKeyManager:
         key_id = "key_" + secrets.token_hex(12)
         created = datetime.now(timezone.utc)
         fingerprint = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
-        record = APIKeyRecord(key_id, principal_id, fingerprint, frozenset(scopes), created, expires_at)
-        self._records[key_id] = record
-        self._digests[key_id] = _digest(raw)
-        return record, raw
+        stored = StoredAPIKey(
+            key_id,
+            principal_id,
+            fingerprint,
+            _digest(raw),
+            frozenset(scopes),
+            created,
+            expires_at,
+        )
+        self._store.put(stored)
+        return APIKeyRecord.from_stored(stored), raw
 
-    def verify(self, raw_key: str, *, required_scope: str | None = None, now: datetime | None = None) -> APIKeyRecord | None:
+    def verify(
+        self,
+        raw_key: str,
+        *,
+        required_scope: str | None = None,
+        now: datetime | None = None,
+    ) -> APIKeyRecord | None:
         if not raw_key.startswith(self.PREFIX):
             return None
         digest = _digest(raw_key)
         current = now or datetime.now(timezone.utc)
-        for key_id, stored in self._digests.items():
-            if hmac.compare_digest(digest, stored):
-                record = self._records[key_id]
-                if record.revoked_at is not None or (record.expires_at is not None and record.expires_at <= current):
-                    return None
-                if required_scope and required_scope not in record.scopes:
-                    return None
-                return record
-        return None
+        stored = self._store.find_by_digest(digest)
+        if stored is None or not hmac.compare_digest(digest, stored.digest):
+            return None
+        if stored.revoked_at is not None or (stored.expires_at is not None and stored.expires_at <= current):
+            return None
+        if required_scope and required_scope not in stored.scopes:
+            return None
+        return APIKeyRecord.from_stored(stored)
 
     def revoke(self, key_id: str, *, now: datetime | None = None) -> APIKeyRecord:
+        revoked = now or datetime.now(timezone.utc)
         try:
-            record = self._records[key_id]
+            return APIKeyRecord.from_stored(self._store.revoke(key_id, revoked))
         except KeyError as exc:
             raise APIKeyError("unknown key") from exc
-        if record.revoked_at is not None:
-            return record
-        revoked = now or datetime.now(timezone.utc)
-        updated = APIKeyRecord(record.key_id, record.principal_id, record.fingerprint, record.scopes, record.created_at, record.expires_at, revoked)
-        self._records[key_id] = updated
-        return updated
 
     def list(self, principal_id: str | None = None) -> tuple[APIKeyRecord, ...]:
-        values = tuple(self._records.values())
-        if principal_id is None:
-            return values
-        return tuple(record for record in values if record.principal_id == principal_id)
+        return tuple(APIKeyRecord.from_stored(item) for item in self._store.list(principal_id))
