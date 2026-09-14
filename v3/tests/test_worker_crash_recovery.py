@@ -29,6 +29,7 @@ class WorkerCrashRecoveryTests(unittest.TestCase):
                     "UPDATE research_queue SET lease_until=? WHERE task_id=?",
                     (expired, "task-1"),
                 )
+                db.commit()
 
             self.assertEqual(1, queue.recover_expired_leases())
 
@@ -59,6 +60,7 @@ class WorkerCrashRecoveryTests(unittest.TestCase):
                     "UPDATE research_queue SET lease_until=? WHERE task_id=?",
                     (expired, "task-1"),
                 )
+                db.commit()
 
             queue.recover_expired_leases()
             second = queue.claim(worker_id="worker-b", lease_seconds=30)
