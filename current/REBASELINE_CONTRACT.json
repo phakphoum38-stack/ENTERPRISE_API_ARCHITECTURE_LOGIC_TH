@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "contract": "RESEARCH_OS_REBASELINE",
+  "purpose": "Create a new verified generation from a verified state without rewriting historical truth.",
+  "required_inputs": [
+    "parent_generation_sha",
+    "successor_generation_sha",
+    "evidence_root",
+    "provenance_root",
+    "assurance_state",
+    "known_risks",
+    "lessons_learned",
+    "immutability_verified",
+    "verification_complete"
+  ],
+  "allowed_assurance_states": ["VERIFIED", "ASSURED", "CERTIFIED"],
+  "invariants": [
+    "parent_generation_is_immutable",
+    "prior_evidence_is_preserved",
+    "successor_sha_differs_from_parent",
+    "successor_verification_is_explicit",
+    "certification_is_not_inherited",
+    "rebaseline_does_not_mutate_git_refs",
+    "rebaseline_does_not_grant_authority"
+  ],
+  "failure_mode": "FAIL_CLOSED",
+  "authority": {
+    "engine_may_prepare_record": true,
+    "engine_may_grant_authority": false,
+    "engine_may_approve_certification": false,
+    "engine_may_merge": false,
+    "engine_may_rewrite_history": false
+  },
+  "lifecycle": [
+    "CURRENT_VERIFIED_GENERATION",
+    "FREEZE_PARENT",
+    "VERIFY_SUCCESSOR",
+    "RECORD_LINEAGE",
+    "NEXT_VERIFIED_GENERATION"
+  ]
+}
