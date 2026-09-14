@@ -26,15 +26,19 @@ class PolicyRule:
     def __post_init__(self) -> None:
         if not self.rule_id.strip():
             raise QuotaError("rule_id must not be empty")
+        if not isinstance(self.effect, PolicyEffect):
+            raise QuotaError("invalid policy effect")
+        if not (self.required_scopes or self.principal_types or self.dimensions):
+            raise QuotaError("policy rule must declare at least one constraint")
+        if any(not isinstance(scope, str) or not scope.strip() for scope in self.required_scopes):
+            raise QuotaError("policy scopes must be non-empty strings")
+        if any(not isinstance(principal, str) or not principal.strip() for principal in self.principal_types):
+            raise QuotaError("policy principal types must be non-empty strings")
         for dimension, limit in self.dimensions.items():
             if not isinstance(dimension, QuotaDimension):
                 raise QuotaError("invalid policy dimension")
             if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
                 raise QuotaError(f"invalid policy limit: {dimension.value}")
-        if any(not scope.strip() for scope in self.required_scopes):
-            raise QuotaError("policy scopes must not be empty")
-        if any(not principal.strip() for principal in self.principal_types):
-            raise QuotaError("policy principal types must not be empty")
 
 
 @dataclass(frozen=True)
@@ -44,10 +48,12 @@ class PolicyContext:
     principal_type: str = "user"
 
     def __post_init__(self) -> None:
-        if not self.principal_id.strip():
+        if not isinstance(self.principal_id, str) or not self.principal_id.strip():
             raise QuotaError("principal_id must not be empty")
-        if not self.principal_type.strip():
+        if not isinstance(self.principal_type, str) or not self.principal_type.strip():
             raise QuotaError("principal_type must not be empty")
+        if any(not isinstance(scope, str) or not scope.strip() for scope in self.scopes):
+            raise QuotaError("context scopes must be non-empty strings")
 
 
 @dataclass(frozen=True)
@@ -80,8 +86,6 @@ class PolicyEngine:
 
     def evaluate(self, context: PolicyContext, usage: Usage) -> PolicyDecision:
         for rule in self._rules:
-            if not (rule.required_scopes or rule.principal_types or rule.dimensions):
-                continue
             if rule.required_scopes and not rule.required_scopes.issubset(context.scopes):
                 continue
             if rule.principal_types and context.principal_type not in rule.principal_types:
