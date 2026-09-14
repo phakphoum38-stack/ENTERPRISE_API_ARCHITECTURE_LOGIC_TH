@@ -11,7 +11,7 @@ from decimal import Decimal
 from enum import Enum
 from threading import RLock
 
-from .resource_governance import QuotaError
+from resource_governance import QuotaError
 
 
 class BudgetDecision(str, Enum):
@@ -73,45 +73,20 @@ class BudgetLedger:
             self._limits[principal_id] = limit
             self._committed.setdefault(principal_id, Decimal("0"))
 
-    def evaluate(
-        self,
-        principal_id: str,
-        amount: Decimal,
-        *,
-        currency: str,
-        now: datetime | None = None,
-    ) -> BudgetDecisionRecord:
+    def evaluate(self, principal_id: str, amount: Decimal, *, currency: str, now: datetime | None = None) -> BudgetDecisionRecord:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         amount = self._validate_amount(amount)
         with self._lock:
             limit = self._limit(principal_id)
             self._validate_currency(limit, currency)
-            reserved = sum(
-                reservation.amount
-                for reservation in self._reservations.values()
-                if reservation.principal_id == principal_id
-            )
+            reserved = sum(r.amount for r in self._reservations.values() if r.principal_id == principal_id)
             committed = self._committed.get(principal_id, Decimal("0"))
             remaining = limit.amount - committed - reserved
             if amount > remaining:
-                return BudgetDecisionRecord(
-                    BudgetDecision.DENY, principal_id, limit.currency, amount,
-                    committed, reserved, max(Decimal("0"), remaining),
-                    "budget_exceeded", now,
-                )
-            return BudgetDecisionRecord(
-                BudgetDecision.ALLOW, principal_id, limit.currency, amount,
-                committed, reserved, remaining - amount, "within_budget", now,
-            )
+                return BudgetDecisionRecord(BudgetDecision.DENY, principal_id, limit.currency, amount, committed, reserved, max(Decimal("0"), remaining), "budget_exceeded", now)
+            return BudgetDecisionRecord(BudgetDecision.ALLOW, principal_id, limit.currency, amount, committed, reserved, remaining - amount, "within_budget", now)
 
-    def reserve(
-        self,
-        principal_id: str,
-        amount: Decimal,
-        *,
-        currency: str,
-        now: datetime | None = None,
-    ) -> BudgetDecisionRecord:
+    def reserve(self, principal_id: str, amount: Decimal, *, currency: str, now: datetime | None = None) -> BudgetDecisionRecord:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         with self._lock:
             decision = self.evaluate(principal_id, amount, currency=currency, now=now)
@@ -120,9 +95,7 @@ class BudgetLedger:
             self._sequence += 1
             reservation_id = f"bres_{self._sequence:08d}"
             amount = self._validate_amount(amount)
-            self._reservations[reservation_id] = BudgetReservation(
-                reservation_id, principal_id, amount, decision.currency, now
-            )
+            self._reservations[reservation_id] = BudgetReservation(reservation_id, principal_id, amount, decision.currency, now)
             return self.evaluate(principal_id, Decimal("0"), currency=currency, now=now)
 
     def commit(self, reservation_id: str, *, actual: Decimal | None = None) -> None:
@@ -147,18 +120,9 @@ class BudgetLedger:
     def snapshot(self, principal_id: str) -> dict[str, str]:
         with self._lock:
             limit = self._limit(principal_id)
-            reserved = sum(
-                r.amount for r in self._reservations.values() if r.principal_id == principal_id
-            )
+            reserved = sum(r.amount for r in self._reservations.values() if r.principal_id == principal_id)
             committed = self._committed.get(principal_id, Decimal("0"))
-            return {
-                "principal_id": principal_id,
-                "currency": limit.currency,
-                "limit": str(limit.amount),
-                "committed": str(committed),
-                "reserved": str(reserved),
-                "remaining": str(limit.amount - committed - reserved),
-            }
+            return {"principal_id": principal_id, "currency": limit.currency, "limit": str(limit.amount), "committed": str(committed), "reserved": str(reserved), "remaining": str(limit.amount - committed - reserved)}
 
     @staticmethod
     def _validate_amount(amount: Decimal) -> Decimal:
