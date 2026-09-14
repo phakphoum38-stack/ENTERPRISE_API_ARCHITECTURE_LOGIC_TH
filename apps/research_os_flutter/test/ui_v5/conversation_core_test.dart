@@ -5,11 +5,11 @@ import 'package:research_os_flutter/src/ui_v5/v5_capability.dart';
 class _FakeConversationBackend implements ResearchOSConversationBackend {
   _FakeConversationBackend({
     this.memoryResponse = const <String, dynamic>{'answer': 'memory answer'},
-    this.directResponse = const <String, dynamic>{'text': 'direct answer'},
   });
 
   final Map<String, dynamic> memoryResponse;
-  final Map<String, dynamic> directResponse;
+  final Map<String, dynamic> directResponse =
+      const <String, dynamic>{'text': 'direct answer'};
   final List<String> memoryPrompts = <String>[];
   final List<String> directPrompts = <String>[];
 
