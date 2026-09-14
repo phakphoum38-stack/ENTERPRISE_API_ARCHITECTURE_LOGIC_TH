@@ -14,7 +14,7 @@ class FriendWorkspace extends StatefulWidget {
 
 class _FriendWorkspaceState extends State<FriendWorkspace> {
   late final ResearchOSConversationController _conversation =
-      ResearchOSConversationController(apiClient: widget.apiClient)
+      ResearchOSConversationController.fromApiClient(apiClient: widget.apiClient)
         ..addListener(_onConversationChanged);
   final TextEditingController _composer = TextEditingController();
 
@@ -150,7 +150,6 @@ class _ConversationPanel extends StatelessWidget {
             child: controller.turns.isEmpty
                 ? const _WelcomeState()
                 : ListView.builder(
-                    reverse: false,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     itemCount: controller.turns.length,
                     itemBuilder: (context, index) {
@@ -177,10 +176,8 @@ class _ConversationPanel extends StatelessWidget {
                                 Wrap(
                                   spacing: 6,
                                   children: <Widget>[
-                                    if (turn.memoryHits > 0)
-                                      Chip(label: Text('Memory ${turn.memoryHits}')),
-                                    if (turn.evidenceIds.isNotEmpty)
-                                      Chip(label: Text('Evidence ${turn.evidenceIds.length}')),
+                                    if (turn.memoryHits > 0) Chip(label: Text('Memory ${turn.memoryHits}')),
+                                    if (turn.evidenceIds.isNotEmpty) Chip(label: Text('Evidence ${turn.evidenceIds.length}')),
                                   ],
                                 ),
                               ],
