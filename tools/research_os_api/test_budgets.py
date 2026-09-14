@@ -2,8 +2,8 @@
 from decimal import Decimal
 import unittest
 
-from .budgets import BudgetDecision, BudgetLedger, BudgetLimit
-from .resource_governance import QuotaError
+from budgets import BudgetDecision, BudgetLedger, BudgetLimit
+from resource_governance import QuotaError
 
 
 class BudgetLedgerTests(unittest.TestCase):
