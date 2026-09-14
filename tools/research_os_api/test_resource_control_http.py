@@ -4,7 +4,7 @@ import os
 import unittest
 
 from budgets import BudgetLimit
-from execution_contract import MeasuredExecution
+from execution_contract import ExecutionContext, MeasuredExecution
 from resource_control_http import HTTPPrincipal, ResourceControlHTTPAdapter
 from resource_control_plane import ResourceControlPlane
 from resource_governance import Entitlement, Limit, QuotaDimension, Usage, Window
@@ -79,10 +79,19 @@ class ResourceControlHTTPAdapterTests(unittest.TestCase):
                 "currency": "usd",
                 "scopes": ["agent:run"],
                 "available_providers": ["local"],
+                "requested_agent": "research",
             },
             self.principal,
-            lambda route: MeasuredExecution(
-                {"provider": route["provider"], "model": route["model"], "text": "ok"},
+            friend=lambda request: {"objective": request.objective},
+            brain=lambda request, friend_result: {"leaf_tasks": 1},
+            factory=lambda request, brain_result: {"plan": "http-test", "leaf_tasks": brain_result["leaf_tasks"]},
+            provider=lambda context, factory_result: {
+                "provider": context.provider,
+                "model": context.model,
+                "text": "ok",
+            },
+            measure=lambda value, context: MeasuredExecution(
+                value,
                 Usage(requests=1, concurrent_jobs=0),
                 Decimal("1.25"),
                 "USD",
