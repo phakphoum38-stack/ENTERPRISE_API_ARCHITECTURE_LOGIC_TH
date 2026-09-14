@@ -40,6 +40,7 @@ class UnifiedResourceExecutionPipelineTests(unittest.TestCase):
             estimated_cost=Decimal("1.00"),
             currency="USD",
             scopes=frozenset({"agent:run"}),
+            available_providers=("local",),
             requested_agent="research",
         )
 
@@ -85,6 +86,44 @@ class UnifiedResourceExecutionPipelineTests(unittest.TestCase):
         self.assertEqual(result.cost, Decimal("0.80"))
         self.assertEqual(len(self.plane.ledger()), 1)
         self.assertEqual(len(self.plane.evidence()), 1)
+
+    def test_denied_admission_blocks_all_execution_stages(self) -> None:
+        calls: list[str] = []
+        plane = ResourceControlPlane()
+        plane.register_principal(
+            "blocked-owner",
+            Entitlement(
+                "blocked",
+                scopes=frozenset({"agent:run"}),
+                limits=(Limit(QuotaDimension.REQUESTS, Window.HOUR, 0),),
+                max_concurrency=1,
+            ),
+            BudgetLimit("USD", Decimal("10.00")),
+        )
+        pipeline = UnifiedResourceExecutionPipeline(plane)
+        request = UnifiedExecutionRequest(
+            request_id="req-denied-before-execution",
+            principal_id="blocked-owner",
+            objective="must not execute",
+            usage=Usage(requests=1),
+            estimated_cost=Decimal("1.00"),
+            currency="USD",
+            scopes=frozenset({"agent:run"}),
+        )
+
+        result = pipeline.execute(
+            request,
+            friend=lambda _: calls.append("friend"),
+            brain=lambda _, __: calls.append("brain"),
+            factory=lambda _, __: calls.append("factory"),
+            provider=lambda _, __: calls.append("provider"),
+            measure=lambda _, __: calls.append("measure"),
+        )
+
+        self.assertFalse(result.admission.allowed)
+        self.assertEqual(calls, [])
+        self.assertEqual(len(plane.ledger()), 0)
+        self.assertEqual(len(plane.evidence()), 0)
 
     def test_missing_measurement_fails_closed_before_accounting(self) -> None:
         request = UnifiedExecutionRequest(

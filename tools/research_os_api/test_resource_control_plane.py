@@ -35,7 +35,7 @@ class ResourceControlPlaneTests(unittest.TestCase):
             request_id="req-1",
             principal_id="user-1",
             objective="research and summarize",
-            usage=Usage(requests=1, concurrent_jobs=1),
+            usage=Usage(requests=1, tokens=123, concurrent_jobs=1),
             estimated_cost=Decimal("2.00"),
             currency="USD",
             scopes=frozenset({"agent:run"}),
@@ -55,6 +55,58 @@ class ResourceControlPlaneTests(unittest.TestCase):
         self.assertEqual(len(self.plane.ledger()), 1)
         self.assertEqual(len(self.plane.evidence()), 1)
         self.assertEqual(self.plane.evidence()[0]["ledger_hash"], self.plane.ledger()[0].entry_hash)
+
+    def test_idempotency_prevents_duplicate_execution_while_first_is_reserved(self):
+        calls: list[str] = []
+
+        first = self.plane.execute(
+            request_id="req-idempotent-first",
+            principal_id="user-1",
+            objective="research and summarize",
+            usage=Usage(requests=1, concurrent_jobs=1),
+            estimated_cost=Decimal("1.00"),
+            currency="USD",
+            scopes=frozenset({"agent:run"}),
+            available_providers=("local",),
+            idempotency_key="same-operation",
+            executor=lambda route: (
+                calls.append("first"),
+                MeasuredExecution(
+                    {"provider": route["provider"], "model": route["model"], "text": "ok"},
+                    Usage(requests=1, concurrent_jobs=1),
+                    Decimal("0.50"),
+                    "USD",
+                ),
+            )[1],
+        )
+        self.assertEqual(first.admission.decision.value, "allow")
+
+        second = self.plane.execute(
+            request_id="req-idempotent-second",
+            principal_id="user-1",
+            objective="research and summarize",
+            usage=Usage(requests=1, concurrent_jobs=1),
+            estimated_cost=Decimal("1.00"),
+            currency="USD",
+            scopes=frozenset({"agent:run"}),
+            available_providers=("local",),
+            idempotency_key="same-operation",
+            executor=lambda route: (
+                calls.append("second"),
+                MeasuredExecution(
+                    {"provider": route["provider"], "model": route["model"], "text": "duplicate"},
+                    Usage(requests=1, concurrent_jobs=1),
+                    Decimal("0.50"),
+                    "USD",
+                ),
+            )[1],
+        )
+
+        self.assertEqual(second.admission.decision.value, "deny")
+        self.assertEqual(second.admission.reason, "idempotency_in_flight")
+        self.assertEqual(calls, ["first"])
+        self.assertEqual(len(self.plane.ledger()), 1)
+        self.assertEqual(len(self.plane.evidence()), 1)
 
     def test_execution_failure_releases_reservation_and_writes_no_ledger(self):
         with self.assertRaises(RuntimeError):
@@ -114,6 +166,7 @@ class ResourceControlPlaneTests(unittest.TestCase):
                 ),
             )
             self.assertTrue(result.ledger_entry)
+            self.assertEqual(result.evidence["cost"], Decimal("0.75"))
         ledger = self.plane.ledger()
         evidence = self.plane.evidence()
         self.assertEqual(ledger[0].previous_hash, "0" * 64)

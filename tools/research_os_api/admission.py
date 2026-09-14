@@ -123,8 +123,12 @@ class ResourceAdmissionGate:
                     reservation = self._reservations.get(prior_reservation_id)
                     if reservation is not None:
                         if reservation.status is AdmissionStatus.RESERVED:
-                            return self._allow_from_reservation(reservation, now)
-                        return self._allow_from_reservation(reservation, now)
+                            # A live reservation already belongs to another
+                            # execution attempt. Reusing it would allow two
+                            # callers to execute the same idempotent operation
+                            # concurrently and double-charge usage/cost.
+                            return self._deny(request, "idempotency_in_flight", now)
+                        return self._deny(request, f"idempotency_replay:{reservation.status.value}", now)
 
             try:
                 entitlement = self._governance.entitlement(request.principal_id)
@@ -255,7 +259,6 @@ class ResourceAdmissionGate:
     @staticmethod
     def _fingerprint(request: AdmissionRequest) -> str:
         payload = {
-            "request_id": request.request_id,
             "principal_id": request.principal_id,
             "usage": request.usage.__dict__,
             "estimated_cost": str(request.estimated_cost),
@@ -269,15 +272,6 @@ class ResourceAdmissionGate:
     def _deny(request: AdmissionRequest, reason: str, now: datetime) -> AdmissionRecord:
         return AdmissionRecord(AdmissionDecision.DENY, request.request_id, request.principal_id, reason, evaluated_at=now)
 
-    @staticmethod
-    def _allow_from_reservation(reservation: AdmissionReservation, now: datetime) -> AdmissionRecord:
-        return AdmissionRecord(
-            AdmissionDecision.ALLOW,
-            reservation.request_id,
-            reservation.principal_id,
-            reservation.status.value,
-            reservation.reservation_id,
-            reservation.quota_reservation_id,
-            reservation.budget_reservation_id,
-            now,
-        )
+
+if __name__ == "__main__":
+    raise SystemExit("admission.py is a library module; run its test suite instead")

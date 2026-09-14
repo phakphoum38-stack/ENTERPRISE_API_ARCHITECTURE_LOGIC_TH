@@ -8,11 +8,12 @@ other execution surfaces without creating a second quota/policy system.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from hashlib import sha256
 import json
+from enum import Enum
 from threading import RLock
 from typing import Any, Callable, Iterable
 
@@ -374,13 +375,23 @@ class ResourceControlPlane:
             self._ledger.append(entry)
             return entry
 
+    @staticmethod
+    def _json_default(value: Any) -> Any:
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, Enum):
+            return value.value
+        if is_dataclass(value):
+            return asdict(value)
+        raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
     def _record_evidence(self, **payload: Any) -> dict[str, Any]:
         with self._lock:
             record = dict(payload)
             record["sequence"] = len(self._evidence) + 1
             record["previous_hash"] = self._evidence_root
             record["recorded_at"] = datetime.now(timezone.utc).isoformat()
-            canonical = json.dumps(record, sort_keys=True, separators=(",", ":")).encode()
+            canonical = json.dumps(record, sort_keys=True, separators=(",", ":"), default=self._json_default).encode()
             record["evidence_hash"] = sha256(canonical).hexdigest()
             self._evidence_root = record["evidence_hash"]
             self._evidence.append(record)

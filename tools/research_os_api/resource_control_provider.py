@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Callable, Mapping
 
-from .execution_contract import ExecutionContext, MeasuredExecution
-from .resource_control_plane import ExecutionResult, ResourceControlPlane
-from .resource_governance import Usage
+from execution_contract import ExecutionContext, MeasuredExecution
+from resource_control_plane import ExecutionResult, ResourceControlPlane
+from resource_governance import Usage
 
 
 @dataclass(frozen=True)
@@ -49,9 +49,8 @@ class ProviderResourceControlAdapter:
         *,
         provider_execute: Callable[[ExecutionContext], object],
         measure: Callable[[object, ExecutionContext], MeasuredExecution],
-        metadata: Mapping[str, object] | None = None,
     ) -> ExecutionResult:
-        def run(route: Mapping[str, object], _request: object) -> MeasuredExecution:
+        def run(route: dict[str, object]) -> MeasuredExecution:
             context = ExecutionContext(
                 request_id=request.request_id,
                 principal_id=request.principal_id,
@@ -63,7 +62,16 @@ class ProviderResourceControlAdapter:
             measured = measure(raw, context)
             if not isinstance(measured, MeasuredExecution):
                 raise TypeError("provider measurement must return MeasuredExecution")
-            return measured
+            value = measured.value
+            if isinstance(value, dict):
+                value = {
+                    **value,
+                    "provider": value.get("provider") or context.provider,
+                    "model": value.get("model") or context.model,
+                }
+            else:
+                value = {"text": value, "provider": context.provider, "model": context.model}
+            return MeasuredExecution(value, measured.usage, measured.cost, measured.currency)
 
         return self.control_plane.execute(
             request_id=request.request_id,
@@ -73,5 +81,4 @@ class ProviderResourceControlAdapter:
             estimated_cost=request.estimated_cost,
             currency=request.currency,
             executor=run,
-            metadata={"provider_boundary": True, **dict(metadata or {})},
         )
