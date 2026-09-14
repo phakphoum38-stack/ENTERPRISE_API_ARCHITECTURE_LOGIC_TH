@@ -62,7 +62,16 @@ class ProviderResourceControlAdapter:
             measured = measure(raw, context)
             if not isinstance(measured, MeasuredExecution):
                 raise TypeError("provider measurement must return MeasuredExecution")
-            return measured
+            value = measured.value
+            if isinstance(value, dict):
+                value = {
+                    **value,
+                    "provider": value.get("provider") or context.provider,
+                    "model": value.get("model") or context.model,
+                }
+            else:
+                value = {"text": value, "provider": context.provider, "model": context.model}
+            return MeasuredExecution(value, measured.usage, measured.cost, measured.currency)
 
         return self.control_plane.execute(
             request_id=request.request_id,
