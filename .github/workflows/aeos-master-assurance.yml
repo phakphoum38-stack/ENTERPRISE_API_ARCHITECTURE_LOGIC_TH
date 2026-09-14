@@ -30,6 +30,7 @@ jobs:
       AEOS_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       AEOS_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
       AEOS_ASSURANCE_RUN_ID: aeos-${{ github.run_id }}-${{ github.run_attempt }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout exact revision
         uses: actions/checkout@v6
