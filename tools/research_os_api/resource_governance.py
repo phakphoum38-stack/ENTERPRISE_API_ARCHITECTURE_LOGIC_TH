@@ -1,6 +1,6 @@
 """Research OS resource governance primitives.
 
-This module is deliberately provider-agnostic and persistence-agnostic.  It is the
+This module is deliberately provider-agnostic and persistence-agnostic. It is the
 canonical policy/decision layer for API-key entitlements and quota accounting;
 HTTP handlers, databases, and provider adapters remain integration layers.
 """
@@ -47,8 +47,12 @@ class Limit:
     amount: int
 
     def __post_init__(self) -> None:
-        if self.amount < 0:
-            raise QuotaError("quota amount must be non-negative")
+        if not isinstance(self.dimension, QuotaDimension):
+            raise QuotaError("invalid quota dimension")
+        if not isinstance(self.window, Window):
+            raise QuotaError("invalid quota window")
+        if isinstance(self.amount, bool) or not isinstance(self.amount, int) or self.amount < 0:
+            raise QuotaError("quota amount must be a non-negative integer")
 
 
 @dataclass(frozen=True)
@@ -62,10 +66,18 @@ class Entitlement:
     def __post_init__(self) -> None:
         if not self.tier.strip():
             raise QuotaError("entitlement tier is required")
-        if self.priority < 0:
-            raise QuotaError("priority must be non-negative")
-        if self.max_concurrency < 1:
-            raise QuotaError("max_concurrency must be at least 1")
+        if any(not isinstance(scope, str) or not scope.strip() for scope in self.scopes):
+            raise QuotaError("entitlement scopes must be non-empty strings")
+        seen: set[tuple[QuotaDimension, Window]] = set()
+        for limit in self.limits:
+            key = (limit.dimension, limit.window)
+            if key in seen:
+                raise QuotaError(f"duplicate quota limit: {limit.dimension.value}:{limit.window.value}")
+            seen.add(key)
+        if isinstance(self.priority, bool) or not isinstance(self.priority, int) or self.priority < 0:
+            raise QuotaError("priority must be a non-negative integer")
+        if isinstance(self.max_concurrency, bool) or not isinstance(self.max_concurrency, int) or self.max_concurrency < 1:
+            raise QuotaError("max_concurrency must be a positive integer")
 
 
 @dataclass(frozen=True)
@@ -90,7 +102,7 @@ class Usage:
         }[dimension]
 
     def __post_init__(self) -> None:
-        if any(v < 0 for v in (
+        values = (
             self.requests,
             self.tokens,
             self.compute_units,
@@ -98,8 +110,9 @@ class Usage:
             self.workers,
             self.storage_bytes,
             self.bandwidth_bytes,
-        )):
-            raise QuotaError("usage values must be non-negative")
+        )
+        if any(isinstance(v, bool) or not isinstance(v, int) or v < 0 for v in values):
+            raise QuotaError("usage values must be non-negative integers")
 
 
 @dataclass(frozen=True)
@@ -158,6 +171,8 @@ class ResourceGovernance:
         if not principal_id:
             raise QuotaError("principal_id is required")
         with self._lock:
+            if principal_id in self._principals:
+                raise QuotaError("principal already registered")
             self._principals[principal_id] = _PrincipalState(entitlement=entitlement)
 
     def entitlement(self, principal_id: str) -> Entitlement:
@@ -208,6 +223,7 @@ class ResourceGovernance:
             if reservation.expires_at <= now:
                 raise QuotaError("reservation expired")
             usage = actual or reservation.usage
+            self._validate_actual_within_reservation(reservation.usage, usage)
             state = self._state(principal_id)
             for limit in state.entitlement.limits:
                 value = usage.value(limit.dimension)
@@ -232,6 +248,12 @@ class ResourceGovernance:
                 result[f"{limit.dimension.value}:{limit.window.value}:limit"] = limit.amount
                 result[f"{limit.dimension.value}:{limit.window.value}:used"] = state.usage.get(key, 0)
             return result
+
+    @staticmethod
+    def _validate_actual_within_reservation(reserved: Usage, actual: Usage) -> None:
+        for dimension in QuotaDimension:
+            if actual.value(dimension) > reserved.value(dimension):
+                raise QuotaError(f"actual usage exceeds reservation: {dimension.value}")
 
     def _state(self, principal_id: str) -> _PrincipalState:
         try:
