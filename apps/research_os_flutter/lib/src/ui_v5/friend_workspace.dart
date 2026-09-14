@@ -51,13 +51,15 @@ class _FriendWorkspaceState extends State<FriendWorkspace> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _send() async {
+  Future<void> _send({bool speakResponse = false}) async {
     final text = _composer.text.trim();
     if (text.isEmpty) return;
     _composer.clear();
     final friendTurn = await _conversation.sendText(text);
-    if (friendTurn != null && _voiceListening) {
+    if (friendTurn != null && speakResponse) {
+      _conversation.setState(ResearchOSConversationState.speaking);
       await _voice.speak(friendTurn.text);
+      _conversation.setState(ResearchOSConversationState.idle);
     }
   }
 
@@ -87,10 +89,10 @@ class _FriendWorkspaceState extends State<FriendWorkspace> {
           );
           if (isFinal) {
             _voiceListening = false;
-            _send();
+            _send(speakResponse: true);
           }
         },
-        onError: (message) {
+        onError: (_) {
           if (!mounted) return;
           setState(() => _voiceListening = false);
           _conversation.setState(ResearchOSConversationState.failed);
