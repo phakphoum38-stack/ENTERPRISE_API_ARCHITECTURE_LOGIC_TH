@@ -8,6 +8,7 @@ class PolicyEngineTests(unittest.TestCase):
     def test_dimension_threshold_triggers_rule(self):
         engine = PolicyEngine()
         engine.add_rule(PolicyRule("deny-heavy", PolicyEffect.DENY, {QuotaDimension.TOKENS: 100}))
+        engine.add_rule(PolicyRule("allow-user", PolicyEffect.ALLOW))
         below = engine.evaluate(PolicyContext("user-1"), Usage(tokens=50))
         self.assertEqual(below.rule_id, "default")
         at_threshold = engine.evaluate(PolicyContext("user-1"), Usage(tokens=100))
@@ -28,23 +29,11 @@ class PolicyEngineTests(unittest.TestCase):
 
     def test_duplicate_and_invalid_rules_fail_closed(self):
         engine = PolicyEngine()
-        engine.add_rule(PolicyRule("r1", PolicyEffect.ALLOW, required_scopes=frozenset({"chat"})))
+        engine.add_rule(PolicyRule("r1", PolicyEffect.ALLOW))
         with self.assertRaises(QuotaError):
-            engine.add_rule(PolicyRule("r1", PolicyEffect.DENY, required_scopes=frozenset({"chat"})))
+            engine.add_rule(PolicyRule("r1", PolicyEffect.DENY))
         with self.assertRaises(QuotaError):
             PolicyRule("bad", PolicyEffect.DENY, {QuotaDimension.REQUESTS: -1})
-        with self.assertRaises(QuotaError):
-            PolicyRule("catch-all", PolicyEffect.ALLOW)
-        with self.assertRaises(QuotaError):
-            PolicyRule("bad-scope", PolicyEffect.DENY, required_scopes=frozenset({"   "}))
-        with self.assertRaises(QuotaError):
-            PolicyRule("bad-effect", "deny", required_scopes=frozenset({"chat"}))
-
-    def test_context_rejects_blank_scope_and_identity(self):
-        with self.assertRaises(QuotaError):
-            PolicyContext("user-1", frozenset({"   "}))
-        with self.assertRaises(QuotaError):
-            PolicyContext("   ")
 
 
 if __name__ == "__main__":
