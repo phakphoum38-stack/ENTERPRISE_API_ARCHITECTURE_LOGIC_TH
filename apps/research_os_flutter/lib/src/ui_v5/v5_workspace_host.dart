@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../api/research_os_api_client.dart';
+import 'conversation_core.dart';
 import 'friend_workspace.dart';
 import 'v5_capability.dart';
 import 'v5_workspace_route.dart';
 
 /// Semantic host for V5 workspaces.
 ///
-/// AppShell can adopt this host incrementally. Unknown or not-yet-migrated
-/// workspaces remain explicit instead of silently falling back to an unrelated
-/// legacy page.
-class ResearchOSV5WorkspaceHost extends StatelessWidget {
+/// The host owns the Friend conversation controller so the conversation
+/// survives workspace changes while the host remains mounted. AppShell can
+/// adopt this host incrementally without moving conversation state into each
+/// individual workspace.
+class ResearchOSV5WorkspaceHost extends StatefulWidget {
   const ResearchOSV5WorkspaceHost({
     required this.apiClient,
     required this.level,
@@ -28,20 +30,39 @@ class ResearchOSV5WorkspaceHost extends StatelessWidget {
   )? childBuilder;
 
   @override
+  State<ResearchOSV5WorkspaceHost> createState() =>
+      _ResearchOSV5WorkspaceHostState();
+}
+
+class _ResearchOSV5WorkspaceHostState
+    extends State<ResearchOSV5WorkspaceHost> {
+  late final ResearchOSConversationController _conversation =
+      ResearchOSConversationController.fromApiClient(apiClient: widget.apiClient);
+
+  @override
+  void dispose() {
+    _conversation.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final routes = const ResearchOSWorkspaceRoutes();
-    final route = routes.forWorkspace(workspace);
+    final route = routes.forWorkspace(widget.workspace);
     final registry = const ResearchOSCapabilityRegistry();
 
-    if (!registry.canAccess(level, route.capability)) {
+    if (!registry.canAccess(widget.level, route.capability)) {
       return _V5AccessBoundary(route: route);
     }
 
-    if (workspace == ResearchOSWorkspace.friend) {
-      return FriendWorkspace(apiClient: apiClient);
+    if (widget.workspace == ResearchOSWorkspace.friend) {
+      return FriendWorkspace(
+        apiClient: widget.apiClient,
+        conversation: _conversation,
+      );
     }
 
-    final custom = childBuilder;
+    final custom = widget.childBuilder;
     if (custom != null) return custom(context, route);
 
     return _V5MigrationBoundary(route: route);
