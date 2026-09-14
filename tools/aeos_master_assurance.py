@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from umap_discovery import discover_all
+from tools.umap_discovery import discover_all
 
 ROOT = Path(__file__).resolve().parents[1]
 FAILURE_STATUSES = {"FAIL", "ERROR", "STALE", "INSUFFICIENT_EVIDENCE"}
@@ -194,7 +194,7 @@ def discover_controls() -> list[tuple[str, str, list[str], Path]]:
     test_dir=ROOT/"owner_special"/"tests"
     if test_dir.is_dir(): controls.append(("AEOS_REGRESSION","behavioral",[sys.executable,"-m","unittest","discover","-s",str(test_dir.relative_to(ROOT)),"-p","test_aeos_*.py","-v"],ROOT))
     v3_test_dir=ROOT/"v3"/"tests"; v3_package_dir=ROOT/"v3"
-    if v3_test_dir.is_dir() and (v3_package_dir/"research_os_v3").is_dir(): controls.append(("V3_REGRESSION","integration",[sys.executable,"-m","unittest","discover","-s","tests","-p","test_*.py","-v"],v3_package_dir))
+    if v3_test_dir.is_dir() and (v3_package_dir/"research_os_v3").is_dir(): controls.append(("V3_REGRESSION","integration",[sys.executable,"-m","unittest","discover","-s", "tests", "-p", "test_*.py", "-v"],v3_package_dir))
     return controls
 
 
