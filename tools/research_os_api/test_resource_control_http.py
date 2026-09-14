@@ -103,6 +103,111 @@ class ResourceControlHTTPAdapterTests(unittest.TestCase):
         self.assertEqual(len(self.plane.ledger()), 1)
         self.assertEqual(len(self.plane.evidence()), 1)
 
+    def test_execute_friend_uses_one_governance_boundary(self):
+        calls: list[str] = []
+
+        def friend(route: dict[str, object]) -> dict[str, object]:
+            calls.append("friend")
+            return {"provider": "owner-mock", "model": "friend-unified-master", "text": "ok"}
+
+        result = self.adapter.execute_friend(
+            {
+                "request_id": "req-friend",
+                "objective": "hello",
+                "usage": {"requests": 1},
+                "estimated_cost": "0.00",
+                "currency": "USD",
+                "scopes": ["agent:run"],
+                "available_providers": ["owner-mock"],
+                "idempotency_key": "friend-op-1",
+            },
+            self.principal,
+            friend_executor=friend,
+            measure=lambda value, route: MeasuredExecution(
+                value,
+                Usage(requests=1),
+                Decimal("0.00"),
+                "USD",
+            ),
+        )
+
+        self.assertTrue(result.admission.allowed)
+        self.assertEqual(calls, ["friend"])
+        self.assertEqual(result.provider, "owner-mock")
+        self.assertEqual(result.model, "friend-unified-master")
+        self.assertEqual(result.text, "ok")
+        self.assertEqual(result.usage, Usage(requests=1))
+        self.assertEqual(len(self.plane.ledger()), 1)
+        self.assertEqual(len(self.plane.evidence()), 1)
+
+    def test_execute_friend_denial_blocks_friend(self):
+        calls: list[str] = []
+        plane = ResourceControlPlane()
+        plane.register_principal(
+            "blocked-user",
+            Entitlement(
+                "blocked",
+                scopes=frozenset({"agent:run"}),
+                limits=(Limit(QuotaDimension.REQUESTS, Window.HOUR, 0),),
+                max_concurrency=1,
+            ),
+            BudgetLimit("USD", Decimal("10.00")),
+        )
+        adapter = ResourceControlHTTPAdapter(plane)
+        principal = HTTPPrincipal("blocked-user", frozenset({"agent:run"}))
+
+        result = adapter.execute_friend(
+            {
+                "request_id": "req-friend-denied",
+                "objective": "must not run",
+                "usage": {"requests": 1},
+                "estimated_cost": "0.00",
+                "currency": "USD",
+                "scopes": ["agent:run"],
+            },
+            principal,
+            friend_executor=lambda route: calls.append("friend"),
+            measure=lambda value, route: MeasuredExecution(value, Usage(requests=1), Decimal("0"), "USD"),
+        )
+
+        self.assertFalse(result.admission.allowed)
+        self.assertEqual(calls, [])
+        self.assertEqual(len(plane.ledger()), 0)
+        self.assertEqual(len(plane.evidence()), 0)
+
+    def test_execute_friend_idempotency_replay_executes_once(self):
+        calls: list[str] = []
+        body = {
+            "request_id": "req-first",
+            "objective": "once",
+            "usage": {"requests": 1},
+            "estimated_cost": "0.00",
+            "currency": "USD",
+            "scopes": ["agent:run"],
+            "idempotency_key": "same-operation",
+        }
+
+        first = self.adapter.execute_friend(
+            body,
+            self.principal,
+            friend_executor=lambda route: calls.append("friend") or {"provider": "owner-mock", "model": "friend", "text": "ok"},
+            measure=lambda value, route: MeasuredExecution(value, Usage(requests=1), Decimal("0"), "USD"),
+        )
+        replay_body = {**body, "request_id": "req-replay"}
+        replay = self.adapter.execute_friend(
+            replay_body,
+            self.principal,
+            friend_executor=lambda route: calls.append("replay") or {"provider": "owner-mock", "model": "friend", "text": "should-not-run"},
+            measure=lambda value, route: MeasuredExecution(value, Usage(requests=1), Decimal("0"), "USD"),
+        )
+
+        self.assertTrue(first.admission.allowed)
+        self.assertFalse(replay.admission.allowed)
+        self.assertEqual(replay.admission.reason, "idempotency_replay:committed")
+        self.assertEqual(calls, ["friend"])
+        self.assertEqual(len(self.plane.ledger()), 1)
+        self.assertEqual(len(self.plane.evidence()), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
