@@ -96,7 +96,7 @@ class EntitlementRegistry:
             if not restored.active(now):
                 raise QuotaError("cannot restore expired entitlement")
             self._bindings[principal_id] = restored
-            self._governance.register(principal_id, restored.entitlement)
+            self._governance.update_entitlement(principal_id, restored.entitlement)
             return restored
 
     def snapshot(self, principal_id: str, *, now: datetime | None = None) -> dict[str, object]:
