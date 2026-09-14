@@ -198,15 +198,7 @@ class ResourceControlPlane:
         actual_usage: Usage | None = None,
         actual_cost: Decimal | None = None,
     ) -> ExecutionResult:
-        """Route, execute, and atomically account measured execution.
-
-        A governed executor may return ``MeasuredExecution``. That result is
-        authoritative for post-execution usage/cost/currency and is validated
-        before any reservation is committed. Legacy callers may still supply
-        ``actual_usage``/``actual_cost`` explicitly; new runtime adapters
-        should return ``MeasuredExecution`` so measurement occurs inside the
-        governed execution boundary.
-        """
+        """Route, execute, and account measured execution."""
         governed = self.route(
             request_id=request_id,
             principal_id=principal_id,
@@ -374,13 +366,24 @@ class ResourceControlPlane:
             self._ledger.append(entry)
             return entry
 
+    @staticmethod
+    def _json_default(value: Any) -> Any:
+        if isinstance(value, Decimal):
+            return str(value)
+        raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
     def _record_evidence(self, **payload: Any) -> dict[str, Any]:
         with self._lock:
             record = dict(payload)
             record["sequence"] = len(self._evidence) + 1
             record["previous_hash"] = self._evidence_root
             record["recorded_at"] = datetime.now(timezone.utc).isoformat()
-            canonical = json.dumps(record, sort_keys=True, separators=(",", ":")).encode()
+            canonical = json.dumps(
+                record,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=self._json_default,
+            ).encode()
             record["evidence_hash"] = sha256(canonical).hexdigest()
             self._evidence_root = record["evidence_hash"]
             self._evidence.append(record)
