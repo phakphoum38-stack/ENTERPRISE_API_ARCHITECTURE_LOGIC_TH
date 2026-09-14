@@ -64,6 +64,14 @@ class ResourceGovernanceTests(unittest.TestCase):
         self.assertEqual(snapshot["requests:day:used"], 3)
         self.assertEqual(snapshot["tokens:day:used"], 250)
 
+    def test_commit_rejects_actual_usage_above_reservation(self) -> None:
+        engine = ResourceGovernance()
+        engine.register("user-1", entitlement())
+        result = engine.reserve("user-1", Usage(requests=2), now=NOW)
+        with self.assertRaisesRegex(QuotaError, "actual usage exceeds reservation: requests"):
+            engine.commit(result.reservation_id, actual=Usage(requests=3), now=NOW)
+        self.assertEqual(engine.evaluate("user-1", Usage(requests=8), now=NOW).decision, Decision.ALLOW)
+
     def test_release_returns_reserved_capacity(self) -> None:
         engine = ResourceGovernance()
         engine.register("user-1", entitlement())
@@ -89,9 +97,31 @@ class ResourceGovernanceTests(unittest.TestCase):
         later = NOW + timedelta(minutes=2)
         self.assertIs(engine.evaluate("user-1", Usage(requests=10), now=later).decision, Decision.ALLOW)
 
-    def test_rejects_negative_limit_and_unknown_principal(self) -> None:
+    def test_rejects_malformed_limits_and_duplicate_limits(self) -> None:
         with self.assertRaises(QuotaError):
             Limit(QuotaDimension.REQUESTS, Window.DAY, -1)
+        with self.assertRaises(QuotaError):
+            Limit(QuotaDimension.REQUESTS, Window.DAY, True)
+        with self.assertRaises(QuotaError):
+            Entitlement(
+                tier="developer",
+                limits=(
+                    Limit(QuotaDimension.REQUESTS, Window.DAY, 10),
+                    Limit(QuotaDimension.REQUESTS, Window.DAY, 20),
+                ),
+            )
+
+    def test_rejects_duplicate_principal_registration(self) -> None:
+        engine = ResourceGovernance()
+        engine.register("user-1", entitlement())
+        with self.assertRaisesRegex(QuotaError, "already registered"):
+            engine.register("user-1", entitlement())
+
+    def test_rejects_unknown_principal(self) -> None:
         engine = ResourceGovernance()
         with self.assertRaisesRegex(QuotaError, "unknown principal"):
             engine.evaluate("missing", Usage(requests=1), now=NOW)
+
+
+if __name__ == "__main__":
+    unittest.main()
