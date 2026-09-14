@@ -127,11 +127,8 @@ class APIKeyManager:
         current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         if record.revoked_at is not None or (record.expires_at is not None and record.expires_at <= current):
             raise APIKeyError("cannot rotate inactive key")
-        if expires_at is not None:
-            if expires_at.tzinfo is None:
-                raise APIKeyError("expires_at must be timezone-aware")
-            if expires_at.astimezone(timezone.utc) <= current:
-                raise APIKeyError("expires_at must be in the future")
+        if expires_at is not None and expires_at.astimezone(timezone.utc) <= current:
+            raise APIKeyError("expires_at must be in the future")
         self.revoke(key_id, now=current)
         return self.create(record.principal_id, record.scopes, expires_at=expires_at)
 
