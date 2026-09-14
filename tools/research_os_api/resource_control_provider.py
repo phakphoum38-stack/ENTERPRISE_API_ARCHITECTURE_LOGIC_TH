@@ -49,7 +49,6 @@ class ProviderResourceControlAdapter:
         *,
         provider_execute: Callable[[ExecutionContext], object],
         measure: Callable[[object, ExecutionContext], MeasuredExecution],
-        metadata: Mapping[str, object] | None = None,
     ) -> ExecutionResult:
         def run(route: Mapping[str, object], _request: object) -> MeasuredExecution:
             context = ExecutionContext(
@@ -73,5 +72,4 @@ class ProviderResourceControlAdapter:
             estimated_cost=request.estimated_cost,
             currency=request.currency,
             executor=run,
-            metadata={"provider_boundary": True, **dict(metadata or {})},
         )
