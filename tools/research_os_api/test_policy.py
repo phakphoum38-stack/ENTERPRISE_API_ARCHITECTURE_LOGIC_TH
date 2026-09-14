@@ -9,9 +9,9 @@ class PolicyEngineTests(unittest.TestCase):
         engine = PolicyEngine()
         engine.add_rule(PolicyRule("deny-heavy", PolicyEffect.DENY, {QuotaDimension.TOKENS: 100}))
         engine.add_rule(PolicyRule("allow-user", PolicyEffect.ALLOW))
-        below = engine.evaluate(PolicyContext("user-1"), Usage({QuotaDimension.TOKENS: 50}))
+        below = engine.evaluate(PolicyContext("user-1"), Usage(tokens=50))
         self.assertEqual(below.rule_id, "default")
-        at_threshold = engine.evaluate(PolicyContext("user-1"), Usage({QuotaDimension.TOKENS: 100}))
+        at_threshold = engine.evaluate(PolicyContext("user-1"), Usage(tokens=100))
         self.assertEqual(at_threshold.effect, PolicyEffect.DENY)
 
     def test_scope_and_principal_constraints(self):
