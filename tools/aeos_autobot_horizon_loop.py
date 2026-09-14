@@ -14,7 +14,6 @@ import hashlib
 import json
 from typing import Callable, Iterable, Mapping
 
-
 HORIZON = tuple(f"H{i:02d}" for i in range(28))
 
 
@@ -137,7 +136,8 @@ def run_horizon_loop(
 ) -> LoopResult:
     """Run H00-H27 as one causal repair batch until FINISHED or HARD_STOP.
 
-    ``apply_repair`` must return the new exact source SHA. The controller never
+    ``apply_repair`` must return the new exact source SHA. After every repair,
+    ``verify`` performs a fresh complete H00-H27 scan. The controller never
     performs git/ref/merge operations itself. Independent verification is a
     separate callable and must succeed before FINISHED is returned.
     """
@@ -189,6 +189,10 @@ def run_horizon_loop(
                 raise HorizonLoopError("IDENTITY_MISMATCH")
             if new_sha == current_sha:
                 raise HorizonLoopError("REPAIR_DID_NOT_CHANGE_IDENTITY")
+            post_repair_findings = _validate_horizon(verify(new_sha))
+            missing_post = set(HORIZON) - {item.horizon for item in post_repair_findings}
+            if missing_post:
+                raise HorizonLoopError("INCOMPLETE_POST_REPAIR_HORIZON")
             history.append(repair)
             current_sha = new_sha
         except HorizonLoopError as exc:
