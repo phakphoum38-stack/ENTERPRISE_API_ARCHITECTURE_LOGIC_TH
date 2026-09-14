@@ -49,7 +49,7 @@ def test_provider_requires_measured_execution() -> None:
         )
 
 
-def test_provider_measured_execution_is_returned() -> None:
+def test_provider_measured_execution_is_committed() -> None:
     adapter = _adapter()
     request = ProviderControlRequest(
         request_id="provider-2",
@@ -63,8 +63,8 @@ def test_provider_measured_execution_is_returned() -> None:
     )
     measured = MeasuredExecution(
         value="answer",
-        usage=Usage(requests=1, tokens=12),
-        cost=Decimal("0.12"),
+        usage=Usage(requests=1, tokens=8),
+        cost=Decimal("0.08"),
         currency="USD",
     )
 
@@ -74,9 +74,13 @@ def test_provider_measured_execution_is_returned() -> None:
         measure=lambda raw, context: measured,
     )
 
-    assert result is measured
+    assert result.text == "answer"
+    assert result.provider == "test-provider"
+    assert result.model == "test-model"
+    assert result.usage.tokens == 8
+    assert result.cost == Decimal("0.08")
     assert result.currency == "USD"
-    assert result.usage.tokens == 12
+    assert len(adapter.control_plane.ledger()) == 1
 
 
 def test_provider_measurement_failure_releases_control_plane_reservation() -> None:
