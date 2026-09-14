@@ -40,6 +40,7 @@ class UnifiedResourceExecutionPipelineTests(unittest.TestCase):
             estimated_cost=Decimal("1.00"),
             currency="USD",
             scopes=frozenset({"agent:run"}),
+            available_providers=("local",),
             requested_agent="research",
         )
 
