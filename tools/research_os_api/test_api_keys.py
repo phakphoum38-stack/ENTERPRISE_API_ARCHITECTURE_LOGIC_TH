@@ -49,9 +49,9 @@ class APIKeyLifecycleTests(unittest.TestCase):
 
     def test_rotate_rejects_expired_key(self) -> None:
         manager = APIKeyManager()
-        record, _ = manager.create("user-1", frozenset({"chat"}), expires_at=NOW - timedelta(seconds=1))
+        record, _ = manager.create("user-1", frozenset({"chat"}), expires_at=NOW + timedelta(seconds=1))
         with self.assertRaisesRegex(APIKeyError, "inactive"):
-            manager.rotate(record.key_id, now=NOW)
+            manager.rotate(record.key_id, now=NOW + timedelta(seconds=2))
 
 
 if __name__ == "__main__":
