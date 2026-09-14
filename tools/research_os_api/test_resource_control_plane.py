@@ -4,6 +4,7 @@ import os
 import unittest
 
 from budgets import BudgetLimit
+from execution_contract import MeasuredExecution
 from resource_control_plane import ResourceControlPlane
 from resource_governance import Entitlement, Limit, QuotaDimension, Usage, Window
 
@@ -29,7 +30,7 @@ class ResourceControlPlaneTests(unittest.TestCase):
         self.assertEqual(record.key_id, verified.key_id)
         self.assertEqual(verified.principal_id, "user-1")
 
-    def test_execute_is_one_control_plane_path(self):
+    def test_execute_commits_measured_execution(self):
         result = self.plane.execute(
             request_id="req-1",
             principal_id="user-1",
@@ -39,13 +40,18 @@ class ResourceControlPlaneTests(unittest.TestCase):
             currency="USD",
             scopes=frozenset({"agent:run"}),
             available_providers=("local",),
-            executor=lambda route: {"provider": route["provider"], "model": route["model"], "text": "ok"},
-            actual_usage=Usage(requests=1, concurrent_jobs=1),
-            actual_cost=Decimal("1.25"),
+            executor=lambda route: MeasuredExecution(
+                {"provider": route["provider"], "model": route["model"], "text": "ok"},
+                Usage(requests=1, tokens=123, concurrent_jobs=1),
+                Decimal("1.25"),
+                "usd",
+            ),
         )
         self.assertEqual(result.admission.decision.value, "allow")
         self.assertEqual(result.text, "ok")
+        self.assertEqual(result.usage, Usage(requests=1, tokens=123, concurrent_jobs=1))
         self.assertEqual(result.cost, Decimal("1.25"))
+        self.assertEqual(result.currency, "USD")
         self.assertEqual(len(self.plane.ledger()), 1)
         self.assertEqual(len(self.plane.evidence()), 1)
         self.assertEqual(self.plane.evidence()[0]["ledger_hash"], self.plane.ledger()[0].entry_hash)
@@ -67,6 +73,28 @@ class ResourceControlPlaneTests(unittest.TestCase):
         self.assertEqual(self.plane.evidence(), ())
         self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0.00")
 
+    def test_invalid_measured_currency_releases_reservation(self):
+        with self.assertRaises(ValueError):
+            self.plane.execute(
+                request_id="req-currency",
+                principal_id="user-1",
+                objective="research and summarize",
+                usage=Usage(requests=1, concurrent_jobs=1),
+                estimated_cost=Decimal("2.00"),
+                currency="USD",
+                scopes=frozenset({"agent:run"}),
+                available_providers=("local",),
+                executor=lambda route: MeasuredExecution(
+                    {"provider": route["provider"], "model": route["model"], "text": "bad"},
+                    Usage(requests=1, concurrent_jobs=1),
+                    Decimal("1.00"),
+                    "EUR",
+                ),
+            )
+        self.assertEqual(self.plane.ledger(), ())
+        self.assertEqual(self.plane.evidence(), ())
+        self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0.00")
+
     def test_evidence_and_ledger_form_hash_chains(self):
         for index in range(2):
             result = self.plane.execute(
@@ -78,7 +106,12 @@ class ResourceControlPlaneTests(unittest.TestCase):
                 currency="USD",
                 scopes=frozenset({"agent:run"}),
                 available_providers=("local",),
-                executor=lambda route: {"provider": route["provider"], "model": route["model"], "text": "ok"},
+                executor=lambda route: MeasuredExecution(
+                    {"provider": route["provider"], "model": route["model"], "text": "ok"},
+                    Usage(requests=1, concurrent_jobs=0),
+                    Decimal("0.75"),
+                    "USD",
+                ),
             )
             self.assertTrue(result.ledger_entry)
         ledger = self.plane.ledger()
