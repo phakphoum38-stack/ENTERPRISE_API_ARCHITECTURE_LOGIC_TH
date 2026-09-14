@@ -1,0 +1,28 @@
+{
+  "schema": "research-os-successor-handoff/v1",
+  "from_generation": "836229ed5337eca3a675ce1824e9386571a8bd01",
+  "protected_baseline_sha": "565ab068d5a1540ea799b594ff031ba003e068af",
+  "handoff_requires": [
+    "canonical_state",
+    "verified_truths",
+    "evidence_roots",
+    "open_risks",
+    "assumptions",
+    "unknowns",
+    "failure_knowledge",
+    "authority_boundaries",
+    "tooling_state",
+    "active_mission",
+    "next_permitted_action",
+    "forbidden_actions"
+  ],
+  "rules": {
+    "prior_generation_remains_immutable": true,
+    "successor_does_not_inherit_certification_automatically": true,
+    "successor_requires_context_recovery": true,
+    "successor_requires_reverification": true,
+    "handoff_must_include_open_risks": true,
+    "handoff_must_include_forbidden_actions": true
+  },
+  "status": "CONTRACT_ONLY_PENDING_EXECUTION_EVIDENCE"
+}
