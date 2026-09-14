@@ -40,8 +40,8 @@ class APIKeyLifecycleTests(unittest.TestCase):
 
     def test_rotate_revokes_old_key_and_issues_new_key(self) -> None:
         manager = APIKeyManager()
-        old_record, old_raw = manager.create("user-1", frozenset({"chat"}), expires_at=NOW + timedelta(days=1))
-        new_record, new_raw = manager.rotate(old_record.key_id, expires_at=NOW + timedelta(days=2), now=NOW)
+        old_record, old_raw = manager.create("user-1", frozenset({"chat"}), expires_at=datetime.now(timezone.utc) + timedelta(days=1))
+        new_record, new_raw = manager.rotate(old_record.key_id, expires_at=datetime.now(timezone.utc) + timedelta(days=2), now=datetime.now(timezone.utc))
         self.assertNotEqual(old_record.key_id, new_record.key_id)
         self.assertIsNone(manager.verify(old_raw, now=NOW))
         self.assertEqual(manager.verify(new_raw, required_scope="chat", now=NOW), new_record)
@@ -49,9 +49,10 @@ class APIKeyLifecycleTests(unittest.TestCase):
 
     def test_rotate_rejects_expired_key(self) -> None:
         manager = APIKeyManager()
-        record, _ = manager.create("user-1", frozenset({"chat"}), expires_at=NOW + timedelta(seconds=1))
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=1)
+        record, _ = manager.create("user-1", frozenset({"chat"}), expires_at=expires_at)
         with self.assertRaisesRegex(APIKeyError, "inactive"):
-            manager.rotate(record.key_id, now=NOW + timedelta(seconds=2))
+            manager.rotate(record.key_id, now=expires_at + timedelta(seconds=1))
 
 
 if __name__ == "__main__":
