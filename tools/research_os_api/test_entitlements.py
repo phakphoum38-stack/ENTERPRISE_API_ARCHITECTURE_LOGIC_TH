@@ -2,8 +2,8 @@
 from datetime import datetime, timedelta, timezone
 import unittest
 
-from .entitlements import EntitlementRegistry, EntitlementState, PrincipalBinding
-from .resource_governance import Entitlement, Limit, QuotaDimension, QuotaError, Window
+from entitlements import EntitlementRegistry, EntitlementState, PrincipalBinding
+from resource_governance import Entitlement, Limit, QuotaDimension, QuotaError, Window
 
 
 class EntitlementRegistryTests(unittest.TestCase):
