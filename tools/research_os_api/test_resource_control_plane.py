@@ -71,7 +71,7 @@ class ResourceControlPlaneTests(unittest.TestCase):
             )
         self.assertEqual(self.plane.ledger(), ())
         self.assertEqual(self.plane.evidence(), ())
-        self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0.00")
+        self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0")
 
     def test_invalid_measured_currency_releases_reservation(self):
         with self.assertRaises(ValueError):
@@ -93,7 +93,7 @@ class ResourceControlPlaneTests(unittest.TestCase):
             )
         self.assertEqual(self.plane.ledger(), ())
         self.assertEqual(self.plane.evidence(), ())
-        self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0.00")
+        self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0")
 
     def test_evidence_and_ledger_form_hash_chains(self):
         for index in range(2):
