@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Callable, Mapping
 
 from .execution_contract import ExecutionContext, MeasuredExecution
-from .resource_control_plane import ResourceControlPlane
+from .resource_control_plane import ExecutionResult, ResourceControlPlane
 from .resource_governance import Usage
 
 
@@ -16,7 +17,7 @@ class ProviderControlRequest:
     provider: str
     model: str
     estimated_usage: Usage
-    estimated_cost: object
+    estimated_cost: Decimal
     currency: str
 
     def __post_init__(self) -> None:
@@ -30,6 +31,8 @@ class ProviderControlRequest:
             raise ValueError("provider is required")
         if not self.model.strip():
             raise ValueError("model is required")
+        if self.estimated_cost < 0:
+            raise ValueError("estimated_cost cannot be negative")
         if not self.currency.strip():
             raise ValueError("currency is required")
 
@@ -47,8 +50,8 @@ class ProviderResourceControlAdapter:
         provider_execute: Callable[[ExecutionContext], object],
         measure: Callable[[object, ExecutionContext], MeasuredExecution],
         metadata: Mapping[str, object] | None = None,
-    ) -> MeasuredExecution:
-        def run(route: Mapping[str, object], _request: object) -> object:
+    ) -> ExecutionResult:
+        def run(route: Mapping[str, object], _request: object) -> MeasuredExecution:
             context = ExecutionContext(
                 request_id=request.request_id,
                 principal_id=request.principal_id,
@@ -62,7 +65,7 @@ class ProviderResourceControlAdapter:
                 raise TypeError("provider measurement must return MeasuredExecution")
             return measured
 
-        result = self.control_plane.execute(
+        return self.control_plane.execute(
             request_id=request.request_id,
             principal_id=request.principal_id,
             objective=request.objective,
@@ -72,6 +75,3 @@ class ProviderResourceControlAdapter:
             executor=run,
             metadata={"provider_boundary": True, **dict(metadata or {})},
         )
-        if not isinstance(result, MeasuredExecution):
-            raise TypeError("provider execution must resolve to MeasuredExecution")
-        return result
