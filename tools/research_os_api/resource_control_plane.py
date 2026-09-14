@@ -8,7 +8,7 @@ other execution surfaces without creating a second quota/policy system.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from hashlib import sha256
@@ -17,10 +17,11 @@ from threading import RLock
 from typing import Any, Callable, Iterable
 
 from api_keys import APIKeyManager, APIKeyRecord
-from admission import AdmissionDecision, AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
+from admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
 from agent_platform import AgentRouter
 from budgets import BudgetLedger, BudgetLimit
 from controlled_router import GovernedAgentRouter, GovernedRoute
+from execution_contract import MeasuredExecution
 from policy import PolicyEngine, PolicyRule
 from resource_governance import Entitlement, ResourceGovernance, Usage
 
@@ -88,12 +89,7 @@ class ResourceControlPlane:
         self._evidence_root = "0" * 64
         self._lock = RLock()
 
-    def register_principal(
-        self,
-        principal_id: str,
-        entitlement: Entitlement,
-        budget: BudgetLimit,
-    ) -> None:
+    def register_principal(self, principal_id: str, entitlement: Entitlement, budget: BudgetLimit) -> None:
         principal_id = principal_id.strip()
         if not principal_id:
             raise ValueError("principal_id is required")
@@ -202,10 +198,14 @@ class ResourceControlPlane:
         actual_usage: Usage | None = None,
         actual_cost: Decimal | None = None,
     ) -> ExecutionResult:
-        """Route, execute, commit actual usage/cost, and append evidence.
+        """Route, execute, and atomically account measured execution.
 
-        The executor receives only the governed route. If execution raises,
-        the reservation is released and no committed ledger entry is written.
+        A governed executor may return ``MeasuredExecution``. That result is
+        authoritative for post-execution usage/cost/currency and is validated
+        before any reservation is committed. Legacy callers may still supply
+        ``actual_usage``/``actual_cost`` explicitly; new runtime adapters
+        should return ``MeasuredExecution`` so measurement occurs inside the
+        governed execution boundary.
         """
         governed = self.route(
             request_id=request_id,
@@ -227,19 +227,29 @@ class ResourceControlPlane:
         reservation_id = governed.admission.reservation_id
         try:
             value = executor(governed.route or {})
-            actual = actual_usage or usage
-            cost = estimated_cost if actual_cost is None else actual_cost
-            committed = self.router.commit(reservation_id, actual_usage=actual, actual_cost=cost)
-            provider, model, text = self._normalize_execution(value, governed.route)
+            measured, execution_value = self._resolve_measurement(
+                value,
+                admission_currency=currency,
+                estimated_usage=usage,
+                estimated_cost=estimated_cost,
+                actual_usage=actual_usage,
+                actual_cost=actual_cost,
+            )
+            provider, model, text = self._normalize_execution(execution_value, governed.route)
+            committed = self.router.commit(
+                reservation_id,
+                actual_usage=measured.usage,
+                actual_cost=measured.cost,
+            )
             entry = self._record_usage(
                 request_id=request_id,
                 principal_id=principal_id,
                 admission_id=reservation_id,
                 provider=provider,
                 model=model,
-                usage=actual,
-                cost=cost,
-                currency=currency,
+                usage=measured.usage,
+                cost=measured.cost,
+                currency=measured.currency,
                 status=committed.status.value,
             )
             evidence = self._record_evidence(
@@ -248,9 +258,9 @@ class ResourceControlPlane:
                 admission_id=reservation_id,
                 provider=provider,
                 model=model,
-                usage=actual,
-                cost=cost,
-                currency=currency,
+                usage=measured.usage,
+                cost=measured.cost,
+                currency=measured.currency,
                 ledger_hash=entry.entry_hash,
             )
             return ExecutionResult(
@@ -260,15 +270,39 @@ class ResourceControlPlane:
                 provider,
                 model,
                 text,
-                actual,
-                cost,
-                currency.strip().upper(),
+                measured.usage,
+                measured.cost,
+                measured.currency,
                 entry,
                 evidence,
             )
         except Exception:
             self.router.release(reservation_id)
             raise
+
+    @staticmethod
+    def _resolve_measurement(
+        value: Any,
+        *,
+        admission_currency: str,
+        estimated_usage: Usage,
+        estimated_cost: Decimal,
+        actual_usage: Usage | None,
+        actual_cost: Decimal | None,
+    ) -> tuple[MeasuredExecution, Any]:
+        if isinstance(value, MeasuredExecution):
+            expected = admission_currency.strip().upper()
+            if value.currency != expected:
+                raise ValueError("measured execution currency does not match admission currency")
+            if actual_usage is not None and actual_usage != value.usage:
+                raise ValueError("explicit actual_usage conflicts with measured execution")
+            if actual_cost is not None and actual_cost != value.cost:
+                raise ValueError("explicit actual_cost conflicts with measured execution")
+            return value, value.value
+
+        resolved_usage = actual_usage or estimated_usage
+        resolved_cost = estimated_cost if actual_cost is None else actual_cost
+        return MeasuredExecution(value, resolved_usage, resolved_cost, admission_currency), value
 
     def release(self, reservation_id: str):
         return self.router.release(reservation_id)
