@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from threading import RLock
 
-from .resource_governance import Entitlement, QuotaError, ResourceGovernance
+from resource_governance import Entitlement, QuotaError, ResourceGovernance
 
 
 class EntitlementState(str, Enum):
@@ -69,13 +69,7 @@ class EntitlementRegistry:
                 raise QuotaError("principal entitlement is inactive")
             return binding
 
-    def authorize_scope(
-        self,
-        principal_id: str,
-        required_scope: str,
-        *,
-        now: datetime | None = None,
-    ) -> PrincipalBinding:
+    def authorize_scope(self, principal_id: str, required_scope: str, *, now: datetime | None = None) -> PrincipalBinding:
         required_scope = required_scope.strip()
         if not required_scope:
             raise QuotaError("required_scope is required")
