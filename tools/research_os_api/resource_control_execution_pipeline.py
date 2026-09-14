@@ -14,11 +14,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable, Mapping
+from typing import Any, Callable
 
-from .execution_contract import ExecutionContext, MeasuredExecution
-from .resource_control_plane import ExecutionResult, ResourceControlPlane
-from .resource_governance import Usage
+from execution_contract import ExecutionContext, MeasuredExecution
+from resource_control_plane import ExecutionResult, ResourceControlPlane
+from resource_governance import Usage
 
 
 @dataclass(frozen=True)
@@ -45,14 +45,6 @@ class UnifiedExecutionRequest:
             raise ValueError("estimated_cost cannot be negative")
         if not self.currency.strip():
             raise ValueError("currency is required")
-
-
-@dataclass(frozen=True)
-class UnifiedExecutionContext:
-    request: UnifiedExecutionRequest
-    friend: Any
-    brain: Any
-    factory: Any
 
 
 FriendStage = Callable[[UnifiedExecutionRequest], Any]
@@ -82,23 +74,14 @@ class UnifiedResourceExecutionPipeline:
         friend_result = friend(request)
         brain_result = brain(request, friend_result)
         factory_result = factory(request, brain_result)
-        context_holder: dict[str, UnifiedExecutionContext] = {}
 
         def governed_executor(route: dict[str, Any]) -> MeasuredExecution:
-            provider_name = str(route.get("provider") or "unknown")
-            model_name = str(route.get("model") or "unknown")
             execution_context = ExecutionContext(
                 request_id=request.request_id,
                 principal_id=request.principal_id,
-                provider=provider_name,
-                model=model_name,
+                provider=str(route.get("provider") or "unknown"),
+                model=str(route.get("model") or "unknown"),
                 route=dict(route),
-            )
-            context_holder["value"] = UnifiedExecutionContext(
-                request=request,
-                friend=friend_result,
-                brain=brain_result,
-                factory=factory_result,
             )
             raw = provider(execution_context, factory_result)
             measured = measure(raw, execution_context)
