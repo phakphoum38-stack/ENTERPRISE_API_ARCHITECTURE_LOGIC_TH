@@ -35,7 +35,7 @@ class ResourceControlPlaneTests(unittest.TestCase):
             request_id="req-1",
             principal_id="user-1",
             objective="research and summarize",
-            usage=Usage(requests=1, concurrent_jobs=1),
+            usage=Usage(requests=1, tokens=123, concurrent_jobs=1),
             estimated_cost=Decimal("2.00"),
             currency="USD",
             scopes=frozenset({"agent:run"}),
@@ -114,6 +114,7 @@ class ResourceControlPlaneTests(unittest.TestCase):
                 ),
             )
             self.assertTrue(result.ledger_entry)
+            self.assertEqual(result.evidence["cost"], Decimal("0.75"))
         ledger = self.plane.ledger()
         evidence = self.plane.evidence()
         self.assertEqual(ledger[0].previous_hash, "0" * 64)
