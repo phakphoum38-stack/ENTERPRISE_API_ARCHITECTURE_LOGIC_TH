@@ -255,7 +255,14 @@ def discover_controls() -> list[tuple[str, str, list[str], Path]]:
     expected = os.environ.get("AEOS_EXPECTED_SHA", "").strip()
     if expected:
         controls.append(("IDENTITY_SHA", "identity", [sys.executable, "-c", f"import subprocess; actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); expected={expected!r}; print(actual); assert actual == expected, f'expected {{expected}}, got {{actual}}'"], ROOT))
-    compile_paths = [p for p in (ROOT / "owner_special", ROOT / "tools") if p.exists()]
+    compile_paths = [
+        ROOT / "tools",
+        ROOT / "owner_special" / "research_os_friend",
+        ROOT / "owner_special" / "tests",
+        ROOT / "owner_special" / "windows_service",
+        ROOT / "v3",
+    ]
+    compile_paths = [p for p in compile_paths if p.exists()]
     if compile_paths:
         controls.append(("PYTHON_COMPILE", "static", [sys.executable, "-m", "compileall", "-q", *(str(p.relative_to(ROOT)) for p in compile_paths)], ROOT))
     validator_candidates = [ROOT / "tools" / "validate_aeos_source_checks.py", ROOT / "tools" / "validate_aeos_assurance_checks.py", ROOT / "tools" / "validate_provenance_evidence.py"]
