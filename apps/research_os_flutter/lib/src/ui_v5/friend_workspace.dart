@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../api/research_os_api_client.dart';
+import '../features/chat/voice_conversation_controller.dart';
 import 'conversation_core.dart';
 
 class FriendWorkspace extends StatefulWidget {
-  const FriendWorkspace({required this.apiClient, super.key});
+  const FriendWorkspace({
+    required this.apiClient,
+    this.conversation,
+    super.key,
+  });
 
   final ResearchOSApiClient apiClient;
+  final ResearchOSConversationController? conversation;
 
   @override
   State<FriendWorkspace> createState() => _FriendWorkspaceState();
@@ -14,15 +20,29 @@ class FriendWorkspace extends StatefulWidget {
 
 class _FriendWorkspaceState extends State<FriendWorkspace> {
   late final ResearchOSConversationController _conversation =
-      ResearchOSConversationController.fromApiClient(apiClient: widget.apiClient)
-        ..addListener(_onConversationChanged);
+      widget.conversation ??
+          ResearchOSConversationController.fromApiClient(
+            apiClient: widget.apiClient,
+          );
+  late final bool _ownsConversation = widget.conversation == null;
+  late final VoiceConversationController _voice = VoiceConversationController();
   final TextEditingController _composer = TextEditingController();
+
+  bool _voiceReady = false;
+  bool _voiceInitializing = false;
+  bool _voiceListening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _conversation.addListener(_onConversationChanged);
+  }
 
   @override
   void dispose() {
-    _conversation
-      ..removeListener(_onConversationChanged)
-      ..dispose();
+    _conversation.removeListener(_onConversationChanged);
+    if (_ownsConversation) _conversation.dispose();
+    _voice.dispose();
     _composer.dispose();
     super.dispose();
   }
@@ -35,7 +55,68 @@ class _FriendWorkspaceState extends State<FriendWorkspace> {
     final text = _composer.text.trim();
     if (text.isEmpty) return;
     _composer.clear();
-    await _conversation.sendText(text);
+    final friendTurn = await _conversation.sendText(text);
+    if (friendTurn != null && _voiceListening) {
+      await _voice.speak(friendTurn.text);
+    }
+  }
+
+  Future<void> _toggleVoice() async {
+    if (_voiceInitializing) return;
+
+    if (_voiceListening) {
+      await _voice.stopListening();
+      if (mounted) setState(() => _voiceListening = false);
+      return;
+    }
+
+    if (!_voiceReady) {
+      _voiceInitializing = true;
+      if (mounted) setState(() {});
+      final ready = await _voice.initialize(
+        onResult: (text, isFinal) {
+          if (!mounted) return;
+          setState(() {
+            _composer.text = text;
+            _composer.selection = TextSelection.collapsed(offset: text.length);
+          });
+          _conversation.setState(
+            isFinal
+                ? ResearchOSConversationState.understanding
+                : ResearchOSConversationState.listening,
+          );
+          if (isFinal) {
+            _voiceListening = false;
+            _send();
+          }
+        },
+        onError: (message) {
+          if (!mounted) return;
+          setState(() => _voiceListening = false);
+          _conversation.setState(ResearchOSConversationState.failed);
+        },
+        onStatus: (status) {
+          if (!mounted) return;
+          if (status == 'done' || status == 'notListening') {
+            setState(() => _voiceListening = false);
+          }
+        },
+      );
+      _voiceInitializing = false;
+      _voiceReady = ready;
+      if (!ready) {
+        if (mounted) setState(() {});
+        return;
+      }
+    }
+
+    final started = await _voice.startListening();
+    if (mounted) {
+      setState(() => _voiceListening = started);
+      if (started) {
+        _conversation.setState(ResearchOSConversationState.listening);
+      }
+    }
   }
 
   @override
@@ -51,6 +132,9 @@ class _FriendWorkspaceState extends State<FriendWorkspace> {
               controller: _conversation,
               composer: _composer,
               onSend: _send,
+              onVoice: _toggleVoice,
+              voiceListening: _voiceListening,
+              voiceInitializing: _voiceInitializing,
             );
             if (compact) {
               return Column(
@@ -105,11 +189,17 @@ class _ConversationPanel extends StatelessWidget {
     required this.controller,
     required this.composer,
     required this.onSend,
+    required this.onVoice,
+    required this.voiceListening,
+    required this.voiceInitializing,
   });
 
   final ResearchOSConversationController controller;
   final TextEditingController composer;
   final VoidCallback onSend;
+  final Future<void> Function() onVoice;
+  final bool voiceListening;
+  final bool voiceInitializing;
 
   String _stateLabel(ResearchOSConversationState state) => switch (state) {
         ResearchOSConversationState.idle => 'พร้อมสนทนา',
@@ -201,8 +291,13 @@ class _ConversationPanel extends StatelessWidget {
           _Composer(
             controller: composer,
             enabled: controller.state == ResearchOSConversationState.idle ||
-                controller.state == ResearchOSConversationState.failed,
+                controller.state == ResearchOSConversationState.failed ||
+                controller.state == ResearchOSConversationState.listening ||
+                controller.state == ResearchOSConversationState.understanding,
             onSend: onSend,
+            onVoice: onVoice,
+            voiceListening: voiceListening,
+            voiceInitializing: voiceInitializing,
           ),
         ],
       ),
@@ -265,11 +360,21 @@ class _PromptChip extends StatelessWidget {
 }
 
 class _Composer extends StatelessWidget {
-  const _Composer({required this.controller, required this.enabled, required this.onSend});
+  const _Composer({
+    required this.controller,
+    required this.enabled,
+    required this.onSend,
+    required this.onVoice,
+    required this.voiceListening,
+    required this.voiceInitializing,
+  });
 
   final TextEditingController controller;
   final bool enabled;
   final VoidCallback onSend;
+  final Future<void> Function() onVoice;
+  final bool voiceListening;
+  final bool voiceInitializing;
 
   @override
   Widget build(BuildContext context) => TextField(
@@ -280,13 +385,26 @@ class _Composer extends StatelessWidget {
         textInputAction: TextInputAction.newline,
         onSubmitted: (_) => onSend(),
         decoration: InputDecoration(
-          hintText: 'บอก Friend ว่าต้องการทำอะไร…',
-          prefixIcon: const Icon(Icons.chat_bubble_outline),
-          suffixIcon: IconButton(
-            tooltip: 'ส่ง',
-            onPressed: enabled ? onSend : null,
-            icon: const Icon(Icons.arrow_upward_rounded),
+          hintText: voiceListening ? 'กำลังฟังคุณอยู่…' : 'บอก Friend ว่าต้องการทำอะไร…',
+          prefixIcon: IconButton(
+            tooltip: voiceListening ? 'หยุดฟัง' : 'คุยด้วยเสียง',
+            onPressed: enabled ? onVoice : null,
+            icon: Icon(voiceListening ? Icons.stop_circle_outlined : Icons.mic_none_rounded),
           ),
+          suffixIcon: voiceInitializing
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : IconButton(
+                  tooltip: 'ส่ง',
+                  onPressed: enabled ? onSend : null,
+                  icon: const Icon(Icons.arrow_upward_rounded),
+                ),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
         ),
       );
