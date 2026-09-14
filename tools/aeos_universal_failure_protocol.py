@@ -42,8 +42,6 @@ class FailureRecord:
             raise UniversalFailureError("IDENTITY_MISMATCH")
         if self.source_sha != expected_source_sha:
             raise UniversalFailureError("STALE_FAILURE_SOURCE")
-        if self.status != "PASS" and not self.root_cause:
-            raise UniversalFailureError("ROOT_CAUSE_UNKNOWN")
 
     @property
     def fingerprint(self) -> str:
@@ -58,6 +56,7 @@ class FailureRecord:
 
 
 def normalize_failures(records: Iterable[FailureRecord], source_sha: str) -> tuple[FailureRecord, ...]:
+    """Normalize identity/evidence first; root-cause analysis happens next."""
     items = tuple(records)
     for record in items:
         record.validate(source_sha)
@@ -65,12 +64,14 @@ def normalize_failures(records: Iterable[FailureRecord], source_sha: str) -> tup
 
 
 def collapse_failures(records: Iterable[FailureRecord], source_sha: str) -> dict[str, tuple[FailureRecord, ...]]:
+    """Collapse only after root-cause analysis; unknown roots fail closed."""
     items = normalize_failures(records, source_sha)
     groups: dict[str, list[FailureRecord]] = {}
     for record in items:
         if record.status == "PASS":
             continue
-        assert record.root_cause is not None
+        if not record.root_cause:
+            raise UniversalFailureError("ROOT_CAUSE_UNKNOWN")
         groups.setdefault(record.root_cause, []).append(record)
     return {root: tuple(groups[root]) for root in sorted(groups)}
 
