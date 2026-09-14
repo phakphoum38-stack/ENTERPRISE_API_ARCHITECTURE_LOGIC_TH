@@ -8,6 +8,9 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+_TEST_DATA_DIR = tempfile.mkdtemp(prefix="research-os-cloud-test-")
+os.environ["RESEARCH_OS_DATA_DIR"] = _TEST_DATA_DIR
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "research_os_api"))
 
