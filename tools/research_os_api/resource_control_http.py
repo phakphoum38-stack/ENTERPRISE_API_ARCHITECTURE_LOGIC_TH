@@ -1,15 +1,21 @@
-"""HTTP boundary for the canonical Friend -> Brain -> Factory -> Provider path.
+"""HTTP boundary for the canonical governed execution paths.
 
-HTTP is transport only. Identity is already authenticated by the canonical
-session/API-key layer; ResourceControlPlane remains the single authority for
-admission, routing, execution accounting, and evidence.
+HTTP is transport only. Identity is authenticated by the canonical session/API-key
+layer; ResourceControlPlane remains the single authority for admission, routing,
+execution accounting, and evidence.
+
+The HTTP adapter supports two deliberate execution shapes:
+- UnifiedResourceExecutionPipeline for genuinely separate Friend -> Brain -> Factory -> Provider stages.
+- FriendResourceControlAdapter for the production Friend runtime, where Friend already owns
+  Brain/skills/tools/Factory/Provider orchestration and must not be decomposed and executed twice.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
+from execution_contract import MeasuredExecution
 from resource_control_execution_pipeline import (
     BrainStage,
     FactoryStage,
@@ -19,6 +25,7 @@ from resource_control_execution_pipeline import (
     UnifiedExecutionRequest,
     UnifiedResourceExecutionPipeline,
 )
+from resource_control_friend import FriendControlRequest, FriendResourceControlAdapter
 from resource_control_plane import ExecutionResult, ResourceControlPlane
 from resource_governance import Usage
 
@@ -78,12 +85,27 @@ class ResourceControlHTTPRequest:
             idempotency_key=self.idempotency_key,
         )
 
+    def to_friend_request(self) -> FriendControlRequest:
+        return FriendControlRequest(
+            request_id=self.request_id,
+            principal_id=self.principal_id,
+            objective=self.objective,
+            usage=self.usage,
+            estimated_cost=self.estimated_cost,
+            currency=self.currency,
+            scopes=self.scopes,
+            available_providers=self.available_providers,
+            requested_agent=self.requested_agent,
+            idempotency_key=self.idempotency_key,
+        )
+
 
 class ResourceControlHTTPAdapter:
     """Translate an authenticated HTTP request into one governed execution."""
 
     def __init__(self, plane: ResourceControlPlane):
         self._pipeline = UnifiedResourceExecutionPipeline(plane)
+        self._friend_adapter = FriendResourceControlAdapter(plane)
         self._plane = plane
 
     def authenticate_api_key(self, raw_api_key: str, *, required_scope: str | None = None) -> HTTPPrincipal:
@@ -154,6 +176,7 @@ class ResourceControlHTTPAdapter:
         provider: ProviderStage,
         measure: MeasureStage,
     ) -> ExecutionResult:
+        """Execute a request through the generic multi-stage pipeline."""
         request = self.normalize(body, principal)
         return self._pipeline.execute(
             request.to_pipeline_request(),
@@ -161,6 +184,27 @@ class ResourceControlHTTPAdapter:
             brain=brain,
             factory=factory,
             provider=provider,
+            measure=measure,
+        )
+
+    def execute_friend(
+        self,
+        body: Mapping[str, Any],
+        principal: HTTPPrincipal,
+        *,
+        friend_executor: Callable[[dict[str, Any]], Any],
+        measure: Callable[[Any, dict[str, Any]], MeasuredExecution],
+    ) -> ExecutionResult:
+        """Execute the already-composed Friend runtime exactly once.
+
+        This is the production composition boundary: Friend remains the owner
+        of Brain/skills/tools/Factory/Provider orchestration while Resource
+        Control remains the owner of admission, accounting, and evidence.
+        """
+        request = self.normalize(body, principal)
+        return self._friend_adapter.execute(
+            request.to_friend_request(),
+            friend_executor,
             measure=measure,
         )
 
