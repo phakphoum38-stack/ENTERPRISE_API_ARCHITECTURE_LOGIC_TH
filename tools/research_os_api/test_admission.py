@@ -59,10 +59,13 @@ class ResourceAdmissionGateTests(unittest.TestCase):
         self.assertIn("budget", second.reason)
         self.gate.release(first.reservation_id)
 
-    def test_idempotency_replays_same_reservation(self):
+    def test_idempotency_replay_while_reserved_fails_closed(self):
         first = self.gate.admit(self.request())
-        second = self.gate.admit(self.request(request_id="different-request"))
-        self.assertEqual(first.reservation_id, second.reservation_id)
+        replay = self.gate.admit(self.request(request_id="different-request"))
+        self.assertEqual(first.decision, AdmissionDecision.ALLOW)
+        self.assertEqual(replay.decision, AdmissionDecision.DENY)
+        self.assertEqual(replay.reason, "idempotency_in_flight")
+        self.assertEqual(replay.reservation_id, None)
         self.assertEqual(self.budget.snapshot("user-1")["reserved"], "2.00")
 
     def test_idempotency_conflict_fails_closed(self):
