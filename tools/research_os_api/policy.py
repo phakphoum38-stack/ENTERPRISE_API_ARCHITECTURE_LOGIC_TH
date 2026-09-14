@@ -80,6 +80,8 @@ class PolicyEngine:
 
     def evaluate(self, context: PolicyContext, usage: Usage) -> PolicyDecision:
         for rule in self._rules:
+            if not (rule.required_scopes or rule.principal_types or rule.dimensions):
+                continue
             if rule.required_scopes and not rule.required_scopes.issubset(context.scopes):
                 continue
             if rule.principal_types and context.principal_type not in rule.principal_types:
