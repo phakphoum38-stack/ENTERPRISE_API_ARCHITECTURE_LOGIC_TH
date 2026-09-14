@@ -98,12 +98,17 @@ class HorizonLoopTests(unittest.TestCase):
         with self.assertRaises(UniversalFailureError):
             normalize_failures([failure("F1", "CI", "workflow", "root", source=SHA2)], SHA)
 
-    def test_universal_intake_rejects_missing_evidence_and_root(self):
+    def test_universal_intake_allows_unknown_root_until_causal_analysis(self):
+        records = [failure("F2", "tests", "semantic", None)]
+        normalized = normalize_failures(records, SHA)
+        self.assertEqual(normalized[0].root_cause, None)
+        with self.assertRaises(UniversalFailureError):
+            collapse_failures(records, SHA)
+
+    def test_universal_intake_rejects_missing_evidence(self):
         bad_evidence = FailureRecord("F1", "CI", "workflow", "FAIL", "x", "", SHA, "root")
         with self.assertRaises(UniversalFailureError):
             normalize_failures([bad_evidence], SHA)
-        with self.assertRaises(UniversalFailureError):
-            normalize_failures([failure("F2", "tests", "semantic", None)], SHA)
 
     def test_universal_completion_requires_all_pass(self):
         passes = [failure("P1", "H00", "tests", None, status="PASS")]
