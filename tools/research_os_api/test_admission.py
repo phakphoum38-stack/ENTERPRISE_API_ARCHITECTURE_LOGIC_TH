@@ -26,9 +26,9 @@ class ResourceAdmissionGateTests(unittest.TestCase):
         self.budget.register("user-1", BudgetLimit("USD", Decimal("10.00")))
         self.gate = ResourceAdmissionGate(self.governance, self.policy, self.budget)
 
-    def request(self, *, key: str | None = "k1", requests: int = 1, concurrent_jobs: int = 1, cost: str = "2.00") -> AdmissionRequest:
+    def request(self, *, key: str | None = "k1", requests: int = 1, concurrent_jobs: int = 1, cost: str = "2.00", request_id: str = "req-1") -> AdmissionRequest:
         return AdmissionRequest(
-            request_id="req-1",
+            request_id=request_id,
             principal_id="user-1",
             usage=Usage(requests=requests, concurrent_jobs=concurrent_jobs),
             estimated_cost=Decimal(cost),
@@ -61,24 +61,32 @@ class ResourceAdmissionGateTests(unittest.TestCase):
 
     def test_idempotency_replays_same_reservation(self):
         first = self.gate.admit(self.request())
-        second = self.gate.admit(self.request())
+        second = self.gate.admit(self.request(request_id="different-request"))
         self.assertEqual(first.reservation_id, second.reservation_id)
         self.assertEqual(self.budget.snapshot("user-1")["reserved"], "2.00")
 
     def test_idempotency_conflict_fails_closed(self):
         self.gate.admit(self.request())
-        conflicting = AdmissionRequest(
-            request_id="different",
-            principal_id="user-1",
-            usage=Usage(requests=1, concurrent_jobs=1),
-            estimated_cost=Decimal("2.00"),
-            currency="USD",
-            scopes=frozenset({"agent:run"}),
-            idempotency_key="k1",
-        )
+        conflicting = self.request(request_id="different", cost="3.00")
         result = self.gate.admit(conflicting)
         self.assertEqual(result.decision, AdmissionDecision.DENY)
         self.assertEqual(result.reason, "idempotency_conflict")
+
+    def test_committed_idempotency_replay_fails_closed(self):
+        first = self.gate.admit(self.request())
+        committed = self.gate.commit(first.reservation_id, actual_usage=Usage(requests=1, concurrent_jobs=1), actual_cost=Decimal("1.25"))
+        self.assertEqual(committed.status, AdmissionStatus.COMMITTED)
+        replay = self.gate.admit(self.request(request_id="retry-after-commit"))
+        self.assertEqual(replay.decision, AdmissionDecision.DENY)
+        self.assertEqual(replay.reason, "idempotency_replay:committed")
+
+    def test_idempotency_released_replay_fails_closed(self):
+        first = self.gate.admit(self.request())
+        released = self.gate.release(first.reservation_id)
+        self.assertEqual(released.status, AdmissionStatus.RELEASED)
+        replay = self.gate.admit(self.request(request_id="retry-after-release"))
+        self.assertEqual(replay.decision, AdmissionDecision.DENY)
+        self.assertEqual(replay.reason, "idempotency_replay:released")
 
     def test_commit_records_actual_usage_and_cost(self):
         result = self.gate.admit(self.request())
