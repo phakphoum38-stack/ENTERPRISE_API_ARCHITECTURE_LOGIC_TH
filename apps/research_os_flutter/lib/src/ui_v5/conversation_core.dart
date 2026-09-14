@@ -2,6 +2,31 @@ import 'package:flutter/foundation.dart';
 
 import '../api/research_os_api_client.dart';
 
+/// Minimal backend contract used by the V5 conversation core.
+///
+/// Keeping this boundary separate from the concrete HTTP client lets the
+/// conversation state machine be tested without network access while the
+/// production adapter continues to use the existing Research OS API.
+abstract interface class ResearchOSConversationBackend {
+  Future<Map<String, dynamic>> answerWithMemory(String question);
+  Future<Map<String, dynamic>> generateText(String prompt);
+}
+
+final class ResearchOSApiConversationBackend
+    implements ResearchOSConversationBackend {
+  ResearchOSApiConversationBackend(this._apiClient);
+
+  final ResearchOSApiClient _apiClient;
+
+  @override
+  Future<Map<String, dynamic>> answerWithMemory(String question) =>
+      _apiClient.answerWithMemory(question);
+
+  @override
+  Future<Map<String, dynamic>> generateText(String prompt) =>
+      _apiClient.generateText(prompt);
+}
+
 /// Shared state model for the V5 Friend conversation.
 ///
 /// The existing VoiceConversationPage remains the compatibility surface while
@@ -39,11 +64,16 @@ enum ResearchOSConversationState {
 
 class ResearchOSConversationController extends ChangeNotifier {
   ResearchOSConversationController({
-    required ResearchOSApiClient apiClient,
-  }) : _apiClient = apiClient;
+    required ResearchOSConversationBackend backend,
+  }) : _backend = backend;
 
-  final ResearchOSApiClient _apiClient;
-  final List<ResearchOSConversationTurn> _turns = <ResearchOSConversationTurn>[];
+  ResearchOSConversationController.fromApiClient({
+    required ResearchOSApiClient apiClient,
+  }) : _backend = ResearchOSApiConversationBackend(apiClient);
+
+  final ResearchOSConversationBackend _backend;
+  final List<ResearchOSConversationTurn> _turns =
+      <ResearchOSConversationTurn>[];
 
   ResearchOSConversationState _state = ResearchOSConversationState.idle;
   bool _useMemory = true;
@@ -82,8 +112,8 @@ class ResearchOSConversationController extends ChangeNotifier {
 
     try {
       final response = _useMemory
-          ? await _apiClient.answerWithMemory(normalized)
-          : await _apiClient.generateText(normalized);
+          ? await _backend.answerWithMemory(normalized)
+          : await _backend.generateText(normalized);
       final answer =
           (response['text'] ?? response['answer'] ?? '').toString().trim();
       final spoken = answer.isEmpty
