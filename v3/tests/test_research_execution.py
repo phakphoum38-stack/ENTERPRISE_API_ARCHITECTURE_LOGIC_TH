@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from research_os_v3.evidence import Evidence
@@ -19,7 +20,7 @@ class ResearchExecutionTests(unittest.TestCase):
             queue = DurableTaskQueue(path)
             queue.enqueue(QueueTask("t1", "r1", {"x": 1}))
 
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 row = db.execute(
                     "SELECT task_id,status FROM research_queue WHERE task_id=?",
                     ("t1",),
