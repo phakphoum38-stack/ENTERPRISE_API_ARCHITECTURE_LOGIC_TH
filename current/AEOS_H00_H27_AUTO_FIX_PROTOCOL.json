@@ -1,7 +1,8 @@
 {
-  "schema": "aeos-h00-h27-single-pass-auto-fix/v1",
+  "schema": "aeos-universal-failure-to-finish/v1",
   "status": "PROPOSED",
-  "horizon": {"start": "H00", "end": "H27", "inclusive": true},
+  "scope": "ALL_AEOS_FAILURES",
+  "horizon": {"start": "H00", "end": "H27", "inclusive": true, "plus_external_assurance_surfaces": true},
   "mode": "AUTO_GUARDED",
   "completion_states": ["FINISHED", "HARD_STOP"],
   "max_repair_iterations": 10,
@@ -10,48 +11,13 @@
   "max_unchanged_failure_retries": 1,
   "max_runtime_seconds": 7200,
   "full_scan_after_repair": true,
-  "one_consolidated_repair_pr": true,
-  "required_dimensions": [
-    "identity", "ancestry", "source", "contracts", "dependencies",
-    "semantic", "tests", "ci", "evidence", "provenance",
-    "security", "runtime", "recovery", "cross_horizon",
-    "duplicate_supersession", "final_lifecycle"
-  ],
-  "states": [
-    "DISCOVER", "ANALYZE", "GAP_SET_READY", "ROOT_CAUSE_READY",
-    "REPAIR_PLANNED", "REPAIRING", "VERIFYING", "FULL_RESCAN",
-    "FINISHED", "HARD_STOP"
-  ],
-  "hard_stop_codes": [
-    "IDENTITY_MISMATCH", "MAIN_SHA_DRIFT", "DEPENDENCY_CYCLE",
-    "ROOT_CAUSE_UNKNOWN", "PROVENANCE_INVALID", "EVIDENCE_CONFLICT",
-    "CONTRACT_DRIFT", "SECURITY_BOUNDARY_VIOLATION", "AUTHORITY_ESCALATION",
-    "CONSTITUTION_MODIFICATION", "REPAIR_NOT_EFFECTIVE", "REPAIR_OUT_OF_SCOPE",
-    "CI_NOT_EXACT_HEAD", "DECISION_REPLAY_MISMATCH", "BUDGET_EXHAUSTED",
-    "POST_MERGE_HEALTH_FAILURE"
-  ],
-  "repair_policy": {
-    "allowed": ["inspect", "classify", "plan", "bounded_source_fix", "regression_test", "collect_evidence", "reverify"],
-    "forbidden": ["weaken_gate", "delete_required_evidence", "rewrite_canonical_history", "self_approve", "escalate_authority", "modify_constitution_to_pass", "fabricate_evidence", "merge_as_fix_stage"]
-  },
-  "completion_requirements": [
-    "all_h00_h27_discovered",
-    "all_required_dimensions_pass",
-    "exact_sha_bound",
-    "full_regression_pass",
-    "exact_head_ci_pass",
-    "evidence_and_provenance_pass",
-    "independent_verification_pass",
-    "final_gate_pass"
-  ],
-  "governance_after_finished": [
-    "FORENSIC",
-    "INDEPENDENT_REVIEW",
-    "PRE_AUTHORITY",
-    "AUTHORITY_PACKET",
-    "OWNER_AUTHORITY",
-    "MERGE",
-    "POST_MERGE_VERIFY",
-    "REBASELINE"
-  ]
+  "one_consolidated_repair_pr_per_causal_batch": true,
+  "failure_intake": {"required": ["failure_id", "scope", "dimension", "status", "symptom", "evidence_ref", "source_sha", "severity", "blocking", "repair_required", "verification_required"], "identity_policy": "exact_40_char_lowercase_git_sha", "evidence_policy": "every_non_pass_failure_requires_traceable_evidence", "unknown_root_cause": "HARD_STOP", "stale_source": "HARD_STOP"},
+  "causal_pipeline": ["DISCOVER_ALL", "INGEST_FAILURES", "NORMALIZE", "CORRELATE", "ROOT_CAUSE_ANALYSIS", "REPAIR_SET_BUILD", "REPAIR_FIREWALL", "ONE_PR_REPAIR", "FULL_REVALIDATION", "FAILURE_REINGEST", "FINISHED_OR_HARD_STOP"],
+  "required_dimensions": ["identity", "ancestry", "source", "contracts", "dependencies", "semantic", "tests", "ci", "evidence", "provenance", "security", "runtime", "recovery", "cross_horizon", "duplicate_supersession", "final_lifecycle", "authority", "artifact_lineage"],
+  "states": ["DISCOVER", "ANALYZE", "GAP_SET_READY", "ROOT_CAUSE_READY", "REPAIR_PLANNED", "REPAIRING", "VERIFYING", "FULL_RESCAN", "FINISHED", "HARD_STOP"],
+  "hard_stop_codes": ["IDENTITY_MISMATCH", "MAIN_SHA_DRIFT", "STALE_FAILURE_SOURCE", "DEPENDENCY_CYCLE", "ROOT_CAUSE_UNKNOWN", "EVIDENCE_MISSING", "PROVENANCE_INVALID", "EVIDENCE_CONFLICT", "CONTRACT_DRIFT", "SECURITY_BOUNDARY_VIOLATION", "AUTHORITY_ESCALATION", "CONSTITUTION_MODIFICATION", "REPAIR_NOT_EFFECTIVE", "REPAIR_OUT_OF_SCOPE", "CI_NOT_EXACT_HEAD", "DECISION_REPLAY_MISMATCH", "BUDGET_EXHAUSTED", "POST_MERGE_HEALTH_FAILURE", "VERIFICATION_REQUIREMENT_MISSING"],
+  "repair_policy": {"allowed": ["inspect", "classify", "normalize", "correlate", "plan", "bounded_source_fix", "regression_test", "collect_evidence", "reverify", "full_rescan"], "forbidden": ["weaken_gate", "delete_required_evidence", "rewrite_canonical_history", "self_approve", "escalate_authority", "modify_constitution_to_pass", "fabricate_evidence", "merge_as_fix_stage", "change_branch_protection"]},
+  "completion_requirements": ["all_discovered_failures_ingested", "all_failures_have_traceable_evidence", "all_failures_have_known_root_cause", "all_blocking_failures_closed", "all_required_dimensions_pass", "exact_sha_bound", "full_regression_pass", "exact_head_ci_pass", "evidence_and_provenance_pass", "independent_verification_pass", "final_gate_pass"],
+  "governance_after_finished": ["FORENSIC", "INDEPENDENT_REVIEW", "PRE_AUTHORITY", "AUTHORITY_PACKET", "OWNER_AUTHORITY", "MERGE", "POST_MERGE_VERIFY", "REBASELINE"]
 }
