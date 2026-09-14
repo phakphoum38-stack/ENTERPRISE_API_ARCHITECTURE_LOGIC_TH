@@ -50,7 +50,7 @@ class ProviderResourceControlAdapter:
         provider_execute: Callable[[ExecutionContext], object],
         measure: Callable[[object, ExecutionContext], MeasuredExecution],
     ) -> ExecutionResult:
-        def run(route: Mapping[str, object], _request: object) -> MeasuredExecution:
+        def run(route: dict[str, object]) -> MeasuredExecution:
             context = ExecutionContext(
                 request_id=request.request_id,
                 principal_id=request.principal_id,
