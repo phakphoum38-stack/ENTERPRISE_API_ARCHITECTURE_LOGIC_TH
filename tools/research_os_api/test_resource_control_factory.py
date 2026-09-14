@@ -2,11 +2,11 @@ from decimal import Decimal
 import unittest
 
 from budgets import BudgetLimit
-from policy import PolicyRule
+from execution_contract import MeasuredExecution
+from policy import PolicyEffect, PolicyRule
 from resource_control_factory import FactoryWorkload, ResourceControlledFactory
 from resource_control_plane import ResourceControlPlane
-from resource_governance import Entitlement
-from execution_contract import MeasuredExecution
+from resource_governance import Entitlement, Limit, QuotaDimension, Usage, Window
 
 
 class ResourceControlledFactoryTests(unittest.TestCase):
@@ -14,12 +14,25 @@ class ResourceControlledFactoryTests(unittest.TestCase):
         self.plane = ResourceControlPlane()
         self.plane.register_principal(
             "factory-user",
-            Entitlement("factory-user", frozenset({"agent:run"}), {"compute_units": 100, "requests": 10}, max_concurrency=4),
+            Entitlement(
+                "factory-user",
+                scopes=frozenset({"agent:run"}),
+                limits=(
+                    Limit(QuotaDimension.COMPUTE_UNITS, Window.HOUR, 100),
+                    Limit(QuotaDimension.REQUESTS, Window.HOUR, 10),
+                ),
+                max_concurrency=4,
+            ),
             BudgetLimit("USD", Decimal("10")),
         )
-        self.plane.add_policy_rule(PolicyRule(
-            effect="allow", scopes=frozenset({"agent:run"}), principal_types=frozenset({"user"})
-        ))
+        self.plane.add_policy_rule(
+            PolicyRule(
+                rule_id="factory-agent-run",
+                effect=PolicyEffect.ALLOW,
+                required_scopes=frozenset({"agent:run"}),
+                principal_types=frozenset({"user"}),
+            )
+        )
         self.factory = ResourceControlledFactory(self.plane)
 
     def test_workload_maps_to_governed_usage(self):
