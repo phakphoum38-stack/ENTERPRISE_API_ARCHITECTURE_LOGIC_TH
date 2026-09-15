@@ -44,6 +44,7 @@ class BudgetDecisionRecord:
     remaining: Decimal
     reason: str
     evaluated_at: datetime
+    reservation_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -96,7 +97,19 @@ class BudgetLedger:
             reservation_id = f"bres_{self._sequence:08d}"
             amount = self._validate_amount(amount)
             self._reservations[reservation_id] = BudgetReservation(reservation_id, principal_id, amount, decision.currency, now)
-            return self.evaluate(principal_id, Decimal("0"), currency=currency, now=now)
+            post = self.evaluate(principal_id, Decimal("0"), currency=currency, now=now)
+            return BudgetDecisionRecord(
+                post.decision,
+                post.principal_id,
+                post.currency,
+                amount,
+                post.committed,
+                post.reserved,
+                post.remaining,
+                "reserved",
+                post.evaluated_at,
+                reservation_id,
+            )
 
     def commit(self, reservation_id: str, *, actual: Decimal | None = None) -> None:
         with self._lock:
