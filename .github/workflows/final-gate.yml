@@ -209,14 +209,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate read-only release contract
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          test "${{ github.ref_name }}" != "main"
+
+          case "$EVENT_NAME" in
+            pull_request)
+              if [[ ! "$REF_NAME" =~ ^[0-9]+/merge$ ]]; then
+                echo "Unexpected pull_request ref_name: $REF_NAME"
+                exit 1
+              fi
+              ;;
+            workflow_dispatch)
+              echo "Manual dispatch: PR merge-ref validation is not applicable."
+              ;;
+            *)
+              echo "Unsupported release-gate event: $EVENT_NAME"
+              exit 1
+              ;;
+          esac
+
+          # Scan only executable workflow commands. The old gate searched its own
+          # validator expression and could classify policy text as a direct push.
           if grep -RInE \
             --exclude='final-gate.yml' \
-            'git push .*main|git push origin HEAD:main|git push origin main' \
+            '^[[:space:]]*(git[[:space:]]+push([[:space:]]+[^#]*)?([[:space:]]|:)main([[:space:]]|$)|git[[:space:]]+push[[:space:]]+origin[[:space:]]+HEAD:main([[:space:]]|$))' \
             .github/workflows; then
-            echo 'Direct main push detected in workflow definitions.'
+            echo 'Direct main push command detected in workflow definitions.'
             exit 1
           fi
-          echo 'All required V3.5 and production-readiness gates passed; release authority remains the PR merge process.'
+
+          echo 'Release validation passed: event/ref contract is valid and workflow definitions remain read-only.'
