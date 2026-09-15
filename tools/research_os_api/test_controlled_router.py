@@ -59,7 +59,7 @@ class GovernedAgentRouterTests(unittest.TestCase):
     def test_route_failure_releases_reservation(self):
         with self.assertRaises(ValueError):
             self.route(requested_agent="does-not-exist", idempotency_key=None)
-        self.assertEqual(self.budget.snapshot("user-1")["reserved"], "0.00")
+        self.assertEqual(self.budget.snapshot("user-1")["reserved"], "0")
 
     def test_idempotent_route_reuses_admission(self):
         first = self.route()
