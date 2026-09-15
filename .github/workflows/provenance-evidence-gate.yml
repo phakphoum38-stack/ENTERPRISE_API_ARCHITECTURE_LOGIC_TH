@@ -1,0 +1,89 @@
+name: Provenance Evidence Gate
+
+on:
+  pull_request:
+    paths:
+      - 'current/PROVENANCE_EVIDENCE_*.json'
+      - 'tools/validate_provenance_evidence.py'
+      - 'tools/record_provenance_entry.py'
+      - 'tools/generate_target_provenance.py'
+      - 'tools/test_validate_provenance_evidence.py'
+      - 'tools/provenance_conformance/**'
+      - 'docs/PROVENANCE_EVIDENCE_LEDGER.md'
+      - 'docs/PROVENANCE_THREAT_MODEL.md'
+      - '.github/workflows/provenance-evidence-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'current/PROVENANCE_EVIDENCE_*.json'
+      - 'tools/validate_provenance_evidence.py'
+      - 'tools/record_provenance_entry.py'
+      - 'tools/generate_target_provenance.py'
+      - 'tools/test_validate_provenance_evidence.py'
+      - 'tools/provenance_conformance/**'
+      - 'docs/PROVENANCE_EVIDENCE_LEDGER.md'
+      - 'docs/PROVENANCE_THREAT_MODEL.md'
+      - '.github/workflows/provenance-evidence-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provenance-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate canonical provenance ledger
+        run: python tools/validate_provenance_evidence.py
+      - name: Run provenance conformance and tamper regressions
+        run: python -m unittest tools.test_validate_provenance_evidence -v
+      - name: Compile verifier and producer
+        run: python -m py_compile tools/validate_provenance_evidence.py tools/record_provenance_entry.py tools/generate_target_provenance.py tools/test_validate_provenance_evidence.py
+      - name: Generate target-bound evidence and provenance
+        run: python tools/generate_target_provenance.py --output-dir target-provenance
+      - name: Independently verify target-bound provenance
+        run: python tools/validate_provenance_evidence.py --ledger target-provenance/TARGET_BOUND_PROVENANCE.json --target-commit "$GITHUB_SHA" > target-provenance/TARGET_BOUND_VERIFICATION.json
+      - name: Assert independent verification report is PASS
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("target-provenance/TARGET_BOUND_VERIFICATION.json").read_text(encoding="utf-8"))
+          if report.get("status") != "PASS":
+              raise SystemExit(f"verification_not_pass:{report}")
+          if report.get("errors"):
+              raise SystemExit(f"verification_errors:{report['errors']}")
+          print(json.dumps(report, sort_keys=True))
+          PY
+      - name: Verify generated roots are complete
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          p = Path("target-provenance/TARGET_BOUND_ROOTS.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
+          required = {"target_commit", "source_commit", "evidence_root", "provenance_root", "evidence_file", "provenance_file"}
+          missing = sorted(required - set(d))
+          if missing:
+              raise SystemExit(f"missing_root_fields:{missing}")
+          if d["target_commit"] != os.environ["GITHUB_SHA"]:
+              raise SystemExit("target_commit_mismatch")
+          for field in ("evidence_root", "provenance_root"):
+              value = d[field]
+              if len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+                  raise SystemExit(f"invalid_root:{field}")
+          print(json.dumps(d, sort_keys=True))
+          PY
+      - name: Upload target-bound provenance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: target-bound-provenance-${{ github.run_id }}
+          path: target-provenance/
+          if-no-files-found: error
+          retention-days: 30
