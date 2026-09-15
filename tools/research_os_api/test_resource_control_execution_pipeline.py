@@ -3,7 +3,7 @@ from decimal import Decimal
 import unittest
 
 from budgets import BudgetLimit
-from execution_contract import ExecutionContext, MeasuredExecution
+from execution_contract import MeasuredExecution
 from resource_control_execution_pipeline import UnifiedExecutionRequest, UnifiedResourceExecutionPipeline
 from resource_control_plane import ResourceControlPlane
 from resource_governance import Entitlement, Limit, QuotaDimension, Usage, Window
@@ -39,7 +39,7 @@ class UnifiedResourceExecutionPipelineTests(unittest.TestCase):
         pipeline = UnifiedResourceExecutionPipeline(plane)
         request = UnifiedExecutionRequest("req-denied-before-execution", "blocked-owner", "must not execute", Usage(requests=1), Decimal("1.00"), "USD", frozenset({"agent:run"}))
         result = pipeline.execute(request, friend=lambda _: calls.append("friend"), brain=lambda _, __: calls.append("brain"), factory=lambda _, __: calls.append("factory"), provider=lambda _, __: calls.append("provider"), measure=lambda _, __: calls.append("measure"))
-        self.assertFalse(result.admission.allowed)
+        self.assertNotEqual(result.admission.decision.value, "allow")
         self.assertEqual(calls, [])
         self.assertEqual(len(plane.ledger()), 0)
         self.assertEqual(len(plane.evidence()), 0)
