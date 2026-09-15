@@ -24,6 +24,7 @@ from .provider_settings import MemorySecretStore, OpenAICompatibleProvider, Prov
 from .providers import MockProvider, ProviderRouter
 from .reasoning import DecisionPlanner
 from .runtime import FriendRuntime
+from .resource_control_runtime import install_friend_resource_control
 from .self_learning_contract import SelfLearningContract, SelfLearningContractError
 from .service import OWNER_HEADER, PROFILE_HEADER, SESSION_HEADER, OwnerFriendService, default_owner_data_root
 from .skills import Skill, SkillRegistry
@@ -33,6 +34,8 @@ from .unified_tool_catalog import TOOL_CATALOG, ToolDescriptor, ToolState, Unifi
 from .v3_bridge import V3Bridge, V3BridgeStatus
 from .autobot_execution_loop import AutobotExecutionError, ExecutionEvent, ExecutionJob, ExecutionState, validate_job_payload
 from .trusted_web_research import MatchState, ResearchError, ResearchRecord, SourceKind, classify_source, match_environment, validate_research_finding
+
+install_friend_resource_control()
 
 __all__ = [
     "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalProof", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
