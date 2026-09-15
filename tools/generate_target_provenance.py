@@ -50,7 +50,7 @@ def main() -> int:
     recorded_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     changed = git("diff-tree", "--no-commit-id", "--name-only", "-r", target).splitlines()
-    tree = git("rev-parse", "^{tree}".replace("^", "")) if False else git("show", "-s", "--format=%T", target)
+    tree = git("show", "-s", "--format=%T", target)
 
     evidence = {
         "schema_version": "1.0",
@@ -70,6 +70,7 @@ def main() -> int:
     attestation_id = f"AT-TARGET-{target[:12]}"
     attestation = {
         "entry_id": attestation_id,
+        "sequence": 1,
         "recorded_at": recorded_at,
         "actor_id": "github-actions:provenance-evidence-gate",
         "action": "attest_target_generation",
@@ -98,6 +99,7 @@ def main() -> int:
     change_id = f"CH-TARGET-{target[:12]}"
     change = {
         "entry_id": change_id,
+        "sequence": 2,
         "recorded_at": recorded_at,
         "actor_id": "github-actions:provenance-evidence-gate",
         "action": "verify_target_generation",
