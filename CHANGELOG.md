@@ -4,6 +4,28 @@
 
 รูปแบบเวอร์ชันใช้ Semantic Versioning และเก็บ Snapshot ทุกเวอร์ชันไว้ใน `versions/`
 
+## [0.3.0-alpha] — 2026-08-18
+
+### Added
+
+- Durable persistence contract and fencing boundary.
+- PostgreSQL durable assignment schema and adapter.
+- Transaction-owned assignment reservation/completion.
+- Versioning policy and release baseline.
+
+### Reference foundations
+
+- Queue / Scheduler / Runner orchestration.
+- Runner registry, heartbeat, health filtering, and graceful drain.
+- Assignment reservation and multi-runner contention tests.
+
+### Not production-complete yet
+
+- Live PostgreSQL integration tests.
+- Durable runner registry and lease renewal.
+- Production queue adapter and delivery semantics.
+- Load and chaos validation.
+
 ## [2.0.0-rc.1] — 2026-08-09
 
 ### Changed
@@ -36,7 +58,6 @@
 - เพิ่ม ANEF-010 — Versioning Standard
 - เพิ่ม ANEF-011 — Repository Structure
 - เพิ่ม Version Index และนโยบายรักษาเวอร์ชัน
-- กำหนด `current/` เป็นตัวชี้ไปยังเวอร์ชันที่กำลังพัฒนา
 - เพิ่ม Research Curator v0.1 สำหรับแปลงบทสนทนาเป็น Research Artifact
 - เพิ่ม Research Curator v0.2 พร้อม Knowledge Filter, Quality Gate, Duplicate Detection, Typed Relationships และ Truth Status Promotion
 - เพิ่ม Research Curator v0.3 พร้อม Knowledge Diff Report, JSON/Mermaid Knowledge Graph Export และ Validated Git Publisher
