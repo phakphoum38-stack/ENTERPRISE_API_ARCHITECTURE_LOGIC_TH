@@ -2,7 +2,7 @@
 from decimal import Decimal
 import unittest
 
-from agent_platform import AgentRegistry, AgentRouter
+from agent_platform import AgentRouter
 from admission import AdmissionDecision, ResourceAdmissionGate
 from budgets import BudgetLedger, BudgetLimit
 from controlled_router import GovernedAgentRouter
@@ -18,9 +18,7 @@ class GovernedAgentRouterTests(unittest.TestCase):
         self.budget = BudgetLedger()
         self.budget.register("user-1", BudgetLimit("USD", Decimal("10.00")))
         self.gate = ResourceAdmissionGate(self.governance, self.policy, self.budget)
-        self.registry = AgentRegistry()
-        self.registry.register("general", providers=("local",))
-        self.router = GovernedAgentRouter(self.gate, AgentRouter(self.registry))
+        self.router = GovernedAgentRouter(self.gate, AgentRouter())
 
     def route(self, *, requested_agent: str | None = None, idempotency_key: str | None = "k1", request_id: str = "req-1"):
         return self.router.route(
