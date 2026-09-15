@@ -167,27 +167,15 @@ def _retry_delay_from_body(body: str) -> float | None:
                             return float(match.group(1))
             message = error.get("message")
             if isinstance(message, str):
-                match = re.search(
-                    r"(?:please\s+)?retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
-                    message,
-                    flags=re.IGNORECASE,
-                )
+                match = re.search(r"(?:please\s+)?retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s", message, flags=re.IGNORECASE)
                 if match:
                     return float(match.group(1))
 
-    match = re.search(
-        r"(?:please\s+)?retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
-        body,
-        flags=re.IGNORECASE,
-    )
+    match = re.search(r"(?:please\s+)?retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s", body, flags=re.IGNORECASE)
     return float(match.group(1)) if match else None
 
 
-def _retry_delay_seconds(
-    exc: urllib.error.HTTPError,
-    body: str,
-    attempt: int,
-) -> float:
+def _retry_delay_seconds(exc: urllib.error.HTTPError, body: str, attempt: int) -> float:
     retry_after = exc.headers.get("Retry-After") if exc.headers else None
     try:
         if retry_after:
@@ -197,8 +185,6 @@ def _retry_delay_seconds(
 
     advised = _retry_delay_from_body(body)
     if advised is not None:
-        # Small cushion prevents retrying a fraction of a second before the
-        # quota window actually resets.
         return max(0.0, advised + 0.5)
 
     return float(2 ** (attempt - 1))
@@ -215,12 +201,7 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
 
     for attempt in range(1, max_attempts + 1):
         try:
-            request = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers=headers,
-                method="POST",
-            )
+            request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
             with urllib.request.urlopen(request, timeout=60) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
@@ -228,7 +209,6 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
             last_error = exc
             if exc.code not in retryable_statuses or attempt == max_attempts:
                 raise ProviderError(f"provider HTTP {exc.code}: {body[:500]}") from exc
-
             delay = _retry_delay_seconds(exc, body, attempt)
             time.sleep(min(max(0.0, delay), max_retry_delay))
         except (urllib.error.URLError, json.JSONDecodeError, ValueError) as exc:
@@ -241,44 +221,23 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
 
 
 def build_provider(name: str | None = None) -> AIProvider:
+    if os.getenv("RESEARCH_OS_AI_ROUTE", "friend").strip().lower() == "direct-provider":
+        raise ProviderError("direct-provider route is disabled; AI execution must enter the canonical Friend Resource Control boundary")
     selected = (name or os.getenv("RESEARCH_OS_PROVIDER", "mock")).lower()
     if selected == "mock":
         return MockProvider()
     if selected in {"openai", "openai-compatible", "local"}:
-        endpoint = _env_or_default(
-            "RESEARCH_OS_OPENAI_ENDPOINT",
-            "http://localhost:11434/v1/chat/completions",
-        )
+        endpoint = _env_or_default("RESEARCH_OS_OPENAI_ENDPOINT", "http://localhost:11434/v1/chat/completions")
         model = _env_or_default("RESEARCH_OS_OPENAI_MODEL", "local-model")
-        return OpenAICompatibleProvider(
-            endpoint=endpoint,
-            api_key=os.getenv("RESEARCH_OS_OPENAI_API_KEY"),
-            default_model=model,
-        )
+        return OpenAICompatibleProvider(endpoint=endpoint, api_key=os.getenv("RESEARCH_OS_OPENAI_API_KEY"), default_model=model)
     if selected == "anthropic":
         key = os.getenv("RESEARCH_OS_ANTHROPIC_API_KEY")
         if not key:
             raise ProviderError("missing RESEARCH_OS_ANTHROPIC_API_KEY")
-        return AnthropicProvider(
-            endpoint=_env_or_default(
-                "RESEARCH_OS_ANTHROPIC_ENDPOINT",
-                "https://api.anthropic.com/v1/messages",
-            ),
-            api_key=key,
-            default_model=_env_or_default("RESEARCH_OS_ANTHROPIC_MODEL", "claude-sonnet-4-5"),
-        )
+        return AnthropicProvider(endpoint=_env_or_default("RESEARCH_OS_ANTHROPIC_ENDPOINT", "https://api.anthropic.com/v1/messages"), api_key=key, default_model=_env_or_default("RESEARCH_OS_ANTHROPIC_MODEL", "claude-sonnet-4-5"))
     if selected == "gemini":
         key = _first_env("RESEARCH_OS_GEMINI_API_KEY", "GEMINI_API_KEY")
         if not key:
-            raise ProviderError(
-                "missing Gemini API key (set RESEARCH_OS_GEMINI_API_KEY or GEMINI_API_KEY)"
-            )
-        return GeminiProvider(
-            endpoint_template=_env_or_default(
-                "RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE",
-                "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
-            ),
-            api_key=key,
-            default_model=_env_or_default("RESEARCH_OS_GEMINI_MODEL", "gemini-2.5-flash"),
-        )
+            raise ProviderError("missing Gemini API key (set RESEARCH_OS_GEMINI_API_KEY or GEMINI_API_KEY)")
+        return GeminiProvider(endpoint_template=_env_or_default("RESEARCH_OS_GEMINI_ENDPOINT_TEMPLATE", "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"), api_key=key, default_model=_env_or_default("RESEARCH_OS_GEMINI_MODEL", "gemini-2.5-flash"))
     raise ProviderError(f"unsupported provider: {selected}")
