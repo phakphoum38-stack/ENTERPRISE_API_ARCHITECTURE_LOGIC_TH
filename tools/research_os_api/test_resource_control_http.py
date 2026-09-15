@@ -48,8 +48,8 @@ class ResourceControlHTTPAdapterTests(unittest.TestCase):
         body = {"request_id": "first", "objective": "once", "usage": {"requests": 1}, "estimated_cost": "0.00", "currency": "USD", "scopes": ["agent:run"], "available_providers": ["local"], "idempotency_key": "same-operation"}
         first = self.adapter.execute_friend(body, self.principal, friend_executor=lambda route: calls.append("friend") or {"provider": "local", "model": "friend", "text": "ok"}, measure=lambda value, route: MeasuredExecution(value, Usage(requests=1), Decimal("0"), "USD"))
         replay = self.adapter.execute_friend({**body, "request_id": "retry"}, self.principal, friend_executor=lambda route: calls.append("replay") or {"text": "duplicate"}, measure=lambda value, route: MeasuredExecution(value, Usage(requests=1), Decimal("0"), "USD"))
-        self.assertTrue(first.admission.allowed)
-        self.assertFalse(replay.admission.allowed)
+        self.assertEqual(first.admission.decision.value, "allow")
+        self.assertNotEqual(replay.admission.decision.value, "allow")
         self.assertEqual(replay.admission.reason, "idempotency_replay:committed")
         self.assertEqual(calls, ["friend"])
         self.assertEqual(len(self.plane.ledger()), 1)
