@@ -47,6 +47,20 @@ function Get-OwnerListeners {
     })
 }
 
+function Get-OwnerListenerPids([object[]]$Listeners) {
+    $pids = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($listener in @($Listeners)) {
+        if ($null -eq $listener) { continue }
+        $property = $listener.PSObject.Properties['OwningProcess']
+        if ($null -eq $property) { continue }
+        $pidValue = 0
+        if ([int]::TryParse([string]$property.Value, [ref]$pidValue) -and $pidValue -gt 0) {
+            [void]$pids.Add($pidValue)
+        }
+    }
+    return @($pids | Sort-Object)
+}
+
 function Stop-OwnerBundledPythonFallback {
     $running = @()
     for ($i = 0; $i -lt 20; $i++) {
@@ -120,8 +134,9 @@ function Remove-OwnerService {
     }
     if ($listeners.Count -gt 0) {
         Show-OwnerServiceDiagnostics
-        $pids = ($listeners | ForEach-Object OwningProcess | Sort-Object -Unique) -join ','
-        throw "Owner Friend listener on port $Port remained after runtime shutdown. PID(s): $pids"
+        $listenerPids = @(Get-OwnerListenerPids -Listeners $listeners)
+        $pidText = if ($listenerPids.Count -gt 0) { $listenerPids -join ',' } else { '<unavailable>' }
+        throw "Owner Friend listener on port $Port remained after runtime shutdown. PID(s): $pidText"
     }
 }
 
