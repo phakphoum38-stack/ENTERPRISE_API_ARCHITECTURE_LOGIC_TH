@@ -18,14 +18,14 @@ class FriendResourceControlTests(unittest.TestCase):
     def test_friend_execution_requires_measured_accounting(self):
         request = FriendControlRequest("friend-1", "owner-1", "research", Usage(requests=1), Decimal("1.00"), "USD", frozenset({"agent:run"}), ("local",))
         with self.assertRaises(TypeError):
-            self.adapter.execute(request, lambda route: {"provider": route["provider"], "text": "ok"}, measure=lambda _value, _route: {"not": "measured"})
+            self.adapter.execute(request, lambda _route: {"provider": "local", "text": "ok"}, measure=lambda _value, _route: {"not": "measured"})
         self.assertEqual(self.plane.ledger(), ())
         self.assertEqual(self.plane.evidence(), ())
         self.assertEqual(self.plane.budget.snapshot("owner-1")["reserved"], "0")
 
     def test_friend_execution_commits_measured_result(self):
         request = FriendControlRequest("friend-2", "owner-1", "research", Usage(requests=1, tokens=200), Decimal("1.00"), "USD", frozenset({"agent:run"}), ("local",))
-        result = self.adapter.execute(request, lambda route: {"provider": route["provider"], "model": route["model"], "text": "ok"}, measure=lambda value, _route: MeasuredExecution(value, Usage(requests=1, tokens=200), Decimal("0.80"), "USD"))
+        result = self.adapter.execute(request, lambda _route: {"provider": "local", "model": "friend", "text": "ok"}, measure=lambda value, _route: MeasuredExecution(value, Usage(requests=1, tokens=200), Decimal("0.80"), "USD"))
         self.assertEqual(result.text, "ok")
         self.assertEqual(result.usage, Usage(requests=1, tokens=200))
         self.assertEqual(result.cost, Decimal("0.80"))
