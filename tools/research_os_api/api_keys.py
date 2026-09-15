@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from entitlements import EntitlementRegistry
 
+from api_key_store import APIKeyStore, InMemoryAPIKeyStore, StoredAPIKey
+
 
 class APIKeyError(ValueError):
     pass
@@ -49,9 +51,21 @@ class APIKeyRecord:
         now = datetime.now(timezone.utc)
         return self.revoked_at is None and (self.expires_at is None or self.expires_at > now)
 
+    @classmethod
+    def from_stored(cls, stored: StoredAPIKey) -> "APIKeyRecord":
+        return cls(
+            stored.key_id,
+            stored.principal_id,
+            stored.fingerprint,
+            stored.scopes,
+            stored.created_at,
+            stored.expires_at,
+            stored.revoked_at,
+        )
+
 
 class APIKeyManager:
-    """In-memory lifecycle manager; persistence belongs to the canonical storage adapter."""
+    """API-key lifecycle manager backed by the canonical storage contract."""
 
     PREFIX = "ro_live_"
 
@@ -60,7 +74,13 @@ class APIKeyManager:
         self._digests: dict[str, str] = {}
         self._entitlements = entitlements
 
-    def create(self, principal_id: str, scopes: set[str] | frozenset[str], *, expires_at: datetime | None = None) -> tuple[APIKeyRecord, str]:
+    def create(
+        self,
+        principal_id: str,
+        scopes: set[str] | frozenset[str],
+        *,
+        expires_at: datetime | None = None,
+    ) -> tuple[APIKeyRecord, str]:
         principal_id = principal_id.strip()
         if not principal_id:
             raise APIKeyError("principal_id is required")
@@ -108,8 +128,9 @@ class APIKeyManager:
         return None
 
     def revoke(self, key_id: str, *, now: datetime | None = None) -> APIKeyRecord:
+        revoked = now or datetime.now(timezone.utc)
         try:
-            record = self._records[key_id]
+            return APIKeyRecord.from_stored(self._store.revoke(key_id, revoked))
         except KeyError as exc:
             raise APIKeyError("unknown key") from exc
         if record.revoked_at is not None:
@@ -133,7 +154,4 @@ class APIKeyManager:
         return self.create(record.principal_id, record.scopes, expires_at=expires_at)
 
     def list(self, principal_id: str | None = None) -> tuple[APIKeyRecord, ...]:
-        values = tuple(self._records.values())
-        if principal_id is None:
-            return values
-        return tuple(record for record in values if record.principal_id == principal_id)
+        return tuple(APIKeyRecord.from_stored(item) for item in self._store.list(principal_id))
