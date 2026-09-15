@@ -17,7 +17,7 @@ from threading import RLock
 
 from budgets import BudgetDecision, BudgetLedger
 from policy import PolicyContext, PolicyEffect, PolicyEngine
-from resource_governance import Decision, Entitlement, QuotaError, ResourceGovernance, Usage
+from resource_governance import Decision, QuotaError, ResourceGovernance, Usage
 
 
 class AdmissionDecision(str, Enum):
@@ -90,14 +90,7 @@ class AdmissionRecord:
 class ResourceAdmissionGate:
     """Single deterministic gate joining policy, quota, and budget."""
 
-    def __init__(
-        self,
-        governance: ResourceGovernance,
-        policy: PolicyEngine,
-        budget: BudgetLedger,
-        *,
-        reservation_ttl: timedelta = timedelta(minutes=5),
-    ) -> None:
+    def __init__(self, governance: ResourceGovernance, policy: PolicyEngine, budget: BudgetLedger, *, reservation_ttl: timedelta = timedelta(minutes=5)) -> None:
         if reservation_ttl <= timedelta(0):
             raise QuotaError("reservation_ttl must be positive")
         self._governance = governance
@@ -130,14 +123,10 @@ class ResourceAdmissionGate:
                 entitlement = self._governance.entitlement(request.principal_id)
             except QuotaError:
                 return self._deny(request, "unknown_principal", now)
-
             if not request.scopes.issubset(entitlement.scopes):
                 return self._deny(request, "scope_not_entitled", now)
 
-            policy_decision = self._policy.evaluate(
-                PolicyContext(request.principal_id, request.scopes, request.principal_type),
-                request.usage,
-            )
+            policy_decision = self._policy.evaluate(PolicyContext(request.principal_id, request.scopes, request.principal_type), request.usage)
             if policy_decision.effect is PolicyEffect.DENY:
                 return self._deny(request, f"policy_denied:{policy_decision.rule_id}", now)
             if policy_decision.effect is PolicyEffect.THROTTLE:
@@ -148,12 +137,7 @@ class ResourceAdmissionGate:
                 decision = AdmissionDecision.THROTTLE if quota.decision is Decision.THROTTLE else AdmissionDecision.DENY
                 return AdmissionRecord(decision, request.request_id, request.principal_id, f"quota:{quota.reason}", evaluated_at=now)
 
-            budget = self._budget.reserve(
-                request.principal_id,
-                request.estimated_cost,
-                currency=request.currency,
-                now=now,
-            )
+            budget = self._budget.reserve(request.principal_id, request.estimated_cost, currency=request.currency, now=now)
             if budget.decision is not BudgetDecision.ALLOW or budget.reservation_id is None:
                 self._governance.release(quota.reservation_id)
                 return self._deny(request, f"budget:{budget.reason}", now)
@@ -161,40 +145,16 @@ class ResourceAdmissionGate:
             self._sequence += 1
             reservation_id = f"ares_{self._sequence:08d}"
             reservation = AdmissionReservation(
-                reservation_id,
-                request.request_id,
-                request.principal_id,
-                request.usage,
-                request.estimated_cost,
-                request.currency.strip().upper(),
-                quota.reservation_id,
-                budget.reservation_id,
-                now,
-                now + self._reservation_ttl,
-                fingerprint=fingerprint,
+                reservation_id, request.request_id, request.principal_id, request.usage,
+                request.estimated_cost, request.currency.strip().upper(), quota.reservation_id,
+                budget.reservation_id, now, now + self._reservation_ttl, fingerprint=fingerprint,
             )
             self._reservations[reservation_id] = reservation
             if request.idempotency_key:
                 self._idempotency[request.idempotency_key] = (fingerprint, reservation_id)
-            return AdmissionRecord(
-                AdmissionDecision.ALLOW,
-                request.request_id,
-                request.principal_id,
-                "reserved",
-                reservation_id,
-                quota.reservation_id,
-                budget.reservation_id,
-                now,
-            )
+            return AdmissionRecord(AdmissionDecision.ALLOW, request.request_id, request.principal_id, "reserved", reservation_id, quota.reservation_id, budget.reservation_id, now)
 
-    def commit(
-        self,
-        reservation_id: str,
-        *,
-        actual_usage: Usage | None = None,
-        actual_cost: Decimal | None = None,
-        now: datetime | None = None,
-    ) -> AdmissionReservation:
+    def commit(self, reservation_id: str, *, actual_usage: Usage | None = None, actual_cost: Decimal | None = None, now: datetime | None = None) -> AdmissionReservation:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         with self._lock:
             reservation = self._reservations.get(reservation_id)
@@ -255,7 +215,6 @@ class ResourceAdmissionGate:
     @staticmethod
     def _fingerprint(request: AdmissionRequest) -> str:
         payload = {
-            "request_id": request.request_id,
             "principal_id": request.principal_id,
             "usage": request.usage.__dict__,
             "estimated_cost": str(request.estimated_cost),
@@ -268,16 +227,3 @@ class ResourceAdmissionGate:
     @staticmethod
     def _deny(request: AdmissionRequest, reason: str, now: datetime) -> AdmissionRecord:
         return AdmissionRecord(AdmissionDecision.DENY, request.request_id, request.principal_id, reason, evaluated_at=now)
-
-    @staticmethod
-    def _allow_from_reservation(reservation: AdmissionReservation, now: datetime) -> AdmissionRecord:
-        return AdmissionRecord(
-            AdmissionDecision.ALLOW,
-            reservation.request_id,
-            reservation.principal_id,
-            reservation.status.value,
-            reservation.reservation_id,
-            reservation.quota_reservation_id,
-            reservation.budget_reservation_id,
-            now,
-        )
