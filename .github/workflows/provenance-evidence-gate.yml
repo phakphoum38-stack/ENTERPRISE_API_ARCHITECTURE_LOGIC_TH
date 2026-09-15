@@ -50,6 +50,7 @@ jobs:
       - name: Verify generated roots are complete
         run: python - <<'PY'
 import json
+import os
 from pathlib import Path
 p = Path("target-provenance/TARGET_BOUND_ROOTS.json")
 d = json.loads(p.read_text(encoding="utf-8"))
@@ -57,7 +58,7 @@ required = {"target_commit", "source_commit", "evidence_root", "provenance_root"
 missing = sorted(required - set(d))
 if missing:
     raise SystemExit(f"missing_root_fields:{missing}")
-if d["target_commit"] != "${GITHUB_SHA}":
+if d["target_commit"] != os.environ["GITHUB_SHA"]:
     raise SystemExit("target_commit_mismatch")
 for field in ("evidence_root", "provenance_root"):
     value = d[field]
