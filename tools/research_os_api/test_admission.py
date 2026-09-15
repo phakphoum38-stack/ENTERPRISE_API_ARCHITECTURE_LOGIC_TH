@@ -26,11 +26,11 @@ class ResourceAdmissionGateTests(unittest.TestCase):
         self.budget.register("user-1", BudgetLimit("USD", Decimal("10.00")))
         self.gate = ResourceAdmissionGate(self.governance, self.policy, self.budget)
 
-    def request(self, *, key: str | None = "k1", requests: int = 1, cost: str = "2.00") -> AdmissionRequest:
+    def request(self, *, key: str | None = "k1", requests: int = 1, concurrent_jobs: int = 1, cost: str = "2.00") -> AdmissionRequest:
         return AdmissionRequest(
             request_id="req-1",
             principal_id="user-1",
-            usage=Usage(requests=requests, concurrent_jobs=1),
+            usage=Usage(requests=requests, concurrent_jobs=concurrent_jobs),
             estimated_cost=Decimal(cost),
             currency="USD",
             scopes=frozenset({"agent:run"}),
@@ -49,12 +49,12 @@ class ResourceAdmissionGateTests(unittest.TestCase):
         result = self.gate.admit(self.request(key=None))
         self.assertEqual(result.decision, AdmissionDecision.DENY)
         self.assertIn("policy_denied", result.reason)
-        self.assertEqual(self.budget.snapshot("user-1")["reserved"], "0.00")
+        self.assertEqual(self.budget.snapshot("user-1")["reserved"], "0")
 
     def test_quota_and_budget_are_fail_closed(self):
-        first = self.gate.admit(self.request(key="first", cost="9.00"))
+        first = self.gate.admit(self.request(key="first", cost="9.00", concurrent_jobs=0))
         self.assertEqual(first.decision, AdmissionDecision.ALLOW)
-        second = self.gate.admit(self.request(key="second", cost="2.00"))
+        second = self.gate.admit(self.request(key="second", cost="2.00", concurrent_jobs=0))
         self.assertEqual(second.decision, AdmissionDecision.DENY)
         self.assertIn("budget", second.reason)
         self.gate.release(first.reservation_id)
