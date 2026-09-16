@@ -1,7 +1,12 @@
 name: AEOS Source-Level Test
 
 on:
-  pull_request:
+  # Use pull_request_target so this external verification is still created
+  # when the PR has merge conflicts. The job has contents:read only and
+  # explicitly checks out the exact PR HEAD; it does not execute workflow
+  # definitions from the PR branch.
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'current/AEOS_ASSURANCE_CHECK_REGISTRY.json'
       - 'current/AEOS_*_CONTRACT.json'
