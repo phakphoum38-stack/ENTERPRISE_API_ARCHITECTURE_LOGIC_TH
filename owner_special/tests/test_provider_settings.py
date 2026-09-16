@@ -27,7 +27,8 @@ class ProviderSettingsTests(unittest.TestCase):
             self.assertTrue(manager.test()["connected"])
             provider = manager.provider()
             self.assertIsNotNone(provider)
-            self.assertEqual(provider.complete(prompt="hello", context=()), "provider-ok")
+            result = provider.complete(prompt="hello", context=())
+            self.assertEqual(result.text, "provider-ok")
 
 
 if __name__ == "__main__":
