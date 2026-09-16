@@ -7,9 +7,12 @@ import urllib.error
 import urllib.request
 from ctypes import wintypes
 from dataclasses import asdict, dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlparse
+
+from .providers import ProviderResult
 
 
 class SecretStore(Protocol):
@@ -153,11 +156,50 @@ class OpenAICompatibleProvider:
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
 
+    @staticmethod
+    def _decimal_env(name: str) -> Decimal | None:
+        raw = os.getenv(name, "").strip()
+        if not raw:
+            return None
+        try:
+            value = Decimal(raw)
+        except InvalidOperation as exc:
+            raise ValueError(f"{name} must be a decimal") from exc
+        if value.is_nan() or value.is_infinite() or value < Decimal("0"):
+            raise ValueError(f"{name} must be finite and non-negative")
+        return value
+
+    def _measurement(self, payload: dict[str, object]) -> tuple[dict[str, int], Decimal | None]:
+        raw_usage = payload.get("usage")
+        if not isinstance(raw_usage, dict):
+            return {}, None
+        def count(name: str) -> int:
+            value = raw_usage.get(name, 0)
+            if isinstance(value, bool):
+                raise ValueError(f"provider usage {name} must be an integer")
+            try:
+                parsed = int(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"provider usage {name} must be an integer") from exc
+            if parsed < 0:
+                raise ValueError(f"provider usage {name} cannot be negative")
+            return parsed
+        prompt_tokens = count("prompt_tokens")
+        completion_tokens = count("completion_tokens")
+        total_tokens = count("total_tokens") or prompt_tokens + completion_tokens
+        usage = {"requests": 1, "tokens": total_tokens}
+        input_rate = self._decimal_env("RESEARCH_OS_PROVIDER_INPUT_USD_PER_1M_TOKENS")
+        output_rate = self._decimal_env("RESEARCH_OS_PROVIDER_OUTPUT_USD_PER_1M_TOKENS")
+        if input_rate is None or output_rate is None:
+            return usage, None
+        cost = (Decimal(prompt_tokens) * input_rate + Decimal(completion_tokens) * output_rate) / Decimal(1_000_000)
+        return usage, cost
+
     def test_connection(self) -> dict[str, object]:
         payload = self.transport.get_json(f"{self.base_url.rstrip('/')}/models", headers=self._headers(), timeout=self.timeout)
         return {"connected": True, "provider": self.name, "models_visible": len(payload.get("data", []) or [])}
 
-    def complete(self, *, prompt: str, context: tuple[str, ...]) -> str:
+    def complete(self, *, prompt: str, context: tuple[str, ...]) -> ProviderResult:
         messages: list[dict[str, str]] = []
         if context:
             messages.append({"role": "system", "content": "Owner context:\n" + "\n".join(context[-12:])})
@@ -177,7 +219,14 @@ class OpenAICompatibleProvider:
         content = first["message"].get("content")
         if not isinstance(content, str) or not content.strip():
             raise RuntimeError("provider response content is empty")
-        return content
+        usage, cost = self._measurement(payload)
+        return ProviderResult(
+            text=content,
+            usage=usage,
+            actual_cost=cost,
+            currency="USD",
+            raw={"usage": payload.get("usage", {}), "model": payload.get("model", self.model)},
+        )
 
 
 class ProviderManager:
