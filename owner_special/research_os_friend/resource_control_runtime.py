@@ -117,7 +117,13 @@ def _governed_ask(runtime: Any, request: Any):
         request_id=_new_request_id(request.owner_id, request.session_id, request.text),
         principal_id=request.owner_id,
         objective=request.text,
-        usage=Usage(requests=1),
+        # Reserve an explicit execution ceiling for every measurable usage
+        # dimension that the provider may return. Actual usage is reconciled
+        # against this reservation and committed only after execution.
+        usage=Usage(
+            requests=1,
+            tokens=_int_env("RESEARCH_OS_RESOURCE_TOKENS_PER_REQUEST", 1_000_000, 0),
+        ),
         estimated_cost=_decimal_env("RESEARCH_OS_RESOURCE_ESTIMATED_COST_USD", "0"),
         currency=_CURRENCY,
         scopes=frozenset({_SCOPE}),
