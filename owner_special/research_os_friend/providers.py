@@ -64,7 +64,12 @@ class ProviderRouter:
         errors: list[str] = []
         for provider in self._providers:
             try:
-                return provider.name, provider.complete(prompt=prompt, context=context)
+                result = provider.complete(prompt=prompt, context=context)
+                if isinstance(result, ProviderResult):
+                    return provider.name, result
+                if isinstance(result, str):
+                    return provider.name, ProviderResult(text=result)
+                raise TypeError("provider must return ProviderResult or text")
             except Exception as exc:
                 errors.append(f"{provider.name}:{type(exc).__name__}")
         raise RuntimeError("all providers failed: " + ",".join(errors))
