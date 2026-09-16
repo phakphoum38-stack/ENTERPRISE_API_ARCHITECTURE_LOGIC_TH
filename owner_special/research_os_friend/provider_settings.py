@@ -173,6 +173,7 @@ class OpenAICompatibleProvider:
         raw_usage = payload.get("usage")
         if not isinstance(raw_usage, dict):
             return {}, None
+
         def count(name: str) -> int:
             value = raw_usage.get(name, 0)
             if isinstance(value, bool):
@@ -184,10 +185,22 @@ class OpenAICompatibleProvider:
             if parsed < 0:
                 raise ValueError(f"provider usage {name} cannot be negative")
             return parsed
+
         prompt_tokens = count("prompt_tokens")
         completion_tokens = count("completion_tokens")
         total_tokens = count("total_tokens") or prompt_tokens + completion_tokens
         usage = {"requests": 1, "tokens": total_tokens}
+
+        resource_control = payload.get("resource_control")
+        if isinstance(resource_control, dict) and resource_control.get("actual_cost") is not None:
+            try:
+                cost = Decimal(str(resource_control["actual_cost"]))
+            except (InvalidOperation, ValueError) as exc:
+                raise ValueError("provider resource-control actual_cost must be a decimal") from exc
+            if cost.is_nan() or cost.is_infinite() or cost < Decimal("0"):
+                raise ValueError("provider resource-control actual_cost must be finite and non-negative")
+            return usage, cost
+
         input_rate = self._decimal_env("RESEARCH_OS_PROVIDER_INPUT_USD_PER_1M_TOKENS")
         output_rate = self._decimal_env("RESEARCH_OS_PROVIDER_OUTPUT_USD_PER_1M_TOKENS")
         if input_rate is None or output_rate is None:
@@ -220,12 +233,16 @@ class OpenAICompatibleProvider:
         if not isinstance(content, str) or not content.strip():
             raise RuntimeError("provider response content is empty")
         usage, cost = self._measurement(payload)
+        resource_control = payload.get("resource_control")
+        currency = "USD"
+        if isinstance(resource_control, dict) and resource_control.get("currency"):
+            currency = str(resource_control["currency"]).strip().upper()
         return ProviderResult(
             text=content,
             usage=usage,
             actual_cost=cost,
-            currency="USD",
-            raw={"usage": payload.get("usage", {}), "model": payload.get("model", self.model)},
+            currency=currency,
+            raw={"usage": payload.get("usage", {}), "model": payload.get("model", self.model), "resource_control": resource_control or {}},
         )
 
 
