@@ -43,7 +43,11 @@ def main() -> None:
             payload = json.loads(self.rfile.read(length).decode('utf-8'))
             messages = payload.get('messages', [])
             user_text = next((item.get('content', '') for item in reversed(messages) if item.get('role') == 'user'), '')
-            self._json(200, {'choices': [{'message': {'content': f'mock-provider:{user_text}'}}]})
+            self._json(200, {
+                'choices': [{'message': {'content': f'mock-provider:{user_text}'}}],
+                'usage': {'prompt_tokens': 8, 'completion_tokens': 4, 'total_tokens': 12},
+                'resource_control': {'actual_cost': '0', 'currency': 'USD'},
+            })
 
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     print(f'mock provider ready on 127.0.0.1:{args.port}', flush=True)
