@@ -1,22 +1,40 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Protocol
+from dataclasses import dataclass, field
+from decimal import Decimal
+from typing import Any, Protocol
+
+
+@dataclass(frozen=True)
+class ProviderResult:
+    """Provider output with normalized accounting metadata."""
+
+    text: str
+    usage: dict[str, int] = field(default_factory=dict)
+    actual_cost: Decimal | None = None
+    currency: str = "USD"
+    raw: dict[str, Any] = field(default_factory=dict)
 
 
 class Provider(Protocol):
     name: str
 
-    def complete(self, *, prompt: str, context: tuple[str, ...]) -> str: ...
+    def complete(self, *, prompt: str, context: tuple[str, ...]) -> ProviderResult: ...
 
 
 @dataclass
 class MockProvider:
     name: str = "owner-mock"
 
-    def complete(self, *, prompt: str, context: tuple[str, ...]) -> str:
+    def complete(self, *, prompt: str, context: tuple[str, ...]) -> ProviderResult:
         prefix = f"context={len(context)}"
-        return f"[{self.name} {prefix}] {prompt}"
+        return ProviderResult(
+            text=f"[{self.name} {prefix}] {prompt}",
+            usage={"requests": 1},
+            actual_cost=Decimal("0"),
+            currency="USD",
+            raw={"mock": True},
+        )
 
 
 class ProviderRouter:
@@ -40,7 +58,7 @@ class ProviderRouter:
             raise RuntimeError("no provider configured")
         return self._providers[0]
 
-    def complete(self, *, prompt: str, context: tuple[str, ...]) -> tuple[str, str]:
+    def complete(self, *, prompt: str, context: tuple[str, ...]) -> tuple[str, ProviderResult]:
         if not self._providers:
             raise RuntimeError("no provider configured")
         errors: list[str] = []
