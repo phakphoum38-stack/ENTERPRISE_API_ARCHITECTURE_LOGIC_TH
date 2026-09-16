@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Callable
 
-from execution_contract import MeasuredExecution
-from resource_control_plane import ExecutionResult, ResourceControlPlane
-from resource_governance import Usage
+from .execution_contract import MeasuredExecution
+from .resource_control_plane import ExecutionResult, ResourceControlPlane
+from .resource_governance import Usage
 
 
 @dataclass(frozen=True)
