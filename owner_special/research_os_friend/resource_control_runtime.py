@@ -10,14 +10,11 @@ from __future__ import annotations
 from decimal import Decimal
 from hashlib import sha256
 import os
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from uuid import uuid4
 
-from tools.research_os_api.budgets import BudgetLimit
-from tools.research_os_api.execution_contract import MeasuredExecution
-from tools.research_os_api.resource_control_friend import FriendControlRequest, FriendResourceControlAdapter
-from tools.research_os_api.resource_control_plane import ResourceControlPlane
-from tools.research_os_api.resource_governance import Entitlement, Limit, QuotaDimension, Usage, Window
+if TYPE_CHECKING:
+    from tools.research_os_api.execution_contract import MeasuredExecution
 
 _SCOPE = "agent:run"
 _CURRENCY = "USD"
@@ -47,7 +44,11 @@ def _new_request_id(owner_id: str, session_id: str, text: str) -> str:
     return f"friend-{digest}"
 
 
-def _build_plane(owner_id: str) -> ResourceControlPlane:
+def _build_plane(owner_id: str):
+    from tools.research_os_api.budgets import BudgetLimit
+    from tools.research_os_api.resource_control_plane import ResourceControlPlane
+    from tools.research_os_api.resource_governance import Entitlement, Limit, QuotaDimension, Window
+
     plane = ResourceControlPlane()
     plane.register_principal(
         owner_id,
@@ -62,7 +63,10 @@ def _build_plane(owner_id: str) -> ResourceControlPlane:
     return plane
 
 
-def _measure_friend(value: Any, route: dict[str, Any]) -> MeasuredExecution:
+def _measure_friend(value: Any, route: dict[str, Any]):
+    from tools.research_os_api.execution_contract import MeasuredExecution
+    from tools.research_os_api.resource_governance import Usage
+
     response = value.get("response") if isinstance(value, dict) else None
     if response is None:
         raise TypeError("Friend measurement requires the original FriendResponse")
@@ -83,6 +87,9 @@ def _measure_friend(value: Any, route: dict[str, Any]) -> MeasuredExecution:
 
 
 def _governed_ask(runtime: Any, request: Any):
+    from tools.research_os_api.resource_control_friend import FriendControlRequest, FriendResourceControlAdapter
+    from tools.research_os_api.resource_governance import Usage
+
     plane = getattr(runtime, "_resource_control_plane", None)
     if plane is None:
         plane = _build_plane(runtime.owner.owner_id)
