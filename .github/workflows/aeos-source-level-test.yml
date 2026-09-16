@@ -20,6 +20,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONPATH: ${{ github.workspace }}/tools/research_os_api:${{ github.workspace }}:${{ github.workspace }}/owner_special
+
 jobs:
   source-level-test:
     runs-on: ubuntu-latest
