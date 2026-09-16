@@ -1,7 +1,10 @@
 name: AEOS Source-Level Test
 
 on:
-  pull_request:
+  # Trusted workflow definition is taken from main. Verification checks the
+  # exact PR head rather than executing workflow definitions from the PR.
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'current/AEOS_ASSURANCE_CHECK_REGISTRY.json'
       - 'current/AEOS_*_CONTRACT.json'
