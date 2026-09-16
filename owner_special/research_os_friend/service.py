@@ -80,81 +80,213 @@ class OwnerFriendService:
                     stream.write(json.dumps(record, sort_keys=True) + "\n")
 
             def _send_json(self, status: int, payload: dict[str, object]) -> None:
-                body = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
+                body = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                self._audit(status)
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
 
-            def _headers(self) -> tuple[str, str, str]:
-                owner_id = _safe_scope(self.headers.get(OWNER_HEADER, ""), "owner")
-                profile_id = _safe_scope(self.headers.get(PROFILE_HEADER, "default"), "profile")
-                session_id = _safe_scope(self.headers.get(SESSION_HEADER, "default"), "session")
-                return owner_id, profile_id, session_id
+            def _scope(self) -> tuple[str, str, str]:
+                claimed_owner = self.headers.get(OWNER_HEADER, "").strip()
+                if not claimed_owner or not service.runtime.owner.matches(claimed_owner):
+                    raise PermissionError("owner identity rejected")
+                profile_id = _safe_scope(self.headers.get(PROFILE_HEADER, "default"), "profile_id")
+                session_id = _safe_scope(self.headers.get(SESSION_HEADER, "default"), "session_id")
+                return claimed_owner, profile_id, session_id
 
-            def _request(self, payload: dict[str, object]) -> FriendRequest:
-                owner_id, profile_id, session_id = self._headers()
+            def _read_payload(self) -> dict[str, object]:
+                length = int(self.headers.get("Content-Length", "0") or "0")
+                if length <= 0 or length > 1024 * 1024:
+                    raise ValueError("request body is required")
+                decoded = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(decoded, dict):
+                    raise ValueError("request body must be a JSON object")
+                return decoded
+
+            def _send_launch_event(self, payload: dict[str, object]) -> None:
+                body = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                self.wfile.write(b"data: " + body + b"\n\n")
+                self.wfile.flush()
+
+            def _launch_desk(self, payload: dict[str, object]) -> None:
                 text = str(payload.get("text", "")).strip()
                 if not text:
                     raise ValueError("text is required")
-                requested_tools = tuple(str(item) for item in payload.get("requested_tools", ()) or ())
-                requested_skills = tuple(str(item) for item in payload.get("requested_skills", ()) or ())
-                return FriendRequest(owner_id=owner_id, profile_id=profile_id, session_id=session_id, text=text, requested_tools=requested_tools, requested_skills=requested_skills)
+                provider = service.provider_manager.provider()
+                if provider is None:
+                    raise RuntimeError("openai_provider_not_ready")
+                self._audit(200)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self._send_launch_event({"type": "started", "agent": "launch-desk"})
+                stream_launch_desk(text=text, api_key=provider.api_key, base_url=provider.base_url, model=provider.model, emit=self._send_launch_event)
 
             def do_GET(self) -> None:
                 path = urlparse(self.path).path
                 try:
                     if path == "/owner/health":
-                        self._send_json(200, {"status": "ok", "version": "1.3.1-owner", "loopback_only": True, "server": self.server_version})
+                        self._send_json(200, {"status": "ok", "edition": "owner-special", "version": "1.3.1-owner", "loopback_only": True})
                         return
+                    owner_id, profile_id, session_id = self._scope()
                     if path == "/owner/status":
-                        self._headers()
-                        self._send_json(200, {"status": "ok", "architecture": service.runtime.architecture()})
+                        architecture = service.runtime.architecture()
+                        architecture.update({"service": "owner-friend", "version": "1.3.1-owner", "profile_id": profile_id, "session_id": session_id})
+                        self._send_json(200, architecture)
+                        return
+
+                    if path.startswith("/owner/schedule/previews/"):
+                        preview_id = path.rsplit("/", 1)[-1].strip()
+                        if not preview_id:
+                            raise ValueError("preview_id is required")
+
+                        preview = service.runtime.previews.get(
+                            owner_id=owner_id,
+                            profile_id=profile_id,
+                            session_id=session_id,
+                            preview_id=preview_id,
+                        )
+                        self._send_json(200, preview.to_dict())
+                        return
+                    if path == "/owner/provider":
+                        self._send_json(200, service.provider_manager.safe_status())
+                        return
+                    if path == "/owner/memory":
+                        items = service.runtime.orchestrator.memory.recall(owner_id=owner_id, profile_id=profile_id, session_id=session_id)
+                        self._send_json(200, {"owner_id": owner_id, "profile_id": profile_id, "session_id": session_id, "count": len(items), "items": [asdict(item) for item in items]})
                         return
                     self._send_json(404, {"error": "not_found"})
                 except PermissionError as exc:
-                    self._send_json(403, {"error": str(exc)})
-                except ValueError as exc:
-                    self._send_json(400, {"error": str(exc)})
+                    self._send_json(403, {"error": "forbidden", "message": str(exc)})
+                except PreviewNotFoundError as exc:
+                    self._send_json(404, {"error": "not_found", "message": str(exc)})
+                except (ValueError, KeyError, json.JSONDecodeError) as exc:
+                    self._send_json(400, {"error": "bad_request", "message": str(exc)})
                 except Exception as exc:
-                    self._send_json(500, {"error": type(exc).__name__})
+                    self._send_json(500, {"error": "internal_error", "type": type(exc).__name__})
 
             def do_POST(self) -> None:
                 path = urlparse(self.path).path
                 try:
-                    length = int(self.headers.get("Content-Length", "0"))
-                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
-                    if not isinstance(payload, dict):
-                        raise ValueError("JSON object required")
-                    if path == "/owner/chat":
-                        response = service.runtime.ask(self._request(payload))
-                        self._send_json(200, {"text": response.text, "provider": response.provider, "memory_items": response.memory_items, "evidence_id": response.evidence_id, "metadata": response.metadata, "decision": asdict(response.decision)})
+                    owner_id, profile_id, session_id = self._scope()
+                    payload = self._read_payload()
+
+                    if path == "/v1/launch-desk/run":
+                        self._launch_desk(payload)
                         return
-                    if path == "/owner/launch-desk/stream":
-                        request = self._request(payload)
-                        for event in stream_launch_desk(service.runtime, request):
-                            self._send_json(200, event)
+
+                    if path.startswith("/owner/schedule/previews/") and path.endswith("/confirm"):
+                        preview_id = path[
+                            len("/owner/schedule/previews/"):-len("/confirm")
+                        ].strip("/")
+                        if not preview_id:
+                            raise ValueError("preview_id is required")
+
+                        preview = service.runtime.previews.confirm(
+                            owner_id=owner_id,
+                            profile_id=profile_id,
+                            session_id=session_id,
+                            preview_id=preview_id,
+                        )
+                        self._send_json(200, preview.to_dict())
                         return
-                    self._send_json(404, {"error": "not_found"})
+
+                    if path == "/owner/provider/config":
+                        status = service.provider_manager.configure(
+                            base_url=str(payload.get("base_url", "")),
+                            model=str(payload.get("model", "")),
+                            api_key=str(payload["api_key"]) if payload.get("api_key") is not None else None,
+                            enabled=bool(payload.get("enabled", True)),
+                        )
+                        service._apply_provider()
+                        self._send_json(200, status)
+                        return
+                    if path == "/owner/provider/test":
+                        self._send_json(200, service.provider_manager.test())
+                        return
+                    if path != "/owner/chat":
+                        self._send_json(404, {"error": "not_found"})
+                        return
+                    text = str(payload.get("text", "")).strip()
+                    if not text:
+                        raise ValueError("text is required")
+                    request = FriendRequest(
+                        owner_id=owner_id,
+                        profile_id=profile_id,
+                        session_id=session_id,
+                        text=text,
+                        complexity=int(payload.get("complexity", 1)),
+                        risk=int(payload.get("risk", 1)),
+                        parallelism=int(payload.get("parallelism", 1)),
+                        helper_budget=int(payload.get("helper_budget", 0)),
+                        requested_skills=tuple(str(item) for item in payload.get("requested_skills", []) or []),
+                        requested_tools=tuple(str(item) for item in payload.get("requested_tools", []) or []),
+                    )
+                    response = service.runtime.ask(request)
+
+                    metadata = dict(response.metadata)
+                    preview_payload = None
+
+                    if "schedule.generate" in response.decision.selected_tools:
+                        tool_results = metadata.get("tool_results", {})
+                        if isinstance(tool_results, dict):
+                            generated = tool_results.get("schedule.generate")
+                            if isinstance(generated, dict):
+                                preview = service.runtime.previews.create(
+                                    owner_id=owner_id,
+                                    profile_id=profile_id,
+                                    session_id=session_id,
+                                    result=generated,
+                                )
+                                preview_payload = {
+                                    "preview_id": preview.preview_id,
+                                    "status": preview.status,
+                                }
+
+                    helper_allocation = service.runtime.helpers.allocate(request, response.decision.scale)
+                    factory_scale = response.decision.scale.value
+                    factory = service.runtime.bridge.factory_plan(factory_scale)
+                    factory["requested_scale"] = response.decision.scale.value
+                    self._send_json(200, {
+                        "text": response.text,
+                        "provider": response.provider,
+                        "memory_items": response.memory_items,
+                        "evidence_id": response.evidence_id,
+                        "decision": {"scale": response.decision.scale.value, "capacity": response.decision.maximum_leaf_capacity, "plan": list(response.decision.plan), "skills": list(response.decision.selected_skills), "tools": list(response.decision.selected_tools), "summary": response.decision.summary},
+                        "helpers": helper_allocation.snapshot(),
+                        "factory": factory,
+                        "metadata": {
+                            **metadata,
+                            **({"preview": preview_payload} if preview_payload is not None else {}),
+                        },
+                    })
                 except PermissionError as exc:
-                    self._send_json(403, {"error": str(exc)})
-                except ValueError as exc:
-                    self._send_json(400, {"error": str(exc)})
+                    self._send_json(403, {"error": "forbidden", "message": str(exc)})
+                except PreviewNotFoundError as exc:
+                    self._send_json(404, {"error": "not_found", "message": str(exc)})
+                except (ValueError, KeyError, json.JSONDecodeError) as exc:
+                    self._send_json(400, {"error": "bad_request", "message": str(exc)})
                 except Exception as exc:
-                    self._send_json(500, {"error": type(exc).__name__})
+                    self._send_json(500, {"error": "internal_error", "type": type(exc).__name__})
 
         return Handler
 
-    def start(self) -> None:
-        if self._thread is not None and self._thread.is_alive():
-            return
-        self._thread = threading.Thread(target=self.httpd.serve_forever, name="research-os-owner-friend", daemon=True)
-        self._thread.start()
+    def serve_forever(self) -> None:
+        self.httpd.serve_forever(poll_interval=0.1)
 
-    def stop(self) -> None:
+    def start(self) -> threading.Thread:
+        if self._thread is not None and self._thread.is_alive():
+            return self._thread
+        self._thread = threading.Thread(target=self.serve_forever, name="owner-friend-service", daemon=True)
+        self._thread.start()
+        return self._thread
+
+    def close(self) -> None:
         self.httpd.shutdown()
         self.httpd.server_close()
         if self._thread is not None:
-            self._thread.join(timeout=2)
-            self._thread = None
+            self._thread.join(timeout=5)
