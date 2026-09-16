@@ -76,8 +76,8 @@ def _build_plane(owner_id: str):
 
 def _measure_friend(value: Any, route: dict[str, Any]):
     _prepare_resource_control_imports()
-    from execution_contract import MeasuredExecution
-    from resource_governance import Usage
+    from tools.research_os_api.execution_contract import MeasuredExecution
+    from tools.research_os_api.resource_governance import Usage
 
     response = value.get("response") if isinstance(value, dict) else None
     if response is None:
