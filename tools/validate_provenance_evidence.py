@@ -167,6 +167,8 @@ def validate(contract: dict, ledger: dict, target_commit: str | None = None) -> 
             if evidence.get("attestation_id"):
                 attestation_ids.add(evidence["attestation_id"])
             timestamp(evidence.get("issued_at"), f"{prefix}.evidence.issued_at", errors)
+            if target_commit and evidence.get("subject_id") != target_commit:
+                errors.append(f"attestation_target_commit_mismatch:{ident}")
     if entries and entries[0].get("sequence") != schema.get("sequence_must_start_at", 1):
         errors.append("sequence_start_mismatch")
     if schema.get("sequence_must_be_contiguous"):
@@ -188,11 +190,57 @@ def validate(contract: dict, ledger: dict, target_commit: str | None = None) -> 
     return errors
 
 
+def validate_target_roots(roots: dict, ledger: dict, target_commit: str | None, errors: list[str]) -> None:
+    required_fields = {"target_commit", "source_commit", "evidence_root", "provenance_root", "evidence_file", "provenance_file"}
+    if not isinstance(roots, dict):
+        errors.append("roots_not_object")
+        return
+    missing = sorted(required_fields - set(roots))
+    for field in missing:
+        errors.append(f"missing_root_field:{field}")
+    if missing:
+        return
+    if target_commit and roots["target_commit"] != target_commit:
+        errors.append("roots_target_commit_mismatch")
+    if not isinstance(roots["target_commit"], str) or not SHA1_RE.fullmatch(roots["target_commit"]):
+        errors.append("invalid_roots_target_commit")
+    if not isinstance(roots["source_commit"], str) or not SHA1_RE.fullmatch(roots["source_commit"]):
+        errors.append("invalid_roots_source_commit")
+    for field in ("evidence_root", "provenance_root"):
+        if not isinstance(roots[field], str) or not SHA256_RE.fullmatch(roots[field]):
+            errors.append(f"invalid_root:{field}")
+
+    ledger_path = (ROOT / roots["provenance_file"]).resolve()
+    evidence_path = (ROOT / roots["evidence_file"]).resolve()
+    for path, label in ((ledger_path, "provenance_file"), (evidence_path, "evidence_file")):
+        try:
+            path.relative_to(ROOT)
+        except ValueError:
+            errors.append(f"root_path_outside_repository:{label}")
+    if ledger_path != ledger_path:
+        errors.append("invalid_ledger_path")
+    if ledger_path.exists() and ledger_path.is_file():
+        if plain_sha256(ledger) != roots["provenance_root"]:
+            errors.append("provenance_root_mismatch")
+    else:
+        errors.append("missing_provenance_file")
+    if evidence_path.exists() and evidence_path.is_file():
+        evidence = load_json(evidence_path, errors)
+        if evidence is not None:
+            if target_commit and evidence.get("target_commit") != target_commit:
+                errors.append("evidence_target_commit_mismatch")
+            if plain_sha256(evidence) != roots["evidence_root"]:
+                errors.append("evidence_root_mismatch")
+    else:
+        errors.append("missing_evidence_file")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--contract", default="current/PROVENANCE_EVIDENCE_CONTRACT.json")
     parser.add_argument("--ledger", default="current/PROVENANCE_EVIDENCE_LEDGER_FIXTURE.json")
     parser.add_argument("--target-commit", default=None)
+    parser.add_argument("--roots", default=None, help="Target-bound roots manifest to independently recompute and verify")
     args = parser.parse_args()
     contract_path, ledger_path = Path(args.contract), Path(args.ledger)
     if not contract_path.is_absolute(): contract_path = Path.cwd() / contract_path
@@ -213,7 +261,14 @@ def main() -> int:
                             actual = plain_sha256(json.loads(artifact.read_text(encoding="utf-8")))
                             if actual != record.get("digest"):
                                 errors.append(f"derived_digest_mismatch:{entry.get('entry_id')}:{name}")
-    report = {"status": "PASS" if not errors else "FAIL", "contract": display_path(contract_path), "ledger": display_path(ledger_path), "entry_count": len(ledger.get("entries", [])) if isinstance(ledger, dict) else 0, "errors": errors}
+        if args.roots:
+            roots_path = Path(args.roots)
+            if not roots_path.is_absolute():
+                roots_path = Path.cwd() / roots_path
+            roots = load_json(roots_path, errors)
+            if roots is not None:
+                validate_target_roots(roots, ledger, args.target_commit, errors)
+    report = {"status": "PASS" if not errors else "FAIL", "contract": display_path(contract_path), "ledger": display_path(ledger_path), "entry_count": len(ledger.get("entries", [])) if isinstance(ledger, dict) else 0, "roots_verified": bool(args.roots), "errors": errors}
     print(json.dumps(report, sort_keys=True))
     return 0 if not errors else 1
 
