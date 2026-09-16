@@ -134,16 +134,26 @@ jobs:
                   )
 
               checks = fetch_checks()
-              if not checks:
-                  raise SystemExit("no CI checks reported for PR HEAD")
-
               self_checks = [c for c in checks if is_self_check(c)]
               external = [c for c in checks if not is_self_check(c)]
 
               if not self_checks:
                   raise SystemExit("verifier self-check identity not observed")
+
               if not external:
-                  raise SystemExit("no external CI checks reported for PR HEAD")
+                  print(json.dumps({
+                      "status": "WAITING_FOR_EXTERNAL_CI",
+                      "poll": attempt,
+                      "max_polls": max_polls,
+                      "self_check_count": len(self_checks),
+                      "external_check_count": 0,
+                      "pending_count": 0,
+                      "reason": "external CI checks have not materialized yet",
+                  }, indent=2, sort_keys=True))
+                  if attempt == max_polls:
+                      raise SystemExit("external CI checks never materialized before verifier timeout")
+                  time.sleep(poll_seconds)
+                  continue
 
               pending = [
                   c for c in external
