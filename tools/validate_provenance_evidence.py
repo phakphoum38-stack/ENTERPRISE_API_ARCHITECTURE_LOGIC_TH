@@ -190,7 +190,7 @@ def validate(contract: dict, ledger: dict, target_commit: str | None = None) -> 
     return errors
 
 
-def validate_target_roots(roots: dict, ledger: dict, target_commit: str | None, errors: list[str]) -> None:
+def validate_target_roots(roots: dict, ledger: dict, ledger_path: Path, target_commit: str | None, errors: list[str]) -> None:
     required_fields = {"target_commit", "source_commit", "evidence_root", "provenance_root", "evidence_file", "provenance_file"}
     if not isinstance(roots, dict):
         errors.append("roots_not_object")
@@ -210,21 +210,26 @@ def validate_target_roots(roots: dict, ledger: dict, target_commit: str | None, 
         if not isinstance(roots[field], str) or not SHA256_RE.fullmatch(roots[field]):
             errors.append(f"invalid_root:{field}")
 
-    ledger_path = (ROOT / roots["provenance_file"]).resolve()
+    expected_ledger = ledger_path.resolve()
+    declared_ledger = (ROOT / roots["provenance_file"]).resolve()
     evidence_path = (ROOT / roots["evidence_file"]).resolve()
-    for path, label in ((ledger_path, "provenance_file"), (evidence_path, "evidence_file")):
+    for path, label in ((declared_ledger, "provenance_file"), (evidence_path, "evidence_file")):
         try:
             path.relative_to(ROOT)
         except ValueError:
             errors.append(f"root_path_outside_repository:{label}")
-    if ledger_path != ledger_path:
-        errors.append("invalid_ledger_path")
-    if ledger_path.exists() and ledger_path.is_file():
+    try:
+        expected_ledger.relative_to(ROOT)
+    except ValueError:
+        errors.append("ledger_path_outside_repository")
+    if declared_ledger != expected_ledger:
+        errors.append("provenance_file_mismatch")
+    if declared_ledger.exists() and declared_ledger.is_file() and not any(e.endswith(":provenance_file") for e in errors):
         if plain_sha256(ledger) != roots["provenance_root"]:
             errors.append("provenance_root_mismatch")
     else:
         errors.append("missing_provenance_file")
-    if evidence_path.exists() and evidence_path.is_file():
+    if evidence_path.exists() and evidence_path.is_file() and not any(e.endswith(":evidence_file") for e in errors):
         evidence = load_json(evidence_path, errors)
         if evidence is not None:
             if target_commit and evidence.get("target_commit") != target_commit:
@@ -267,7 +272,7 @@ def main() -> int:
                 roots_path = Path.cwd() / roots_path
             roots = load_json(roots_path, errors)
             if roots is not None:
-                validate_target_roots(roots, ledger, args.target_commit, errors)
+                validate_target_roots(roots, ledger, ledger_path, args.target_commit, errors)
     report = {"status": "PASS" if not errors else "FAIL", "contract": display_path(contract_path), "ledger": display_path(ledger_path), "entry_count": len(ledger.get("entries", [])) if isinstance(ledger, dict) else 0, "roots_verified": bool(args.roots), "errors": errors}
     print(json.dumps(report, sort_keys=True))
     return 0 if not errors else 1
