@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from hashlib import sha256
+import importlib
 import os
 from pathlib import Path
 import sys
@@ -23,11 +24,15 @@ _CURRENCY = "USD"
 
 
 def _prepare_resource_control_imports() -> None:
-    """Expose the existing flat control modules without creating a new runtime."""
+    """Expose legacy flat imports while preserving one module identity per primitive."""
     module_root = Path(__file__).resolve().parents[2] / "tools" / "research_os_api"
     value = str(module_root)
     if value not in sys.path:
         sys.path.insert(0, value)
+    for name in ("execution_contract", "resource_governance", "budgets", "api_keys", "admission", "agent_platform", "controlled_router", "policy", "resource_control_plane"):
+        qualified = f"tools.research_os_api.{name}"
+        module = importlib.import_module(qualified)
+        sys.modules.setdefault(name, module)
 
 
 def _int_env(name: str, default: int, minimum: int = 0) -> int:
@@ -76,8 +81,8 @@ def _build_plane(owner_id: str):
 
 def _measure_friend(value: Any, route: dict[str, Any]):
     _prepare_resource_control_imports()
-    from tools.research_os_api.execution_contract import MeasuredExecution
-    from tools.research_os_api.resource_governance import Usage
+    from execution_contract import MeasuredExecution
+    from resource_governance import Usage
 
     response = value.get("response") if isinstance(value, dict) else None
     if response is None:
