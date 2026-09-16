@@ -9,6 +9,9 @@ from ctypes import wintypes
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
+
+from provider_measurement import ProviderMeasurement
+from resource_governance import Usage
 from urllib.parse import urlparse
 
 
@@ -157,7 +160,9 @@ class OpenAICompatibleProvider:
         payload = self.transport.get_json(f"{self.base_url.rstrip('/')}/models", headers=self._headers(), timeout=self.timeout)
         return {"connected": True, "provider": self.name, "models_visible": len(payload.get("data", []) or [])}
 
-    def complete(self, *, prompt: str, context: tuple[str, ...]) -> str:
+    def complete(self, *, prompt: str, context: tuple[str, ...]):
+        from .providers import ProviderResult
+
         messages: list[dict[str, str]] = []
         if context:
             messages.append({"role": "system", "content": "Owner context:\n" + "\n".join(context[-12:])})
@@ -177,7 +182,30 @@ class OpenAICompatibleProvider:
         content = first["message"].get("content")
         if not isinstance(content, str) or not content.strip():
             raise RuntimeError("provider response content is empty")
-        return content
+
+        raw_usage = payload.get("usage")
+        if not isinstance(raw_usage, dict):
+            raise RuntimeError("provider response is missing authoritative usage")
+
+        prompt_tokens = raw_usage.get("prompt_tokens", 0)
+        completion_tokens = raw_usage.get("completion_tokens", 0)
+        total_tokens = raw_usage.get("total_tokens")
+
+        if total_tokens is None:
+            if isinstance(prompt_tokens, int) and isinstance(completion_tokens, int):
+                total_tokens = prompt_tokens + completion_tokens
+
+        if not isinstance(total_tokens, int) or total_tokens < 0:
+            raise RuntimeError("provider response has invalid usage")
+
+        measurement = ProviderMeasurement(
+            usage=Usage(requests=1, tokens=total_tokens),
+        )
+
+        return ProviderResult(
+            text=content,
+            measurement=measurement,
+        )
 
 
 class ProviderManager:

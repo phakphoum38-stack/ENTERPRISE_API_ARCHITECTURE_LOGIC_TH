@@ -3,20 +3,34 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from provider_measurement import ProviderMeasurement
+
+
+@dataclass(frozen=True)
+class ProviderResult:
+    text: str
+    measurement: ProviderMeasurement
+
 
 class Provider(Protocol):
     name: str
 
-    def complete(self, *, prompt: str, context: tuple[str, ...]) -> str: ...
+    def complete(self, *, prompt: str, context: tuple[str, ...]) -> ProviderResult: ...
 
 
 @dataclass
 class MockProvider:
     name: str = "owner-mock"
+    measurement: ProviderMeasurement | None = None
 
-    def complete(self, *, prompt: str, context: tuple[str, ...]) -> str:
+    def complete(self, *, prompt: str, context: tuple[str, ...]) -> ProviderResult:
+        if self.measurement is None:
+            raise RuntimeError("provider measurement is required")
         prefix = f"context={len(context)}"
-        return f"[{self.name} {prefix}] {prompt}"
+        return ProviderResult(
+            text=f"[{self.name} {prefix}] {prompt}",
+            measurement=self.measurement,
+        )
 
 
 class ProviderRouter:
@@ -40,7 +54,7 @@ class ProviderRouter:
             raise RuntimeError("no provider configured")
         return self._providers[0]
 
-    def complete(self, *, prompt: str, context: tuple[str, ...]) -> tuple[str, str]:
+    def complete(self, *, prompt: str, context: tuple[str, ...]) -> tuple[str, ProviderResult]:
         if not self._providers:
             raise RuntimeError("no provider configured")
         errors: list[str] = []

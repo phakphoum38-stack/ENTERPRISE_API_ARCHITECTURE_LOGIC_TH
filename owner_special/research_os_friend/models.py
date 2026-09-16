@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from provider_measurement import ProviderMeasurement
+
 
 class ScaleProfile(str, Enum):
     ONE_CUBED = "1^3"
@@ -59,4 +61,5 @@ class FriendResponse:
     provider: str
     memory_items: int
     evidence_id: str
+    measurement: ProviderMeasurement
     metadata: dict[str, Any] = field(default_factory=dict)

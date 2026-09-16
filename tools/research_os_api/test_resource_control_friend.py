@@ -4,10 +4,24 @@ import os
 import unittest
 
 from budgets import BudgetLimit
-from execution_contract import MeasuredExecution
+from provider_measurement import ProviderMeasurement
 from resource_control_friend import FriendControlRequest, FriendResourceControlAdapter
 from resource_control_plane import ResourceControlPlane
 from resource_governance import Entitlement, Limit, QuotaDimension, Usage, Window
+
+
+class FakeFriendResult(dict):
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        text: str,
+        measurement: ProviderMeasurement,
+    ) -> None:
+        super().__init__(provider=provider, model=model, text=text)
+        self.measurement = measurement
+
 
 
 class FriendResourceControlTests(unittest.TestCase):
@@ -42,7 +56,6 @@ class FriendResourceControlTests(unittest.TestCase):
             self.adapter.execute(
                 request,
                 lambda route: {"provider": route["provider"], "text": "ok"},
-                measure=lambda _value, _route: {"not": "measured"},
             )
 
         self.assertEqual(self.plane.ledger(), ())
@@ -63,12 +76,15 @@ class FriendResourceControlTests(unittest.TestCase):
 
         result = self.adapter.execute(
             request,
-            lambda route: {"provider": route["provider"], "model": route["model"], "text": "ok"},
-            measure=lambda value, _route: MeasuredExecution(
-                value,
-                Usage(requests=1, tokens=200),
-                Decimal("0.80"),
-                "USD",
+            lambda route: FakeFriendResult(
+                provider="local",
+                model=route["model"],
+                text="ok",
+                measurement=ProviderMeasurement(
+                    usage=Usage(requests=1, tokens=200),
+                    cost=Decimal("0.80"),
+                    currency="USD",
+                ),
             ),
         )
 

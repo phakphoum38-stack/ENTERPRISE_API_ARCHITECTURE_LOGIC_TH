@@ -193,7 +193,6 @@ class ResourceControlHTTPAdapter:
         principal: HTTPPrincipal,
         *,
         friend_executor: Callable[[dict[str, Any]], Any],
-        measure: Callable[[Any, dict[str, Any]], MeasuredExecution],
     ) -> ExecutionResult:
         """Execute the already-composed Friend runtime exactly once.
 
@@ -205,7 +204,6 @@ class ResourceControlHTTPAdapter:
         return self._friend_adapter.execute(
             request.to_friend_request(),
             friend_executor,
-            measure=measure,
         )
 
     @staticmethod

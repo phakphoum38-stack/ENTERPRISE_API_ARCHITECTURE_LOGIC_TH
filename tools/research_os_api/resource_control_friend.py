@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import Any, Callable, Iterable
 
 from execution_contract import MeasuredExecution
+from provider_measurement import ProviderMeasurement
 from resource_control_plane import ExecutionResult, ResourceControlPlane
 from resource_governance import Usage
 
@@ -54,21 +55,22 @@ class FriendResourceControlAdapter:
         self,
         request: FriendControlRequest,
         friend_executor: Callable[[dict[str, Any]], Any],
-        *,
-        measure: Callable[[Any, dict[str, Any]], MeasuredExecution],
     ) -> ExecutionResult:
         """Execute Friend work through the canonical control plane.
 
-        ``measure`` is mandatory. The adapter deliberately refuses to invent
-        token/cost values from the Friend response. Provider/runtime-specific
-        accounting must return a real ``MeasuredExecution``.
+        Friend/provider execution must carry its authoritative measurement.
+        This adapter is the single boundary that converts that contract into
+        ``MeasuredExecution``. Missing cost/currency fails closed.
         """
         def governed_executor(route: dict[str, Any]) -> MeasuredExecution:
             value = friend_executor(route)
-            measured = measure(value, route)
-            if not isinstance(measured, MeasuredExecution):
-                raise TypeError("Friend measurement must return MeasuredExecution")
-            return measured
+            measurement = getattr(value, "measurement", None)
+            if not isinstance(measurement, ProviderMeasurement):
+                raise TypeError("Friend execution is missing provider measurement")
+            return measurement.to_measured_execution(
+                value,
+                required_currency=request.currency,
+            )
 
         return self._plane.execute(
             request_id=request.request_id,

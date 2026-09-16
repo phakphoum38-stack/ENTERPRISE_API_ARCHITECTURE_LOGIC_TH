@@ -74,8 +74,15 @@ class FriendOrchestrator:
                 tool_results[tool.name] = json.loads(output)
             except (TypeError, json.JSONDecodeError):
                 tool_results[tool.name] = output
-        provider_name, answer = self.providers.complete(prompt=request.text, context=provider_context)
-        answer = self.responses.compose(provider_name=provider_name, answer=answer, tool_results=tool_results)
+        provider_name, provider_result = self.providers.complete(
+            prompt=request.text,
+            context=provider_context,
+        )
+        answer = self.responses.compose(
+            provider_name=provider_name,
+            answer=provider_result.text,
+            tool_results=tool_results,
+        )
         self.memory.remember(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id, kind="request", text=request.text)
         self.memory.remember(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id, kind="response", text=answer)
         evidence_id = self.evidence.record(
@@ -92,6 +99,7 @@ class FriendOrchestrator:
             provider=provider_name,
             memory_items=memory_items,
             evidence_id=evidence_id,
+            measurement=provider_result.measurement,
             metadata={
                 "edition": self.owner.edition,
                 "owner": self.owner.owner_id,

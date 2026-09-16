@@ -5,9 +5,24 @@ import unittest
 
 from budgets import BudgetLimit
 from execution_contract import ExecutionContext, MeasuredExecution
+from provider_measurement import ProviderMeasurement
 from resource_control_http import HTTPPrincipal, ResourceControlHTTPAdapter
 from resource_control_plane import ResourceControlPlane
 from resource_governance import Entitlement, Limit, QuotaDimension, Usage, Window
+
+
+
+class FakeFriendResult(dict):
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        text: str,
+        measurement: ProviderMeasurement,
+    ) -> None:
+        super().__init__(provider=provider, model=model, text=text)
+        self.measurement = measurement
 
 
 class ResourceControlHTTPAdapterTests(unittest.TestCase):
@@ -106,16 +121,25 @@ class ResourceControlHTTPAdapterTests(unittest.TestCase):
     def test_execute_friend_uses_one_governance_boundary(self):
         calls: list[str] = []
 
-        def friend(route: dict[str, object]) -> dict[str, object]:
+        def friend(route: dict[str, object]) -> FakeFriendResult:
             calls.append("friend")
-            return {"provider": "owner-mock", "model": "friend-unified-master", "text": "ok"}
+            return FakeFriendResult(
+                provider="owner-mock",
+                model="friend-unified-master",
+                text="ok",
+                measurement=ProviderMeasurement(
+                    usage=Usage(requests=1),
+                    cost=Decimal("0.01"),
+                    currency="USD",
+                ),
+            )
 
         result = self.adapter.execute_friend(
             {
                 "request_id": "req-friend",
                 "objective": "hello",
                 "usage": {"requests": 1},
-                "estimated_cost": "0.00",
+                "estimated_cost": "0.01",
                 "currency": "USD",
                 "scopes": ["agent:run"],
                 "available_providers": ["owner-mock"],
@@ -123,15 +147,9 @@ class ResourceControlHTTPAdapterTests(unittest.TestCase):
             },
             self.principal,
             friend_executor=friend,
-            measure=lambda value, route: MeasuredExecution(
-                value,
-                Usage(requests=1),
-                Decimal("0.00"),
-                "USD",
-            ),
         )
 
-        self.assertTrue(result.admission.allowed)
+        self.assertEqual(result.admission.decision.value, "allow")
         self.assertEqual(calls, ["friend"])
         self.assertEqual(result.provider, "owner-mock")
         self.assertEqual(result.model, "friend-unified-master")
@@ -161,16 +179,15 @@ class ResourceControlHTTPAdapterTests(unittest.TestCase):
                 "request_id": "req-friend-denied",
                 "objective": "must not run",
                 "usage": {"requests": 1},
-                "estimated_cost": "0.00",
+                "estimated_cost": "0.01",
                 "currency": "USD",
                 "scopes": ["agent:run"],
             },
             principal,
             friend_executor=lambda route: calls.append("friend"),
-            measure=lambda value, route: MeasuredExecution(value, Usage(requests=1), Decimal("0"), "USD"),
         )
 
-        self.assertFalse(result.admission.allowed)
+        self.assertEqual(result.admission.decision.value, "deny")
         self.assertEqual(calls, [])
         self.assertEqual(len(plane.ledger()), 0)
         self.assertEqual(len(plane.evidence()), 0)
@@ -181,7 +198,7 @@ class ResourceControlHTTPAdapterTests(unittest.TestCase):
             "request_id": "req-first",
             "objective": "once",
             "usage": {"requests": 1},
-            "estimated_cost": "0.00",
+            "estimated_cost": "0.01",
             "currency": "USD",
             "scopes": ["agent:run"],
             "idempotency_key": "same-operation",
@@ -190,19 +207,35 @@ class ResourceControlHTTPAdapterTests(unittest.TestCase):
         first = self.adapter.execute_friend(
             body,
             self.principal,
-            friend_executor=lambda route: calls.append("friend") or {"provider": "owner-mock", "model": "friend", "text": "ok"},
-            measure=lambda value, route: MeasuredExecution(value, Usage(requests=1), Decimal("0"), "USD"),
+            friend_executor=lambda route: calls.append("friend") or FakeFriendResult(
+                provider="owner-mock",
+                model="friend",
+                text="ok",
+                measurement=ProviderMeasurement(
+                    usage=Usage(requests=1),
+                    cost=Decimal("0.01"),
+                    currency="USD",
+                ),
+            ),
         )
         replay_body = {**body, "request_id": "req-replay"}
         replay = self.adapter.execute_friend(
             replay_body,
             self.principal,
-            friend_executor=lambda route: calls.append("replay") or {"provider": "owner-mock", "model": "friend", "text": "should-not-run"},
-            measure=lambda value, route: MeasuredExecution(value, Usage(requests=1), Decimal("0"), "USD"),
+            friend_executor=lambda route: calls.append("replay") or FakeFriendResult(
+                provider="owner-mock",
+                model="friend",
+                text="should-not-run",
+                measurement=ProviderMeasurement(
+                    usage=Usage(requests=1),
+                    cost=Decimal("0.01"),
+                    currency="USD",
+                ),
+            ),
         )
 
-        self.assertTrue(first.admission.allowed)
-        self.assertFalse(replay.admission.allowed)
+        self.assertEqual(first.admission.decision.value, "allow")
+        self.assertEqual(replay.admission.decision.value, "deny")
         self.assertEqual(replay.admission.reason, "idempotency_replay:committed")
         self.assertEqual(calls, ["friend"])
         self.assertEqual(len(self.plane.ledger()), 1)
