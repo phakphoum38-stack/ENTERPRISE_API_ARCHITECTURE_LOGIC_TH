@@ -11,7 +11,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from resource_governance import Usage
+try:
+    from .resource_governance import Usage
+except ImportError:
+    # Existing resource-control modules historically use flat imports when
+    # tools/research_os_api is placed directly on sys.path.
+    from resource_governance import Usage
 
 
 @dataclass(frozen=True)

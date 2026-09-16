@@ -24,6 +24,7 @@ from .provider_settings import MemorySecretStore, OpenAICompatibleProvider, Prov
 from .providers import MockProvider, ProviderRouter
 from .reasoning import DecisionPlanner
 from .runtime import FriendRuntime
+from .resource_control_runtime import install_friend_resource_control
 from .self_learning_contract import SelfLearningContract, SelfLearningContractError
 from .service import OWNER_HEADER, PROFILE_HEADER, SESSION_HEADER, OwnerFriendService, default_owner_data_root
 from .skills import Skill, SkillRegistry
@@ -42,5 +43,5 @@ __all__ = [
     "ProviderRouter", "SESSION_HEADER", "ScaleProfile", "ScopedMemory", "Skill", "SkillRegistry", "Tool", "ToolRegistry",
     "ToolSearch", "ToolSearchResult", "TOOL_CATALOG", "ToolDescriptor", "ToolState", "UnifiedToolCatalog", "V3Bridge", "V3BridgeStatus",
     "WindowsDpapiSecretStore", "default_owner_data_root", "install_builtin_skills", "install_builtin_tools",
-    "install_friend_complete_capabilities",
+    "install_friend_complete_capabilities", "install_friend_resource_control",
 ]

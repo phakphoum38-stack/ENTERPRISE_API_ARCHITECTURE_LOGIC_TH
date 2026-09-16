@@ -74,8 +74,8 @@ class FriendOrchestrator:
                 tool_results[tool.name] = json.loads(output)
             except (TypeError, json.JSONDecodeError):
                 tool_results[tool.name] = output
-        provider_name, answer = self.providers.complete(prompt=request.text, context=provider_context)
-        answer = self.responses.compose(provider_name=provider_name, answer=answer, tool_results=tool_results)
+        provider_name, provider_result = self.providers.complete(prompt=request.text, context=provider_context)
+        answer = self.responses.compose(provider_name=provider_name, answer=provider_result.text, tool_results=tool_results)
         self.memory.remember(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id, kind="request", text=request.text)
         self.memory.remember(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id, kind="response", text=answer)
         evidence_id = self.evidence.record(
@@ -86,6 +86,12 @@ class FriendOrchestrator:
             data={"scale": decision.scale.value, "capacity": decision.maximum_leaf_capacity, "skills": list(decision.selected_skills), "tools": list(decision.selected_tools), "provider": provider_name, "summary": decision.summary},
         )
         memory_items = len(self.memory.recall(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id))
+        resource_control = {
+            "usage": dict(provider_result.usage),
+            "actual_cost": str(provider_result.actual_cost) if provider_result.actual_cost is not None else None,
+            "currency": provider_result.currency,
+            "raw": dict(provider_result.raw),
+        }
         return FriendResponse(
             text=answer,
             decision=decision,
@@ -97,5 +103,6 @@ class FriendOrchestrator:
                 "owner": self.owner.owner_id,
                 "capabilities": self.brain.capabilities_for(request),
                 "tool_results": tool_results,
+                "resource_control": resource_control,
             },
         )

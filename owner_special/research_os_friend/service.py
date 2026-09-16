@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from .launch_desk_agent import stream_launch_desk
 from .models import FriendRequest
 from .provider_settings import ProviderManager
+from .resource_control_runtime import install_friend_resource_control
 from .runtime import FriendRuntime
 from .schedule_generation.preview import PreviewNotFoundError
 
@@ -48,6 +49,7 @@ class OwnerFriendService:
         self.data_root = Path(data_root or default_owner_data_root()).resolve()
         self.audit_path = Path(audit_path).resolve() if audit_path is not None else None
         self.runtime = FriendRuntime.create_owner_special(owner_id, data_root=self.data_root, repository_root=repository_root)
+        install_friend_resource_control()
         self.provider_manager = provider_manager or ProviderManager(self.data_root, owner_id)
         self._apply_provider()
         self.httpd = ThreadingHTTPServer((host, port), self._make_handler())
