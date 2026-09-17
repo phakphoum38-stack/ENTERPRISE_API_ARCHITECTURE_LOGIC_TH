@@ -5,16 +5,66 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const OwnerExperimentalWorkbenchApp());
 
+// Research OS 4D visual system.
+// These tokens are presentation-only: API contracts and execution semantics remain unchanged.
+const Color roViolet = Color(0xFF7C3AED);
+const Color roElectricBlue = Color(0xFF2563EB);
+const Color roCyan = Color(0xFF06B6D4);
+const Color roNeonGreen = Color(0xFF22C55E);
+const Color roHotPink = Color(0xFFEC4899);
+const Color roOrange = Color(0xFFF97316);
+const Color roYellow = Color(0xFFFACC15);
+const Color roRed = Color(0xFFEF4444);
+
+const Color roVoid = Color(0xFF070816);
+const Color roPanel = Color(0xFF101329);
+const Color roPanel2 = Color(0xFF171A3A);
+const Color roBorder = Color(0xFF343A78);
+
+const Color roText = Color(0xFFF8FAFC);
+const Color roTextSecondary = Color(0xFFB8C1E0);
+
+const LinearGradient roPrimaryGradient = LinearGradient(
+  colors: [roViolet, roElectricBlue, roCyan],
+);
+
+const LinearGradient roEnergyGradient = LinearGradient(
+  colors: [roHotPink, roViolet, roElectricBlue],
+);
+
+const LinearGradient roSpectrumGradient = LinearGradient(
+  colors: [roHotPink, roViolet, roCyan, roNeonGreen],
+);
+
 class OwnerExperimentalWorkbenchApp extends StatelessWidget {
   const OwnerExperimentalWorkbenchApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF6D5DFB));
+    final scheme = ColorScheme.fromSeed(
+      seedColor: roViolet,
+      brightness: Brightness.dark,
+    );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Research OS — Owner Experimental Workbench',
-      theme: ThemeData(useMaterial3: true, colorScheme: scheme, scaffoldBackgroundColor: scheme.surface),
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: scheme,
+        scaffoldBackgroundColor: roVoid,
+        cardColor: roPanel,
+        dividerColor: roBorder,
+        canvasColor: roVoid,
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: roText),
+          bodyMedium: TextStyle(color: roTextSecondary),
+          titleLarge: TextStyle(color: roText),
+          titleMedium: TextStyle(color: roText),
+          titleSmall: TextStyle(color: roText),
+        ),
+      ),
       home: const WorkbenchPage(),
     );
   }
@@ -260,7 +310,24 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
 
   Widget _auditView() => _Page(title: 'Audit & Forensics', subtitle: 'Every important owner action can become a traceable event', children: [
     _InfoGrid(items: {'Events': '${_events.length}', 'Session': _sessionId, 'Owner': 'owner', 'Audit': 'Local experimental timeline', 'Sensitive output': 'Redaction guard surface', 'Lineage': 'Mission / execution / SHA'}),
-    Expanded(child: Card(child: _events.isEmpty ? const Center(child: Text('No events yet.')) : ListView.builder(itemCount: _events.length, itemBuilder: (_, i) { final e = _events[i]; return ListTile(leading: const Icon(Icons.bolt_outlined), title: Text(e.kind), subtitle: Text(e.detail), trailing: Text(_time(e.time)); }))),
+      Expanded(
+        child: Card(
+          child: _events.isEmpty
+              ? const Center(child: Text('No events yet.'))
+              : ListView.builder(
+                  itemCount: _events.length,
+                  itemBuilder: (_, i) {
+                    final e = _events[i];
+                    return ListTile(
+                      leading: const Icon(Icons.bolt_outlined),
+                      title: Text(e.kind),
+                      subtitle: Text(e.detail),
+                      trailing: Text(_time(e.time)),
+                    );
+                  },
+                ),
+        ),
+      ),
   ]);
 
   Widget _assuranceView() => _Page(title: 'Assurance Center', subtitle: 'P0–P10 assurance surfaces; no verdict is fabricated by the client', children: [
@@ -279,14 +346,120 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
 }
 
 class _Navigation extends StatelessWidget {
-  const _Navigation({required this.selected, required this.onSelect, required this.wide});
+  const _Navigation({
+    required this.selected,
+    required this.onSelect,
+    required this.wide,
+  });
+
   final WorkbenchView selected;
   final ValueChanged<WorkbenchView> onSelect;
   final bool wide;
+
   @override
   Widget build(BuildContext context) {
-    const items = [(WorkbenchView.chat, Icons.forum_outlined, 'Chat'), (WorkbenchView.missions, Icons.route_outlined, 'Missions'), (WorkbenchView.workspace, Icons.code, 'Workspace'), (WorkbenchView.github, Icons.hub_outlined, 'GitHub'), (WorkbenchView.execution, Icons.play_circle_outline, 'Execution'), (WorkbenchView.evidence, Icons.verified_outlined, 'Evidence'), (WorkbenchView.resources, Icons.speed, 'Resources'), (WorkbenchView.audit, Icons.receipt_long, 'Audit'), (WorkbenchView.assurance, Icons.shield_outlined, 'Assurance')];
-    return NavigationRailExtendedLike(wide: wide, child: NavigationRail(selectedIndex: items.indexWhere((x) => x.$1 == selected), onDestinationSelected: (i) => onSelect(items[i].$1), labelType: wide ? NavigationRailLabelType.all : NavigationRailLabelType.none, leading: Padding(padding: const EdgeInsets.all(12), child: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary)), destinations: [for (final x in items) NavigationRailDestination(icon: Icon(x.$2), selectedIcon: Icon(x.$2), label: Text(x.$3))]));
+    const items = [
+      (WorkbenchView.chat, Icons.forum_outlined, 'Chat'),
+      (WorkbenchView.missions, Icons.route_outlined, 'Missions'),
+      (WorkbenchView.workspace, Icons.code, 'Workspace'),
+      (WorkbenchView.github, Icons.hub_outlined, 'GitHub'),
+      (WorkbenchView.execution, Icons.play_circle_outline, 'Execution'),
+      (WorkbenchView.evidence, Icons.verified_outlined, 'Evidence'),
+      (WorkbenchView.resources, Icons.speed, 'Resources'),
+      (WorkbenchView.audit, Icons.receipt_long, 'Audit'),
+      (WorkbenchView.assurance, Icons.shield_outlined, 'Assurance'),
+    ];
+
+    final selectedIndex = items.indexWhere((x) => x.$1 == selected);
+
+    return NavigationRailExtendedLike(
+      wide: wide,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [roPanel, roVoid],
+          ),
+          border: Border(
+            right: BorderSide(color: roBorder, width: 1),
+          ),
+        ),
+        child: NavigationRail(
+          backgroundColor: Colors.transparent,
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (i) => onSelect(items[i].$1),
+          labelType: wide
+              ? NavigationRailLabelType.all
+              : NavigationRailLabelType.none,
+          leading: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 16, 10, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: wide ? 150 : 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: roPrimaryGradient,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x667C3AED),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      wide ? 'RESEARCH OS' : 'RO',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                ),
+                if (wide) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'OWNER WORKBENCH',
+                    style: TextStyle(
+                      color: roTextSecondary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.6,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          selectedIconTheme: const IconThemeData(
+            color: roCyan,
+            size: 23,
+          ),
+          unselectedIconTheme: const IconThemeData(
+            color: roTextSecondary,
+            size: 21,
+          ),
+          destinations: [
+            for (final x in items)
+              NavigationRailDestination(
+                icon: Icon(x.$2),
+                selectedIcon: Icon(x.$2),
+                label: Text(
+                  x.$3,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -299,62 +472,926 @@ class NavigationRailExtendedLike extends StatelessWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.view, required this.status, required this.ownerGuard});
+  const _TopBar({
+    required this.view,
+    required this.status,
+    required this.ownerGuard,
+  });
+
   final WorkbenchView view;
   final String status;
   final bool ownerGuard;
+
+  String _viewLabel() {
+    switch (view) {
+      case WorkbenchView.chat:
+        return 'CHAT';
+      case WorkbenchView.missions:
+        return 'MISSIONS';
+      case WorkbenchView.workspace:
+        return 'WORKSPACE';
+      case WorkbenchView.github:
+        return 'GITHUB';
+      case WorkbenchView.execution:
+        return 'EXECUTION';
+      case WorkbenchView.evidence:
+        return 'EVIDENCE';
+      case WorkbenchView.resources:
+        return 'RESOURCES';
+      case WorkbenchView.audit:
+        return 'AUDIT';
+      case WorkbenchView.assurance:
+        return 'ASSURANCE';
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => Container(height: 64, padding: const EdgeInsets.symmetric(horizontal: 18), decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor))), child: Row(children: [const Icon(Icons.science_outlined), const SizedBox(width: 10), const Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Research OS', style: TextStyle(fontWeight: FontWeight.w700)), Text('Owner Experimental Workbench', style: TextStyle(fontSize: 12))])), Chip(avatar: Icon(ownerGuard ? Icons.lock : Icons.lock_open, size: 15), label: Text(ownerGuard ? 'OWNER ONLY' : 'BLOCKED')), const SizedBox(width: 10), Text(status, overflow: TextOverflow.ellipsis)]));
+  Widget build(BuildContext context) {
+    final connected = status.toLowerCase().contains('connected');
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            roPanel,
+            roPanel2,
+            roVoid,
+          ],
+        ),
+        border: Border(
+          bottom: BorderSide(color: roBorder, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: roPrimaryGradient,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x557C3AED),
+                  blurRadius: 18,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Text(
+                'RO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'RESEARCH OS',
+                      style: TextStyle(
+                        color: roText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: roEnergyGradient,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '4D',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'OWNER WORKBENCH  /  ${_viewLabel()}',
+                  style: const TextStyle(
+                    color: roTextSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (MediaQuery.sizeOf(context).width >= 900) ...[
+            _TopMetric(
+              label: 'MODE',
+              value: view == WorkbenchView.chat ? 'CHAT / WORK' : _viewLabel(),
+              icon: Icons.bolt_outlined,
+              accent: roViolet,
+            ),
+            const SizedBox(width: 8),
+            _TopMetric(
+              label: 'ROUTE',
+              value: 'API :8787',
+              icon: Icons.route_outlined,
+              accent: roCyan,
+            ),
+            const SizedBox(width: 8),
+            _TopMetric(
+              label: 'FRIEND',
+              value: ':8790',
+              icon: Icons.hub_outlined,
+              accent: roElectricBlue,
+            ),
+            const SizedBox(width: 10),
+          ],
+          Container(
+            constraints: const BoxConstraints(maxWidth: 240),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+            decoration: BoxDecoration(
+              color: roVoid.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: connected ? roNeonGreen : roBorder,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: connected
+                        ? const LinearGradient(
+                            colors: [roNeonGreen, roCyan],
+                          )
+                        : const LinearGradient(
+                            colors: [roOrange, roYellow],
+                          ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (connected ? roNeonGreen : roOrange)
+                            .withValues(alpha: 0.55),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    status,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: roText,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 9),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: ownerGuard
+                  ? roSpectrumGradient
+                  : const LinearGradient(
+                      colors: [roRed, roOrange],
+                    ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: (ownerGuard ? roViolet : roRed)
+                      .withValues(alpha: 0.30),
+                  blurRadius: 14,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  ownerGuard ? Icons.lock_outline : Icons.lock_open,
+                  color: Colors.white,
+                  size: 15,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  ownerGuard ? 'OWNER ONLY' : 'BLOCKED',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopMetric extends StatelessWidget {
+  const _TopMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: roVoid.withValues(alpha: 0.62),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: roBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: accent),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: roTextSecondary,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: roText,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
 }
 
 class _ControlStrip extends StatelessWidget {
   const _ControlStrip({required this.children});
+
   final List<Widget> children;
+
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.fromLTRB(18, 12, 18, 8), child: Wrap(spacing: 10, runSpacing: 8, children: children));
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [roPanel, roVoid],
+          ),
+          border: Border(
+            bottom: BorderSide(color: roBorder),
+          ),
+        ),
+        child: Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: children,
+        ),
+      );
 }
 
 class _Toggle extends StatelessWidget {
-  const _Toggle({required this.label, required this.value, required this.onChanged});
-  final String label; final bool value; final ValueChanged<bool> onChanged;
+  const _Toggle({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
   @override
-  Widget build(BuildContext context) => FilterChip(label: Text(label), selected: value, onSelected: onChanged);
+  Widget build(BuildContext context) => FilterChip(
+        label: Text(
+          label,
+          style: TextStyle(
+            color: value ? Colors.white : roTextSecondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+        selected: value,
+        onSelected: onChanged,
+        checkmarkColor: Colors.white,
+        selectedColor: roViolet.withValues(alpha: 0.75),
+        backgroundColor: roPanel2,
+        side: BorderSide(
+          color: value ? roCyan : roBorder,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(11),
+        ),
+      );
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.icon, required this.label});
-  final IconData icon; final String label;
+  const _Badge({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
   @override
-  Widget build(BuildContext context) => Chip(avatar: Icon(icon, size: 16), label: Text(label));
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 7,
+        ),
+        decoration: BoxDecoration(
+          color: roPanel2,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: roBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: roCyan,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: roText,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _Welcome extends StatelessWidget {
   const _Welcome();
+
   @override
-  Widget build(BuildContext context) => Center(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(32), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 850), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Owner Experimental Workbench', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)), const SizedBox(height: 10), const Text('A new experimental UI for commanding the existing Research OS stack. Chat is only one surface: missions, workspace, GitHub, execution, evidence, resources, audit and assurance are first-class.'), const SizedBox(height: 24), _InfoGrid(items: {'Transport': 'Flutter → API Platform :8787 → Friend :8790', 'Identity': 'Owner-only experimental guard', 'Quota': 'No artificial Research OS chat-message quota', 'Execution': 'Existing Policy / Admission / Resource Control', 'Verification': 'Evidence-aware; unknown ≠ PASS', 'Lifecycle': 'Full P0–P10 assurance surface'}), const SizedBox(height: 20), Text('Try a command', style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 8), const Text('“ตรวจงานค้างชุดถัดไป แล้วสรุป evidence ที่ต้องใช้”'), ]))));
+  Widget build(BuildContext context) => Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 850),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Owner Experimental Workbench',
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'A new experimental UI for commanding the existing Research OS stack. Chat is only one surface: missions, workspace, GitHub, execution, evidence, resources, audit and assurance are first-class.',
+                  ),
+                  const SizedBox(height: 24),
+                  _InfoGrid(
+                    items: {
+                      'Transport': 'Flutter → API Platform :8787 → Friend :8790',
+                      'Identity': 'Owner-only experimental guard',
+                      'Quota': 'No artificial Research OS chat-message quota',
+                      'Execution': 'Existing Policy / Admission / Resource Control',
+                      'Verification': 'Evidence-aware; unknown ≠ PASS',
+                      'Lifecycle': 'Full P0–P10 assurance surface',
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Try a command',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '“ตรวจงานค้างชุดถัดไป แล้วสรุป evidence ที่ต้องใช้”',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _InspectorPanel extends StatelessWidget {
-  const _InspectorPanel({required this.mission, required this.execution, required this.provider, required this.complexity, required this.risk, required this.parallelism});
-  final String mission, execution, provider; final int complexity, risk, parallelism;
+  const _InspectorPanel({
+    required this.mission,
+    required this.execution,
+    required this.provider,
+    required this.complexity,
+    required this.risk,
+    required this.parallelism,
+  });
+
+  final String mission;
+  final String execution;
+  final String provider;
+  final int complexity;
+  final int risk;
+  final int parallelism;
+
   @override
-  Widget build(BuildContext context) => Container(decoration: BoxDecoration(border: Border(left: BorderSide(color: Theme.of(context).dividerColor))), padding: const EdgeInsets.all(16), child: ListView(children: [_PanelTitle(title: 'Live Inspector'), _KV('Mission', mission), _KV('Execution', execution), _KV('Provider', provider), _KV('Complexity', '$complexity'), _KV('Risk', '$risk'), _KV('Parallelism', '$parallelism'), const Divider(height: 28), const _PanelTitle(title: 'Contract'), _KV('API', ':8787 /v1/ai/generate'), _KV('Friend', ':8790 /owner/chat'), _KV('Session', 'owner-experimental-chat'), const Divider(height: 28), const _PanelTitle(title: 'Safety'), _KV('Chat quota', 'None'), _KV('Evidence', 'Inspectable'), _KV('Unknown', 'Not PASS')]),);
+  Widget build(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            left: BorderSide(color: roBorder),
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: ListView(
+          children: [
+            const _PanelTitle(title: 'Live Inspector'),
+            _KV('Mission', mission),
+            _KV('Execution', execution),
+            _KV('Provider', provider),
+            _KV('Complexity', '$complexity'),
+            _KV('Risk', '$risk'),
+            _KV('Parallelism', '$parallelism'),
+            const Divider(height: 28),
+            const _PanelTitle(title: 'Contract'),
+            _KV('API', ':8787 /v1/ai/generate'),
+            _KV('Friend', ':8790 /owner/chat'),
+            _KV('Session', 'owner-experimental-chat'),
+            const Divider(height: 28),
+            const _PanelTitle(title: 'Safety'),
+            _KV('Chat quota', 'None'),
+            _KV('Evidence', 'Inspectable'),
+            _KV('Unknown', 'Not PASS'),
+          ],
+        ),
+      );
 }
 
-class _PanelTitle extends StatelessWidget { const _PanelTitle({required this.title}); final String title; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800))); }
-class _KV extends StatelessWidget { const _KV(this.k, this.v); final String k, v; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: Text(k, style: const TextStyle(fontSize: 12))), Expanded(flex: 2, child: Text(v, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)))])); }
+class _PanelTitle extends StatelessWidget {
+  const _PanelTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(
+          title,
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+      );
+}
+
+class _KV extends StatelessWidget {
+  const _KV(this.k, this.v);
+
+  final String k;
+  final String v;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                k,
+                style: const TextStyle(
+                  color: roTextSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                v,
+                style: const TextStyle(
+                  color: roText,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
 
 class _Composer extends StatelessWidget {
-  const _Composer({required this.controller, required this.busy, required this.onSend, required this.endpoint});
-  final TextEditingController controller, endpoint; final bool busy; final VoidCallback onSend;
+  const _Composer({
+    required this.controller,
+    required this.busy,
+    required this.onSend,
+    required this.endpoint,
+  });
+
+  final TextEditingController controller;
+  final TextEditingController endpoint;
+  final bool busy;
+  final VoidCallback onSend;
+
   @override
-  Widget build(BuildContext context) => Material(color: Theme.of(context).colorScheme.surfaceContainer, child: Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 14), child: Column(children: [Row(children: [const Icon(Icons.route_outlined, size: 17), const SizedBox(width: 7), Expanded(child: TextField(controller: endpoint, decoration: const InputDecoration(labelText: 'API Platform endpoint', isDense: true, border: OutlineInputBorder()))), const SizedBox(width: 10), const Text('POST /v1/ai/generate')]), const SizedBox(height: 10), Row(crossAxisAlignment: CrossAxisAlignment.end, children: [Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 6, enabled: !busy, onSubmitted: (_) => onSend(), decoration: const InputDecoration(hintText: 'สั่งงาน Research OS…', border: OutlineInputBorder()))), const SizedBox(width: 10), IconButton.filled(onPressed: busy ? null : onSend, icon: busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.arrow_upward), tooltip: 'Send')])])));
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [roPanel2, roPanel, roVoid],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: roBorder),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x447C3AED),
+              blurRadius: 24,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: roPrimaryGradient,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Text(
+                      'ROUTE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: TextField(
+                      controller: endpoint,
+                      style: const TextStyle(
+                        color: roText,
+                        fontSize: 12,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'API Platform endpoint',
+                        labelStyle: const TextStyle(
+                          color: roTextSecondary,
+                        ),
+                        isDense: true,
+                        prefixIcon: const Icon(
+                          Icons.route_outlined,
+                          color: roCyan,
+                          size: 18,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(11),
+                          borderSide: const BorderSide(color: roBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(11),
+                          borderSide: const BorderSide(
+                            color: roCyan,
+                            width: 1.5,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: roVoid.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const _Badge(
+                    icon: Icons.send_outlined,
+                    label: 'POST /v1/ai/generate',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      minLines: 1,
+                      maxLines: 6,
+                      enabled: !busy,
+                      onSubmitted: (_) => onSend(),
+                      style: const TextStyle(
+                        color: roText,
+                        fontSize: 14,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'สั่งงาน Research OS…',
+                        hintStyle: const TextStyle(
+                          color: roTextSecondary,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.bolt_outlined,
+                          color: roHotPink,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
+                        filled: true,
+                        fillColor: roVoid.withValues(alpha: 0.82),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(
+                            color: roBorder,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(
+                            color: roViolet,
+                            width: 1.7,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: busy ? null : roEnergyGradient,
+                      color: busy ? roPanel2 : null,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: busy
+                          ? null
+                          : const [
+                              BoxShadow(
+                                color: Color(0x557C3AED),
+                                blurRadius: 18,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                    ),
+                    child: IconButton(
+                      onPressed: busy ? null : onSend,
+                      icon: busy
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.arrow_upward_rounded,
+                              color: Colors.white,
+                            ),
+                      tooltip: busy ? 'Sending' : 'Send',
+                      padding: const EdgeInsets.all(15),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    size: 14,
+                    color: roNeonGreen,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'OWNER CHANNEL',
+                    style: TextStyle(
+                      color: roTextSecondary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Icon(
+                    Icons.all_inclusive,
+                    size: 15,
+                    color: roCyan,
+                  ),
+                  SizedBox(width: 5),
+                  Text(
+                    'NO ARTIFICIAL CHAT QUOTA',
+                    style: TextStyle(
+                      color: roTextSecondary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.9,
+                    ),
+                  ),
+                  Spacer(),
+                  Text(
+                    'API :8787  →  FRIEND :8790',
+                    style: TextStyle(
+                      color: roTextSecondary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.7,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message}); final _Message message;
+  const _MessageBubble({required this.message});
+
+  final _Message message;
+
   @override
-  Widget build(BuildContext context) { final user = message.role == 'user'; return Align(alignment: user ? Alignment.centerRight : Alignment.centerLeft, child: Container(constraints: const BoxConstraints(maxWidth: 900), margin: const EdgeInsets.only(bottom: 14), padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: user ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(user ? 'OWNER' : 'FRIEND / RESEARCH OS', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w800)), const SizedBox(height: 6), SelectableText(message.text), if (message.raw != null) Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => showDialog(context: context, builder: (_) => AlertDialog(title: const Text('Raw API response'), content: SingleChildScrollView(child: SelectableText(const JsonEncoder.withIndent('  ').convert(message.raw))), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))])), icon: const Icon(Icons.data_object, size: 16), label: const Text('Raw API'))]))); }
+  Widget build(BuildContext context) {
+    final user = message.role == 'user';
+
+    final gradient = user
+        ? const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [roViolet, roElectricBlue],
+          )
+        : const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [roPanel2, roPanel],
+          );
+
+    return Align(
+      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 900),
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(user ? 18 : 5),
+            bottomRight: Radius.circular(user ? 5 : 18),
+          ),
+          border: Border.all(
+            color: user ? roCyan.withValues(alpha: 0.55) : roBorder,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (user ? roViolet : Colors.black)
+                  .withValues(alpha: user ? 0.24 : 0.18),
+              blurRadius: 18,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Text(
+                    user ? 'OWNER' : 'FRIEND / RESEARCH OS',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                if (message.raw != null)
+                  const Text(
+                    'RAW AVAILABLE',
+                    style: TextStyle(
+                      color: roTextSecondary,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            SelectableText(
+              message.text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                height: 1.45,
+              ),
+            ),
+            if (message.raw != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Raw API response'),
+                      content: SingleChildScrollView(
+                        child: SelectableText(
+                          const JsonEncoder.withIndent('  ')
+                              .convert(message.raw),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  icon: const Icon(Icons.data_object, size: 16),
+                  label: const Text('Raw API'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _Message { const _Message(this.role, this.text, [this.raw]); factory _Message.user(String text) => _Message('user', text); factory _Message.assistant(String text, [dynamic raw]) => _Message('assistant', text, raw); final String role, text; final dynamic raw; }
