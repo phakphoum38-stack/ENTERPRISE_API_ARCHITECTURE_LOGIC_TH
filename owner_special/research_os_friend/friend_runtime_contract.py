@@ -74,7 +74,7 @@ class FriendRuntimeContract:
     def run_agent(self, request: FriendRequest, *, run_correlation_id: str) -> dict[str, Any]:
         self._validate_request(request)
         self._validate_correlation(run_correlation_id)
-        run = self._runtime.run_agent(request)
+        run = self._runtime.run_agent(request, run_correlation_id=run_correlation_id)
         envelope = {"schema": self.SCHEMA, "owner_id": self.owner_id, "source_sha": self.source_sha, "run_correlation_id": run_correlation_id, "run_id": getattr(run, "run_id", ""), "state": getattr(run, "state", ""), "read_only": True}
         self._validate_payload(envelope)
         return copy.deepcopy(envelope)
