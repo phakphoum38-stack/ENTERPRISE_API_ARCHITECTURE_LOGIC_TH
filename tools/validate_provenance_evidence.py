@@ -186,6 +186,12 @@ def validate(contract: dict, ledger: dict, target_commit: str | None = None) -> 
         if att_id and att_id not in attestation_ids:
             errors.append(f"unknown_attestation_reference:{entry.get('entry_id')}")
         if target_commit and entry.get("evidence_type") == "attestation":
+            direct_target = evidence.get("subject_id")
+            if isinstance(direct_target, str) and SHA1_RE.fullmatch(direct_target):
+                if direct_target == target_commit:
+                    continue
+                errors.append(f"attestation_target_commit_mismatch:{entry.get('entry_id')}")
+                continue
             referenced_targets = []
             if isinstance(refs, list):
                 for ref in refs:
@@ -194,10 +200,12 @@ def validate(contract: dict, ledger: dict, target_commit: str | None = None) -> 
                         target = referenced.get("evidence", {}).get("target_commit")
                         if isinstance(target, str) and SHA1_RE.fullmatch(target):
                             referenced_targets.append(target)
-            if not referenced_targets:
-                errors.append(f"attestation_target_commit_missing:{entry.get('entry_id')}")
-            elif any(target != target_commit for target in referenced_targets):
+            if target_commit in referenced_targets:
+                continue
+            if referenced_targets:
                 errors.append(f"attestation_target_commit_mismatch:{entry.get('entry_id')}")
+            else:
+                errors.append(f"attestation_target_commit_missing:{entry.get('entry_id')}")
     return errors
 
 
@@ -278,8 +286,7 @@ def main() -> int:
                                 errors.append(f"derived_digest_mismatch:{entry.get('entry_id')}:{name}")
         if args.roots:
             roots_path = Path(args.roots)
-            if not roots_path.is_absolute():
-                roots_path = Path.cwd() / roots_path
+            if not roots_path.is_absolute(): roots_path = Path.cwd() / roots_path
             roots = load_json(roots_path, errors)
             if roots is not None:
                 validate_target_roots(roots, ledger, ledger_path, args.target_commit, errors)
