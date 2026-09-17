@@ -13,11 +13,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
-from typing import Iterable, Mapping
+from typing import Iterable
 
 from .canonical_identity_federation import CanonicalIdentity, CanonicalIdentityError
 from .continuous_supervisor import ACTIONS, SupervisorDecision
-from .distributed_coordination import ConcurrentProject, CoordinationClaim, DistributedCoordinationError
+from .distributed_coordination import ConcurrentProject, CoordinationClaim
 from .project_fleet import MAX_PROJECTS, ProjectFleet, ProjectFleetError
 
 
@@ -56,6 +56,12 @@ class FleetAssuranceObservation:
             raise ContinuousAssuranceError("claim fencing metadata is incomplete")
         if self.claim_epoch is not None and self.claim_epoch < 1:
             raise ContinuousAssuranceError("claim_epoch must be >= 1")
+        if self.claim_epoch is not None and self.claim_active is not True:
+            raise ContinuousAssuranceError("fenced claim must be active")
+        if self.claim_fenced and self.claim_epoch is None:
+            raise ContinuousAssuranceError("fenced claim requires epoch")
+        if self.claim_fenced and self.claim_active is not True:
+            raise ContinuousAssuranceError("fenced claim must be active")
 
     def fingerprint(self) -> str:
         material = {
