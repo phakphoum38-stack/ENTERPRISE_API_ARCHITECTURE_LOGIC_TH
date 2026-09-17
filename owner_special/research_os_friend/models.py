@@ -4,7 +4,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from provider_measurement import ProviderMeasurement
+try:
+    from provider_measurement import ProviderMeasurement
+except ModuleNotFoundError:
+    from tools.research_os_api.provider_measurement import ProviderMeasurement
 
 
 class ScaleProfile(str, Enum):
