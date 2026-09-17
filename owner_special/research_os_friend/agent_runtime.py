@@ -30,6 +30,7 @@ class AgentTraceEvent:
 @dataclass(frozen=True)
 class AgentRun:
     run_id: str
+    run_correlation_id: str | None = None
     owner_id: str
     profile_id: str
     session_id: str
@@ -90,14 +91,17 @@ class AgentRuntime:
         if self.trace_store is not None:
             self.trace_store.save(run)
 
-    def run(self, request: FriendRequest) -> AgentRun:
+    def run(self, request: FriendRequest, *, run_correlation_id: str | None = None) -> AgentRun:
         run_id = self._run_id(request)
+        if run_correlation_id is not None and (not isinstance(run_correlation_id, str) or not run_correlation_id.strip()):
+            raise ValueError("run_correlation_id must be non-empty when provided")
+        correlation = run_correlation_id.strip() if isinstance(run_correlation_id, str) else None
         events = [
             self._event(
                 sequence=1,
                 event="run-created",
                 status=AgentRunStatus.CREATED,
-                data={"goal": request.text},
+                data={"goal": request.text, "run_correlation_id": correlation},
             ),
             self._event(
                 sequence=2,
@@ -147,6 +151,7 @@ class AgentRuntime:
             )
             run = AgentRun(
                 run_id=run_id,
+                run_correlation_id=correlation,
                 owner_id=request.owner_id,
                 profile_id=request.profile_id,
                 session_id=request.session_id,
