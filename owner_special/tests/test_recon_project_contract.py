@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import pytest
+import unittest
 
 from owner_special.research_os_friend.autobot_governance import GovernanceError
 from owner_special.research_os_friend.recon_project_contract import (
@@ -38,61 +38,55 @@ def make_contract(**overrides):
     return ProjectCreationContract(**values)
 
 
-def test_valid_creation_contract_has_no_failures():
-    assert validate_project_creation(make_contract()) == ()
+class ReconProjectContractTests(unittest.TestCase):
+    def test_valid_creation_contract_has_no_failures(self):
+        self.assertEqual(validate_project_creation(make_contract()), ())
+
+    def test_identity_is_exact_repository_and_initial_commit(self):
+        contract = make_contract()
+        self.assertTrue(contract.identity_key.endswith(f"@{_SHA}"))
+
+    def test_missing_recovery_is_rejected(self):
+        self.assertIn("missing_recovery", make_contract(recovery_defined=False).validate_creation())
+
+    def test_missing_governance_is_rejected(self):
+        self.assertIn("missing_governance", make_contract(governance_defined=False).validate_creation())
+
+    def test_missing_authority_boundary_is_rejected(self):
+        self.assertIn("missing_authority_boundary", make_contract(authority_defined=False).validate_creation())
+
+    def test_unknown_initial_commit_fails_closed(self):
+        with self.assertRaises(GovernanceError):
+            make_contract(initial_commit="not-a-sha")
+
+    def test_duplicate_invariants_fail_closed(self):
+        with self.assertRaises(GovernanceError):
+            make_contract(invariants=("identity", "identity"))
+
+    def test_recon_cannot_enter_authorized_or_released(self):
+        contract = make_contract()
+        self.assertFalse(contract.can_transition(ProjectLifecycle.AUTHORIZED))
+        self.assertFalse(contract.can_transition(ProjectLifecycle.RELEASED))
+
+    def test_failed_project_can_only_enter_recovery(self):
+        contract = make_contract(lifecycle=ProjectLifecycle.FAILED)
+        self.assertTrue(contract.can_transition(ProjectLifecycle.RECOVERY))
+        self.assertFalse(contract.can_transition(ProjectLifecycle.VERIFYING))
+
+    def test_recovery_returns_to_verifying_only(self):
+        contract = make_contract(lifecycle=ProjectLifecycle.RECOVERY)
+        self.assertTrue(contract.can_transition(ProjectLifecycle.VERIFYING))
+        self.assertFalse(contract.can_transition(ProjectLifecycle.RELEASED))
+
+    def test_terminal_retirement_cannot_transition(self):
+        contract = make_contract(lifecycle=ProjectLifecycle.RETIRED)
+        self.assertFalse(contract.can_transition(ProjectLifecycle.PROPOSED))
+
+    def test_protocol_depth_is_metadata_not_release_authority(self):
+        contract = make_contract(assurance_level=AssuranceLevel.P10_CONTINUOUS)
+        self.assertEqual(contract.assurance_level, AssuranceLevel.P10_CONTINUOUS)
+        self.assertFalse(contract.can_transition(ProjectLifecycle.RELEASED))
 
 
-def test_identity_is_exact_repository_and_initial_commit():
-    contract = make_contract()
-    assert contract.identity_key.endswith(f"@{_SHA}")
-
-
-def test_missing_recovery_is_rejected():
-    assert "missing_recovery" in make_contract(recovery_defined=False).validate_creation()
-
-
-def test_missing_governance_is_rejected():
-    assert "missing_governance" in make_contract(governance_defined=False).validate_creation()
-
-
-def test_missing_authority_boundary_is_rejected():
-    assert "missing_authority_boundary" in make_contract(authority_defined=False).validate_creation()
-
-
-def test_unknown_initial_commit_fails_closed():
-    with pytest.raises(GovernanceError):
-        make_contract(initial_commit="not-a-sha")
-
-
-def test_duplicate_invariants_fail_closed():
-    with pytest.raises(GovernanceError):
-        make_contract(invariants=("identity", "identity"))
-
-
-def test_recon_cannot_enter_authorized_or_released():
-    contract = make_contract()
-    assert contract.can_transition(ProjectLifecycle.AUTHORIZED) is False
-    assert contract.can_transition(ProjectLifecycle.RELEASED) is False
-
-
-def test_failed_project_can_only_enter_recovery():
-    contract = make_contract(lifecycle=ProjectLifecycle.FAILED)
-    assert contract.can_transition(ProjectLifecycle.RECOVERY) is True
-    assert contract.can_transition(ProjectLifecycle.VERIFYING) is False
-
-
-def test_recovery_returns_to_verifying_only():
-    contract = make_contract(lifecycle=ProjectLifecycle.RECOVERY)
-    assert contract.can_transition(ProjectLifecycle.VERIFYING) is True
-    assert contract.can_transition(ProjectLifecycle.RELEASED) is False
-
-
-def test_terminal_retirement_cannot_transition():
-    contract = make_contract(lifecycle=ProjectLifecycle.RETIRED)
-    assert contract.can_transition(ProjectLifecycle.PROPOSED) is False
-
-
-def test_protocol_depth_is_metadata_not_release_authority():
-    contract = make_contract(assurance_level=AssuranceLevel.P10_CONTINUOUS)
-    assert contract.assurance_level == AssuranceLevel.P10_CONTINUOUS
-    assert contract.can_transition(ProjectLifecycle.RELEASED) is False
+if __name__ == "__main__":
+    unittest.main()
