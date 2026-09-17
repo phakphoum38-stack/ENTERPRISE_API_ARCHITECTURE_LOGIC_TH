@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from resource_governance import Usage
+try:
+    from .resource_governance import Usage
+except ImportError:
+    from resource_governance import Usage
 
 
 @dataclass(frozen=True)
@@ -33,7 +36,10 @@ class ProviderMeasurement:
         required_currency: str,
     ):
         """Convert only complete authoritative accounting into MeasuredExecution."""
-        from execution_contract import MeasuredExecution
+        try:
+            from .execution_contract import MeasuredExecution
+        except ImportError:
+            from execution_contract import MeasuredExecution
 
         if self.cost is None or self.currency is None:
             raise ValueError("authoritative provider cost is required")
