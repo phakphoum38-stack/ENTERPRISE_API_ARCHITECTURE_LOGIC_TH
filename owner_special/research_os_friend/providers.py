@@ -4,8 +4,15 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol
 
-from provider_measurement import ProviderMeasurement
-from resource_governance import Usage
+try:
+    from provider_measurement import ProviderMeasurement
+except ModuleNotFoundError:
+    from tools.research_os_api.provider_measurement import ProviderMeasurement
+
+try:
+    from resource_governance import Usage
+except ModuleNotFoundError:
+    from tools.research_os_api.resource_governance import Usage
 
 
 @dataclass(frozen=True)
