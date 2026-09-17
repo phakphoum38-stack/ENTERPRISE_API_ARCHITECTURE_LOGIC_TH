@@ -9,12 +9,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
-from execution_contract import MeasuredExecution
-from provider_measurement import ProviderMeasurement
-from resource_control_plane import ExecutionResult, ResourceControlPlane
-from resource_governance import Usage
+try:
+    from .execution_contract import MeasuredExecution
+    from .resource_control_plane import ExecutionResult, ResourceControlPlane
+    from .resource_governance import Usage
+    from .provider_measurement import ProviderMeasurement
+except ImportError:
+    from execution_contract import MeasuredExecution
+    from resource_control_plane import ExecutionResult, ResourceControlPlane
+    from resource_governance import Usage
+    from provider_measurement import ProviderMeasurement
 
 
 @dataclass(frozen=True)
@@ -55,22 +61,27 @@ class FriendResourceControlAdapter:
         self,
         request: FriendControlRequest,
         friend_executor: Callable[[dict[str, Any]], Any],
+        *,
+        measure: Callable[[Any, dict[str, Any]], MeasuredExecution] | None = None,
     ) -> ExecutionResult:
         """Execute Friend work through the canonical control plane.
 
-        Friend/provider execution must carry its authoritative measurement.
-        This adapter is the single boundary that converts that contract into
-        ``MeasuredExecution``. Missing cost/currency fails closed.
+        New provider integrations must carry authoritative ProviderMeasurement.
+        The legacy ``measure`` callback remains accepted for existing resource-
+        control callers and is only used when the Friend result has no embedded
+        provider measurement.
         """
         def governed_executor(route: dict[str, Any]) -> MeasuredExecution:
             value = friend_executor(route)
             measurement = getattr(value, "measurement", None)
-            if not isinstance(measurement, ProviderMeasurement):
+            if isinstance(measurement, ProviderMeasurement):
+                return measurement.to_measured_execution(value, required_currency=request.currency)
+            if measure is None:
                 raise TypeError("Friend execution is missing provider measurement")
-            return measurement.to_measured_execution(
-                value,
-                required_currency=request.currency,
-            )
+            measured = measure(value, route)
+            if not isinstance(measured, MeasuredExecution):
+                raise TypeError("Friend measurement must return MeasuredExecution")
+            return measured
 
         return self._plane.execute(
             request_id=request.request_id,

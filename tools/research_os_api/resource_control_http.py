@@ -4,10 +4,8 @@ HTTP is transport only. Identity is authenticated by the canonical session/API-k
 layer; ResourceControlPlane remains the single authority for admission, routing,
 execution accounting, and evidence.
 
-The HTTP adapter supports two deliberate execution shapes:
-- UnifiedResourceExecutionPipeline for genuinely separate Friend -> Brain -> Factory -> Provider stages.
-- FriendResourceControlAdapter for the production Friend runtime, where Friend already owns
-  Brain/skills/tools/Factory/Provider orchestration and must not be decomposed and executed twice.
+The adapter supports two execution shapes: a generic Friend -> Brain -> Factory
+-> Provider pipeline, and the already-composed Friend runtime exactly once.
 """
 from __future__ import annotations
 
@@ -16,35 +14,16 @@ from decimal import Decimal
 from typing import Any, Callable, Mapping
 
 from execution_contract import MeasuredExecution
-from resource_control_execution_pipeline import (
-    BrainStage,
-    FactoryStage,
-    FriendStage,
-    MeasureStage,
-    ProviderStage,
-    UnifiedExecutionRequest,
-    UnifiedResourceExecutionPipeline,
-)
+from resource_control_execution_pipeline import BrainStage, FactoryStage, FriendStage, MeasureStage, ProviderStage, UnifiedExecutionRequest, UnifiedResourceExecutionPipeline
 from resource_control_friend import FriendControlRequest, FriendResourceControlAdapter
 from resource_control_plane import ExecutionResult, ResourceControlPlane
 from resource_governance import Usage
 
-
-_USAGE_FIELDS = (
-    "requests",
-    "tokens",
-    "compute_units",
-    "concurrent_jobs",
-    "workers",
-    "storage_bytes",
-    "bandwidth_bytes",
-)
+_USAGE_FIELDS = ("requests", "tokens", "compute_units", "concurrent_jobs", "workers", "storage_bytes", "bandwidth_bytes")
 
 
 @dataclass(frozen=True)
 class HTTPPrincipal:
-    """Identity authenticated by the canonical session/API-key layer."""
-
     principal_id: str
     scopes: frozenset[str]
 
@@ -58,8 +37,6 @@ class HTTPPrincipal:
 
 @dataclass(frozen=True)
 class ResourceControlHTTPRequest:
-    """Canonicalized HTTP request before it enters the control plane."""
-
     request_id: str
     principal_id: str
     objective: str
@@ -72,37 +49,13 @@ class ResourceControlHTTPRequest:
     idempotency_key: str | None
 
     def to_pipeline_request(self) -> UnifiedExecutionRequest:
-        return UnifiedExecutionRequest(
-            request_id=self.request_id,
-            principal_id=self.principal_id,
-            objective=self.objective,
-            usage=self.usage,
-            estimated_cost=self.estimated_cost,
-            currency=self.currency,
-            scopes=self.scopes,
-            available_providers=self.available_providers,
-            requested_agent=self.requested_agent,
-            idempotency_key=self.idempotency_key,
-        )
+        return UnifiedExecutionRequest(self.request_id, self.principal_id, self.objective, self.usage, self.estimated_cost, self.currency, self.scopes, self.available_providers, self.requested_agent, self.idempotency_key)
 
     def to_friend_request(self) -> FriendControlRequest:
-        return FriendControlRequest(
-            request_id=self.request_id,
-            principal_id=self.principal_id,
-            objective=self.objective,
-            usage=self.usage,
-            estimated_cost=self.estimated_cost,
-            currency=self.currency,
-            scopes=self.scopes,
-            available_providers=self.available_providers,
-            requested_agent=self.requested_agent,
-            idempotency_key=self.idempotency_key,
-        )
+        return FriendControlRequest(self.request_id, self.principal_id, self.objective, self.usage, self.estimated_cost, self.currency, self.scopes, self.available_providers, self.requested_agent, self.idempotency_key)
 
 
 class ResourceControlHTTPAdapter:
-    """Translate an authenticated HTTP request into one governed execution."""
-
     def __init__(self, plane: ResourceControlPlane):
         self._pipeline = UnifiedResourceExecutionPipeline(plane)
         self._friend_adapter = FriendResourceControlAdapter(plane)
@@ -122,105 +75,37 @@ class ResourceControlHTTPAdapter:
             raise ValueError("objective is required")
         if not currency:
             raise ValueError("currency is required")
-
-        usage_payload = body.get("usage")
-        if usage_payload is None:
-            usage_payload = {"requests": 1}
+        usage_payload = body.get("usage") or {"requests": 1}
         if not isinstance(usage_payload, Mapping):
             raise ValueError("usage must be an object")
         unknown = sorted(set(usage_payload) - set(_USAGE_FIELDS))
         if unknown:
             raise ValueError(f"unknown usage dimensions: {', '.join(unknown)}")
         usage = Usage(**{field: int(usage_payload.get(field, 0)) for field in _USAGE_FIELDS})
-
         try:
             estimated_cost = Decimal(str(body.get("estimated_cost", "0")))
         except (ArithmeticError, ValueError) as exc:
             raise ValueError("estimated_cost must be a valid decimal") from exc
         if estimated_cost < 0:
             raise ValueError("estimated_cost cannot be negative")
-
-        requested_scopes = frozenset(
-            str(scope).strip() for scope in (body.get("scopes") or principal.scopes) if str(scope).strip()
-        )
+        requested_scopes = frozenset(str(scope).strip() for scope in (body.get("scopes") or principal.scopes) if str(scope).strip())
         if not requested_scopes.issubset(principal.scopes):
             raise ValueError("requested scopes exceed authenticated principal scopes")
-
         providers = body.get("available_providers") or ()
         if isinstance(providers, str):
             providers = (providers,)
         if not isinstance(providers, (tuple, list)):
             raise ValueError("available_providers must be a list")
+        return ResourceControlHTTPRequest(request_id, principal.principal_id, objective, usage, estimated_cost, currency, requested_scopes, str(body.get("requested_agent") or "").strip() or None, tuple(str(provider).strip() for provider in providers if str(provider).strip()), str(body.get("idempotency_key") or "").strip() or None)
 
-        return ResourceControlHTTPRequest(
-            request_id=request_id,
-            principal_id=principal.principal_id,
-            objective=objective,
-            usage=usage,
-            estimated_cost=estimated_cost,
-            currency=currency,
-            scopes=requested_scopes,
-            requested_agent=str(body.get("requested_agent") or "").strip() or None,
-            available_providers=tuple(str(provider).strip() for provider in providers if str(provider).strip()),
-            idempotency_key=str(body.get("idempotency_key") or "").strip() or None,
-        )
-
-    def execute(
-        self,
-        body: Mapping[str, Any],
-        principal: HTTPPrincipal,
-        *,
-        friend: FriendStage,
-        brain: BrainStage,
-        factory: FactoryStage,
-        provider: ProviderStage,
-        measure: MeasureStage,
-    ) -> ExecutionResult:
-        """Execute a request through the generic multi-stage pipeline."""
+    def execute(self, body: Mapping[str, Any], principal: HTTPPrincipal, *, friend: FriendStage, brain: BrainStage, factory: FactoryStage, provider: ProviderStage, measure: MeasureStage) -> ExecutionResult:
         request = self.normalize(body, principal)
-        return self._pipeline.execute(
-            request.to_pipeline_request(),
-            friend=friend,
-            brain=brain,
-            factory=factory,
-            provider=provider,
-            measure=measure,
-        )
+        return self._pipeline.execute(request.to_pipeline_request(), friend=friend, brain=brain, factory=factory, provider=provider, measure=measure)
 
-    def execute_friend(
-        self,
-        body: Mapping[str, Any],
-        principal: HTTPPrincipal,
-        *,
-        friend_executor: Callable[[dict[str, Any]], Any],
-    ) -> ExecutionResult:
-        """Execute the already-composed Friend runtime exactly once.
-
-        This is the production composition boundary: Friend remains the owner
-        of Brain/skills/tools/Factory/Provider orchestration while Resource
-        Control remains the owner of admission, accounting, and evidence.
-        """
+    def execute_friend(self, body: Mapping[str, Any], principal: HTTPPrincipal, *, friend_executor: Callable[[dict[str, Any]], Any], measure: Callable[[Any, dict[str, Any]], MeasuredExecution]) -> ExecutionResult:
         request = self.normalize(body, principal)
-        return self._friend_adapter.execute(
-            request.to_friend_request(),
-            friend_executor,
-        )
+        return self._friend_adapter.execute(request.to_friend_request(), friend_executor, measure=measure)
 
     @staticmethod
     def response(result: ExecutionResult) -> dict[str, Any]:
-        return {
-            "request_id": result.request_id,
-            "provider": result.provider,
-            "model": result.model,
-            "text": result.text,
-            "usage": result.usage.__dict__ if result.usage else None,
-            "cost": str(result.cost) if result.cost is not None else None,
-            "currency": result.currency,
-            "route": result.route,
-            "admission": {
-                "status": result.admission.status.value,
-                "reservation_id": result.admission.reservation_id,
-            },
-            "ledger_sequence": result.ledger_entry.sequence if result.ledger_entry else None,
-            "evidence_id": (result.evidence or {}).get("evidence_id") if result.evidence else None,
-        }
+        return {"request_id": result.request_id, "provider": result.provider, "model": result.model, "text": result.text, "usage": result.usage.__dict__ if result.usage else None, "cost": str(result.cost) if result.cost is not None else None, "currency": result.currency, "route": result.route, "admission": {"status": result.admission.status.value, "reservation_id": result.admission.reservation_id}, "ledger_sequence": result.ledger_entry.sequence if result.ledger_entry else None, "evidence_id": (result.evidence or {}).get("evidence_id") if result.evidence else None}

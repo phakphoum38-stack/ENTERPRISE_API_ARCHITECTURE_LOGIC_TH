@@ -1,10 +1,22 @@
+"""Contract types shared by governed runtime execution surfaces.
+
+This module contains no admission, routing, or provider logic. Runtime
+surfaces must hand measured execution results back to ResourceControlPlane;
+these types make that boundary explicit without introducing a second control
+plane.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from resource_governance import Usage
+try:
+    from .resource_governance import Usage
+except ImportError:
+    # Existing resource-control modules historically use flat imports when
+    # tools/research_os_api is placed directly on sys.path.
+    from resource_governance import Usage
 
 
 @dataclass(frozen=True)
@@ -19,10 +31,9 @@ class MeasuredExecution:
     def __post_init__(self) -> None:
         if self.cost < 0:
             raise ValueError("execution cost cannot be negative")
-        currency = self.currency.strip().upper()
-        if not currency:
+        if not self.currency.strip():
             raise ValueError("execution currency is required")
-        object.__setattr__(self, "currency", currency)
+        object.__setattr__(self, "currency", self.currency.strip().upper())
 
 
 @dataclass(frozen=True)
@@ -36,11 +47,11 @@ class ExecutionContext:
     route: dict[str, Any]
 
     def __post_init__(self) -> None:
-        for field_name in (
-            "request_id",
-            "principal_id",
-            "provider",
-            "model",
-        ):
-            if not getattr(self, field_name).strip():
-                raise ValueError(f"{field_name} is required")
+        if not self.request_id.strip():
+            raise ValueError("request_id is required")
+        if not self.principal_id.strip():
+            raise ValueError("principal_id is required")
+        if not self.provider.strip():
+            raise ValueError("provider is required")
+        if not self.model.strip():
+            raise ValueError("model is required")
