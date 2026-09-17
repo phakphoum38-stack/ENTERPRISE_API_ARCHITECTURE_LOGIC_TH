@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import re
 import subprocess
@@ -15,6 +16,7 @@ PRODUCER = ROOT / "tools" / "record_provenance_entry.py"
 FIXTURE = ROOT / "current" / "PROVENANCE_EVIDENCE_LEDGER_FIXTURE.json"
 CONTRACT = ROOT / "current" / "PROVENANCE_EVIDENCE_CONTRACT.json"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
+DOMAIN = b"provenance-entry-v1\x00"
 
 
 class ProvenanceEvidenceTests(unittest.TestCase):
@@ -108,6 +110,49 @@ class ProvenanceEvidenceTests(unittest.TestCase):
         result = self.validate(ledger)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unknown_evidence_reference:EV-001", self.errors(result))
+
+    def test_artifact_digest_uses_raw_file_bytes(self):
+        with tempfile.TemporaryDirectory(dir=ROOT) as d:
+            d = Path(d)
+            artifact = d / "artifact.json"
+            original = b'{"a":1,"b":2}\n'
+            reformatted = b'{\n  "b": 2,\n  "a": 1\n}\n'
+            self.assertNotEqual(original, reformatted)
+            self.assertEqual(json.loads(original), json.loads(reformatted))
+            artifact.write_bytes(original)
+
+            ledger = self.load()
+            entry = copy.deepcopy(ledger["entries"][0])
+            entry["evidence_type"] = "artifact"
+            entry["evidence"] = {"statement": "raw-byte artifact regression"}
+            entry["input_hashes"] = {
+                "source": {
+                    "algorithm": "git-sha1",
+                    "digest": "0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10",
+                    "subject": "git-commit",
+                }
+            }
+            entry["output_hashes"] = {
+                "artifact": {
+                    "algorithm": "sha256",
+                    "digest": hashlib.sha256(original).hexdigest(),
+                    "subject": f"artifact:{artifact.relative_to(ROOT)}",
+                }
+            }
+            entry["previous_entry_hash"] = None
+            unsigned = dict(entry)
+            unsigned.pop("entry_hash", None)
+            entry["entry_hash"] = hashlib.sha256(
+                DOMAIN
+                + json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+            ).hexdigest()
+            test_ledger = {"contract_version": "1.1.0", "entries": [entry]}
+
+            artifact.write_bytes(reformatted)
+            result = self.validate(test_ledger)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("derived_digest_mismatch:EV-001:artifact", self.errors(result))
 
     def test_producer_rejects_caller_supplied_derived_fields(self):
         with tempfile.TemporaryDirectory() as d:
