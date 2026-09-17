@@ -46,6 +46,11 @@ def plain_sha256(value: object) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
+def raw_sha256(path: Path) -> str:
+    """Hash the exact persisted artifact bytes, without parsing or reserializing."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def required(obj: dict, fields: list[str], prefix: str, errors: list[str]) -> None:
     for field in fields:
         if field not in obj:
@@ -210,7 +215,7 @@ def main() -> int:
                         rel = record["subject"][len("artifact:"):]
                         artifact = (ROOT / rel).resolve()
                         if artifact.exists() and artifact.is_file():
-                            actual = plain_sha256(json.loads(artifact.read_text(encoding="utf-8")))
+                            actual = raw_sha256(artifact)
                             if actual != record.get("digest"):
                                 errors.append(f"derived_digest_mismatch:{entry.get('entry_id')}:{name}")
     report = {"status": "PASS" if not errors else "FAIL", "contract": display_path(contract_path), "ledger": display_path(ledger_path), "entry_count": len(ledger.get("entries", [])) if isinstance(ledger, dict) else 0, "errors": errors}
