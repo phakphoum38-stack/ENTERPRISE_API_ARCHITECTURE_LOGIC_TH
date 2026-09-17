@@ -176,6 +176,147 @@ class CircuitBreaker:
         return fingerprints.count(fingerprints[-1]) >= self.max_same_failure
 
 
+class ReconState(str, Enum):
+    """Operational states; recovery may choose among several safe next paths."""
+
+    PENDING = "PENDING"
+    GENERATING = "GENERATING"
+    WAITING = "WAITING"
+    RETRYING = "RETRYING"
+    GENERATED = "GENERATED"
+    VERIFYING = "VERIFYING"
+    PASS = "PASS"
+    FAIL = "FAIL"
+    CODE_DEFECT = "CODE_DEFECT"
+    INTEGRITY_FAILURE = "INTEGRITY_FAILURE"
+    RECONSTRUCTION_REQUIRED = "RECONSTRUCTION_REQUIRED"
+    TIMEOUT = "TIMEOUT"
+
+
+class TransitionDecision(str, Enum):
+    """Decision class for adaptive transitions; it is not a fixed workflow."""
+
+    ALLOWED = "ALLOWED"
+    CONDITIONAL = "CONDITIONAL"
+    FORBIDDEN = "FORBIDDEN"
+
+
+_TERMINAL_STATES = frozenset({
+    ReconState.PASS,
+    ReconState.INTEGRITY_FAILURE,
+    ReconState.RECONSTRUCTION_REQUIRED,
+})
+
+_TRANSITIONS = {
+    ReconState.PENDING: frozenset({ReconState.GENERATING, ReconState.WAITING, ReconState.VERIFYING}),
+    ReconState.GENERATING: frozenset({
+        ReconState.WAITING,
+        ReconState.RETRYING,
+        ReconState.GENERATED,
+        ReconState.VERIFYING,
+        ReconState.FAIL,
+        ReconState.CODE_DEFECT,
+    }),
+    ReconState.WAITING: frozenset({
+        ReconState.GENERATING,
+        ReconState.RETRYING,
+        ReconState.VERIFYING,
+        ReconState.RECONSTRUCTION_REQUIRED,
+        ReconState.TIMEOUT,
+    }),
+    ReconState.RETRYING: frozenset({
+        ReconState.GENERATING,
+        ReconState.WAITING,
+        ReconState.GENERATED,
+        ReconState.VERIFYING,
+        ReconState.FAIL,
+        ReconState.CODE_DEFECT,
+    }),
+    ReconState.GENERATED: frozenset({ReconState.VERIFYING, ReconState.FAIL, ReconState.CODE_DEFECT}),
+    ReconState.VERIFYING: frozenset({
+        ReconState.PASS,
+        ReconState.FAIL,
+        ReconState.WAITING,
+        ReconState.CODE_DEFECT,
+        ReconState.INTEGRITY_FAILURE,
+        ReconState.RECONSTRUCTION_REQUIRED,
+    }),
+    ReconState.FAIL: frozenset({
+        ReconState.PENDING,
+        ReconState.GENERATING,
+        ReconState.WAITING,
+        ReconState.RETRYING,
+        ReconState.VERIFYING,
+        ReconState.CODE_DEFECT,
+        ReconState.RECONSTRUCTION_REQUIRED,
+    }),
+    ReconState.CODE_DEFECT: frozenset({
+        ReconState.GENERATING,
+        ReconState.RETRYING,
+        ReconState.VERIFYING,
+        ReconState.RECONSTRUCTION_REQUIRED,
+    }),
+    ReconState.TIMEOUT: frozenset({
+        ReconState.WAITING,
+        ReconState.RETRYING,
+        ReconState.RECONSTRUCTION_REQUIRED,
+    }),
+}
+
+
+def guard_recon_transition(
+    current: ReconState,
+    target: ReconState,
+    *,
+    verification_complete: bool = False,
+    integrity_failure: bool = False,
+    recovery_path_available: bool = True,
+) -> TransitionDecision:
+    """Guard lifecycle integrity without turning RECON into a single-path FSM."""
+    if not isinstance(current, ReconState) or not isinstance(target, ReconState):
+        raise GovernanceError("unknown RECON state")
+    if current in _TERMINAL_STATES:
+        return TransitionDecision.FORBIDDEN
+    if target == ReconState.PASS and not verification_complete:
+        return TransitionDecision.CONDITIONAL
+    if integrity_failure and target not in {ReconState.INTEGRITY_FAILURE, ReconState.RECONSTRUCTION_REQUIRED}:
+        return TransitionDecision.FORBIDDEN
+    if target not in _TRANSITIONS.get(current, frozenset()):
+        return TransitionDecision.FORBIDDEN
+    if target == ReconState.RECONSTRUCTION_REQUIRED and recovery_path_available:
+        return TransitionDecision.CONDITIONAL
+    return TransitionDecision.ALLOWED
+
+
+@dataclass(frozen=True)
+class SelfRepairRequest:
+    """Describes RECON self-repair without granting governance authority."""
+
+    changed_paths: tuple[str, ...]
+    modifies_governance: bool = False
+    modifies_authority: bool = False
+    modifies_verification: bool = False
+    modifies_evidence: bool = False
+    bypasses_gate: bool = False
+    self_grants_capability: bool = False
+
+
+def validate_self_repair_request(request: SelfRepairRequest, budget: RepairBudget) -> tuple[str, ...]:
+    """Allow implementation repair while rejecting governance-escape repairs."""
+    if not isinstance(request, SelfRepairRequest):
+        raise GovernanceError("invalid self-repair request")
+    if any((
+        request.modifies_governance,
+        request.modifies_authority,
+        request.modifies_verification,
+        request.modifies_evidence,
+        request.bypasses_gate,
+        request.self_grants_capability,
+    )):
+        raise GovernanceError("self-repair cannot alter or bypass governance boundaries")
+    return validate_repair_scope(request.changed_paths, budget)
+
+
 def classify_failure(value: str, *, integrity_signal: bool = False) -> FailureClass:
     """Classify conservatively; ambiguous failures become UNKNOWN."""
     if not isinstance(value, str) or not value.strip():
