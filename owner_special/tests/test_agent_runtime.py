@@ -26,6 +26,16 @@ class AgentRuntimeTests(unittest.TestCase):
         self.assertEqual(run.events[-1].data["evidence_id"], run.response.evidence_id)
         self.assertEqual(runtime.get_agent_run(run.run_id), run)
         self.assertEqual(runtime.agent_runs(), (run,))
+        self.assertIsNone(run.run_correlation_id)
+
+    def test_agent_runtime_binds_run_correlation_id(self):
+        runtime = FriendRuntime.create_owner_special("owner-agent-runtime")
+        run = runtime.run_agent(
+            FriendRequest(owner_id="owner-agent-runtime", text="correlated run"),
+            run_correlation_id="p1.api.run-1",
+        )
+        self.assertEqual(run.run_correlation_id, "p1.api.run-1")
+        self.assertEqual(run.events[0].data["run_correlation_id"], "p1.api.run-1")
 
     def test_agent_runtime_preserves_owner_boundary_on_failure(self):
         runtime = FriendRuntime.create_owner_special("owner-agent-runtime")
