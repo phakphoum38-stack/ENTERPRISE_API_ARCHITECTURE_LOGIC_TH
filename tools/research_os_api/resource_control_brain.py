@@ -1,30 +1,27 @@
-"""Friend-to-Resource-Control-Plane execution boundary.
+"""Brain-to-resource-control planning boundary.
 
-The Friend runtime remains the owner of Friend orchestration, Brain, skills,
-and tools. This adapter owns only admission/execution normalization: Friend
-execution must enter the canonical ResourceControlPlane and must return an
-explicit MeasuredExecution before quota/budget commitment.
+Brain remains the authority for logical workload/scale selection. This adapter
+only converts that workload into an admission request; it does not create a
+second quota or scale authority and it never invents post-execution usage.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 from execution_contract import MeasuredExecution
-from provider_measurement import ProviderMeasurement
 from resource_control_plane import ExecutionResult, ResourceControlPlane
 from resource_governance import Usage
 
 
 @dataclass(frozen=True)
-class FriendControlRequest:
-    """Canonical resource inputs attached to one Friend execution."""
-
+class BrainControlRequest:
     request_id: str
     principal_id: str
     objective: str
-    usage: Usage
+    leaf_tasks: int
+    parallelism: int
     estimated_cost: Decimal
     currency: str
     scopes: frozenset[str]
@@ -39,44 +36,47 @@ class FriendControlRequest:
             raise ValueError("principal_id is required")
         if not self.objective.strip():
             raise ValueError("objective is required")
+        if self.leaf_tasks < 1:
+            raise ValueError("leaf_tasks must be positive")
+        if self.parallelism < 1:
+            raise ValueError("parallelism must be positive")
         if self.estimated_cost < 0:
             raise ValueError("estimated_cost cannot be negative")
-        if not self.currency.strip():
-            raise ValueError("currency is required")
 
 
-class FriendResourceControlAdapter:
-    """Govern Friend execution without duplicating Friend runtime policy."""
+class BrainResourceControlAdapter:
+    """Admit Brain work through the single ResourceControlPlane."""
 
     def __init__(self, plane: ResourceControlPlane):
         self._plane = plane
 
     def execute(
         self,
-        request: FriendControlRequest,
-        friend_executor: Callable[[dict[str, Any]], Any],
+        request: BrainControlRequest,
+        brain_executor: Callable[[dict[str, Any]], Any],
+        *,
+        measure: Callable[[Any, dict[str, Any]], MeasuredExecution],
     ) -> ExecutionResult:
-        """Execute Friend work through the canonical control plane.
+        # Logical workload is an admission estimate. Actual provider/runtime
+        # accounting must be supplied explicitly by the measurement callback.
+        usage = Usage(
+            requests=1,
+            compute_units=request.leaf_tasks,
+            concurrent_jobs=min(request.parallelism, request.leaf_tasks),
+        )
 
-        Friend/provider execution must carry its authoritative measurement.
-        This adapter is the single boundary that converts that contract into
-        ``MeasuredExecution``. Missing cost/currency fails closed.
-        """
         def governed_executor(route: dict[str, Any]) -> MeasuredExecution:
-            value = friend_executor(route)
-            measurement = getattr(value, "measurement", None)
-            if not isinstance(measurement, ProviderMeasurement):
-                raise TypeError("Friend execution is missing provider measurement")
-            return measurement.to_measured_execution(
-                value,
-                required_currency=request.currency,
-            )
+            value = brain_executor(route)
+            measured = measure(value, route)
+            if not isinstance(measured, MeasuredExecution):
+                raise TypeError("Brain measurement must return MeasuredExecution")
+            return measured
 
         return self._plane.execute(
             request_id=request.request_id,
             principal_id=request.principal_id,
             objective=request.objective,
-            usage=request.usage,
+            usage=usage,
             estimated_cost=request.estimated_cost,
             currency=request.currency,
             scopes=request.scopes,

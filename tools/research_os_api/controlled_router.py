@@ -71,6 +71,12 @@ class GovernedAgentRouter:
                 available_providers=available_providers,
                 allow_fallback=allow_fallback,
             )
+            provider_selection = route.get("provider_selection") or {}
+            route = {
+                **route,
+                "provider": provider_selection.get("provider"),
+                "model": (provider_selection.get("model") or ""),
+            }
         except Exception:
             self._admission.release(admission.reservation_id)  # type: ignore[arg-type]
             raise

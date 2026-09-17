@@ -73,9 +73,14 @@ class UnifiedResourceExecutionPipeline:
         """Admit once, then run Friend -> Brain -> Factory -> Provider."""
 
         def governed_executor(route: dict[str, Any]) -> MeasuredExecution:
+            # All stage callbacks are inside the single ResourceControlPlane
+            # executor. This guarantees admission occurs before any stage that
+            # can perform work, and prevents nested adapters from double-
+            # reserving, measuring, committing, or recording evidence.
             friend_result = friend(request)
             brain_result = brain(request, friend_result)
             factory_result = factory(request, brain_result)
+
             execution_context = ExecutionContext(
                 request_id=request.request_id,
                 principal_id=request.principal_id,

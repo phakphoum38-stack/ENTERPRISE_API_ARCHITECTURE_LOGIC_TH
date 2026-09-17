@@ -98,6 +98,7 @@ class FriendOrchestrator:
             provider=provider_name,
             memory_items=memory_items,
             evidence_id=evidence_id,
+            measurement=provider_result.measurement,
             metadata={
                 "edition": self.owner.edition,
                 "owner": self.owner.owner_id,
