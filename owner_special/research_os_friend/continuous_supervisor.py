@@ -54,4 +54,4 @@ def decide(observation: SupervisorObservation) -> SupervisorDecision:
 def next_attempt(*, identity: CanonicalIdentity, attempt: CanonicalAttempt) -> CanonicalAttempt:
     if attempt.task_id != identity.task_id or attempt.run_id != identity.run_id:
         raise SupervisorDecisionError("attempt does not match canonical task/run")
-    return attempt.retry(attempt_id=f"{attempt.attempt_id}:retry", attempt_number=attempt.attempt_number+1)
+    return attempt.retry(attempt_id=f"{attempt.attempt_id}:retry")
