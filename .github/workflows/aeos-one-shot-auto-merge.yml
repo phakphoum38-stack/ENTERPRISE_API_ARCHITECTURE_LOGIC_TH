@@ -11,14 +11,20 @@ on:
         description: Exact PR HEAD SHA to review
         required: true
         type: string
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_run:
+    workflows:
+      - Owner Special Friend Complete
+      - Research OS Gate
+      - Research OS Final Gate
+      - AEOS Master Assurance Gate
+    types: [completed]
 
 permissions:
   contents: read
   pull-requests: read
   checks: read
   statuses: read
+  actions: read
 
 jobs:
   comprehensive-review:
@@ -32,19 +38,52 @@ jobs:
           INPUT_HEAD: ${{ inputs.expected_head_sha }}
           EVENT_PR: ${{ github.event.pull_request.number }}
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW_HEAD: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
         run: |
           set -euo pipefail
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             PR="$INPUT_PR"
             HEAD="$INPUT_HEAD"
           else
-            PR="$EVENT_PR"
-            HEAD="$EVENT_HEAD"
+            HEAD="$WORKFLOW_HEAD"
+            test -n "$HEAD"
+            PR=""
+            echo "trigger_workflow=$WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
           fi
-          test -n "$PR"
           test -n "$HEAD"
           echo "pr=$PR" >> "$GITHUB_OUTPUT"
           echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve pull request for workflow completion
+        if: ${{ github.event_name == 'workflow_run' }}
+        id: workflow-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD: ${{ steps.target.outputs.head }}
+        run: |
+          set -euo pipefail
+          prs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls" --paginate)"
+          pr="$(python3 -c 'import json,sys; rows=json.load(sys.stdin); matches=[p for p in rows if p.get("state")=="open" and p.get("head",{}).get("sha")==sys.argv[1]]; print(matches[0]["number"] if len(matches)==1 else "")' "$HEAD" <<< "$prs")"
+          test -n "$pr"
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+
+      - name: Finalize target identity
+        id: identity
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PR: ${{ steps.target.outputs.pr }}
+          WORKFLOW_PR: ${{ steps.workflow-pr.outputs.pr }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR="$DISPATCH_PR"
+          else
+            PR="$WORKFLOW_PR"
+          fi
+          test -n "$PR"
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          echo "head=${{ steps.target.outputs.head }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout trusted main
         uses: actions/checkout@v4
@@ -54,8 +93,8 @@ jobs:
 
       - name: Fetch exact PR HEAD without executing PR workflow code
         env:
-          PR_NUMBER: ${{ steps.target.outputs.pr }}
-          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
+          PR_NUMBER: ${{ steps.identity.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/aeos-target"
@@ -66,8 +105,8 @@ jobs:
       - name: Verify PR checks are green
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.target.outputs.pr }}
-          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
+          PR_NUMBER: ${{ steps.identity.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
           INITIAL_POLL_SECONDS: 5
           MAX_POLL_SECONDS: 30
           MAX_WAIT_SECONDS: 900
@@ -84,8 +123,8 @@ jobs:
 
       - name: Run one-shot comprehensive review
         env:
-          PR_NUMBER: ${{ steps.target.outputs.pr }}
-          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
+          PR_NUMBER: ${{ steps.identity.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
         run: |
           set -euo pipefail
           python3 tools/aeos/comprehensive_review.py \
@@ -95,7 +134,7 @@ jobs:
 
       - name: Verify review certificate is non-authorizing
         env:
-          EXPECTED_HEAD: ${{ steps.target.outputs.head }}
+          EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
