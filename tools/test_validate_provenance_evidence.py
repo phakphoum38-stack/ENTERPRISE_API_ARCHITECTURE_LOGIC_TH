@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import re
 import subprocess
@@ -40,6 +41,19 @@ class ProvenanceEvidenceTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(VALIDATOR)], cwd=ROOT, capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(json.loads(result.stdout)["status"], "PASS")
+
+    def test_artifact_digest_uses_exact_file_bytes_not_canonical_json(self):
+        from tools.validate_provenance_evidence import plain_sha256, raw_sha256
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".json", delete=False) as f:
+            f.write(b'{ "b": 2, "a": 1 }\n')
+            path = Path(f.name)
+        try:
+            self.assertEqual(raw_sha256(path), hashlib.sha256(path.read_bytes()).hexdigest())
+            parsed = json.loads(path.read_text(encoding="utf-8"))
+            self.assertNotEqual(raw_sha256(path), plain_sha256(parsed))
+        finally:
+            path.unlink(missing_ok=True)
 
     def test_git_sha1_is_never_accepted_as_artifact_sha256(self):
         ledger = self.load()
