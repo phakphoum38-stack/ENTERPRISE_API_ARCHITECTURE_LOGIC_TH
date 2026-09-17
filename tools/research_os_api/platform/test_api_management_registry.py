@@ -3,8 +3,18 @@ from datetime import datetime, timezone
 
 import pytest
 
-from api_management_models import API, APIEndpoint, APIVersion, APIKey, Organization, Plan, Project, Scope, Application, GatewayRoute
-from api_management_registry import ManagementRegistry
+try:
+    from tools.research_os_api.api_management_models import (
+        API, APIEndpoint, APIVersion, APIKey, APIProduct, Organization, Plan,
+        Project, Scope, Application, GatewayRoute,
+    )
+    from tools.research_os_api.platform.api_management_registry import ManagementRegistry
+except ModuleNotFoundError:
+    from api_management_models import (
+        API, APIEndpoint, APIVersion, APIKey, APIProduct, Organization, Plan,
+        Project, Scope, Application, GatewayRoute,
+    )
+    from api_management_registry import ManagementRegistry
 
 
 def registry() -> ManagementRegistry:
@@ -38,7 +48,6 @@ def test_cross_project_product_reference_fails_closed() -> None:
     r.add_organization(Organization("org-2", "Other"))
     r.add_project(Project("proj-2", "org-2", "Other Project"))
     r.add_api(API("api-2", "proj-2", "Other API"))
-    from api_management_models import APIProduct
     with pytest.raises(ValueError, match="outside its project"):
         r.add_product(APIProduct("product-1", "proj-1", "Mixed", ("api-2",), ()))
 
