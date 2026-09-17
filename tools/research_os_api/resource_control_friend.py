@@ -15,10 +15,12 @@ try:
     from .execution_contract import MeasuredExecution
     from .resource_control_plane import ExecutionResult, ResourceControlPlane
     from .resource_governance import Usage
+    from .provider_measurement import ProviderMeasurement
 except ImportError:
     from execution_contract import MeasuredExecution
     from resource_control_plane import ExecutionResult, ResourceControlPlane
     from resource_governance import Usage
+    from provider_measurement import ProviderMeasurement
 
 
 @dataclass(frozen=True)
@@ -60,11 +62,22 @@ class FriendResourceControlAdapter:
         request: FriendControlRequest,
         friend_executor: Callable[[dict[str, Any]], Any],
         *,
-        measure: Callable[[Any, dict[str, Any]], MeasuredExecution],
+        measure: Callable[[Any, dict[str, Any]], MeasuredExecution] | None = None,
     ) -> ExecutionResult:
-        """Execute Friend work through the canonical control plane."""
+        """Execute Friend work through the canonical control plane.
+
+        New provider integrations must carry authoritative ProviderMeasurement.
+        The legacy ``measure`` callback remains accepted for existing resource-
+        control callers and is only used when the Friend result has no embedded
+        provider measurement.
+        """
         def governed_executor(route: dict[str, Any]) -> MeasuredExecution:
             value = friend_executor(route)
+            measurement = getattr(value, "measurement", None)
+            if isinstance(measurement, ProviderMeasurement):
+                return measurement.to_measured_execution(value, required_currency=request.currency)
+            if measure is None:
+                raise TypeError("Friend execution is missing provider measurement")
             measured = measure(value, route)
             if not isinstance(measured, MeasuredExecution):
                 raise TypeError("Friend measurement must return MeasuredExecution")
