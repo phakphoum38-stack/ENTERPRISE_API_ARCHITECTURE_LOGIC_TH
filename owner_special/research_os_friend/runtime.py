@@ -151,11 +151,11 @@ class FriendRuntime:
     def ask(self, request: FriendRequest) -> FriendResponse:
         return self.orchestrator.handle(request)
 
-    def run_agent(self, request: FriendRequest) -> AgentRun:
+    def run_agent(self, request: FriendRequest, *, run_correlation_id: str | None = None) -> AgentRun:
         """Run through the agent-runtime lifecycle while preserving orchestrator ownership."""
         if self.agent_runtime is None:
             self.agent_runtime = AgentRuntime(self.orchestrator, trace_store=self.agent_trace_store)
-        return self.agent_runtime.run(request)
+        return self.agent_runtime.run(request, run_correlation_id=run_correlation_id)
 
     def get_agent_run(self, run_id: str) -> AgentRun | None:
         if self.agent_runtime is None:
