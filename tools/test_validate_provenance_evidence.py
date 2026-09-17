@@ -152,7 +152,7 @@ class ProvenanceEvidenceTests(unittest.TestCase):
             result = self.validate(test_ledger)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("derived_digest_mismatch:EV-001:output_hashes.artifact", self.errors(result))
+        self.assertIn("derived_digest_mismatch:EV-001:artifact", self.errors(result))
 
     def test_producer_rejects_caller_supplied_derived_fields(self):
         with tempfile.TemporaryDirectory() as d:
