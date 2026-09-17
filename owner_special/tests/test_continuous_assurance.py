@@ -160,6 +160,20 @@ class ContinuousAssuranceTests(unittest.TestCase):
                 FleetProject("project-2", second),
             ])
 
+    def test_inconsistent_fenced_claim_metadata_fails_closed(self) -> None:
+        with self.assertRaisesRegex(ContinuousAssuranceError, "fenced claim must be active"):
+            from owner_special.research_os_friend.continuous_assurance import FleetAssuranceObservation
+            FleetAssuranceObservation(
+                project_id="project-1",
+                identity=identity("project-1", "work-1", "mission-1"),
+                supervisor_action="NOOP",
+                concurrency_active=0,
+                concurrency_limit=1,
+                claim_epoch=1,
+                claim_active=False,
+                claim_fenced=True,
+            )
+
     def test_concurrency_is_bounded(self) -> None:
         fleet, project = self.make_project()
         observation = observe_project(fleet=fleet, project=project)
