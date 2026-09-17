@@ -13,7 +13,6 @@ from api_management_models import (
     API, APIEndpoint, APIKey, APIVersion, APIProduct, Application,
     DeveloperPortalMetadata, Entitlement, GatewayRoute, Organization, Plan,
     Project, Scope, Webhook, validate_api_key_scope_subset,
-    validate_management_model,
 )
 
 T = TypeVar("T")
@@ -77,12 +76,16 @@ class ManagementRegistry:
         version = self.versions.get(obj.version_id)
         if version is None:
             raise ValueError("endpoint references unknown version")
-        validate_management_model(
-            organization=self.organizations[self.projects[self.apis[version.api_id].project_id].organization_id],
-            project=self.projects[self.apis[version.api_id].project_id],
-            application=next((a for a in self.applications.values() if a.project_id == version.api_id), Application("_unused", self.apis[version.api_id].project_id, "_unused")),
-            api=self.apis[version.api_id], version=version, endpoint=obj, scopes=self.scopes, plans=self.plans,
-        )
+        api = self.apis.get(version.api_id)
+        if api is None or api.project_id not in self.projects:
+            raise ValueError("endpoint references an invalid api hierarchy")
+        if obj.method.upper() not in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}:
+            raise ValueError("unsupported HTTP method")
+        if not obj.path.startswith("/"):
+            raise ValueError("endpoint path must start with /")
+        missing = sorted(set(obj.scopes) - self.scopes.keys())
+        if missing:
+            raise ValueError("endpoint references unknown scopes: " + ", ".join(missing))
         return self._put(self.endpoints, obj, obj.endpoint_id)
 
     def add_plan(self, obj: Plan) -> Plan:
