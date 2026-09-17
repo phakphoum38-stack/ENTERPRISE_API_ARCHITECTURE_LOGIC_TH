@@ -6,7 +6,7 @@ control-plane kernel.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Mapping, Optional, Tuple
@@ -153,10 +153,13 @@ def validate_management_model(
     api: API,
     version: APIVersion,
     endpoint: APIEndpoint,
-    scopes: Mapping[str, Scope] = field(default_factory=dict),
-    plans: Mapping[str, Plan] = field(default_factory=dict),
+    scopes: Optional[Mapping[str, Scope]] = None,
+    plans: Optional[Mapping[str, Plan]] = None,
 ) -> None:
     """Fail closed when canonical management relationships are inconsistent."""
+    scopes = {} if scopes is None else scopes
+    plans = {} if plans is None else plans
+
     if project.organization_id != organization.organization_id:
         raise ManagementInvariantViolation("PROJECT_ORGANIZATION_MISMATCH", "project must belong to organization")
     if application.project_id != project.project_id:
