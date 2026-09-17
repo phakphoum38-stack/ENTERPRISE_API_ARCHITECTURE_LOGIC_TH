@@ -30,13 +30,13 @@ class AgentTraceEvent:
 @dataclass(frozen=True)
 class AgentRun:
     run_id: str
-    run_correlation_id: str | None = None
     owner_id: str
     profile_id: str
     session_id: str
     goal: str
     status: AgentRunStatus
     events: tuple[AgentTraceEvent, ...]
+    run_correlation_id: str | None = None
     response: FriendResponse | None = None
     error: str | None = None
 
