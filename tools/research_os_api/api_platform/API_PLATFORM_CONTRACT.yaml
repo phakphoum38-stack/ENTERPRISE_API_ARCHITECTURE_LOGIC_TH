@@ -9,7 +9,7 @@ purpose: >-
   APIs without replacing the Research OS runtime control-plane kernel.
 
 boundaries:
-  runtime_api_contract: tools/research_os_api_api/openapi.yaml
+  runtime_api_contract: tools/research_os_api/openapi.yaml
   execution_kernel: tools/research_os_api/resource_control_plane.py
   management_owns:
     - organization
