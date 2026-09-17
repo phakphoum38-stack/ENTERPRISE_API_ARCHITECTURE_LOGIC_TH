@@ -64,5 +64,5 @@ class FriendResponse:
     provider: str
     memory_items: int
     evidence_id: str
-    measurement: ProviderMeasurement
+    measurement: ProviderMeasurement | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
