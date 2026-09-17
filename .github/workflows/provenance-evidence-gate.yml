@@ -56,8 +56,8 @@ jobs:
           echo "TARGET_SHA=$TARGET_SHA" >> "$GITHUB_ENV"
       - name: Generate target-bound evidence and provenance
         run: python tools/generate_target_provenance.py --output-dir target-provenance --target-commit "$TARGET_SHA"
-      - name: Independently verify target-bound provenance
-        run: python tools/validate_provenance_evidence.py --ledger target-provenance/TARGET_BOUND_PROVENANCE.json --target-commit "$TARGET_SHA" > target-provenance/TARGET_BOUND_VERIFICATION.json
+      - name: Independently verify target-bound provenance and roots
+        run: python tools/validate_provenance_evidence.py --ledger target-provenance/TARGET_BOUND_PROVENANCE.json --roots target-provenance/TARGET_BOUND_ROOTS.json --target-commit "$TARGET_SHA" > target-provenance/TARGET_BOUND_VERIFICATION.json
       - name: Assert independent verification report is PASS
         run: |
           python - <<'PY'
@@ -68,6 +68,8 @@ jobs:
               raise SystemExit(f'verification_not_pass:{report}')
           if report.get('errors'):
               raise SystemExit(f"verification_errors:{report['errors']}")
+          if report.get('roots_verified') is not True:
+              raise SystemExit('roots_not_independently_verified')
           print(json.dumps(report, sort_keys=True))
           PY
       - name: Verify generated roots are complete
