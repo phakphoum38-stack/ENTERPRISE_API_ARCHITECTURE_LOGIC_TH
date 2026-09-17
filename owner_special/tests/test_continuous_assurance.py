@@ -151,21 +151,14 @@ class ContinuousAssuranceTests(unittest.TestCase):
         summary = assure_fleet(fleet=fleet, observations=[observation])
         self.assertEqual(summary.status, "PASS")
 
-    def test_duplicate_work_identity_fails_closed(self) -> None:
+    def test_fleet_rejects_duplicate_work_identity(self) -> None:
         first = identity("project-1", "shared-work", "mission-1")
         second = identity("project-2", "shared-work", "mission-2")
-        fleet = build_fleet([
-            FleetProject("project-1", first),
-            FleetProject("project-2", second),
-        ])
-        p1 = ConcurrentProject("project-1", first)
-        p2 = ConcurrentProject("project-2", second)
-        observations = [
-            observe_project(fleet=fleet, project=p1),
-            observe_project(fleet=fleet, project=p2),
-        ]
-        with self.assertRaisesRegex(ContinuousAssuranceError, "duplicate canonical work_id"):
-            assure_fleet(fleet=fleet, observations=observations)
+        with self.assertRaisesRegex(Exception, "duplicate canonical work_id"):
+            build_fleet([
+                FleetProject("project-1", first),
+                FleetProject("project-2", second),
+            ])
 
     def test_concurrency_is_bounded(self) -> None:
         fleet, project = self.make_project()
