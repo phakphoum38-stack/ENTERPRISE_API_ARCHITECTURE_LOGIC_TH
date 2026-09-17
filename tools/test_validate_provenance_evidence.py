@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from validate_provenance_evidence import digest
+from tools.validate_provenance_evidence import digest
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "tools" / "validate_provenance_evidence.py"
