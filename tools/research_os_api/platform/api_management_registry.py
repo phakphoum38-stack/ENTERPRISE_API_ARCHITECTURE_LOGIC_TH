@@ -9,11 +9,18 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Dict, Iterable, TypeVar
 
-from api_management_models import (
-    API, APIEndpoint, APIKey, APIVersion, APIProduct, Application,
-    DeveloperPortalMetadata, Entitlement, GatewayRoute, Organization, Plan,
-    Project, Scope, Webhook, validate_api_key_scope_subset,
-)
+try:
+    from tools.research_os_api.api_management_models import (
+        API, APIEndpoint, APIKey, APIVersion, APIProduct, Application,
+        DeveloperPortalMetadata, Entitlement, GatewayRoute, Organization, Plan,
+        Project, Scope, Webhook, validate_api_key_scope_subset,
+    )
+except ModuleNotFoundError:
+    from api_management_models import (
+        API, APIEndpoint, APIKey, APIVersion, APIProduct, Application,
+        DeveloperPortalMetadata, Entitlement, GatewayRoute, Organization, Plan,
+        Project, Scope, Webhook, validate_api_key_scope_subset,
+    )
 
 T = TypeVar("T")
 
