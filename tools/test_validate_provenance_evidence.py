@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from validate_provenance_evidence import digest
+
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "tools" / "validate_provenance_evidence.py"
 PRODUCER = ROOT / "tools" / "record_provenance_entry.py"
@@ -73,6 +75,31 @@ class ProvenanceEvidenceTests(unittest.TestCase):
         target = ledger["entries"][0]["evidence"]["target_commit"]
         result = self.validate(ledger, target_commit=target)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_target_commit_binding_accepts_exact_direct_attestation_target(self):
+        ledger = self.load()
+        target = ledger["entries"][0]["evidence"]["target_commit"]
+        attestation = ledger["entries"][1]
+        attestation["evidence"]["subject_id"] = target
+        attestation["evidence"]["evidence_ids"] = []
+        unsigned = dict(attestation)
+        unsigned.pop("entry_hash", None)
+        attestation["entry_hash"] = digest(unsigned)
+        result = self.validate(ledger, target_commit=target)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_target_commit_binding_rejects_stale_direct_attestation_target(self):
+        ledger = self.load()
+        target = ledger["entries"][0]["evidence"]["target_commit"]
+        stale_target = "f" * 40
+        attestation = ledger["entries"][1]
+        attestation["evidence"]["subject_id"] = stale_target
+        unsigned = dict(attestation)
+        unsigned.pop("entry_hash", None)
+        attestation["entry_hash"] = digest(unsigned)
+        result = self.validate(ledger, target_commit=target)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("attestation_target_commit_mismatch:EV-002", self.errors(result))
 
     def test_payload_or_evidence_tamper_breaks_entry_hash(self):
         ledger = self.load()
