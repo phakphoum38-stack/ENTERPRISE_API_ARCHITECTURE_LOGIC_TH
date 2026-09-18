@@ -1,0 +1,467 @@
+{
+  "schema_version": "1.0",
+  "contract": "GITHUB_100PROJECT_CONTINUOUS_ASSURANCE",
+  "protocol": "100PROJECT",
+  "mode": "READ_AUDIT_RECONCILE_VERIFY",
+  "fail_closed": true,
+  "unknown_policy": "HOLD",
+  "merge_authority": "RECON_OWNER_AUTHORITY_UNCHANGED",
+  "continuous_model": [
+    "event_driven",
+    "scheduled_reconciliation",
+    "checkpoint_resume",
+    "gap_detection",
+    "idempotent_replay",
+    "watchdog",
+    "independent_observer",
+    "post_change_verification"
+  ],
+  "mutation_boundary": {
+    "allowed": [
+      "create_bounded_evidence",
+      "create_investigation_issue",
+      "create_isolated_repair_proposal"
+    ],
+    "forbidden": [
+      "change_branch_protection",
+      "change_rulesets",
+      "grant_permissions",
+      "approve_reviews",
+      "merge_pull_requests",
+      "enable_auto_merge",
+      "rewrite_canonical_history",
+      "disable_required_checks"
+    ]
+  },
+  "state_values": [
+    "PASS",
+    "FAIL",
+    "HOLD",
+    "UNKNOWN",
+    "UNAVAILABLE",
+    "NOT_APPLICABLE",
+    "INSUFFICIENT_SCOPE"
+  ],
+  "surfaces": [
+    [
+      "P01",
+      "Repository identity"
+    ],
+    [
+      "P02",
+      "Repository visibility"
+    ],
+    [
+      "P03",
+      "Default branch"
+    ],
+    [
+      "P04",
+      "Repository lifecycle"
+    ],
+    [
+      "P05",
+      "Repository archive state"
+    ],
+    [
+      "P06",
+      "Repository fork state"
+    ],
+    [
+      "P07",
+      "Repository topics/metadata"
+    ],
+    [
+      "P08",
+      "Repository security policy"
+    ],
+    [
+      "P09",
+      "Repository dependency policy"
+    ],
+    [
+      "P10",
+      "Repository CODEOWNERS"
+    ],
+    [
+      "P11",
+      "Organization membership"
+    ],
+    [
+      "P12",
+      "Teams"
+    ],
+    [
+      "P13",
+      "Team repository access"
+    ],
+    [
+      "P14",
+      "Collaborator permissions"
+    ],
+    [
+      "P15",
+      "Outside collaborators"
+    ],
+    [
+      "P16",
+      "App installations"
+    ],
+    [
+      "P17",
+      "OAuth/App identities"
+    ],
+    [
+      "P18",
+      "Token scope visibility"
+    ],
+    [
+      "P19",
+      "Least privilege evidence"
+    ],
+    [
+      "P20",
+      "Audit actor identity"
+    ],
+    [
+      "P21",
+      "Branch inventory"
+    ],
+    [
+      "P22",
+      "Protected branches"
+    ],
+    [
+      "P23",
+      "Rulesets"
+    ],
+    [
+      "P24",
+      "Required status checks"
+    ],
+    [
+      "P25",
+      "Required reviews"
+    ],
+    [
+      "P26",
+      "Conversation resolution"
+    ],
+    [
+      "P27",
+      "Linear history policy"
+    ],
+    [
+      "P28",
+      "Force-push policy"
+    ],
+    [
+      "P29",
+      "Deletion policy"
+    ],
+    [
+      "P30",
+      "Tag protection"
+    ],
+    [
+      "P31",
+      "Commit ancestry"
+    ],
+    [
+      "P32",
+      "Commit identity"
+    ],
+    [
+      "P33",
+      "Commit signatures"
+    ],
+    [
+      "P34",
+      "Git tree integrity"
+    ],
+    [
+      "P35",
+      "Blob integrity"
+    ],
+    [
+      "P36",
+      "Path validity"
+    ],
+    [
+      "P37",
+      "Duplicate/malformed paths"
+    ],
+    [
+      "P38",
+      "Submodule integrity"
+    ],
+    [
+      "P39",
+      "Tag ancestry"
+    ],
+    [
+      "P40",
+      "Canonical SHA binding"
+    ],
+    [
+      "P41",
+      "Pull request inventory"
+    ],
+    [
+      "P42",
+      "PR base/head"
+    ],
+    [
+      "P43",
+      "PR changed-file set"
+    ],
+    [
+      "P44",
+      "PR review state"
+    ],
+    [
+      "P45",
+      "PR approvals"
+    ],
+    [
+      "P46",
+      "PR requested reviewers"
+    ],
+    [
+      "P47",
+      "PR conflicts"
+    ],
+    [
+      "P48",
+      "PR mergeability"
+    ],
+    [
+      "P49",
+      "PR draft state"
+    ],
+    [
+      "P50",
+      "PR auto-merge state"
+    ],
+    [
+      "P51",
+      "Workflow inventory"
+    ],
+    [
+      "P52",
+      "Workflow permissions"
+    ],
+    [
+      "P53",
+      "Workflow triggers"
+    ],
+    [
+      "P54",
+      "workflow_run dependencies"
+    ],
+    [
+      "P55",
+      "pull_request_target safety"
+    ],
+    [
+      "P56",
+      "Checkout revision binding"
+    ],
+    [
+      "P57",
+      "Action pinning"
+    ],
+    [
+      "P58",
+      "Third-party action provenance"
+    ],
+    [
+      "P59",
+      "Secret exposure boundary"
+    ],
+    [
+      "P60",
+      "Workflow mutation authority"
+    ],
+    [
+      "P61",
+      "Workflow run health"
+    ],
+    [
+      "P62",
+      "Job health"
+    ],
+    [
+      "P63",
+      "Step failure classification"
+    ],
+    [
+      "P64",
+      "Skipped-job causality"
+    ],
+    [
+      "P65",
+      "Retry behavior"
+    ],
+    [
+      "P66",
+      "Concurrency policy"
+    ],
+    [
+      "P67",
+      "Cancellation policy"
+    ],
+    [
+      "P68",
+      "Runner availability"
+    ],
+    [
+      "P69",
+      "Runner trust boundary"
+    ],
+    [
+      "P70",
+      "Run artifact integrity"
+    ],
+    [
+      "P71",
+      "Environments"
+    ],
+    [
+      "P72",
+      "Deployment history"
+    ],
+    [
+      "P73",
+      "Environment approvals"
+    ],
+    [
+      "P74",
+      "Environment secrets boundary"
+    ],
+    [
+      "P75",
+      "Deployment protection"
+    ],
+    [
+      "P76",
+      "Packages"
+    ],
+    [
+      "P77",
+      "Artifacts retention"
+    ],
+    [
+      "P78",
+      "Release objects"
+    ],
+    [
+      "P79",
+      "Release/tag lineage"
+    ],
+    [
+      "P80",
+      "Pages/deployment lineage"
+    ],
+    [
+      "P81",
+      "Code scanning"
+    ],
+    [
+      "P82",
+      "Dependabot"
+    ],
+    [
+      "P83",
+      "Secret scanning"
+    ],
+    [
+      "P84",
+      "Security advisories"
+    ],
+    [
+      "P85",
+      "Dependency graph"
+    ],
+    [
+      "P86",
+      "SBOM/provenance"
+    ],
+    [
+      "P87",
+      "Vulnerability state"
+    ],
+    [
+      "P88",
+      "Security policy drift"
+    ],
+    [
+      "P89",
+      "Supply-chain drift"
+    ],
+    [
+      "P90",
+      "Security gate freshness"
+    ],
+    [
+      "P91",
+      "Issues"
+    ],
+    [
+      "P92",
+      "Discussions"
+    ],
+    [
+      "P93",
+      "Projects"
+    ],
+    [
+      "P94",
+      "Webhooks/events"
+    ],
+    [
+      "P95",
+      "Event delivery gaps"
+    ],
+    [
+      "P96",
+      "API/rate-limit health"
+    ],
+    [
+      "P97",
+      "Audit/compliance evidence"
+    ],
+    [
+      "P98",
+      "Checkpoint integrity"
+    ],
+    [
+      "P99",
+      "Cross-run evidence correlation"
+    ],
+    [
+      "P100",
+      "Mission/drain completion"
+    ]
+  ],
+  "required_fields": [
+    "control_id",
+    "surface",
+    "observed_state",
+    "checked_at",
+    "source_ref",
+    "evidence_fingerprint",
+    "scope_state"
+  ],
+  "termination": {
+    "drain_only_when": [
+      "no_required_work",
+      "no_unresolved_failure",
+      "no_unknown",
+      "no_stale",
+      "no_unverified_change",
+      "no_blocked_dependency"
+    ],
+    "otherwise": "CONTINUE_OR_HOLD"
+  }
+}
