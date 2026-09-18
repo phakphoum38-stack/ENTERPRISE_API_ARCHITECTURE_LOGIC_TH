@@ -7,6 +7,7 @@ import 'google_identity_page.dart';
 import 'launch_desk_page.dart';
 import 'mission_control_desktop_page.dart';
 import 'native_control_center_page.dart';
+import 'native_core_workspace_page.dart';
 import 'owner_api.dart';
 import 'team_center.dart';
 
@@ -47,7 +48,7 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
         index: _index,
         onIndexChanged: (value) => setState(() => _index = value),
         pages: pages,
-        controlCenter: NativeControlCenterPage(api: widget.api, onNavigate: (value) => setState(() => _index = value)),
+        controlCenter: NativeCoreWorkspacePage(api: widget.api, onNavigate: (value) => setState(() => _index = value)),
         teamCenter: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
           child: TeamCenter(onChanged: _onTeamChanged),
