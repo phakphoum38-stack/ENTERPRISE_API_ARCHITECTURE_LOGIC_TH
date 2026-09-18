@@ -111,6 +111,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage> {
           ),
         },
         child: Focus(
+          autofocus: true,
           focusNode: _focus,
           child: LayoutBuilder(
             builder: (context, constraints) {
