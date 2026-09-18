@@ -32,10 +32,11 @@ class _FakeApi extends OwnerFriendApi {
 }
 
 Future<void> _scrollControlCenter(WidgetTester tester) async {
-  await tester.ensureVisible(find.text('Human Control Boundary'));
-  await tester.pump();
-  await tester.ensureVisible(find.text('Universal Inspector'));
-  await tester.pump();
+  final listView = find.byType(ListView).first;
+  for (var i = 0; i < 6; i++) {
+    await tester.drag(listView, const Offset(0, -500));
+    await tester.pump();
+  }
 }
 
 void main() {
