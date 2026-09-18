@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'github_api.dart';
+
 class GitHubWorkbenchPage extends StatefulWidget {
-  const GitHubWorkbenchPage({super.key});
+  const GitHubWorkbenchPage({super.key, this.api});
+
+  final GitHubApi? api;
 
   @override
   State<GitHubWorkbenchPage> createState() => _GitHubWorkbenchPageState();
@@ -13,6 +17,10 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
   String _repository = 'ENTERPRISE_API_ARCHITECTURE_LOGIC_TH';
   final String _branch = 'feat/github-workbench';
   final _search = TextEditingController();
+  late final GitHubApi _api = widget.api ?? GitHubApi();
+  GitHubRepositorySnapshot? _repositorySnapshot;
+  String? _runtimeError;
+  bool _loading = false;
 
   static const _sections = <({IconData icon, String label})>[
     (icon: Icons.folder_outlined, label: 'Repository'),
@@ -28,6 +36,7 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
   @override
   void dispose() {
     _search.dispose();
+    if (widget.api == null) _api.dispose();
     super.dispose();
   }
 
@@ -134,6 +143,27 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
     }
   }
 
+  Future<void> _refreshRepository() async {
+    setState(() {
+      _loading = true;
+      _runtimeError = null;
+    });
+    try {
+      final data = await _api.repository('phakphoum38-stack/' + _repository);
+      if (!mounted) return;
+      setState(() {
+        _repositorySnapshot = GitHubRepositorySnapshot.fromJson(data);
+        _runtimeError = null;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _runtimeError = error.toString();
+        _loading = false;
+      });
+    }
+  }
   Widget _repositoryPanel(ThemeData theme) {
     return Card(
       child: ListView(
@@ -163,7 +193,31 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
           ),
           const SizedBox(height: 18),
           _statusTile(theme, Icons.account_tree_outlined, 'Branch', _branch),
-          _statusTile(theme, Icons.cloud_done_outlined, 'Connection', 'GitHub adapter surface ready'),
+          _statusTile(
+            theme,
+            _repositorySnapshot == null ? Icons.cloud_off_outlined : Icons.cloud_done_outlined,
+            'Connection',
+            _repositorySnapshot == null ? 'Not loaded' : 'GitHub API connected',
+          ),
+          if (_repositorySnapshot != null) ...[
+            _statusTile(theme, Icons.account_tree_outlined, 'Default branch', _repositorySnapshot!.defaultBranch),
+            _statusTile(theme, Icons.bug_report_outlined, 'Open issues', _repositorySnapshot!.openIssues.toString()),
+          ],
+          if (_runtimeError != null)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.error_outline),
+              title: const Text('GitHub adapter error'),
+              subtitle: Text(_runtimeError!),
+            ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _loading ? null : _refreshRepository,
+            icon: _loading
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh),
+            label: Text(_loading ? 'Loading repository…' : 'Refresh repository'),
+          ),
           _statusTile(theme, Icons.visibility_outlined, 'Mutation mode', _dryRun ? 'Preview only' : 'Human approval required'),
           const SizedBox(height: 12),
           FilledButton.icon(
