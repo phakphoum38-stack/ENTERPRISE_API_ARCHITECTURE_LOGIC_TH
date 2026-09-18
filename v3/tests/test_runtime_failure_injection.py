@@ -40,7 +40,7 @@ class RuntimeFailureInjectionTests(unittest.TestCase):
                     ("2000-01-01T00:00:00+00:00", "task-1"),
                 )
 
-            self.assertEqual(1, queue.recover_expired())
+            self.assertEqual(1, queue.recover_expired_leases())
             recovered = queue.claim(worker_id="worker-b", lease_seconds=30)
             self.assertIsNotNone(recovered)
 
