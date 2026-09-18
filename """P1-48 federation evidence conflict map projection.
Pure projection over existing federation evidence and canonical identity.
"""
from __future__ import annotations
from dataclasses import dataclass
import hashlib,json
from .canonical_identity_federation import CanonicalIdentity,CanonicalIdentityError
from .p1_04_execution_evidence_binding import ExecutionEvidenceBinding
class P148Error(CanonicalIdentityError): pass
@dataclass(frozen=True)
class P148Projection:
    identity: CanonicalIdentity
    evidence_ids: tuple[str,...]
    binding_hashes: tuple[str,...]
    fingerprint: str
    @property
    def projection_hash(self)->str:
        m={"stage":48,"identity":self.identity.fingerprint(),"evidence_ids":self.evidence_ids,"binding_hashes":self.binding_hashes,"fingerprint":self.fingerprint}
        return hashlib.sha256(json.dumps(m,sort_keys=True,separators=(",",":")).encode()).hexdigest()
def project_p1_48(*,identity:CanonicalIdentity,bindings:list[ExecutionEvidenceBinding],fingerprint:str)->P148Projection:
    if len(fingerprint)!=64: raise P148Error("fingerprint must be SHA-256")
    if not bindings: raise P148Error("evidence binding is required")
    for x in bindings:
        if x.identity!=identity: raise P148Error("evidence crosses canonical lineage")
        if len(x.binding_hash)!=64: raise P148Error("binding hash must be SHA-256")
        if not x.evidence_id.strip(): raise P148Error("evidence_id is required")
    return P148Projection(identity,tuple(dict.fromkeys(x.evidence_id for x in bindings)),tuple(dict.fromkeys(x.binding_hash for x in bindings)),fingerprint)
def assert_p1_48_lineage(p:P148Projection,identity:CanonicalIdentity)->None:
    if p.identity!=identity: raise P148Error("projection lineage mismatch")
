@@ -1,0 +1,29 @@
+"""P1-48 federation evidence conflict map projection.
+Pure projection over existing federation evidence and canonical identity.
+"""
+from __future__ import annotations
+from dataclasses import dataclass
+import hashlib,json
+from .canonical_identity_federation import CanonicalIdentity,CanonicalIdentityError
+from .p1_04_execution_evidence_binding import ExecutionEvidenceBinding
+class P148Error(CanonicalIdentityError): pass
+@dataclass(frozen=True)
+class P148Projection:
+    identity: CanonicalIdentity
+    evidence_ids: tuple[str,...]
+    binding_hashes: tuple[str,...]
+    fingerprint: str
+    @property
+    def projection_hash(self)->str:
+        m={"stage":48,"identity":self.identity.fingerprint(),"evidence_ids":self.evidence_ids,"binding_hashes":self.binding_hashes,"fingerprint":self.fingerprint}
+        return hashlib.sha256(json.dumps(m,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+def project_p1_48(*,identity:CanonicalIdentity,bindings:list[ExecutionEvidenceBinding],fingerprint:str)->P148Projection:
+    if len(fingerprint)!=64: raise P148Error("fingerprint must be SHA-256")
+    if not bindings: raise P148Error("evidence binding is required")
+    for x in bindings:
+        if x.identity!=identity: raise P148Error("evidence crosses canonical lineage")
+        if len(x.binding_hash)!=64: raise P148Error("binding hash must be SHA-256")
+        if not x.evidence_id.strip(): raise P148Error("evidence_id is required")
+    return P148Projection(identity,tuple(dict.fromkeys(x.evidence_id for x in bindings)),tuple(dict.fromkeys(x.binding_hash for x in bindings)),fingerprint)
+def assert_p1_48_lineage(p:P148Projection,identity:CanonicalIdentity)->None:
+    if p.identity!=identity: raise P148Error("projection lineage mismatch")
