@@ -15,9 +15,6 @@ on:
 permissions:
   contents: read
 
-env:
-  TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha || github.sha }}
-
 # Do not cancel an in-flight final gate when another push/commit arrives.
 # The gate must finish its required jobs so a cancelled child job is not
 # misreported as a final-gate failure caused by concurrency cancellation.
@@ -27,6 +24,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11'
+  TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha || github.sha }}
 
 jobs:
   python-quality:
@@ -123,8 +121,18 @@ jobs:
     name: Flutter Analyze Test Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact target SHA
         uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }} 
+          fetch-depth: 0
+
+      - name: Verify checked-out SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$actual"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
