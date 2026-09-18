@@ -1,0 +1,63 @@
+name: GitHub 100PROJECT Continuous Assurance
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  issues: read
+  checks: read
+  deployments: read
+
+concurrency:
+  group: github-100project-assurance
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Validate 100PROJECT Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - run: python tools/validate_github_100project.py --contract current/GITHUB_100PROJECT_CONTINUOUS_ASSURANCE_CONTRACT.json --print-fingerprint
+      - run: python -m unittest discover -s owner_special/tests -p 'test_github_100project.py' -v
+
+  inventory:
+    name: GitHub Surface Inventory
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - name: Record bounded inventory contract
+        run: |
+          set -euo pipefail
+          python tools/validate_github_100project.py
+          printf '%s\n' '100PROJECT inventory contract validated; provider capability discovery is read-only.' > github-100project-inventory.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: github-100project-inventory-${{ github.run_id }}
+          path: github-100project-inventory.txt
+          if-no-files-found: error
+
+  drain:
+    name: Continuity / Drain Gate
+    needs: inventory
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "CONTINUE: event/schedule completed; future events and scheduled reconciliation remain authoritative."
+          echo "No merge, permission, ruleset, branch-protection, or canonical-history mutation is performed."
