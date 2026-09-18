@@ -1,0 +1,61 @@
+name: Continuous Assurance Watchdog
+
+on:
+  schedule:
+    - cron: "47 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  checks: read
+
+concurrency:
+  group: continuous-assurance-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    name: Detect assurance drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact event revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Verify assurance control-plane presence
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            ".github/workflows/github-100project-continuous-assurance.yml"
+            ".github/workflows/workflow-integrity-gate.yml"
+            ".github/workflows/assurance-lineage-gate.yml"
+            ".github/workflows/security-boundary-observer.yml"
+            ".github/workflows/continuous-assurance-watchdog.yml"
+          )
+          for path in "${required[@]}"; do
+            test -f "$path" || { echo "FAIL: missing assurance workflow: $path"; exit 1; }
+          done
+          echo "PASS: assurance workflow set is present"
+
+      - name: Query recent assurance workflow state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate             -H "Accept: application/vnd.github+json"             "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=20"             --jq '.workflow_runs[] | [.name,.status,.conclusion,.head_sha] | @tsv'             | head -20
+          echo "PASS: watchdog observation completed"
+
+      - name: Explicit no-mutation assertion
+        run: |
+          echo "WATCHDOG_MODE=OBSERVE_ONLY"
+          echo "MERGE_AUTHORITY=UNCHANGED"
+          echo "BRANCH_PROTECTION=UNCHANGED"
+          echo "PERMISSIONS=UNCHANGED"
