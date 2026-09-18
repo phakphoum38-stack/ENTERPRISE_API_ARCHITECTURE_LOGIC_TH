@@ -36,8 +36,8 @@ def correlate_cross_shard(
     identity: CanonicalIdentity,
     integration: P1FunctionalIntegrationTrace,
 ) -> CrossShardCorrelation:
-    if address.project_id != integration.work_id and not address.project_id:
-        raise CrossShardCorrelationError("invalid project correlation")
+    if not address.project_id.strip():
+        raise CrossShardCorrelationError("project correlation requires project_id")
     if address.namespace != identity.mission_id:
         raise CrossShardCorrelationError("logical namespace does not match mission")
     if integration.identity_fingerprint != identity.fingerprint():
