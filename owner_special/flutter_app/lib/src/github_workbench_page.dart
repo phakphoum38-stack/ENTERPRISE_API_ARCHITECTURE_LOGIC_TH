@@ -149,7 +149,7 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
       _runtimeError = null;
     });
     try {
-      final data = await _api.repository('phakphoum38-stack/' + _repository);
+      final data = await _api.repository('phakphoum38-stack/$_repository');
       if (!mounted) return;
       setState(() {
         _repositorySnapshot = GitHubRepositorySnapshot.fromJson(data);
