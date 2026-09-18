@@ -1,10 +1,5 @@
-# P1-21 Cross-Project Evidence Boundary
+# P1-21 cross project evidence boundary
 
-Ensures evidence from different logical projects cannot cross project boundaries.
+Independent implementation for P1-21. It projects existing evidence bindings while preserving canonical mission/work/baseline lineage.
 
-## Boundary
-- Existing evidence bindings only.
-- Canonical mission/work/baseline lineage remains authoritative.
-- Deterministic SHA-256 projection metadata.
-- Fail-closed on invalid lineage or hashes.
-- No new scheduler, queue, worker, execution engine, authority, merge path, storage layer, or CI behavior.
+Boundary: no new storage, scheduler, queue, worker, execution engine, authority, merge path, or CI behavior.

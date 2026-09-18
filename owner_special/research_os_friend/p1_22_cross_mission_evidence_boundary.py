@@ -1,71 +1,32 @@
-"""P1-22 Cross-Mission Evidence Boundary.
+"""P1-22 cross mission evidence boundary projection.
 
-Pure projection/validation over existing Research OS evidence and canonical
-identity. No new execution, scheduler, queue, worker, authority, merge,
-storage, or CI behavior.
+Pure validation/projection over existing canonical evidence bindings.
+No new execution, storage, scheduler, queue, worker, authority, merge,
+or CI behavior.
 """
 from __future__ import annotations
 from dataclasses import dataclass
-import hashlib
-import json
-from typing import Iterable
-
-from .canonical_identity_federation import CanonicalIdentity, CanonicalIdentityError
+import hashlib,json
+from .canonical_identity_federation import CanonicalIdentity,CanonicalIdentityError
 from .p1_04_execution_evidence_binding import ExecutionEvidenceBinding
-
-
-class P122Error(CanonicalIdentityError):
-    """Raised when the P1-22 contract cannot be proven."""
-
-
+class P122Error(CanonicalIdentityError): pass
 @dataclass(frozen=True)
 class P122Projection:
     identity: CanonicalIdentity
-    evidence_ids: tuple[str, ...]
-    binding_hashes: tuple[str, ...]
+    evidence_ids: tuple[str,...]
+    binding_hashes: tuple[str,...]
     fingerprint: str
-
     @property
-    def projection_hash(self) -> str:
-        material = {
-            "identity": self.identity.fingerprint(),
-            "evidence_ids": self.evidence_ids,
-            "binding_hashes": self.binding_hashes,
-            "fingerprint": self.fingerprint,
-        }
-        return hashlib.sha256(
-            json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()
-
-
-def project_p1_22(
-    *, identity: CanonicalIdentity,
-    bindings: Iterable[ExecutionEvidenceBinding],
-    fingerprint: str,
-) -> P122Projection:
-    """Ensures evidence cannot cross canonical mission lineage."""
-    if not isinstance(fingerprint, str) or len(fingerprint) != 64:
-        raise P122Error("fingerprint must be SHA-256")
-    items = tuple(bindings)
-    if not items:
-        raise P122Error("at least one evidence binding is required")
-    for item in items:
-        if item.identity != identity:
-            raise P122Error("evidence crosses canonical lineage")
-        if not isinstance(item.binding_hash, str) or len(item.binding_hash) != 64:
-            raise P122Error("binding hash must be SHA-256")
-        if not isinstance(item.evidence_id, str) or not item.evidence_id.strip():
-            raise P122Error("evidence_id is required")
-    return P122Projection(
-        identity=identity,
-        evidence_ids=tuple(dict.fromkeys(x.evidence_id for x in items)),
-        binding_hashes=tuple(dict.fromkeys(x.binding_hash for x in items)),
-        fingerprint=fingerprint,
-    )
-
-
-def assert_p1_22_lineage(
-    projection: P122Projection, identity: CanonicalIdentity
-) -> None:
-    if projection.identity != identity:
-        raise P122Error("projection lineage mismatch")
+    def projection_hash(self)->str:
+        m={"stage":22,"identity":self.identity.fingerprint(),"evidence_ids":self.evidence_ids,"binding_hashes":self.binding_hashes,"fingerprint":self.fingerprint}
+        return hashlib.sha256(json.dumps(m,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+def project_p1_22(*,identity:CanonicalIdentity,bindings:list[ExecutionEvidenceBinding],fingerprint:str)->P122Projection:
+    if len(fingerprint)!=64: raise P122Error("fingerprint must be SHA-256")
+    if not bindings: raise P122Error("evidence binding is required")
+    for x in bindings:
+        if x.identity!=identity: raise P122Error("evidence crosses canonical lineage")
+        if len(x.binding_hash)!=64: raise P122Error("binding hash must be SHA-256")
+        if not x.evidence_id.strip(): raise P122Error("evidence_id is required")
+    return P122Projection(identity,tuple(dict.fromkeys(x.evidence_id for x in bindings)),tuple(dict.fromkeys(x.binding_hash for x in bindings)),fingerprint)
+def assert_p1_22_lineage(projection:P122Projection,identity:CanonicalIdentity)->None:
+    if projection.identity!=identity: raise P122Error("projection lineage mismatch")
