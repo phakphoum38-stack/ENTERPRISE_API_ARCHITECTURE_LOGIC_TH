@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'owner_api.dart';
 
@@ -84,7 +85,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     final route = routes[command];
     if (route != null) {
       widget.onNavigate?.call(route);
-      setState(() => _events.insert(0, command + ' prepared'));
+      setState(() => _events.insert(0, '$command prepared'));
       return;
     }
     if (command == 'Inspect object') _tabs.animateTo(4);
