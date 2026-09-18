@@ -168,7 +168,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
           _Inspector(controller: _inspector, selectedObject: _selectedObject, onInspect: (id) {
             setState(() {
               _selectedObject = id;
-              _events.insert(0, 'Inspector opened: ' + id);
+              _events.insert(0, 'Inspector opened: $id');
             });
           }),
           _Simulation(enabled: _simulation, onToggle: (value) => setState(() {
