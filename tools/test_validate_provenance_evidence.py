@@ -10,6 +10,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.validate_provenance_evidence import digest, plain_sha256
+
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "tools" / "validate_provenance_evidence.py"
 PRODUCER = ROOT / "tools" / "record_provenance_entry.py"
@@ -75,6 +77,73 @@ class ProvenanceEvidenceTests(unittest.TestCase):
         target = ledger["entries"][0]["evidence"]["target_commit"]
         result = self.validate(ledger, target_commit=target)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_target_commit_binding_accepts_exact_direct_attestation_target(self):
+        ledger = self.load()
+        target = ledger["entries"][0]["evidence"]["target_commit"]
+        attestation = ledger["entries"][1]
+        attestation["evidence"]["subject_id"] = target
+        attestation["evidence"]["evidence_ids"] = []
+        unsigned = dict(attestation)
+        unsigned.pop("entry_hash", None)
+        attestation["entry_hash"] = digest(unsigned)
+        result = self.validate(ledger, target_commit=target)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_target_commit_binding_rejects_stale_direct_attestation_target(self):
+        ledger = self.load()
+        target = ledger["entries"][0]["evidence"]["target_commit"]
+        stale_target = "f" * 40
+        attestation = ledger["entries"][1]
+        attestation["evidence"]["subject_id"] = stale_target
+        unsigned = dict(attestation)
+        unsigned.pop("entry_hash", None)
+        attestation["entry_hash"] = digest(unsigned)
+        result = self.validate(ledger, target_commit=target)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("attestation_target_commit_mismatch:EV-002", self.errors(result))
+
+    def test_target_bound_roots_are_independently_verified_and_evidence_is_raw_bytes(self):
+        ledger = self.load()
+        target = ledger["entries"][0]["evidence"]["target_commit"]
+        source = ledger["entries"][0]["evidence"]["source_commit"]
+        with tempfile.TemporaryDirectory(dir=ROOT) as d:
+            d = Path(d)
+            evidence_path = d / "TARGET_BOUND_EVIDENCE.json"
+            ledger_path = d / "TARGET_BOUND_PROVENANCE.json"
+            roots_path = d / "TARGET_BOUND_ROOTS.json"
+            evidence_bytes = json.dumps({"target_commit": target, "source_commit": source}, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+            evidence_path.write_bytes(evidence_bytes)
+            ledger_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            roots = {
+                "schema_version": "1.0",
+                "target_commit": target,
+                "source_commit": source,
+                "evidence_root": hashlib.sha256(evidence_bytes).hexdigest(),
+                "provenance_root": plain_sha256(ledger),
+                "evidence_file": str(evidence_path.relative_to(ROOT)).replace("\\", "/"),
+                "provenance_file": str(ledger_path.relative_to(ROOT)).replace("\\", "/"),
+            }
+            roots_path.write_text(json.dumps(roots, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), "--contract", str(CONTRACT), "--ledger", str(ledger_path), "--roots", str(roots_path), "--target-commit", target],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(json.loads(result.stdout)["roots_verified"])
+            evidence_path.write_bytes(json.dumps({"source_commit": source, "target_commit": target}, separators=(",", ":")).encode("utf-8") + b"\n")
+            tampered = subprocess.run(
+                [sys.executable, str(VALIDATOR), "--contract", str(CONTRACT), "--ledger", str(ledger_path), "--roots", str(roots_path), "--target-commit", target],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(tampered.returncode, 0)
+            self.assertIn("evidence_root_mismatch", self.errors(tampered))
 
     def test_payload_or_evidence_tamper_breaks_entry_hash(self):
         ledger = self.load()
