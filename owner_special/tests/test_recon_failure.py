@@ -5,7 +5,7 @@ from owner_special.research_os_friend.recon_failure import FailureKind, ingest_f
 
 
 class ReconFailureTests(unittest.TestCase):
-    def test_code_failure_enters_recon_as_code_defect(self):
+    def test_observed_provenance_test_import_failure_enters_recon_as_code_defect(self):
         failure = ingest_failure(
             source_sha="d115518c0d904c2a10b992edd8335ca7d15d0d99",
             gate="Provenance Evidence Gate",
