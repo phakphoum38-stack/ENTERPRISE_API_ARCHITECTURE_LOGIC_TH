@@ -97,7 +97,9 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage> {
         : const <String, dynamic>{};
     final capabilities = (_status?['capabilities'] as List? ?? const <Object>[]).length;
 
-    return Shortcuts(
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.keyK, control: true): _OpenCommandIntent(),
         SingleActivator(LogicalKeyboardKey.keyK, meta: true): _OpenCommandIntent(),
