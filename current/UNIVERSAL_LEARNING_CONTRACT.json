@@ -1,0 +1,113 @@
+{
+  "contract_id": "research-os-universal-learning-v1",
+  "version": 1,
+  "mathematical_root": {
+    "symbol": "10^1000",
+    "model": "logical_coverage_cardinality",
+    "materialization": "forbidden",
+    "execution": "bounded_projection",
+    "cardinality_rule": "product_of_declared_dimension_cardinalities"
+  },
+  "knowledge_kinds": [
+    "FACT",
+    "OBSERVATION",
+    "MEASUREMENT",
+    "MODEL",
+    "HYPOTHESIS",
+    "THEORY",
+    "INTERPRETATION",
+    "OPINION",
+    "IDEA",
+    "FICTION",
+    "SIMULATION",
+    "UNKNOWN"
+  ],
+  "domains": [
+    "LANGUAGE",
+    "MATHEMATICS",
+    "SCIENCE",
+    "ENGINEERING",
+    "TECHNOLOGY",
+    "ARTS",
+    "DESIGN",
+    "BUSINESS",
+    "ECONOMICS",
+    "LAW",
+    "HUMANITIES",
+    "SOCIAL_SCIENCE",
+    "EDUCATION",
+    "LIFE_AND_WORK",
+    "RESEARCH"
+  ],
+  "learning_states": [
+    "UNKNOWN",
+    "DISCOVERED",
+    "UNDERSTANDING_PARTIAL",
+    "UNDERSTOOD",
+    "PRACTICED",
+    "TESTED",
+    "EVIDENCED",
+    "CONFIDENT",
+    "MASTERED",
+    "SUPERSEDED",
+    "CONFLICTED"
+  ],
+  "required_lineage": [
+    "purpose",
+    "intent",
+    "requirement",
+    "scope",
+    "context",
+    "source",
+    "assumption",
+    "learning_event",
+    "test",
+    "evidence",
+    "confidence"
+  ],
+  "conservation_laws": [
+    "intent",
+    "requirement",
+    "scope",
+    "context",
+    "idea",
+    "decision",
+    "identity",
+    "state",
+    "knowledge",
+    "evidence",
+    "confidence",
+    "provenance",
+    "authority",
+    "history",
+    "reality"
+  ],
+  "principles": [
+    "understand_before_act",
+    "unknown_is_not_known",
+    "evidence_before_confidence",
+    "confidence_is_not_truth",
+    "learning_does_not_grant_authority",
+    "contradictions_are_preserved_until_resolved",
+    "supersession_preserves_history",
+    "interruption_preserves_recovery_state",
+    "cross_domain_transfer_requires_validation",
+    "self_correction_requires_retest",
+    "human_correction_is_lineage_bearing",
+    "no_unauthorized_self_modification"
+  ],
+  "authority": {
+    "learning": "allowed_within_contract",
+    "core_mutation": "separate_gate",
+    "promotion": "separate_gate",
+    "owner_authority": "separate",
+    "merge_authority": "unchanged"
+  },
+  "resource_policy": {
+    "unbounded_execution": "forbidden",
+    "10^1000_materialization": "forbidden",
+    "scheduler_creation": "not_part_of_learning_root",
+    "worker_creation": "not_part_of_learning_root",
+    "queue_creation": "not_part_of_learning_root"
+  }
+}
