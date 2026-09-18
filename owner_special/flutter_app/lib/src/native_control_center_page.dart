@@ -257,6 +257,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage> {
           ),
         ),
       ),
+    ),
     );
   }
 }
