@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Exact commit SHA to validate"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -19,16 +24,25 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11'
+  TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha || github.sha }}
 
 jobs:
   python-quality:
     name: Python Build Test Analyze
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact revision
+      - name: Checkout exact target SHA
         uses: actions/checkout@v6
         with:
+          ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
+
+      - name: Verify checked-out SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$actual"
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -70,8 +84,18 @@ jobs:
     needs: python-quality
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact target SHA
         uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+
+      - name: Verify checked-out SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$actual"
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -98,8 +122,18 @@ jobs:
     name: Flutter Analyze Test Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact target SHA
         uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }} 
+          fetch-depth: 0
+
+      - name: Verify checked-out SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$actual"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
