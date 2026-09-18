@@ -47,7 +47,7 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
         index: _index,
         onIndexChanged: (value) => setState(() => _index = value),
         pages: pages,
-        controlCenter: NativeControlCenterPage(api: widget.api),
+        controlCenter: NativeControlCenterPage(api: widget.api, onNavigate: (value) => setState(() => _index = value)),
         teamCenter: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
           child: TeamCenter(onChanged: _onTeamChanged),
