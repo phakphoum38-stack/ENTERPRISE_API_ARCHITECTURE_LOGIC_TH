@@ -52,7 +52,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).last, 'EV-001');
+    await tester.enterText(find.byKey(const Key('control-center-inspector')), 'EV-001');
     await tester.tap(find.text('Inspect'));
     await tester.pump();
 
