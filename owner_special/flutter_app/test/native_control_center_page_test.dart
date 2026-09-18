@@ -49,11 +49,11 @@ void main() {
     expect(find.text('Control Center'), findsOneWidget);
     expect(find.text('System Map'), findsOneWidget);
     expect(find.text('Ctrl/⌘ K'), findsOneWidget);
-    expect(find.text('Approve — human'), findsOneWidget);
 
     await _scrollControlCenter(tester);
     expect(find.text('Human Control Boundary'), findsOneWidget);
     expect(find.text('Universal Inspector'), findsOneWidget);
+    expect(find.text('Approve — human'), findsOneWidget);
   });
 
   testWidgets('inspector records selected object without granting authority', (tester) async {
