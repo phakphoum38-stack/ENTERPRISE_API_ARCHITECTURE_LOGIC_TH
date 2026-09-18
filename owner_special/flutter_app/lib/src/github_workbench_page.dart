@@ -11,7 +11,7 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
   int _section = 0;
   bool _dryRun = true;
   String _repository = 'ENTERPRISE_API_ARCHITECTURE_LOGIC_TH';
-  String _branch = 'feat/github-workbench';
+  final String _branch = 'feat/github-workbench';
   final _search = TextEditingController();
 
   static const _sections = <({IconData icon, String label})>[
@@ -142,7 +142,7 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
           Text('Repository', style: theme.textTheme.titleLarge),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
-            value: _repository,
+            initialValue: _repository,
             decoration: const InputDecoration(labelText: 'Repository'),
             items: const [
               DropdownMenuItem(
