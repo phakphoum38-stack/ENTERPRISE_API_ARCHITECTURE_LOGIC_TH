@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -32,6 +33,7 @@ class Delivery:
     consumer: str
     idempotency_key: str
     status: str
+    lease_id: str | None = None
     lease_until: str | None = None
 
 
@@ -39,7 +41,7 @@ class DurableEventDelivery:
     """Append-only event log plus durable consumer delivery ledger.
 
     This is a persistence boundary, not a second event bus or execution path.
-    Delivery is at-least-once; consumers must acknowledge idempotently.
+    Delivery is at-least-once and consumer acknowledgement is idempotent.
     """
 
     def __init__(self, path: Path, *, lease_seconds: int = 30) -> None:
@@ -70,8 +72,8 @@ class DurableEventDelivery:
                     consumer TEXT NOT NULL,
                     idempotency_key TEXT NOT NULL UNIQUE,
                     status TEXT NOT NULL,
-                    lease_until TEXT,
-                    UNIQUE(event_id, consumer)
+                    lease_id TEXT,
+                    lease_until TEXT
                 )"""
             )
             db.execute("CREATE INDEX IF NOT EXISTS idx_delivery_ready ON deliveries(consumer,status,lease_until)")
@@ -95,21 +97,18 @@ class DurableEventDelivery:
         if not all((event_id, consumer, delivery_id, idempotency_key)):
             raise ValueError("event_id, consumer, delivery_id and idempotency_key are required")
         with sqlite3.connect(self.path) as db:
-            event = db.execute("SELECT 1 FROM events WHERE event_id=?", (event_id,)).fetchone()
-            if event is None:
+            if db.execute("SELECT 1 FROM events WHERE event_id=?", (event_id,)).fetchone() is None:
                 raise KeyError(event_id)
             try:
                 db.execute(
-                    """INSERT INTO deliveries
-                    (delivery_id,event_id,consumer,idempotency_key,status)
-                    VALUES (?,?,?,?,?)""",
+                    "INSERT INTO deliveries (delivery_id,event_id,consumer,idempotency_key,status) VALUES (?,?,?,?,?)",
                     (delivery_id,event_id,consumer,idempotency_key,"available"),
                 )
             except sqlite3.IntegrityError:
                 row = db.execute(
-                    "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_until "
-                    "FROM deliveries WHERE idempotency_key=? OR (event_id=? AND consumer=?)",
-                    (idempotency_key,event_id,consumer),
+                    "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until "
+                    "FROM deliveries WHERE idempotency_key=?",
+                    (idempotency_key,),
                 ).fetchone()
                 if row is None:
                     raise
@@ -120,10 +119,11 @@ class DurableEventDelivery:
         now = datetime.now(timezone.utc)
         now_iso = now.isoformat()
         until = (now + timedelta(seconds=self.lease_seconds)).isoformat()
+        lease_id = uuid.uuid4().hex
         with sqlite3.connect(self.path, timeout=30, isolation_level=None) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
-                "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_until "
+                "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until "
                 "FROM deliveries WHERE delivery_id=? AND "
                 "(status='available' OR (status='delivering' AND lease_until<=?))",
                 (delivery_id,now_iso),
@@ -131,32 +131,35 @@ class DurableEventDelivery:
             if row is None:
                 return None
             db.execute(
-                "UPDATE deliveries SET status='delivering', lease_until=? "
+                "UPDATE deliveries SET status='delivering',lease_id=?,lease_until=? "
                 "WHERE delivery_id=? AND (status='available' OR (status='delivering' AND lease_until<=?))",
-                (until,delivery_id,now_iso),
+                (lease_id,until,delivery_id,now_iso),
             )
-        return Delivery(row[0],row[1],row[2],row[3],"delivering",until)
+        return Delivery(row[0],row[1],row[2],row[3],"delivering",lease_id,until)
 
-    def ack(self, delivery_id: str) -> None:
+    def ack(self, delivery_id: str, lease_id: str) -> None:
+        if not lease_id:
+            raise ValueError("lease_id is required")
         with sqlite3.connect(self.path) as db:
             cursor = db.execute(
-                "UPDATE deliveries SET status='acked', lease_until=NULL "
-                "WHERE delivery_id=? AND status='delivering'",
-                (delivery_id,),
+                "UPDATE deliveries SET status='acked',lease_id=NULL,lease_until=NULL "
+                "WHERE delivery_id=? AND status='delivering' AND lease_id=?",
+                (delivery_id,lease_id),
             )
-            if cursor.rowcount != 1:
-                row = db.execute("SELECT status FROM deliveries WHERE delivery_id=?", (delivery_id,)).fetchone()
-                if row is None:
-                    raise KeyError(delivery_id)
-                if row[0] == "acked":
-                    return
-                raise EventDeliveryOwnershipError("delivery is not actively owned")
+            if cursor.rowcount == 1:
+                return
+            row = db.execute("SELECT status FROM deliveries WHERE delivery_id=?", (delivery_id,)).fetchone()
+            if row is None:
+                raise KeyError(delivery_id)
+            if row[0] == "acked":
+                return
+            raise EventDeliveryOwnershipError("delivery is not owned by the supplied lease")
 
     def recover_expired(self) -> int:
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.path) as db:
             cursor = db.execute(
-                "UPDATE deliveries SET status='available', lease_until=NULL "
+                "UPDATE deliveries SET status='available',lease_id=NULL,lease_until=NULL "
                 "WHERE status='delivering' AND lease_until<=?",
                 (now,),
             )
@@ -165,8 +168,11 @@ class DurableEventDelivery:
     def get_delivery(self, delivery_id: str) -> Delivery | None:
         with sqlite3.connect(self.path) as db:
             row = db.execute(
-                "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_until "
+                "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until "
                 "FROM deliveries WHERE delivery_id=?",
                 (delivery_id,),
             ).fetchone()
         return Delivery(*row) if row else None
+
+    def close(self) -> None:
+        return None
