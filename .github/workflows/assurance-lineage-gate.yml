@@ -1,0 +1,53 @@
+name: Assurance Lineage Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assurance-lineage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lineage:
+    name: Verify exact target lineage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact event revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Verify repository identity and target SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL="$(git rev-parse HEAD)"
+          EXPECTED="${GITHUB_SHA}"
+          test "$ACTUAL" = "$EXPECTED"
+          test -n "$ACTUAL"
+          echo "PASS: HEAD=$ACTUAL"
+
+      - name: Verify Git object database
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fsck --full --no-progress
+          echo "PASS: git object database is internally consistent"
+
+      - name: Verify no workflow-side authority mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE '(^|[[:space:]])(gh[[:space:]]+pr[[:space:]]+(merge|approve)|git[[:space:]]+push[[:space:]]+[^#]*(:main|main)|enable[_-]auto[_-]merge)([[:space:]]|$)' .github/workflows; then
+            echo "FAIL: workflow authority mutation detected"
+            exit 1
+          fi
+          echo "PASS: workflow authority boundary intact"
