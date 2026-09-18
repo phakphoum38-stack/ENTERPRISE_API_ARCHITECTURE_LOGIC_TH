@@ -221,6 +221,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage> {
                       children: [
                         Expanded(
                           child: TextField(
+                            key: const Key('control-center-inspector'),
                             controller: _inspector,
                             decoration: const InputDecoration(labelText: 'Object ID', hintText: 'task, source, evidence, service…'),
                             onSubmitted: (value) => setState(() => _objectId = value.trim()),
