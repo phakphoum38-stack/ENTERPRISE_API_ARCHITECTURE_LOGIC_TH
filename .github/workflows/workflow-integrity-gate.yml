@@ -1,0 +1,58 @@
+name: Workflow Integrity Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-integrity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  integrity:
+    name: Validate workflow definitions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact event revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Validate workflow files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d .github/workflows
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path(".github/workflows")
+          files = sorted(list(root.glob("*.yml")) + list(root.glob("*.yaml")))
+          if not files:
+              raise SystemExit("FAIL: no workflow definitions found")
+          forbidden = (
+              r"git\s+push\s+[^\n]*main",
+              r"gh\s+pr\s+merge",
+              r"gh\s+pr\s+approve",
+              r"enable[_-]auto[_-]merge",
+              r"merge_pull_request",
+          )
+          for path in files:
+              text = path.read_text(encoding="utf-8")
+              if not text.strip():
+                  raise SystemExit(f"FAIL: empty workflow: {path}")
+              if "\t" in text:
+                  raise SystemExit(f"FAIL: tab character in workflow: {path}")
+              for pattern in forbidden:
+                  if re.search(pattern, text, re.I):
+                      raise SystemExit(f"FAIL: forbidden mutation pattern in {path}: {pattern}")
+          print(f"PASS: validated {len(files)} workflow definitions")
+          PY
+          ruby -e 'require "yaml"; Dir[".github/workflows/*.{yml,yaml}"].sort.each { |f| YAML.load_file(f); puts "PASS: #{f}" }'
