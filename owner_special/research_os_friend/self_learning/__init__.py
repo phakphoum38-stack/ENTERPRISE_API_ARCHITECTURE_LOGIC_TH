@@ -3,6 +3,7 @@ from .evaluation_history import SkillEvaluationLedger, SkillEvaluationRecord, ag
 from .learner import SelfLearningEngine
 from .lifecycle import SkillLifecycleAssembler, SkillLifecycleCertificate, SkillLifecycleSnapshot
 from .models import LearnedSkillCandidate
+from .persistent_registry import PersistentLearnedSkillRegistry
 from .promotion_history import (
     PromotionEvidenceBundle,
     SkillPromotionLedger,
@@ -21,6 +22,7 @@ from .versioning import SkillVersionProposal, propose_next_version
 __all__ = [
     "LearnedSkillCandidate",
     "LearnedSkillRegistry",
+    "PersistentLearnedSkillRegistry",
     "SelfLearningEngine",
     "SkillFeedback",
     "SkillVersionProposal",
