@@ -21,7 +21,7 @@ class OwnerFriendApp extends StatefulWidget {
 }
 
 class _OwnerFriendAppState extends State<OwnerFriendApp> {
-  int _index = 1;
+  int _index = 0;
   TeamRecord _currentTeam = const TeamRecord(id: 'research', name: 'Research Team');
 
   void _onTeamChanged(TeamRecord team) => setState(() => _currentTeam = team);
