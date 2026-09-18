@@ -31,9 +31,10 @@ jobs:
     name: Python Build Test Analyze
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact revision
+      - name: Checkout exact target SHA
         uses: actions/checkout@v6
         with:
+          ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
 
       - name: Verify checked-out SHA
