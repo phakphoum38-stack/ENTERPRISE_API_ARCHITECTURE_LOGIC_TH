@@ -33,7 +33,7 @@ class WorkerPoolDrainTests(unittest.TestCase):
             waiter.join(timeout=2)
 
             self.assertEqual([True], result)
-            self.assertEqual("done", future.result(timeout=1))
+            self.assertEqual("task-1", future.result(timeout=1))
             self.assertIs(pool.stats().lifecycle, WorkerPoolLifecycle.DRAINED)
         finally:
             pool.shutdown()
