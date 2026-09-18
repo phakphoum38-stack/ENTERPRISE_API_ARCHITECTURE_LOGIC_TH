@@ -104,8 +104,8 @@ class GitHubApi {
     request.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
     request.headers.set('X-GitHub-Api-Version', '2022-11-28');
     request.headers.set(HttpHeaders.userAgentHeader, 'Research-OS-GitHub-Workbench');
-    if (_token != null && _token!.trim().isNotEmpty) {
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${_token!.trim()}');
+    if (_token != null && _token.trim().isNotEmpty) {
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${_token.trim()}');
     }
     final response = await request.close().timeout(timeout);
     final body = await utf8.decoder.bind(response).join().timeout(timeout);
