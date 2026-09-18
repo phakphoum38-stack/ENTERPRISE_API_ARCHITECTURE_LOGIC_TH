@@ -5,6 +5,8 @@ import 'friend_module_shell.dart';
 import 'friend_theme.dart';
 import 'google_identity_page.dart';
 import 'launch_desk_page.dart';
+import 'mission_control_desktop_page.dart';
+import 'native_control_center_page.dart';
 import 'owner_api.dart';
 import 'team_center.dart';
 
@@ -27,6 +29,7 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
+      MissionControlDesktopPage(projection: null),
       _FriendChatPage(api: widget.api, team: _currentTeam),
       LaunchDeskPage(api: widget.api),
       _CapabilitiesPage(api: widget.api, startup: widget.startup),
@@ -44,6 +47,7 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
         index: _index,
         onIndexChanged: (value) => setState(() => _index = value),
         pages: pages,
+        controlCenter: NativeControlCenterPage(api: widget.api),
         teamCenter: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
           child: TeamCenter(onChanged: _onTeamChanged),
