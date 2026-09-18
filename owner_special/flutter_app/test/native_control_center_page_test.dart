@@ -40,9 +40,9 @@ void main() {
 
     expect(find.text('Control Center'), findsOneWidget);
     expect(find.text('System Map'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Human Control Boundary'), 300);
+    await tester.ensureVisible(find.text('Human Control Boundary').first);
     expect(find.text('Human Control Boundary'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Universal Inspector'), 300);
+    await tester.ensureVisible(find.text('Universal Inspector').first);
     expect(find.text('Universal Inspector'), findsOneWidget);
     expect(find.text('Ctrl/⌘ K'), findsOneWidget);
     expect(find.text('Approve — human'), findsOneWidget);
@@ -54,7 +54,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.byKey(const Key('control-center-inspector')), 300);
+    await tester.ensureVisible(find.byKey(const Key('control-center-inspector')).first);
     await tester.enterText(find.byKey(const Key('control-center-inspector')), 'EV-001');
     await tester.tap(find.text('Inspect'));
     await tester.pump();
