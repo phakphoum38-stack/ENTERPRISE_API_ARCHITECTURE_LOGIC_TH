@@ -1,0 +1,109 @@
+name: Recon Continuous Reconciliation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  checks: read
+
+concurrency:
+  group: recon-continuous-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  recon:
+    name: Recon - classify lineage and tree integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact target
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checkout identity
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SHA"
+
+      - name: Recon Git tree and workflow boundaries
+        shell: bash
+        env:
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+
+          def run(*args):
+              return subprocess.check_output(args, text=True).strip()
+
+          target = run("git", "rev-parse", "HEAD")
+          base = os.environ.get("GITHUB_BASE_SHA", "")
+          malformed = []
+          for name in run("git", "ls-tree", "-r", "--name-only", target).splitlines():
+              if len(name) > 240 or name.startswith(('"""', "'''")):
+                  malformed.append(name[:260])
+
+          workflows = []
+          root = Path(".github/workflows")
+          for path in sorted(root.glob("*.y*ml")) if root.exists() else []:
+              text = path.read_text(encoding="utf-8", errors="replace")
+              hits = [x for x in (
+                  "contents: write", "administration: write",
+                  "enable-auto-merge", "disable-branch-protection"
+              ) if x in text]
+              workflows.append({"path": str(path), "forbidden_hits": hits})
+
+          result = {
+              "schema": "research-os-recon-v1",
+              "event": os.environ.get("GITHUB_EVENT_NAME", ""),
+              "target_sha": target,
+              "base_sha": base,
+              "tree_integrity": "FAIL" if malformed else "PASS",
+              "malformed_paths": malformed,
+              "workflow_observation": workflows,
+              "authority_mutation_performed": False,
+              "merge_authority_changed": False,
+              "classification": (
+                  "REBUILD_ON_CURRENT_MAIN" if base and base != target
+                  else "OBSERVE_CURRENT_TARGET"
+              ),
+          }
+          Path("recon-report.json").write_text(
+              json.dumps(result, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          if malformed:
+              raise SystemExit("RECON FAIL: malformed Git tree/path entries detected")
+          print(json.dumps(result, indent=2, sort_keys=True))
+          PY
+
+      - name: Publish Recon evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: recon-continuous-reconciliation
+          path: recon-report.json
+          if-no-files-found: error
+
+      - name: Assert authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Recon is observational/reconciliatory only."
+          echo "No review approval, merge, auto-merge, permission grant, ruleset mutation, or canonical-history rewrite is performed."
