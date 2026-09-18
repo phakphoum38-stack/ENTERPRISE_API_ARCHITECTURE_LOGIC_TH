@@ -6,11 +6,29 @@ import 'package:research_os_owner_special/src/owner_api.dart';
 
 class _FakeApi extends OwnerFriendApi {
   @override
+  Future<Map<String, dynamic>> health() async => {'status': 'ok'};
+
+  @override
   Future<Map<String, dynamic>> status() async => {
     'brain_profiles': {'default': 1},
     'helper_scheduler': {'max_active_workers': 12, 'max_logical_helpers': 100},
     'capabilities': ['brain', 'memory', 'evidence'],
   };
+
+  @override
+  Future<Map<String, dynamic>> memory() async => {};
+
+  @override
+  Future<Map<String, dynamic>> providerStatus() async => {};
+
+  @override
+  Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey}) async => {};
+
+  @override
+  Future<Map<String, dynamic>> testProvider() async => {};
+
+  @override
+  Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) async => {'text': text};
 }
 
 void main() {
