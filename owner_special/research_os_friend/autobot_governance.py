@@ -207,6 +207,8 @@ _TERMINAL_STATES = frozenset({
     ReconState.RECONSTRUCTION_REQUIRED,
 })
 
+# Operational transitions deliberately have multiple alternatives. The guard
+# protects integrity/terminal boundaries without forcing RECON through one path.
 _TRANSITIONS = {
     ReconState.PENDING: frozenset({ReconState.GENERATING, ReconState.WAITING, ReconState.VERIFYING}),
     ReconState.GENERATING: frozenset({
@@ -272,7 +274,14 @@ def guard_recon_transition(
     integrity_failure: bool = False,
     recovery_path_available: bool = True,
 ) -> TransitionDecision:
-    """Guard lifecycle integrity without turning RECON into a single-path FSM."""
+    """Guard lifecycle integrity without turning RECON into a single-path FSM.
+
+    Normal operational states may select among several paths. Only transitions
+    that would manufacture authority, bypass integrity, or leave terminal states
+    without a new recovery session are forbidden. Missing proof produces a
+    conditional decision rather than an automatic stop, allowing RECON to wait,
+    retry, discover, or reconstruct.
+    """
     if not isinstance(current, ReconState) or not isinstance(target, ReconState):
         raise GovernanceError("unknown RECON state")
     if current in _TERMINAL_STATES:
@@ -302,7 +311,13 @@ class SelfRepairRequest:
 
 
 def validate_self_repair_request(request: SelfRepairRequest, budget: RepairBudget) -> tuple[str, ...]:
-    """Allow implementation repair while rejecting governance-escape repairs."""
+    """Allow implementation repair while rejecting governance-escape repairs.
+
+    RECON may repair its own implementation, but a repair cannot weaken or
+    replace authority, governance, verification, evidence, or gate rules merely
+    to obtain a passing result. Such a defect must be escalated through the
+    normal independent-review/authority lifecycle.
+    """
     if not isinstance(request, SelfRepairRequest):
         raise GovernanceError("invalid self-repair request")
     if any((

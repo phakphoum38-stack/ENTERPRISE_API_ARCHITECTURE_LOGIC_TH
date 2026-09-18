@@ -99,18 +99,32 @@ class AutobotGovernanceTests(unittest.TestCase):
             validate_repair_scope(("a.py", "a.py"), RepairBudget())
 
     def test_recon_transition_is_adaptive_not_single_path(self):
-        self.assertEqual(guard_recon_transition(ReconState.GENERATING, ReconState.WAITING), TransitionDecision.ALLOWED)
-        self.assertEqual(guard_recon_transition(ReconState.GENERATING, ReconState.GENERATED), TransitionDecision.ALLOWED)
-        self.assertEqual(guard_recon_transition(ReconState.GENERATING, ReconState.VERIFYING), TransitionDecision.ALLOWED)
-
-    def test_recon_pass_requires_verification(self):
-        self.assertEqual(guard_recon_transition(ReconState.VERIFYING, ReconState.PASS), TransitionDecision.CONDITIONAL)
         self.assertEqual(
-            guard_recon_transition(ReconState.VERIFYING, ReconState.PASS, verification_complete=True),
+            guard_recon_transition(ReconState.GENERATING, ReconState.WAITING),
+            TransitionDecision.ALLOWED,
+        )
+        self.assertEqual(
+            guard_recon_transition(ReconState.GENERATING, ReconState.GENERATED),
+            TransitionDecision.ALLOWED,
+        )
+        self.assertEqual(
+            guard_recon_transition(ReconState.GENERATING, ReconState.VERIFYING),
             TransitionDecision.ALLOWED,
         )
 
-    def test_integrity_failure_blocks_operational_shortcut(self):
+    def test_recon_pass_requires_verification_but_does_not_force_stop(self):
+        self.assertEqual(
+            guard_recon_transition(ReconState.VERIFYING, ReconState.PASS),
+            TransitionDecision.CONDITIONAL,
+        )
+        self.assertEqual(
+            guard_recon_transition(
+                ReconState.VERIFYING, ReconState.PASS, verification_complete=True
+            ),
+            TransitionDecision.ALLOWED,
+        )
+
+    def test_integrity_failure_blocks_shortcut_to_operational_states(self):
         self.assertEqual(
             guard_recon_transition(
                 ReconState.VERIFYING,
@@ -121,24 +135,40 @@ class AutobotGovernanceTests(unittest.TestCase):
             TransitionDecision.FORBIDDEN,
         )
         self.assertEqual(
-            guard_recon_transition(ReconState.VERIFYING, ReconState.INTEGRITY_FAILURE, integrity_failure=True),
+            guard_recon_transition(
+                ReconState.VERIFYING,
+                ReconState.INTEGRITY_FAILURE,
+                integrity_failure=True,
+            ),
             TransitionDecision.ALLOWED,
         )
 
-    def test_terminal_state_cannot_continue(self):
-        self.assertEqual(guard_recon_transition(ReconState.PASS, ReconState.GENERATING), TransitionDecision.FORBIDDEN)
+    def test_terminal_state_cannot_continue_without_new_session(self):
+        self.assertEqual(
+            guard_recon_transition(ReconState.PASS, ReconState.GENERATING),
+            TransitionDecision.FORBIDDEN,
+        )
 
     def test_self_repair_allows_implementation_but_not_governance_escape(self):
         request = SelfRepairRequest(changed_paths=("owner_special/research_os_friend/recon.py",))
-        self.assertEqual(validate_self_repair_request(request, RepairBudget()), request.changed_paths)
+        self.assertEqual(
+            validate_self_repair_request(request, RepairBudget()),
+            request.changed_paths,
+        )
         with self.assertRaises(GovernanceError):
             validate_self_repair_request(
-                SelfRepairRequest(changed_paths=("owner_special/research_os_friend/recon.py",), modifies_governance=True),
+                SelfRepairRequest(
+                    changed_paths=("owner_special/research_os_friend/recon.py",),
+                    modifies_governance=True,
+                ),
                 RepairBudget(),
             )
         with self.assertRaises(GovernanceError):
             validate_self_repair_request(
-                SelfRepairRequest(changed_paths=("owner_special/research_os_friend/recon.py",), bypasses_gate=True),
+                SelfRepairRequest(
+                    changed_paths=("owner_special/research_os_friend/recon.py",),
+                    bypasses_gate=True,
+                ),
                 RepairBudget(),
             )
 
