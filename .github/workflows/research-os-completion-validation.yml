@@ -12,9 +12,17 @@ on:
       - 'v3/**'
       - '.github/workflows/research-os-completion-validation.yml'
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Exact commit SHA to validate"
+        required: false
+        type: string
 
 permissions:
   contents: read
+
+env:
+  TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha || github.sha }}
 
 concurrency:
   group: research-os-completion-${{ github.ref }}
@@ -29,8 +37,15 @@ jobs:
       - name: Checkout exact commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.TARGET_SHA }}
           fetch-depth: 1
+
+      - name: Verify checked-out SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$actual"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
