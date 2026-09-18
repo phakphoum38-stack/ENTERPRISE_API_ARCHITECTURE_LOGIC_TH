@@ -1,0 +1,23 @@
+name: V3 Runtime Assurance Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'v3/research_os_v3/**'
+      - 'v3/tests/**'
+      - 'docs/V3-*.md'
+      - '.github/workflows/v3-runtime-assurance-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-assurance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run SET 19-35 tests
+        run: |
+          python -m unittest             v3.research_os_v3.test_scenario_algebra             v3.research_os_v3.test_pairwise_scenario_planner             v3.research_os_v3.test_identity_conservation_aggregator             v3.research_os_v3.test_evidence_hash_aggregator             v3.tests.test_target_sha_manifest_validator             v3.tests.test_cross_subsystem_replay_proof             v3.tests.test_runtime_evidence_reconciliation             v3.tests.test_full_assurance_ledger             v3.tests.test_review_reconciliation             v3.tests.test_authority_boundary             v3.tests.test_replay_certification             v3.tests.test_final_assurance_bundle             v3.tests.test_forensic_pack
