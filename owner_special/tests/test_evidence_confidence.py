@@ -27,6 +27,8 @@ class EvidenceConfidenceBoundaryTests(unittest.TestCase):
         self.assertEqual(result.evidence_count, 1)
         self.assertEqual(result.score, 1.0)
         self.assertEqual(result.status, "CONFIDENT")
+        self.assertEqual(result.mathematical_root, "10^1000")
+        self.assertEqual(result.coverage_model, "logical_cartesian_product")
         self.assertEqual(len(result.confidence_id), 64)
 
     def test_failed_evidence_cannot_increase_confidence(self) -> None:
@@ -46,6 +48,17 @@ class EvidenceConfidenceBoundaryTests(unittest.TestCase):
     def test_malformed_evidence_fails_closed(self) -> None:
         invalid = LearningEvidence(
             evidence_id="invalid",
+            test_id="a" * 64,
+            sandbox_id="sandbox",
+            result_hash="b" * 64,
+            passed=True,
+        )
+        with self.assertRaises(ValueError):
+            self.boundary.derive(invalid)
+
+    def test_uppercase_and_non_sha_evidence_fail_closed(self) -> None:
+        invalid = LearningEvidence(
+            evidence_id="A" * 64,
             test_id="a" * 64,
             sandbox_id="sandbox",
             result_hash="b" * 64,
