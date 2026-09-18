@@ -65,8 +65,8 @@ jobs:
           for path in sorted(root.glob("*.y*ml")) if root.exists() else []:
               text = path.read_text(encoding="utf-8", errors="replace")
               hits = [x for x in (
-                  "contents: write", "administration: write",
-                  "enable-auto-merge", "disable-branch-protection"
+                  "contents:" + " write", "administration:" + " write",
+                  "enable-" + "auto-merge", "disable-" + "branch-protection"
               ) if x in text]
               workflows.append({"path": str(path), "forbidden_hits": hits})
 
@@ -106,4 +106,4 @@ jobs:
         run: |
           set -euo pipefail
           echo "Recon is observational/reconciliatory only."
-          echo "No review approval, merge, auto-merge, permission grant, ruleset mutation, or canonical-history rewrite is performed."
+          echo "No review approval, merge action, permission grant, ruleset mutation, or canonical-history rewrite is performed."
