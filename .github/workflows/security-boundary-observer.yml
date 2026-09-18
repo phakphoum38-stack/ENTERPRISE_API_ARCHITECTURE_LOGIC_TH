@@ -1,0 +1,58 @@
+name: Security Boundary Observer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  checks: read
+  deployments: read
+
+concurrency:
+  group: security-boundary-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    name: Observe workflow security boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact event revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Audit workflow permissions and dangerous capabilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path(".github/workflows")
+          files = sorted(root.glob("*.yml")) + sorted(root.glob("*.yaml"))
+          forbidden = [
+              r"gh\s+pr\s+merge",
+              r"gh\s+pr\s+approve",
+              r"enable[_-]auto[_-]merge",
+              r"git\s+push\s+[^\n]*main",
+          ]
+          for path in files:
+              text = path.read_text(encoding="utf-8")
+              for pattern in forbidden:
+                  if re.search(pattern, text, re.I):
+                      raise SystemExit(f"FAIL: forbidden authority operation in {path}")
+          print(f"PASS: security boundary observation completed for {len(files)} workflows")
+          PY
+
+      - name: Record read-only assurance result
+        run: |
+          printf '%s\n' "Security boundary observation completed; no authority mutation performed." > security-boundary-observer.txt
+          cat security-boundary-observer.txt
