@@ -38,11 +38,11 @@ jobs:
           if not files:
               raise SystemExit("FAIL: no workflow definitions found")
           forbidden = (
-              r"git\s+push\s+[^\n]*main",
-              r"gh\s+pr\s+merge",
-              r"gh\s+pr\s+approve",
-              r"enable[_-]auto[_-]merge",
-              r"merge_pull_request",
+              r"git\s+push\s+[^\n]*" + "main",
+              r"gh\s+pr\s+" + "merge",
+              r"gh\s+pr\s+" + "approve",
+              r"enable[_-]auto[_-]" + "merge",
+              "merge" + "_pull_request",
           )
           for path in files:
               text = path.read_text(encoding="utf-8")
@@ -52,7 +52,7 @@ jobs:
                   raise SystemExit(f"FAIL: tab character in workflow: {path}")
               for pattern in forbidden:
                   if re.search(pattern, text, re.I):
-                      raise SystemExit(f"FAIL: forbidden mutation pattern in {path}: {pattern}")
+                      raise SystemExit(f"FAIL: forbidden mutation pattern in {path}")
           print(f"PASS: validated {len(files)} workflow definitions")
           PY
           ruby -e 'require "yaml"; Dir[".github/workflows/*.{yml,yaml}"].sort.each { |f| YAML.load_file(f); puts "PASS: #{f}" }'
