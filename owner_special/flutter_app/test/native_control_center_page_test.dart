@@ -31,6 +31,14 @@ class _FakeApi extends OwnerFriendApi {
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]}) async => {'text': text};
 }
 
+Future<void> _scrollControlCenter(WidgetTester tester) async {
+  final listView = find.byType(ListView).first;
+  for (var i = 0; i < 4; i++) {
+    await tester.drag(listView, const Offset(0, -500));
+    await tester.pump();
+  }
+}
+
 void main() {
   testWidgets('control center exposes command center and inspector', (tester) async {
     await tester.pumpWidget(MaterialApp(
@@ -40,17 +48,8 @@ void main() {
 
     expect(find.text('Control Center'), findsOneWidget);
     expect(find.text('System Map'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Human Control Boundary'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await _scrollControlCenter(tester);
     expect(find.text('Human Control Boundary'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Universal Inspector'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
     expect(find.text('Universal Inspector'), findsOneWidget);
     expect(find.text('Ctrl/⌘ K'), findsOneWidget);
     expect(find.text('Approve — human'), findsOneWidget);
@@ -62,11 +61,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('control-center-inspector')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await _scrollControlCenter(tester);
     await tester.enterText(find.byKey(const Key('control-center-inspector')), 'EV-001');
     await tester.tap(find.text('Inspect'));
     await tester.pump();
