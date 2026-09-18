@@ -5,16 +5,18 @@ import 'owner_api.dart';
 import 'runtime_status_pill.dart';
 
 class FriendAppShell extends StatelessWidget {
-  const FriendAppShell({required this.index, required this.onIndexChanged, required this.pages, required this.teamCenter, required this.status, this.missionControlProjection, super.key});
+  const FriendAppShell({required this.index, required this.onIndexChanged, required this.pages, required this.teamCenter, required this.status, this.missionControlProjection, this.controlCenter, super.key});
   final int index;
   final ValueChanged<int> onIndexChanged;
   final List<Widget> pages;
   final Widget teamCenter;
   final Widget status;
   final Map<String, dynamic>? missionControlProjection;
+  final Widget? controlCenter;
 
   static const items = <({IconData icon, String label})>[
-    (icon: Icons.dashboard_outlined, label: 'Mission Control'),
+    (icon: Icons.dashboard_outlined, label: 'Control Center'),
+    (icon: Icons.space_dashboard_outlined, label: 'Mission Control'),
     (icon: Icons.chat_bubble_outline, label: 'Friend'),
     (icon: Icons.rocket_launch_outlined, label: 'Launch Desk'),
     (icon: Icons.auto_awesome_outlined, label: 'Capabilities'),
@@ -36,7 +38,7 @@ class FriendAppShell extends StatelessWidget {
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 900;
             final content = index == 0
-                ? MissionControlDesktopPage(projection: missionControlProjection)
+                ? (controlCenter ?? MissionControlDesktopPage(projection: missionControlProjection))
                 : pages[index - 1];
             return Row(
               children: [
