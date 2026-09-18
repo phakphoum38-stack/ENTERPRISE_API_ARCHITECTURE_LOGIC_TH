@@ -62,7 +62,7 @@ def integrate_p1_governance_chain(*, identity: CanonicalIdentity, handoff: Indep
         raise P1FunctionalIntegrationError("owner decision target mismatch")
     if decision.exact_sha == identity.baseline_sha:
         raise P1FunctionalIntegrationError("integration target equals protected baseline")
-    material="|".join((identity.fingerprint(),handoff.review_evidence_digest,
+    material="|".join((identity.fingerprint(),handoff.independent_review_digest,
         pre_authority.packet_digest,packet.packet_digest,decision.decision_evidence_id,decision.decision))
     return P1FunctionalIntegrationTrace(identity.fingerprint(),identity.work_id,identity.mission_id,
         identity.baseline_sha,decision.exact_sha,handoff.independent_review_status,
