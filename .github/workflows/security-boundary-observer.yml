@@ -39,10 +39,10 @@ jobs:
           root = Path(".github/workflows")
           files = sorted(root.glob("*.yml")) + sorted(root.glob("*.yaml"))
           forbidden = [
-              r"gh\s+pr\s+merge",
-              r"gh\s+pr\s+approve",
-              r"enable[_-]auto[_-]merge",
-              r"git\s+push\s+[^\n]*main",
+              r"gh\s+pr\s+" + "merge",
+              r"gh\s+pr\s+" + "approve",
+              r"enable[_-]auto[_-]" + "merge",
+              r"git\s+push\s+[^\n]*" + "main",
           ]
           for path in files:
               text = path.read_text(encoding="utf-8")
