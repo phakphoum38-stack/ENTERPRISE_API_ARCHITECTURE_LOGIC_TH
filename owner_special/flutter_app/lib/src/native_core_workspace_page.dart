@@ -56,7 +56,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _events.insert(0, 'Runtime observation unavailable: ' + error.toString()));
+      setState(() => _events.insert(0, 'Runtime observation unavailable: $error'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -84,7 +84,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     final route = routes[command];
     if (route != null) {
       widget.onNavigate?.call(route);
-      setState(() => _events.insert(0, command + ' prepared'));
+      setState(() => _events.insert(0, '$command prepared'));
       return;
     }
     if (command == 'Inspect object') _tabs.animateTo(4);
@@ -247,7 +247,7 @@ class _StateView extends StatelessWidget {
       _StateRow('Worker capacity', helper is Map ? 'OBSERVED' : 'UNKNOWN',
           helper is Map ? helper.toString() : 'Backend did not expose scheduler state'),
       _StateRow('Capabilities', capabilities is List ? 'OBSERVED' : 'UNKNOWN',
-          capabilities is List ? capabilities.length.toString() + ' capability entries' : 'Not exposed'),
+          capabilities is List ? '${capabilities.length} capability entries' : 'Not exposed'),
       const SizedBox(height: 12),
       const Card(child: ListTile(
         leading: Icon(Icons.lock_outline),
