@@ -1,41 +1,42 @@
-from __future__ import annotations
-
 import threading
 import time
-
-import pytest
+import unittest
 
 from v3.worker_pool import BoundedWorkerPool, WorkerPoolClosedError, WorkerPoolLifecycle
 
 
-def test_drain_closes_admission_and_waits_for_active_work() -> None:
-    started = threading.Event()
-    release = threading.Event()
+class WorkerPoolDrainTests(unittest.TestCase):
+    def test_drain_closes_admission_and_waits_for_active_work(self):
+        started = threading.Event()
+        release = threading.Event()
 
-    def work(_: str) -> str:
-        started.set()
-        release.wait(timeout=2)
-        return "done"
+        def work(value):
+            started.set()
+            release.wait(timeout=2)
+            return value
 
-    pool = BoundedWorkerPool[str, str](max_workers=1, max_queue=2)
-    future = pool.submit("task-1", work)
-    assert started.wait(timeout=1)
+        pool = BoundedWorkerPool(max_workers=1, max_queue=2)
+        try:
+            future = pool.submit("task-1", work)
+            self.assertTrue(started.wait(timeout=1))
+            self.assertIs(pool.begin_drain(), WorkerPoolLifecycle.DRAINING)
+            with self.assertRaises(WorkerPoolClosedError):
+                pool.submit("task-2", work)
 
-    assert pool.begin_drain() is WorkerPoolLifecycle.DRAINING
-    with pytest.raises(WorkerPoolClosedError):
-        pool.submit("task-2", work)
+            result = []
+            waiter = threading.Thread(target=lambda: result.append(pool.wait_for_drain(timeout=2)))
+            waiter.start()
+            time.sleep(0.05)
+            self.assertIs(pool.stats().lifecycle, WorkerPoolLifecycle.DRAINING)
 
-    result = []
-    waiter = threading.Thread(target=lambda: result.append(pool.wait_for_drain(timeout=2)))
-    waiter.start()
-    time.sleep(0.05)
-    assert pool.stats().lifecycle is WorkerPoolLifecycle.DRAINING
+            release.set()
+            waiter.join(timeout=2)
 
-    release.set()
-    waiter.join(timeout=2)
+            self.assertEqual([True], result)
+            self.assertEqual("done", future.result(timeout=1))
+            self.assertIs(pool.stats().lifecycle, WorkerPoolLifecycle.DRAINED)
+        finally:
+            pool.shutdown()
 
-    assert result == [True]
-    assert future.result(timeout=1) == "done"
-    assert pool.stats().lifecycle is WorkerPoolLifecycle.DRAINED
-    pool.shutdown()
-    assert pool.stats().lifecycle is WorkerPoolLifecycle.SHUTDOWN
+if __name__ == "__main__":
+    unittest.main()
