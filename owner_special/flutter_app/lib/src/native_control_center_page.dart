@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'owner_api.dart';
 
 class NativeControlCenterPage extends StatefulWidget {
-  const NativeControlCenterPage({required this.api, super.key});
+  const NativeControlCenterPage({required this.api, this.onNavigate, super.key});
   final OwnerFriendApi api;
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<NativeControlCenterPage> createState() => _NativeControlCenterPageState();
@@ -36,7 +37,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage> {
   void initState() {
     super.initState();
     _load();
-    _focus.requestFocus();
+    // Keyboard focus is attached by Focus(autofocus: true) after the first frame.
   }
 
   @override
@@ -65,10 +66,18 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage> {
   }
 
   void _runCommand(String command) {
+    const routes = <String, int>{
+      'Research': 1,
+      'Runtime': 1,
+      'Friend': 2,
+      'Evidence': 4,
+    };
     setState(() {
       _search.clear();
       _activity.insert(0, 'Command prepared: $command');
     });
+    final route = routes[command];
+    if (route != null) widget.onNavigate?.call(route);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$command prepared — execution remains bounded by the control plane.')),
     );
