@@ -44,7 +44,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: NativeCoreWorkspacePage(api: _FakeApi()),
     ));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.text('Native Core Workspace'), findsOneWidget);
     expect(find.text('LIVE'), findsOneWidget);
@@ -61,10 +62,12 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: NativeCoreWorkspacePage(api: _FakeApi()),
     ));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
 
     await tester.tap(find.text('Inspector'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
     final inspectorField = find.widgetWithText(TextField, 'Object ID');
     expect(inspectorField, findsOneWidget);
     await tester.enterText(inspectorField, 'EV-001');
@@ -80,7 +83,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: NativeCoreWorkspacePage(api: _FakeApi()),
     ));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
 
     await tester.tap(find.text('LIVE'));
     await tester.pump();
