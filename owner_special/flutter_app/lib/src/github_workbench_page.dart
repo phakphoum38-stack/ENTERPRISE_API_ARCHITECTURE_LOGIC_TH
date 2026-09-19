@@ -49,25 +49,22 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
         final header = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'GitHub Workbench',
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  key: const Key('github-dry-run'),
-                  selected: _dryRun,
-                  onSelected: (value) => setState(() => _dryRun = value),
-                  avatar: Icon(_dryRun ? Icons.visibility_outlined : Icons.edit_outlined, size: 17),
-                  label: Text(_dryRun ? 'DRY RUN' : 'LIVE'),
-                ),
-              ],
+            Text(
+              'GitHub Workbench',
+              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilterChip(
+                key: const Key('github-dry-run'),
+                selected: _dryRun,
+                onSelected: (value) => setState(() => _dryRun = value),
+                avatar: Icon(_dryRun ? Icons.visibility_outlined : Icons.edit_outlined, size: 17),
+                label: Text(_dryRun ? 'DRY RUN' : 'LIVE'),
+              ),
             ),
             const SizedBox(height: 4),
             Text(
