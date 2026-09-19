@@ -24,6 +24,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     'Control Center initialized',
     'Human authority boundary active',
   ];
+  int _livePulse = 0;
 
   static const commands = <String>[
     'Open Research', 'Open Friend', 'Open Runtime', 'Open Evidence',
@@ -52,6 +53,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
       if (!mounted) return;
       setState(() {
         _status = status;
+        _livePulse++;
         _events.insert(0, 'Runtime status observed');
       });
     } catch (error) {
@@ -153,6 +155,17 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
                 ),
               ),
             const SizedBox(height: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              height: _loading ? 3 : 1,
+              decoration: BoxDecoration(
+                color: _loading ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: _loading ? const LinearProgressIndicator(minHeight: 3) : null,
+            ),
+            const SizedBox(height: 8),
             TabBar(controller: _tabs, isScrollable: true, tabs: const [
               Tab(text: 'Overview', icon: Icon(Icons.dashboard_outlined)),
               Tab(text: 'Activity', icon: Icon(Icons.timeline_outlined)),
@@ -163,7 +176,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
             ]),
             const SizedBox(height: 8),
             Expanded(child: TabBarView(controller: _tabs, children: [
-              _Overview(status: _status, simulation: _simulation),
+              _Overview(key: ValueKey('overview-$_livePulse'), status: _status, simulation: _simulation),
               _Activity(events: _events),
               _StateView(status: _status),
               _EvidenceView(status: _status),
@@ -186,7 +199,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
 }
 
 class _Overview extends StatelessWidget {
-  const _Overview({required this.status, required this.simulation});
+  const _Overview({super.key, required this.status, required this.simulation});
   final Map<String, dynamic>? status;
   final bool simulation;
 
@@ -213,6 +226,9 @@ class _Overview extends StatelessWidget {
         _Metric('Capabilities', caps.toString()),
       ]),
       const SizedBox(height: 12),
+      const SizedBox(height: 12),
+      _LiveSystemCard(online: status != null),
+      const SizedBox(height: 12),
       const _BoundaryCard(),
     ]);
   }
@@ -229,7 +245,10 @@ class _Activity extends StatelessWidget {
     itemBuilder: (_, index) => ListTile(
       dense: true,
       leading: const Icon(Icons.circle_outlined, size: 18),
-      title: Text(events[index]),
+      title: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 240),
+        child: Text(events[index], key: ValueKey(events[index])),
+      ),
       subtitle: const Text('OBSERVED'),
     ),
   );
@@ -354,6 +373,82 @@ class _Simulation extends StatelessWidget {
     ),
     const _LifecycleCard(),
   ]);
+}
+
+class _LiveSystemCard extends StatefulWidget {
+  const _LiveSystemCard({required this.online});
+  final bool online;
+
+  @override
+  State<_LiveSystemCard> createState() => _LiveSystemCardState();
+}
+
+class _LiveSystemCardState extends State<_LiveSystemCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = widget.online
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outline;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) => Opacity(
+                opacity: widget.online ? .45 + (_controller.value * .55) : 1,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    boxShadow: widget.online
+                        ? [BoxShadow(color: color.withValues(alpha: .28), blurRadius: 10)]
+                        : const [],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                widget.online ? 'LIVE SYSTEM — runtime observed' : 'SYSTEM STATE — waiting for runtime observation',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            Text(
+              widget.online ? 'LIVE' : 'UNKNOWN',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _BoundaryCard extends StatelessWidget {
