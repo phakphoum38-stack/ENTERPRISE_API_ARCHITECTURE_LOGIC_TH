@@ -46,15 +46,20 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 1000;
-        return Column(
+        final header = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
                 Expanded(
-                  child: Text('GitHub Workbench',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  child: Text(
+                    'GitHub Workbench',
+                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                const SizedBox(width: 8),
                 FilterChip(
                   key: const Key('github-dry-run'),
                   selected: _dryRun,
@@ -67,36 +72,48 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
             const SizedBox(height: 4),
             Text(
               'Native GitHub work surface • every mutating action remains behind the Human Control Boundary',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 14),
-            Expanded(
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: compact ? 190 : 220,
-                    child: Card(
-                      child: ListView(
-                        padding: const EdgeInsets.all(8),
-                        children: [
-                          for (var i = 0; i < _sections.length; i++)
-                            ListTile(
-                              dense: true,
-                              selected: i == _section,
-                              leading: Icon(_sections[i].icon, size: 19),
-                              title: Text(_sections[i].label),
-                              onTap: () => setState(() => _section = i),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildSection(theme)),
-                ],
-              ),
-            ),
           ],
+        );
+
+        final body = SizedBox(
+          height: constraints.hasBoundedHeight
+              ? (constraints.maxHeight - 110).clamp(240.0, constraints.maxHeight)
+              : 520.0,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: compact ? 190 : 220,
+                child: Card(
+                  child: ListView(
+                    padding: const EdgeInsets.all(8),
+                    children: [
+                      for (var i = 0; i < _sections.length; i++)
+                        ListTile(
+                          dense: true,
+                          selected: i == _section,
+                          leading: Icon(_sections[i].icon, size: 19),
+                          title: Text(_sections[i].label),
+                          onTap: () => setState(() => _section = i),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: _buildSection(theme)),
+            ],
+          ),
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [header, body],
         );
       },
     );
