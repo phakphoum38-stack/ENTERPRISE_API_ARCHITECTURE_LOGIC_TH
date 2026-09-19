@@ -105,13 +105,9 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
           ),
         );
 
-        return SizedBox(
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [header, body],
-          ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [header, body],
         );
       },
     );
@@ -181,9 +177,11 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
   }
   Widget _repositoryPanel(ThemeData theme) {
     return Card(
-      child: ListView(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           Text('Repository Details', style: theme.textTheme.titleLarge),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
@@ -241,7 +239,9 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
             icon: const Icon(Icons.play_arrow_outlined),
             label: const Text('Execute approved action'),
           ),
+          const SizedBox(height: 8),
         ],
+        ),
       ),
     );
   }
