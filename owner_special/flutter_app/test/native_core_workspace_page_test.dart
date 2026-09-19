@@ -64,9 +64,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Inspector'));
-    await tester.pump();
-    await tester.enterText(find.byType(TextField).last, 'EV-001');
+    await tester.pumpAndSettle();
+    final inspectorField = find.widgetWithText(TextField, 'Object ID');
+    expect(inspectorField, findsOneWidget);
+    await tester.enterText(inspectorField, 'EV-001');
     await tester.tap(find.text('Inspect'));
+    await tester.pump();
     await tester.pump();
 
     expect(find.text('EV-001'), findsOneWidget);
