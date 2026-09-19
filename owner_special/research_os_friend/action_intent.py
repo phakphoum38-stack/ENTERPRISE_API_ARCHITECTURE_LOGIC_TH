@@ -44,6 +44,7 @@ _BLOCKED = re.compile(
     r"api.?key|private.?key|approve|authorize|release|merge|dispatch)(?:$|[^a-z])",
     re.IGNORECASE,
 )
+_BLOCKED_SCHEME = re.compile(r"(?:(?:javascript|data)\\s*:)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -139,7 +140,7 @@ class ActionIntentValidator:
             ("target", intent.target),
             *(("parameter", value) for _, value in intent.params),
         ):
-            if _BLOCKED.search(value):
+            if _BLOCKED.search(value) or _BLOCKED_SCHEME.search(value):
                 raise ActionIntentError(f"{field_name} contains forbidden executable or credential-like content")
 
     @staticmethod
