@@ -96,87 +96,91 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     final query = _command.text.trim().toLowerCase();
     final matches = commands.where((item) => item.toLowerCase().contains(query)).take(8).toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Native Core Workspace',
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 3),
-            Text('Command • Activity • State • Evidence • Inspector • Simulation',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ])),
-          FilterChip(
-            selected: _simulation,
-            onSelected: (value) => setState(() {
-              _simulation = value;
-              _events.insert(0, value ? 'Simulation mode enabled' : 'Simulation mode disabled');
-            }),
-            avatar: const Icon(Icons.science_outlined, size: 17),
-            label: Text(_simulation ? 'SIMULATION' : 'LIVE'),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'Refresh runtime',
-            onPressed: _loading ? null : _load,
-            icon: _loading
-                ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.refresh),
-          ),
-        ]),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _command,
-          onChanged: (_) => setState(() {}),
-          onSubmitted: _runCommand,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.search),
-            suffixText: 'Ctrl/⌘ K',
-            hintText: 'Command, navigation, inspect…',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-          ),
-        ),
-        if (query.isNotEmpty)
-          Card(
-            child: Column(
-              children: matches.isEmpty
-                  ? [const ListTile(title: Text('No matching command'))]
-                  : matches.map((item) => ListTile(
-                        leading: const Icon(Icons.bolt_outlined),
-                        title: Text(item),
-                        subtitle: const Text('Prepared through the native control lifecycle'),
-                        onTap: () => _runCommand(item),
-                      )).toList(),
+    return Material(
+      child: SizedBox.expand(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Native Core Workspace',
+                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 3),
+                Text('Command • Activity • State • Evidence • Inspector • Simulation',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ])),
+              FilterChip(
+                selected: _simulation,
+                onSelected: (value) => setState(() {
+                  _simulation = value;
+                  _events.insert(0, value ? 'Simulation mode enabled' : 'Simulation mode disabled');
+                }),
+                avatar: const Icon(Icons.science_outlined, size: 17),
+                label: Text(_simulation ? 'SIMULATION' : 'LIVE'),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Refresh runtime',
+                onPressed: _loading ? null : _load,
+                icon: _loading
+                    ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _command,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: _runCommand,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                suffixText: 'Ctrl/⌘ K',
+                hintText: 'Command, navigation, inspect…',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
             ),
-          ),
-        const SizedBox(height: 8),
-        TabBar(controller: _tabs, isScrollable: true, tabs: const [
-          Tab(text: 'Overview', icon: Icon(Icons.dashboard_outlined)),
-          Tab(text: 'Activity', icon: Icon(Icons.timeline_outlined)),
-          Tab(text: 'State', icon: Icon(Icons.account_tree_outlined)),
-          Tab(text: 'Evidence', icon: Icon(Icons.fact_check_outlined)),
-          Tab(text: 'Inspector', icon: Icon(Icons.manage_search_outlined)),
-          Tab(text: 'Simulation', icon: Icon(Icons.science_outlined)),
-        ]),
-        const SizedBox(height: 8),
-        Expanded(child: TabBarView(controller: _tabs, children: [
-          _Overview(status: _status, simulation: _simulation),
-          _Activity(events: _events),
-          _StateView(status: _status),
-          _EvidenceView(status: _status),
-          _Inspector(controller: _inspector, selectedObject: _selectedObject, onInspect: (id) {
-            setState(() {
-              _selectedObject = id;
-              _events.insert(0, 'Inspector opened: $id');
-            });
-          }),
-          _Simulation(enabled: _simulation, onToggle: (value) => setState(() {
-            _simulation = value;
-            _events.insert(0, value ? 'Simulation mode enabled' : 'Simulation mode disabled');
-          })),
-        ])),
-      ],
+            if (query.isNotEmpty)
+              Card(
+                child: Column(
+                  children: matches.isEmpty
+                      ? [const ListTile(title: Text('No matching command'))]
+                      : matches.map((item) => ListTile(
+                            leading: const Icon(Icons.bolt_outlined),
+                            title: Text(item),
+                            subtitle: const Text('Prepared through the native control lifecycle'),
+                            onTap: () => _runCommand(item),
+                          )).toList(),
+                ),
+              ),
+            const SizedBox(height: 8),
+            TabBar(controller: _tabs, isScrollable: true, tabs: const [
+              Tab(text: 'Overview', icon: Icon(Icons.dashboard_outlined)),
+              Tab(text: 'Activity', icon: Icon(Icons.timeline_outlined)),
+              Tab(text: 'State', icon: Icon(Icons.account_tree_outlined)),
+              Tab(text: 'Evidence', icon: Icon(Icons.fact_check_outlined)),
+              Tab(text: 'Inspector', icon: Icon(Icons.manage_search_outlined)),
+              Tab(text: 'Simulation', icon: Icon(Icons.science_outlined)),
+            ]),
+            const SizedBox(height: 8),
+            Expanded(child: TabBarView(controller: _tabs, children: [
+              _Overview(status: _status, simulation: _simulation),
+              _Activity(events: _events),
+              _StateView(status: _status),
+              _EvidenceView(status: _status),
+              _Inspector(controller: _inspector, selectedObject: _selectedObject, onInspect: (id) {
+                setState(() {
+                  _selectedObject = id;
+                  _events.insert(0, 'Inspector opened: $id');
+                });
+              }),
+              _Simulation(enabled: _simulation, onToggle: (value) => setState(() {
+                _simulation = value;
+                _events.insert(0, value ? 'Simulation mode enabled' : 'Simulation mode disabled');
+              })),
+            ])),
+          ],
+        ),
+      ),
     );
   }
 }
