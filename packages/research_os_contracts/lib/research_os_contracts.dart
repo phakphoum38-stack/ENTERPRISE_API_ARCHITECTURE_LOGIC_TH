@@ -1,6 +1,16 @@
 /// Public entry point for the shared Research OS capability contracts.
 library;
 
+export 'control_contract.dart';
+export 'error_contract.dart';
+export 'lifecycle_contract.dart';
+export 'migration_contract.dart';
+export 'navigation_contract.dart';
+export 'observability_contract.dart';
+export 'platform_contract.dart';
+export 'schema_contract.dart';
+export 'state_contract.dart';
+
 abstract interface class RuntimeStatusCapability {
   Future<Map<String, dynamic>> runtimeStatus();
 }
