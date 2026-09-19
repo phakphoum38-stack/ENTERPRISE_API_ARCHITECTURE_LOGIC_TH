@@ -80,10 +80,7 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
           ],
         );
 
-        final body = SizedBox(
-          height: constraints.hasBoundedHeight
-              ? (constraints.maxHeight - 110).clamp(240.0, constraints.maxHeight)
-              : 520.0,
+        final body = Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
