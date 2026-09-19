@@ -105,9 +105,13 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
           ),
         );
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [header, body],
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [header, body],
+          ),
         );
       },
     );
