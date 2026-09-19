@@ -4,7 +4,7 @@ import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
 import 'features/auth/google_login_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
-import 'features/chat/voice_conversation_page.dart';
+import 'features/chat/chat_workspace_page.dart';
 import 'features/developer_access/developer_access_page.dart';
 import 'features/friend/friend_connect_page.dart';
 import 'features/github/github_dashboard_page.dart';
@@ -42,7 +42,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   List<Widget> get _pages => <Widget>[
         HomePage(apiClient: widget.apiClient),
-        VoiceConversationPage(apiClient: widget.apiClient),
+        ChatWorkspacePage(apiClient: widget.apiClient),
         AgentCenterPage(apiClient: widget.apiClient),
         LibraryPage(apiClient: widget.apiClient),
         KnowledgeGraphPage(apiClient: widget.apiClient),
