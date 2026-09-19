@@ -1,0 +1,53 @@
+{
+  "contract_id": "research-os-native-control-plane-v1",
+  "version": 1,
+  "purpose": "Unify control, experience, knowledge and assurance behind one native Research OS control plane.",
+  "root_ref": "current/MATHEMATICAL_ROOT_CONTRACT.json",
+  "learning_ref": "current/UNIVERSAL_LEARNING_CONTRACT.json",
+  "engines": [
+    {"id":"control","responsibility":"commands, navigation, actions, state transitions and human control boundaries"},
+    {"id":"experience","responsibility":"native UI model, layout, interaction, motion, accessibility and presentation state"},
+    {"id":"knowledge","responsibility":"context, knowledge objects, research, evidence references and learning handoff"},
+    {"id":"assurance","responsibility":"identity, provenance, evidence, verification, audit and recovery gates"}
+  ],
+  "composition": {
+    "application_shell": "control",
+    "ui_state": "experience",
+    "domain_state": "knowledge",
+    "trust_state": "assurance"
+  },
+  "command_lifecycle": ["INTENT","VALIDATE","AUTHORIZE","EXECUTE","OBSERVE","EVIDENCE","COMPLETE"],
+  "view_lifecycle": ["DISCOVERED","LOADED","ACTIVE","TRANSITIONING","SUSPENDED","RECOVERING","CLOSED"],
+  "knowledge_states": ["UNKNOWN","DISCOVERED","TESTED","EVIDENCED","CONFIDENT","MASTERED","SUPERSEDED","CONFLICTED"],
+  "assurance_states": ["UNASSESSED","OBSERVED","SUPPORTED","VERIFIED","CONTRADICTED","HOLD"],
+  "human_control": {
+    "system_may": ["OBSERVE","ANALYZE","RESEARCH","PREPARE","PROPOSE"],
+    "human_required": ["APPROVE","AUTHORIZE","RELEASE","OVERRIDE_HIGH_RISK"]
+  },
+  "invariants": [
+    "one_control_plane",
+    "one_command_model",
+    "one_object_inspector_model",
+    "unknown_is_not_known",
+    "confidence_is_not_truth",
+    "assurance_is_not_authority",
+    "evidence_precedes_confidence",
+    "history_is_preserved",
+    "recovery_is_explicit",
+    "10^1000_is_logical_only",
+    "no_automatic_merge",
+    "no_automatic_authority_grant",
+    "no_duplicate_scheduler_or_queue"
+  ],
+  "motion": {
+    "state_driven": true,
+    "reduced_motion_supported": true,
+    "decorative_motion_must_not_change_semantics": true
+  },
+  "bounds": {
+    "commands_per_dispatch": 100,
+    "visible_navigation_depth": 8,
+    "inspector_relation_depth": 8
+  },
+  "authority": "descriptive_and_controlled; does not grant merge or owner authority"
+}

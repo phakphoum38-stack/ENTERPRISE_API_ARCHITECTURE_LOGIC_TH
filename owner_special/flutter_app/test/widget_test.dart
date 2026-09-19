@@ -70,6 +70,11 @@ void main() {
     await tester.pumpWidget(OwnerFriendApp(api: FakeOwnerFriendApi()));
     await tester.pump();
 
+    // Control Center is the default surface; explicitly open Friend before
+    // asserting Friend-specific controls.
+    await tester.tap(find.text('Friend').first);
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('turbo-million')), findsOneWidget);
     expect(find.byKey(const Key('friend-input')), findsOneWidget);
     expect(find.byKey(const Key('friend-send')), findsOneWidget);
