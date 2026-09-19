@@ -24,6 +24,7 @@ class FriendAppShell extends StatelessWidget {
     (icon: Icons.tune_outlined, label: 'Provider'),
     (icon: Icons.groups_outlined, label: 'Team'),
     (icon: Icons.account_circle_outlined, label: 'Google Identity'),
+    (icon: Icons.integration_instructions_outlined, label: 'GitHub Workbench'),
   ];
 
   @override
