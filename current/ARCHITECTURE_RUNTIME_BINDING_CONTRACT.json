@@ -1,0 +1,22 @@
+{
+  "contract_id": "research-os-architecture-runtime-binding-v1",
+  "schema_version": "1.0",
+  "status": "ACTIVE",
+  "mode": "read_only_runtime_binding_inspection",
+  "source_contract": "current/ARCHITECTURE_COMPLETENESS_CONTRACT.json",
+  "unknown_policy": "FAIL",
+  "statuses": ["PASS", "PARTIAL", "UNPROVEN", "DUPLICATED"],
+  "failure_statuses": ["UNPROVEN", "DUPLICATED"],
+  "partial_status": "reported_without_promotion",
+  "rules": {
+    "shared_contract_consumption": "each root must import the shared contract package",
+    "adapter_presence": "each root must expose a declared transport or compatibility adapter",
+    "navigation": "global navigation must have one canonical owner; root-local navigation is reported as partial",
+    "design_system": "visual tokens or themes must have declared evidence",
+    "runtime_binding": "file presence alone is never sufficient proof of runtime binding",
+    "authority": "UI evidence never grants merge, approval, release, dispatch or execution authority"
+  },
+  "no_history_rewrite": true,
+  "no_automatic_merge": true,
+  "no_automatic_authority_grant": true
+}
