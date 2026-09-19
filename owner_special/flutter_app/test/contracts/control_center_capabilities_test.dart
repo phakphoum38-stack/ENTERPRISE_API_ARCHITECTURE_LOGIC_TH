@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_contracts/research_os_contracts.dart';
 
-import '../../lib/src/contracts/control_center_capabilities.dart';
-import '../../lib/src/contracts/owner_friend_capability_adapter.dart';
-import '../../lib/src/owner_api.dart';
+import 'package:research_os_owner_special/src/contracts/control_center_capabilities.dart';
+import 'package:research_os_owner_special/src/contracts/owner_friend_capability_adapter.dart';
+import 'package:research_os_owner_special/src/owner_api.dart';
 
 final class _FakeOwnerApi implements OwnerFriendApi {
   @override
@@ -39,6 +39,12 @@ final class _FakeOwnerApi implements OwnerFriendApi {
     List<String> requestedTools = const <String>[],
   }) async =>
       <String, dynamic>{};
+
+  @override
+  void setSession(String token) {}
+
+  @override
+  void clearSession() {}
 
   @override
   Future<Map<String, dynamic>> authStatus() async => <String, dynamic>{};
