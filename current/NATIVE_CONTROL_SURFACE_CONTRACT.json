@@ -1,0 +1,98 @@
+{
+  "contract_id": "research-os-native-control-surface-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Provide one reusable interaction surface for command discovery, semantic search, universal inspection, system mapping, and observable control-center navigation.",
+  "root_ref": "current/MATHEMATICAL_ROOT_CONTRACT.json",
+  "control_ref": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+  "experience_ref": "current/EXPERIENCE_GUI_UX_UI_CONTRACT.json",
+  "capabilities": [
+    "COMMAND_DISCOVERY",
+    "SEMANTIC_SEARCH",
+    "UNIVERSAL_INSPECTOR",
+    "SYSTEM_MAP",
+    "OBJECT_TRACE",
+    "WHY_TRACE"
+  ],
+  "command_lifecycle": [
+    "INTENT",
+    "VALIDATE",
+    "PREPARE",
+    "AUTHORIZE",
+    "EXECUTE",
+    "OBSERVE",
+    "EVIDENCE",
+    "COMPLETE",
+    "RECOVER"
+  ],
+  "search_domains": [
+    "TASK",
+    "KNOWLEDGE",
+    "SOURCE",
+    "EVIDENCE",
+    "SERVICE",
+    "TOOL",
+    "PROJECT",
+    "SNAPSHOT",
+    "FAILURE",
+    "DECISION",
+    "DESIGN",
+    "COMPONENT"
+  ],
+  "inspect_fields": [
+    "identity",
+    "type",
+    "state",
+    "owner",
+    "version",
+    "relations",
+    "dependencies",
+    "provenance",
+    "evidence",
+    "confidence",
+    "risk",
+    "history",
+    "recovery",
+    "successor"
+  ],
+  "system_map_planes": [
+    "CORE",
+    "ASSURANCE",
+    "PLATFORM",
+    "EXPERIENCE"
+  ],
+  "invariants": [
+    "search_is_read_only",
+    "inspection_is_read_only",
+    "navigation_does_not_grant_authority",
+    "command_preparation_is_not_execution",
+    "unknown_is_preserved",
+    "provenance_is_preserved",
+    "evidence_is_not_authority",
+    "human_authority_boundaries_are_preserved",
+    "no_duplicate_control_center",
+    "no_duplicate_runtime",
+    "no_duplicate_memory",
+    "no_duplicate_assurance",
+    "no_history_rewrite",
+    "10^1000_is_logical_only"
+  ],
+  "bounds": {
+    "max_search_results": 100,
+    "max_inspector_relations": 256,
+    "max_inspector_evidence": 256,
+    "max_trace_depth": 32,
+    "max_activity_items": 1000
+  },
+  "authority": {
+    "mode": "descriptive_only",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_release": false,
+    "may_merge": false,
+    "may_change_branch_protection": false,
+    "may_rewrite_history": false
+  },
+  "failure_policy": "FAIL_CLOSED"
+}
