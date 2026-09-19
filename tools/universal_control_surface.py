@@ -7,10 +7,10 @@ external I/O remain in existing adapters.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import hashlib
 import json
-from typing import Any, Iterable, Mapping
+from typing import Mapping
 
 
 SEARCH_DOMAINS = {
@@ -139,7 +139,10 @@ class UniversalControlSurface:
             score = sum(1 for token in term.split() if token in haystack)
             if score:
                 hits.append(SearchHit(obj.object_id, obj.object_type, obj.title, score, obj.state))
-        hits.sort(key=lambda hit: (-hit.score, hit.object_id))
+        # Stable tie ordering preserves canonical registry/insertion order.
+        # This keeps equal-score semantic matches deterministic without using
+        # object IDs as an arbitrary secondary relevance signal.
+        hits.sort(key=lambda hit: -hit.score)
         return tuple(hits[:cap])
 
     def inspect(self, object_id: str) -> SurfaceObject:
