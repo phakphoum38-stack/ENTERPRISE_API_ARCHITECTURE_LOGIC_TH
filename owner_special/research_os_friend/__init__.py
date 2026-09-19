@@ -1,3 +1,4 @@
+from .action_intent import ActionEffect, ActionApproval, ActionIntent, ActionIntentError, ActionIntentValidator
 from .agent_runtime import AgentRun, AgentRuntime, AgentRunStatus, AgentTraceEvent
 from .agent_trace_store import PersistentAgentTraceStore
 from .agents_sdk_adapter import AgentsSdkAdapter, AgentsSdkContract, AgentsSdkToolContract
@@ -36,7 +37,7 @@ from .autobot_execution_loop import AutobotExecutionError, ExecutionEvent, Execu
 from .trusted_web_research import MatchState, ResearchError, ResearchRecord, SourceKind, classify_source, match_environment, validate_research_finding
 
 __all__ = [
-    "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalProof", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
+    "ActionEffect", "ActionApproval", "ActionIntent", "ActionIntentError", "ActionIntentValidator", "AgentRun", "AgentRuntime", "AgentRunStatus", "AgentTraceEvent", "PersistentAgentTraceStore", "AgentsSdkAdapter", "AgentsSdkContract", "AgentsSdkToolContract", "ApprovalGate", "ApprovalProof", "ApprovalRecord", "ApprovalState", "SIDE_EFFECT_TOOLS", "PersistentApprovalStore", "Capability", "CapabilityRegistry", "DecisionPlanner", "EvidenceRecorder", "FriendBrain", "FriendContext",
     "FriendDecision", "FriendOrchestrator", "FriendRequest", "FriendResponse", "FriendRuntime", "HelperAllocation",
     "HelperScheduler", "MemorySecretStore", "MissionControl", "MissionControlCapabilities", "MockProvider", "OpenAICompatibleProvider", "OWNER_HEADER", "OwnerBundleBuilder",
     "OwnerFriendService", "OwnerIdentity", "OwnerPolicy", "PROFILE_HEADER", "PersistentScopedMemory", "ProviderManager",
