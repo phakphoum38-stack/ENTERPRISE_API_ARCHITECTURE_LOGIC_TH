@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:research_os_contracts/research_os_contracts.dart';
+
 import 'owner_api.dart';
 
 class NativeCoreWorkspacePage extends StatefulWidget {
-  const NativeCoreWorkspacePage({required this.api, this.onNavigate, super.key});
+  const NativeCoreWorkspacePage({required this.api, this.runtimeCapability, this.onNavigate, super.key});
   final OwnerFriendApi api;
+  final RuntimeStatusCapability? runtimeCapability;
   final ValueChanged<int>? onNavigate;
 
   @override
@@ -49,7 +52,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final status = await widget.api.status();
+      final status = await (widget.runtimeCapability ?? _OwnerRuntimeCapability(widget.api)).runtimeStatus();
       if (!mounted) return;
       setState(() {
         _status = status;
@@ -520,4 +523,13 @@ class _Metric extends StatelessWidget {
       ]),
     )),
   );
+}
+
+
+final class _OwnerRuntimeCapability implements RuntimeStatusCapability {
+  const _OwnerRuntimeCapability(this.api);
+  final OwnerFriendApi api;
+
+  @override
+  Future<Map<String, dynamic>> runtimeStatus() => api.status();
 }
