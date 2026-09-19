@@ -5,7 +5,7 @@ import 'package:research_os_owner_special/src/github_workbench_page.dart';
 
 void main() {
   Future<void> revealAuthority(WidgetTester tester) async {
-    final navigation = find.byType(ListView).first;
+    final navigation = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
       find.text('Authority'),
       200,
