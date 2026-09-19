@@ -1,0 +1,118 @@
+{
+  "contract_id": "research-os-architecture-completeness-v1",
+  "schema_version": "1.0",
+  "status": "ACTIVE",
+  "purpose": "Single machine-readable contract for closing architecture gaps across the three Flutter roots, shared contracts, adapters, runtime, UI, assurance and release lifecycle.",
+  "canonical_shell": "owner_special/flutter_app",
+  "roots": [
+    "apps/research_os_flutter",
+    "owner_special/flutter_app",
+    "v3/flutter_app"
+  ],
+  "shared_contract_root": "packages/research_os_contracts",
+  "required_dimensions": [
+    "contract",
+    "ownership",
+    "implementation",
+    "adapter",
+    "ui_surface",
+    "api_surface",
+    "state",
+    "navigation",
+    "error_recovery",
+    "security_authority",
+    "audit_observability",
+    "offline_recovery",
+    "idempotency_concurrency",
+    "schema_versioning",
+    "platform_parity",
+    "design_system",
+    "accessibility",
+    "performance",
+    "feature_flags",
+    "artifact_provenance",
+    "migration",
+    "retirement"
+  ],
+  "global_invariants": [
+    "one_canonical_control_plane",
+    "one_owner_per_capability",
+    "ui_never_grants_authority",
+    "ui_never_owns_transport_credentials",
+    "execution_requires_explicit_authorization",
+    "unknown_is_not_pass",
+    "evidence_is_derived_from_observed_state",
+    "retries_are_idempotent_where_mutation_is_possible",
+    "state_reconstruction_is_explicit",
+    "schema_changes_are_versioned",
+    "release_artifacts_are_source_bound",
+    "retirement_requires_parity_and_evidence",
+    "git_history_is_preserved"
+  ],
+  "required_shared_contracts": {
+    "capability": "packages/research_os_contracts/lib/research_os_contracts.dart",
+    "navigation": "packages/research_os_contracts/lib/navigation_contract.dart",
+    "state": "packages/research_os_contracts/lib/state_contract.dart",
+    "error": "packages/research_os_contracts/lib/error_contract.dart",
+    "control": "packages/research_os_contracts/lib/control_contract.dart",
+    "observability": "packages/research_os_contracts/lib/observability_contract.dart",
+    "schema": "packages/research_os_contracts/lib/schema_contract.dart",
+    "platform": "packages/research_os_contracts/lib/platform_contract.dart",
+    "migration": "packages/research_os_contracts/lib/migration_contract.dart",
+    "lifecycle": "packages/research_os_contracts/lib/lifecycle_contract.dart"
+  },
+  "required_control_documents": [
+    "current/RESEARCH_OS_FLUTTER_CONTRACT.json",
+    "current/NATIVE_CONTROL_PLANE_CONTRACT.json",
+    "current/ARCHITECTURE_COMPLETENESS_CONTRACT.json",
+    "docs/ARCHITECTURE_COMPLETENESS.md"
+  ],
+  "root_requirements": {
+    "apps/research_os_flutter": [
+      "pubspec.yaml"
+    ],
+    "owner_special/flutter_app": [
+      "pubspec.yaml",
+      "lib/main.dart"
+    ],
+    "v3/flutter_app": [
+      "pubspec.yaml"
+    ]
+  },
+  "dimension_controls": {
+    "contract": "shared capability contracts plus this completeness contract",
+    "ownership": "canonical owner is declared per capability before implementation is promoted",
+    "implementation": "implementation remains in the owning subsystem; no shadow implementation is accepted",
+    "adapter": "transport/platform details remain behind adapters",
+    "ui_surface": "UI consumes capability/state contracts and does not become an authority boundary",
+    "api_surface": "API endpoints are mapped to an adapter and capability or explicitly marked compatibility-only",
+    "state": "view, domain and trust state have distinct ownership and explicit lifecycle",
+    "navigation": "navigation is shell-owned and declarative; features do not own global navigation",
+    "error_recovery": "errors have stable categories, recoverability and evidence semantics",
+    "security_authority": "identity, policy and human approval remain outside presentation widgets",
+    "audit_observability": "correlation, audit, health and evidence share stable identifiers",
+    "offline_recovery": "offline work is queued, replayed and reconciled without duplicate mutation",
+    "idempotency_concurrency": "mutations expose replay keys and concurrent work has explicit ownership semantics",
+    "schema_versioning": "schema/event/contract changes declare compatibility and migration policy",
+    "platform_parity": "platform runners preserve application contracts while retaining platform-specific identity",
+    "design_system": "visual tokens, components and interaction rules have one declared source of truth",
+    "accessibility": "semantic labels, focus, contrast, reduced motion and keyboard/screen-reader paths are testable",
+    "performance": "startup, frame, memory and network budgets are explicit and measurable",
+    "feature_flags": "flags have owner, default, scope, expiry and removal/migration policy",
+    "artifact_provenance": "build/release artifacts bind to exact source and verification evidence",
+    "migration": "upgrades define preflight, compatibility, migration, rollback and postflight checks",
+    "retirement": "a root or capability is retired only after parity, dependency, evidence and rollback gates close"
+  },
+  "verification_policy": {
+    "mode": "read_only_inspection",
+    "unknown_policy": "FAIL",
+    "missing_required_path": "FAIL",
+    "duplicate_owner": "FAIL",
+    "unbound_capability": "FAIL",
+    "docs_only": "WARN",
+    "compatibility_only": "PASS_WITH_EXCEPTION",
+    "no_history_rewrite": true,
+    "no_automatic_merge": true,
+    "no_automatic_authority_grant": true
+  }
+}
