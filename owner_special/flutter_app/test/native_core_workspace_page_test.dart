@@ -48,7 +48,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.text('Native Core Workspace'), findsOneWidget);
-    expect(find.text('LIVE'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, 'LIVE'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('Activity'), findsOneWidget);
     expect(find.text('State'), findsOneWidget);
@@ -75,7 +75,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('EV-001'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, 'EV-001'), findsOneWidget);
     expect(find.textContaining('no authority grant'), findsOneWidget);
   });
 
@@ -86,12 +86,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
-    await tester.tap(find.text('LIVE'));
+    await tester.tap(find.widgetWithText(FilterChip, 'LIVE'));
     await tester.pump();
-    expect(find.text('SIMULATION'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, 'SIMULATION'), findsOneWidget);
 
-    await tester.tap(find.text('SIMULATION'));
+    await tester.tap(find.widgetWithText(FilterChip, 'SIMULATION'));
     await tester.pump();
-    expect(find.text('LIVE'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, 'LIVE'), findsOneWidget);
   });
 }
