@@ -1,22 +1,37 @@
-import '../owner_api.dart';
-import 'research_os_capabilities.dart';
+import 'package:research_os_contracts/research_os_contracts.dart';
 
-/// Owner Friend transport exposed through the canonical capability boundary.
-final class OwnerFriendCapabilityAdapter {
+import '../owner_api.dart';
+
+/// Owner Friend transport exposed through stable shared capability contracts.
+final class OwnerFriendCapabilityAdapter
+    implements
+        RuntimeStatusCapability,
+        ProviderCapability,
+        IdentityCapability,
+        MemoryCapability {
   OwnerFriendCapabilityAdapter(this.api);
 
   final OwnerFriendApi api;
 
+  @override
   Future<Map<String, dynamic>> runtimeStatus() => api.status();
 
+  @override
+  Future<Map<String, dynamic>> providers() => api.providerStatus();
+
+  @override
   Future<Map<String, dynamic>> providerStatus() => api.providerStatus();
 
-  Future<Map<String, dynamic>> memory() => api.memory();
+  @override
+  Future<Map<String, dynamic>> memorySearch(String query) => api.memory();
 
+  @override
   Future<Map<String, dynamic>> identityStatus() => api.authStatus();
 
+  @override
   Future<Map<String, dynamic>> signIn() => api.startGoogleIdentity();
 
+  @override
   Future<Map<String, dynamic>> signOut() => api.signOut();
 
   Future<Map<String, dynamic>> configureProvider(
