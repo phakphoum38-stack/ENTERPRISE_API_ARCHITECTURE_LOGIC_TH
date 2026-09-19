@@ -186,7 +186,7 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('Repository', style: theme.textTheme.titleLarge),
+          Text('Repository Details', style: theme.textTheme.titleLarge),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
             initialValue: _repository,
@@ -238,6 +238,7 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
           _statusTile(theme, Icons.visibility_outlined, 'Mutation mode', _dryRun ? 'Preview only' : 'Human approval required'),
           const SizedBox(height: 12),
           FilledButton.icon(
+            key: const Key('github-execute-approved-action'),
             onPressed: _dryRun ? null : () {},
             icon: const Icon(Icons.play_arrow_outlined),
             label: const Text('Execute approved action'),
