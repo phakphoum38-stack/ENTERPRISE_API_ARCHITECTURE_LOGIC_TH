@@ -25,7 +25,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Preview only'), findsOneWidget);
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
+    final button = tester.widget<FilledButton>(find.byKey(const Key('github-execute-approved-action')));
     expect(button.onPressed, isNull);
 
     await tester.tap(find.text('Authority'));
