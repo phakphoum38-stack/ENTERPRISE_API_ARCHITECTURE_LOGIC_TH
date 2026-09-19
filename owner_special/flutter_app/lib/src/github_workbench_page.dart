@@ -190,7 +190,7 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
             initialValue: _repository,
-            decoration: const InputDecoration(labelText: 'Repository'),
+            decoration: const InputDecoration(labelText: 'Repository Name'),
             items: const [
               DropdownMenuItem(
                 value: 'ENTERPRISE_API_ARCHITECTURE_LOGIC_TH',
