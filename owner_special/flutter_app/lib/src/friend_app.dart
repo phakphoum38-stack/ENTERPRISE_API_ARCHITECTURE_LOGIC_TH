@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'friend_app_shell.dart';
+import 'contracts/control_center_capabilities.dart';
+import 'contracts/owner_friend_capability_adapter.dart';
+import 'package:research_os_contracts/research_os_contracts.dart';
 import 'friend_module_shell.dart';
 import 'friend_theme.dart';
 import 'google_identity_page.dart';
@@ -11,10 +14,11 @@ import 'owner_api.dart';
 import 'team_center.dart';
 
 class OwnerFriendApp extends StatefulWidget {
-  const OwnerFriendApp({required this.api, this.startup, this.startupError, super.key});
+  const OwnerFriendApp({required this.api, this.startup, this.startupError, this.researchCapabilities, super.key});
   final OwnerFriendApi api;
   final Map<String, dynamic>? startup;
   final String? startupError;
+  final ResearchOSCapabilities? researchCapabilities;
 
   @override
   State<OwnerFriendApp> createState() => _OwnerFriendAppState();
@@ -28,6 +32,10 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
 
   @override
   Widget build(BuildContext context) {
+    final capabilities = ControlCenterCapabilities(
+      owner: OwnerFriendCapabilityAdapter(widget.api),
+      research: widget.researchCapabilities,
+    );
     final pages = <Widget>[
       MissionControlDesktopPage(projection: null),
       _FriendChatPage(api: widget.api, team: _currentTeam),
@@ -47,7 +55,7 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
         index: _index,
         onIndexChanged: (value) => setState(() => _index = value),
         pages: pages,
-        controlCenter: NativeCoreWorkspacePage(api: widget.api, onNavigate: (value) => setState(() => _index = value)),
+        controlCenter: NativeCoreWorkspacePage(api: widget.api, runtimeCapability: capabilities.runtime, onNavigate: (value) => setState(() => _index = value)),
         teamCenter: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
           child: TeamCenter(onChanged: _onTeamChanged),
