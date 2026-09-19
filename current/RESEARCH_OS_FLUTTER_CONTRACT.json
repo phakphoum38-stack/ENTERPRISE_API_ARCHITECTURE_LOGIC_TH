@@ -1,0 +1,116 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Stable cross-system contract map for converging three Flutter roots without collapsing platform/runtime boundaries.",
+  "canonical_shell": "owner_special/flutter_app",
+  "sources": [
+    "apps/research_os_flutter",
+    "owner_special/flutter_app",
+    "v3/flutter_app"
+  ],
+  "contracts": {
+    "research_api": {
+      "source": "apps/research_os_flutter/lib/src/api/research_os_api_client.dart",
+      "role": "general Research OS backend adapter",
+      "capabilities": [
+        "health",
+        "providers",
+        "knowledge_artifacts",
+        "knowledge_graph",
+        "brain_capacity",
+        "brain_skills",
+        "brain_providers",
+        "google_identity",
+        "google_workspace",
+        "agents",
+        "orchestrations",
+        "github_dashboard",
+        "memory",
+        "ai_generation",
+        "conversation_cloud_sync",
+        "copilot"
+      ],
+      "boundary": "HTTP adapter; JSON transport remains outside UI feature contracts"
+    },
+    "owner_friend": {
+      "source": "owner_special/flutter_app/lib/src/owner_api.dart",
+      "role": "Owner/Control Center local-first Friend runtime adapter",
+      "capabilities": [
+        "health",
+        "status",
+        "memory",
+        "provider_status",
+        "provider_configuration",
+        "provider_test",
+        "friend_chat",
+        "google_identity_handoff",
+        "launch_desk"
+      ],
+      "boundary": "Owner identity, session headers, local Friend runtime, and Windows service remain platform/runtime concerns"
+    },
+    "v3_runtime": {
+      "source": "v3/flutter_app/lib/src/api/v3_api.dart",
+      "role": "V3 compatibility adapter",
+      "capabilities": [
+        "health",
+        "providers",
+        "master",
+        "user"
+      ],
+      "boundary": "V3 endpoints remain compatibility-gated until equivalent Control Center capability is verified"
+    }
+  },
+  "shared_domain_contracts": {
+    "runtime_status": {
+      "minimum_fields": ["status"],
+      "optional_fields": ["version", "server", "loopback_only", "capabilities"]
+    },
+    "provider": {
+      "minimum_identity": ["id"],
+      "optional_fields": ["name", "model", "status", "enabled", "cost", "latency"]
+    },
+    "identity": {
+      "minimum_fields": ["authenticated"],
+      "session_boundary": "session/token is owned by adapter, not UI widgets"
+    },
+    "memory": {
+      "minimum_operation": ["search"],
+      "conversation_sync": ["commit", "list", "sync", "delete"],
+      "session_key_boundary": "sync keys never belong in presentation widgets"
+    },
+    "orchestration": {
+      "lifecycle": ["intent", "validate", "authorize", "execute", "observe", "evidence", "complete"],
+      "execution_boundary": "UI prepares/requests; authority and execution remain external to presentation"
+    },
+    "platform": {
+      "supported_roles": ["windows", "ios", "android", "web", "other"],
+      "rule": "runner and packaging identity are not duplicated application systems"
+    }
+  },
+  "adapter_rules": [
+    "UI features depend on capability interfaces, not concrete HTTP clients.",
+    "Research API, Owner Friend API, and V3 API remain independently testable adapters.",
+    "No UI feature imports a platform runner implementation.",
+    "No adapter owns navigation state.",
+    "No migration changes Owner Special Windows identity or installer contracts.",
+    "V3 compatibility is retained until its release gates can be satisfied by the canonical shell.",
+    "JSON payloads may evolve behind adapters; stable UI contracts use normalized domain fields.",
+    "Execution and authority are never granted by the Flutter shell itself."
+  ],
+  "migration_order": [
+    "extract shared domain contracts",
+    "wrap existing APIs with capability interfaces",
+    "migrate feature pages into canonical Control Center",
+    "add adapter-backed tests",
+    "verify Windows/iOS/other platform runners",
+    "verify Owner identity/installer and V3 gates",
+    "retire duplicate UI roots only after all gates close"
+  ],
+  "non_goals": [
+    "delete apps/research_os_flutter",
+    "delete owner_special/flutter_app",
+    "delete v3/flutter_app",
+    "rewrite Git history",
+    "replace platform runners with a single runner",
+    "move backend/runtime into Flutter"
+  ]
+}

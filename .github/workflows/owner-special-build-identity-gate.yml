@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'owner_special/**'
+      - 'packages/research_os_contracts/**'
       - 'v3/research_os_v3/**'
       - '.github/workflows/owner-special-build-identity-gate.yml'
   push:
