@@ -1,0 +1,7 @@
+name: research_os_contracts
+description: Shared, transport-independent Research OS capability contracts.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
