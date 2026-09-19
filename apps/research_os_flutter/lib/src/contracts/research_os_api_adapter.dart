@@ -1,8 +1,10 @@
-import '../api/research_os_api_client.dart';
-import '../contracts/research_os_capabilities.dart';
+import 'package:research_os_contracts/research_os_contracts.dart';
 
-/// Adapter exposing the existing ResearchOSApiClient through stable
-/// capability contracts. Transport and JSON details remain below this layer.
+import '../api/research_os_api_client.dart';
+
+/// Adapter exposing the existing ResearchOSApiClient through the canonical
+/// shared capability contracts. Transport and JSON details remain below this
+/// layer.
 final class ResearchOSApiAdapter implements ResearchOSCapabilities {
   ResearchOSApiAdapter(this.client);
 
