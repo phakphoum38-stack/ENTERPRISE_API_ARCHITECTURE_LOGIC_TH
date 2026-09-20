@@ -95,7 +95,7 @@ class ResearchOSAPITests(unittest.TestCase):
                 "risk": 7,
                 "parallelism": 128,
                 "helper_budget": 1_000_000,
-            })
+            }, headers={"X-Research-OS-Owner": "owner"})
         self.assertEqual(200, status)
         self.assertEqual("friend", payload["route"])
         self.assertEqual("friend-ok", payload["text"])
