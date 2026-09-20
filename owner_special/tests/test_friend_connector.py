@@ -9,6 +9,7 @@ from tools.research_os_api.friend_connector import (
     ConnectionProfileStore,
     FriendConnectionProfile,
     FriendConnector,
+    MemoryConnectionCredentialStore,
 )
 
 
@@ -30,7 +31,7 @@ class FriendConnectorProfileTests(unittest.TestCase):
 
     def test_auto_prefers_direct_and_falls_back(self):
         with tempfile.TemporaryDirectory() as root:
-            connector = FriendConnector(owner_id="owner", data_root=Path(root))
+            connector = FriendConnector(owner_id="owner", data_root=Path(root), credential_store=MemoryConnectionCredentialStore())
             connector.profiles.upsert(FriendConnectionProfile("auto", "Auto", "owner", transport="auto"))
             with patch.object(connector, "_direct_chat", side_effect=RuntimeError("direct down")) as direct:
                 with patch.object(connector, "_http_request", return_value={"text": "ok"}) as http:
