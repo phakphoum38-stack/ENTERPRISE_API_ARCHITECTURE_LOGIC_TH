@@ -25,7 +25,7 @@ class ExperienceNativeDesignStudioTests(unittest.TestCase):
         studio = ExperienceStudio()
         component = Component("control-center", "Control Center")
         studio.add_component(component)
-        with self.assertRaisesRegex(ValueError, "requires evidence"):
+        with self.assertRaisesRegex(ValueError, "require evidence"):
             component.transition(ExperienceState.RELEASED)
 
     def test_state_complete_component_and_motion(self):
