@@ -1,0 +1,71 @@
+name: ROOT Forensic Resolve Binding Execute
+
+on:
+  push:
+    branches:
+      - forensic/root-resolve-binding-execute-20260921
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forensic-resolve-binding-execute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all refs for forensic search
+        run: |
+          git fetch --all --prune --tags
+
+      - name: Search historical resolve/binding/execute lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p forensic-output
+          {
+            echo "ROOT FORENSIC: resolve -> binding -> execute"
+            echo "HEAD: $(git rev-parse HEAD)"
+            echo "DATE: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "=== CURRENT TREE: semantic files ==="
+            git grep -n -E 'GatewayRoute|gateway_route|operation_id|endpoint_id|target|capability|binding|adapter|resolve|delegate|execute' -- . ':!forensic-output' || true
+            echo
+            echo "=== ALL HISTORY: resolve symbols ==="
+            git log --all --oneline --decorate --regexp-ignore-case --extended-regexp --grep='resolve|resolver|resolution' || true
+            git log --all --oneline --regexp-ignore-case -S'resolve' -- . || true
+            echo
+            echo "=== ALL HISTORY: binding symbols ==="
+            git log --all --oneline --regexp-ignore-case --extended-regexp --grep='binding|bind|adapter|integration' || true
+            git log --all --oneline --regexp-ignore-case -S'binding' -- . || true
+            echo
+            echo "=== ALL HISTORY: execution symbols ==="
+            git log --all --oneline --regexp-ignore-case --extended-regexp --grep='execute|executor|dispatch|invoke|delegate' || true
+            git log --all --oneline --regexp-ignore-case -S'execute' -- . || true
+            echo
+            echo "=== TARGET/ENDPOINT/OPERATION HISTORY ==="
+            for term in 'GatewayRoute' 'target' 'endpoint_id' 'operation_id' 'capability_id' 'binding_id' 'adapter_id'; do
+              echo "--- $term ---"
+              git log --all --oneline --regexp-ignore-case -S"$term" -- . || true
+            done
+            echo
+            echo "=== RENAMES / MOVES ==="
+            git log --all --name-status --find-renames --find-copies --format='%H %s' -- . | grep -E '^[RCA][0-9]*|GatewayRoute|api_management|adapter|binding|resolve|execute' || true
+          } | tee forensic-output/root-resolve-binding-execute.txt
+
+      - name: Require forensic evidence
+        shell: bash
+        run: |
+          test -s forensic-output/root-resolve-binding-execute.txt
+          grep -Eiq 'resolve|resolver|binding|adapter|execute|GatewayRoute|operation_id|endpoint_id' forensic-output/root-resolve-binding-execute.txt
+
+      - name: Upload forensic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: root-resolve-binding-execute
+          path: forensic-output/root-resolve-binding-execute.txt
+          if-no-files-found: error
