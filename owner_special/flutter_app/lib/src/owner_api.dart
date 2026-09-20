@@ -170,7 +170,10 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
         'helper_budget': helperBudget,
         if (requestedSkills.isNotEmpty) 'requested_skills': requestedSkills,
         if (requestedTools.isNotEmpty) 'requested_tools': requestedTools,
-        'session_id': sessionId,\n        'connection_id': _friendConnectionId,\n        if (_friendConnectionPassword != null && _friendConnectionPassword!.isNotEmpty) 'connection_password': _friendConnectionPassword,\n      }));
+        'session_id': sessionId,
+        'connection_id': _friendConnectionId,
+        if (_friendConnectionPassword != null && _friendConnectionPassword!.isNotEmpty) 'connection_password': _friendConnectionPassword,
+      }));
       request.contentLength = payload.length;
       request.add(payload);
       final response = await request.close().timeout(requestTimeout);
