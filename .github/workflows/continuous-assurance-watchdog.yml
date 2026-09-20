@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api --paginate             -H "Accept: application/vnd.github+json"             "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=20"             --jq '.workflow_runs[] | [.name,.status,.conclusion,.head_sha] | @tsv'             | head -20
+          gh api             -H "Accept: application/vnd.github+json"             "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=20"             --jq '.workflow_runs[:20] | .[] | [.name,.status,.conclusion,.head_sha] | @tsv'
           echo "PASS: watchdog observation completed"
 
       - name: Explicit no-mutation assertion
