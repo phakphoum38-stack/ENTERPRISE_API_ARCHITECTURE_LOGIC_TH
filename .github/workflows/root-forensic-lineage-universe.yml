@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - forensic/root-resolve-binding-execute-20260921
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -40,8 +40,10 @@ jobs:
             while IFS= read -r p; do
               [ -n "$p" ] || continue
               echo "--- PATTERN: $p ---" | tee -a "$out"
-              if git grep -n -I -E "$p" -- . ':!.git' 2>/dev/null | head -120 | tee -a "$out" | grep -q .; then
+              matches="$(git grep -n -I -E "$p" -- . 2>/dev/null | head -120 || true)"
+              if [ -n "$matches" ]; then
                 found=1
+                printf '%s\n' "$matches" | tee -a "$out"
               fi
               git log --all --oneline --find-renames --find-copies -S"$p" -- 2>/dev/null | head -80 | tee -a "$out" || true
             done <<< "$patterns"
