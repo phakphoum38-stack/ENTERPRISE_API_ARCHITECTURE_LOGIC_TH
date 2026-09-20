@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   research_os_contracts:
     path: ../../packages/research_os_contracts
+  flutter_secure_storage: ^10.3.4
 
 dev_dependencies:
   flutter_test:
