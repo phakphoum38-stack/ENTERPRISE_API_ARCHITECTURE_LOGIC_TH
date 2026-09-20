@@ -293,6 +293,21 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
+            if path == "/v1/friend/connections":
+                if self.headers.get("X-Research-OS-Owner", "").strip() != FRIEND_OWNER_ID:
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})
+                    return
+                connector = _friend_connector()
+                self._send(HTTPStatus.OK, {"owner_only": True, "connections": [item.public_dict() for item in connector.profiles.list()]})
+                return
+            if path == "/v1/friend/diagnostics":
+                if self.headers.get("X-Research-OS-Owner", "").strip() != FRIEND_OWNER_ID:
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})
+                    return
+                connector = _friend_connector()
+                diagnostics = [connector.test(item.id) for item in connector.profiles.list()]
+                self._send(HTTPStatus.OK, {"owner_only": True, "connections": diagnostics})
+                return
             if path == "/v1/github/dashboard":
                 params = parse_qs(parsed.query)
                 repository = str(params.get("repository", [os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY)])[0]).strip()
@@ -381,6 +396,36 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 session_id_value = str(body.get("session_id", "")).strip()
                 deleted = delete_cloud_session(session_id_value, user_id=str(principal["user_id"]))
                 self._send(HTTPStatus.OK, {"session_id": session_id_value, "deleted": deleted})
+                return
+            if path == "/v1/friend/connections":
+                if self.headers.get("X-Research-OS-Owner", "").strip() != FRIEND_OWNER_ID:
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})
+                    return
+                connection_id = str(body.get("id", "")).strip()
+                if not connection_id:
+                    raise ValueError("id is required")
+                connector = _friend_connector()
+                existing = next((item for item in connector.profiles.list() if item.id == connection_id), None)
+                profile = FriendConnectionProfile(
+                    id=connection_id,
+                    name=str(body.get("name", existing.name if existing else "")).strip(),
+                    username=str(body.get("username", existing.username if existing else FRIEND_OWNER_ID)).strip(),
+                    transport=str(body.get("transport", existing.transport if existing else "auto")).strip().lower(),
+                    endpoint=str(body.get("endpoint", existing.endpoint if existing else FRIEND_BASE_URL)).strip(),
+                    enabled=bool(body.get("enabled", existing.enabled if existing else True)),
+                    locked=bool(body.get("locked", existing.locked if existing else False)),
+                )
+                connector.profiles.upsert(profile)
+                if body.get("password") is not None:
+                    connector.credentials.set(profile.id, str(body.get("password", "")))
+                self._send(HTTPStatus.OK, {"saved": True, "connection": profile.public_dict(), "password_configured": connector.credentials.get(profile.id) is not None})
+                return
+            if path == "/v1/friend/connections/test":
+                if self.headers.get("X-Research-OS-Owner", "").strip() != FRIEND_OWNER_ID:
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})
+                    return
+                connection_id = str(body.get("id", "default")).strip()
+                self._send(HTTPStatus.OK, _friend_connector().test(connection_id))
                 return
             if path == "/v1/ai/generate":
                 prompt = str(body.get("prompt", "")).strip()
