@@ -437,7 +437,8 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "session_id": body.get("session_id"), "route": "direct-provider"})
                     return
                 if self.headers.get("X-Research-OS-Owner", "").strip() != FRIEND_OWNER_ID:
-                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})\n                    return
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})
+                    return
                 friend = _friend_chat(prompt, session_id=str(body.get("session_id") or "main-api"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)), connection_id=str(body.get("connection_id", "default")), connection_password=str(body.get("connection_password")) if body.get("connection_password") is not None else None)
                 self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers"), "metadata": friend.get("metadata")})
                 return
@@ -456,7 +457,8 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "direct-provider"})
                     return
                 if self.headers.get("X-Research-OS-Owner", "").strip() != FRIEND_OWNER_ID:
-                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})\n                    return
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})
+                    return
                 friend = _friend_chat(f"{system}\n\n{prompt}", session_id=str(body.get("session_id") or "main-api-memory"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)), connection_id=str(body.get("connection_id", "default")), connection_password=str(body.get("connection_password")) if body.get("connection_password") is not None else None)
                 self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers")})
                 return
