@@ -37,7 +37,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 6, vsync: this);
+    _tabs = TabController(length: 9, vsync: this);
     _load();
   }
 
@@ -173,8 +173,11 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
               Tab(text: 'Overview', icon: Icon(Icons.dashboard_outlined)),
               Tab(text: 'Activity', icon: Icon(Icons.timeline_outlined)),
               Tab(text: 'State', icon: Icon(Icons.account_tree_outlined)),
+              Tab(text: 'System Map', icon: Icon(Icons.hub_outlined)),
               Tab(text: 'Evidence', icon: Icon(Icons.fact_check_outlined)),
               Tab(text: 'Inspector', icon: Icon(Icons.manage_search_outlined)),
+              Tab(text: 'Failures', icon: Icon(Icons.warning_amber_outlined)),
+              Tab(text: 'History', icon: Icon(Icons.history_outlined)),
               Tab(text: 'Simulation', icon: Icon(Icons.science_outlined)),
             ]),
             const SizedBox(height: 8),
@@ -182,6 +185,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
               _Overview(key: ValueKey('overview-$_livePulse'), status: _status, simulation: _simulation),
               _Activity(events: _events),
               _StateView(status: _status),
+              _SystemMap(status: _status),
               _EvidenceView(status: _status),
               _Inspector(controller: _inspector, selectedObject: _selectedObject, onInspect: (id) {
                 setState(() {
@@ -189,6 +193,8 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
                   _events.insert(0, 'Inspector opened: $id');
                 });
               }),
+              _FailureView(status: _status),
+              _HistoryView(events: _events),
               _Simulation(enabled: _simulation, onToggle: (value) => setState(() {
                 _simulation = value;
                 _events.insert(0, value ? 'Simulation mode enabled' : 'Simulation mode disabled');
@@ -281,6 +287,112 @@ class _StateView extends StatelessWidget {
         subtitle: Text('Approve • Authorize • Release remain human-controlled.'),
       )),
     ]);
+  }
+}
+
+class _SystemMap extends StatelessWidget {
+  const _SystemMap({required this.status});
+  final Map<String, dynamic>? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final observed = status != null;
+    final nodes = <({String name, IconData icon, bool live})>[
+      (name: 'ROOT', icon: Icons.functions_outlined, live: true),
+      (name: 'CORE', icon: Icons.memory_outlined, live: observed),
+      (name: 'RESEARCH', icon: Icons.travel_explore_outlined, live: _hasList(status, 'research')),
+      (name: 'FRIEND', icon: Icons.auto_awesome_outlined, live: observed),
+      (name: 'PLATFORM', icon: Icons.account_tree_outlined, live: _hasList(status, 'capabilities')),
+      (name: 'ASSURANCE', icon: Icons.verified_outlined, live: _hasList(status, 'evidence')),
+      (name: 'REALITY', icon: Icons.public_outlined, live: false),
+    ];
+    return ListView(children: [
+      const Card(child: ListTile(
+        leading: Icon(Icons.hub_outlined),
+        title: Text('Live System Map'),
+        subtitle: Text('One canonical Control Center • observations only • no authority grant'),
+      )),
+      ...nodes.map((node) => Card(
+        child: ListTile(
+          leading: Icon(node.icon),
+          title: Text(node.name),
+          trailing: _StateBadge(observed: node.live),
+          subtitle: Text(node.live ? 'OBSERVED / CONNECTED' : 'UNKNOWN / NOT EXPOSED'),
+        ),
+      )),
+      const Card(child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('ROOT → CORE → RESEARCH / FRIEND / PLATFORM → ASSURANCE → REALITY'),
+      )),
+    ]);
+  }
+
+  static bool _hasList(Map<String, dynamic>? status, String key) =>
+      status?[key] is List && (status![key] as List).isNotEmpty;
+}
+
+class _FailureView extends StatelessWidget {
+  const _FailureView({required this.status});
+  final Map<String, dynamic>? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final failures = status?['failures'];
+    if (failures is! List || failures.isEmpty) {
+      return const Card(child: ListTile(
+        leading: Icon(Icons.check_circle_outline),
+        title: Text('No failure feed exposed'),
+        subtitle: Text('This is not interpreted as zero failures. The current runtime API does not expose a failure collection.'),
+      ));
+    }
+    return ListView.builder(
+      itemCount: failures.length,
+      itemBuilder: (_, index) {
+        final item = failures[index];
+        return ListTile(
+          leading: const Icon(Icons.warning_amber_outlined),
+          title: Text(item is Map ? item['id']?.toString() ?? 'Failure' : item.toString()),
+          subtitle: Text(item is Map ? item.toString() : 'Observed failure item'),
+        );
+      },
+    );
+  }
+}
+
+class _HistoryView extends StatelessWidget {
+  const _HistoryView({required this.events});
+  final List<String> events;
+
+  @override
+  Widget build(BuildContext context) => ListView.separated(
+    itemCount: events.length,
+    separatorBuilder: (_, __) => const Divider(height: 1),
+    itemBuilder: (_, index) => ListTile(
+      leading: const Icon(Icons.history_outlined),
+      title: Text(events[index]),
+      subtitle: const Text('Local Control Center observation history'),
+    ),
+  );
+}
+
+class _StateBadge extends StatelessWidget {
+  const _StateBadge({required this.observed});
+  final bool observed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = observed ? theme.colorScheme.primary : theme.colorScheme.outline;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 240),
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: observed ? [BoxShadow(color: color.withValues(alpha: .25), blurRadius: 8)] : const [],
+      ),
+    );
   }
 }
 
