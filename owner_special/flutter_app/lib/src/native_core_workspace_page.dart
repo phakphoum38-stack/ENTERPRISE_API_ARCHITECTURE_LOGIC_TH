@@ -19,6 +19,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
   late final TabController _tabs;
   final _command = TextEditingController();
   final _inspector = TextEditingController();
+  final _targetSha = TextEditingController();
   Map<String, dynamic>? _status;
   bool _loading = false;
   bool _simulation = false;
@@ -29,9 +30,14 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
   ];
   int _livePulse = 0;
 
-  static const commands = <String>[
+  static const commands = <_CommandDefinition>[
+    _CommandDefinition(id: 'CMD-GENERATE-ORCHESTRATOR', label: 'Run Generate Orchestrator', target: 'generate-orchestrator.yml', risk: 'LOW', defaultMode: 'SIMULATION', description: 'Resolve the canonical workflow binding and prepare a workflow_dispatch preview.', keywords: 'generate orchestrator workflow actions build'),
+    _CommandDefinition(id: 'CMD-REFRESH-RUNTIME', label: 'Refresh Runtime', target: 'owner-runtime', risk: 'LOW', defaultMode: 'LIVE', description: 'Observe the existing Owner Friend runtime status.', keywords: 'refresh runtime health status observe'),
+    _CommandDefinition(id: 'CMD-INSPECT-EVIDENCE', label: 'Inspect Evidence', target: 'evidence', risk: 'LOW', defaultMode: 'SIMULATION', description: 'Open the evidence projection without fabricating missing lineage.', keywords: 'inspect evidence provenance lineage hash'),
+  ];
+  static const _navigationCommands = <String>[
     'Open Research', 'Open Friend', 'Open Runtime', 'Open Evidence',
-    'Inspect object', 'Simulation mode', 'Refresh runtime',
+    'Inspect object', 'Simulation mode',
   ];
 
   @override
@@ -46,6 +52,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     _tabs.dispose();
     _command.dispose();
     _inspector.dispose();
+    _targetSha.dispose();
     super.dispose();
   }
 
@@ -71,7 +78,18 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     final command = value.trim();
     if (command.isEmpty) return;
     _command.clear();
-    if (command == 'Refresh runtime') {
+    _CommandDefinition? workflow;
+    for (final item in commands) {
+      if (item.label == command) {
+        workflow = item;
+        break;
+      }
+    }
+    if (workflow != null) {
+      _showCommandPreview(workflow);
+      return;
+    }
+    if (command == 'Refresh Runtime') {
       _load();
       return;
     }
@@ -95,11 +113,51 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     if (command == 'Inspect object') _tabs.animateTo(4);
   }
 
+  Future<void> _showCommandPreview(_CommandDefinition command) async {
+    final selectedMode = await showDialog<String>(
+      context: context,
+      builder: (context) => _CommandPreviewDialog(
+        command: command,
+        initialMode: command.defaultMode == 'LIVE' && !_simulation ? 'LIVE' : 'SIMULATION',
+        targetShaController: _targetSha,
+      ),
+    );
+    if (!mounted || selectedMode == null) return;
+    setState(() {
+      _simulation = selectedMode != 'LIVE';
+      _events.insert(
+        0,
+        selectedMode == 'LIVE'
+            ? '${command.id} authorization boundary reached; execution remains human-controlled'
+            : '${command.id} prepared in simulation',
+      );
+    });
+  }
+
+  String _commandSubtitle(String label) {
+    for (final command in commands) {
+      if (command.label == label) {
+        return '${command.id} • ${command.target} • risk ${command.risk} • default ${command.defaultMode}';
+      }
+    }
+    return 'Prepared through the native control lifecycle';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final query = _command.text.trim().toLowerCase();
-    final matches = commands.where((item) => item.toLowerCase().contains(query)).take(8).toList();
+    final workflowMatches = commands.where((item) =>
+        item.label.toLowerCase().contains(query) ||
+        item.id.toLowerCase().contains(query) ||
+        item.target.toLowerCase().contains(query) ||
+        item.keywords.toLowerCase().contains(query),
+      );
+    final matches = <String>[
+      ...workflowMatches.map((item) => item.label),
+      ..._navigationCommands.where((item) => item.toLowerCase().contains(query)),
+      'Refresh Runtime',
+    ].toSet().take(8).toList();
 
     return Material(
       child: SizedBox.expand(
@@ -152,7 +210,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
                       : matches.map((item) => ListTile(
                             leading: const Icon(Icons.bolt_outlined),
                             title: Text(item),
-                            subtitle: const Text('Prepared through the native control lifecycle'),
+                            subtitle: Text(_commandSubtitle(item)),
                             onTap: () => _runCommand(item),
                           )).toList(),
                 ),
@@ -526,6 +584,50 @@ class _Metric extends StatelessWidget {
 }
 
 
+final class _CommandDefinition {
+  const _CommandDefinition({required this.id, required this.label, required this.target, required this.risk, required this.defaultMode, required this.description, required this.keywords});
+  final String id; final String label; final String target; final String risk; final String defaultMode; final String description; final String keywords;
+}
+
+final class _CommandPreviewDialog extends StatefulWidget {
+  const _CommandPreviewDialog({required this.command, required this.initialMode, required this.targetShaController});
+  final _CommandDefinition command; final String initialMode; final TextEditingController targetShaController;
+  @override State<_CommandPreviewDialog> createState() => _CommandPreviewDialogState();
+}
+
+class _CommandPreviewDialogState extends State<_CommandPreviewDialog> {
+  late String _mode; bool _humanAuthorized = false;
+  @override void initState() { super.initState(); _mode = widget.initialMode; }
+  bool get _shaValid => RegExp(r'^[0-9a-f]{64}
+  const _OwnerRuntimeCapability(this.api);
+  final OwnerFriendApi api;
+
+  @override
+  Future<Map<String, dynamic>> runtimeStatus() => api.status();
+}
+).hasMatch(widget.targetShaController.text.trim());
+  @override Widget build(BuildContext context) {
+    final live = _mode == 'LIVE';
+    return AlertDialog(
+      title: Row(children: [const Icon(Icons.bolt_outlined), const SizedBox(width: 10), Expanded(child: Text(widget.command.label))]),
+      content: SizedBox(width: 620, child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(widget.command.description), const SizedBox(height: 16),
+        Wrap(spacing: 8, runSpacing: 8, children: [Chip(label: Text(widget.command.id)), Chip(label: Text('Target: \${widget.command.target}')), Chip(label: Text('Risk: \${widget.command.risk}'))]),
+        const SizedBox(height: 14),
+        SegmentedButton<String>(segments: const [ButtonSegment(value: 'SIMULATION', label: Text('SIMULATION'), icon: Icon(Icons.science_outlined)), ButtonSegment(value: 'LIVE', label: Text('LIVE'), icon: Icon(Icons.lock_outline))], selected: {_mode}, onSelectionChanged: (value) => setState(() => _mode = value.first)),
+        const SizedBox(height: 14),
+        TextField(controller: widget.targetShaController, onChanged: (_) => setState(() {}), decoration: InputDecoration(labelText: 'Exact target SHA-256', hintText: '64 lowercase hexadecimal characters', errorText: widget.targetShaController.text.isEmpty || _shaValid ? null : 'Must be exactly 64 lowercase hexadecimal characters', prefixIcon: const Icon(Icons.fingerprint))),
+        const SizedBox(height: 12),
+        Card(child: ListTile(leading: Icon(live ? Icons.warning_amber_outlined : Icons.science_outlined), title: Text(live ? 'Human authorization required' : 'No live execution'), subtitle: Text(live ? 'Preview reaches the authorization boundary only. The UI does not self-authorize, merge, release, or dispatch a real workflow.' : 'Prepared for inspection only. Simulation is not execution.'))),
+        if (live) ...[
+          CheckboxListTile(value: _humanAuthorized, onChanged: (value) => setState(() => _humanAuthorized = value ?? false), title: const Text('I explicitly authorize the LIVE execution boundary'), subtitle: const Text('Authorization is a human decision and is never inferred from observation or confidence.'), controlAffinity: ListTileControlAffinity.leading),
+          const Text('LIVE dispatch is intentionally not invoked from this UI surface yet; no real GitHub Actions run will be started by this preview.'),
+        ],
+      ]))),
+      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')), FilledButton.icon(onPressed: _shaValid ? () => Navigator.of(context).pop(_mode) : null, icon: Icon(live && _humanAuthorized ? Icons.lock_open : Icons.play_arrow), label: Text(live ? (_humanAuthorized ? 'Authorize Boundary' : 'Review LIVE') : 'Prepare Simulation'))],
+    );
+  }
+}
 final class _OwnerRuntimeCapability implements RuntimeStatusCapability {
   const _OwnerRuntimeCapability(this.api);
   final OwnerFriendApi api;
