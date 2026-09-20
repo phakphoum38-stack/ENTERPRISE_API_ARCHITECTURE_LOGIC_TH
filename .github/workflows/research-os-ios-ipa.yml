@@ -90,31 +90,44 @@ jobs:
           flutter build ipa --release --no-codesign
           --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
 
-      - name: Verify native iOS build inputs
+      - name: Locate and verify native iOS build outputs
         working-directory: apps/research_os_flutter
         shell: bash
         run: |
           set -euo pipefail
-          REGISTRANT="ios/Runner/GeneratedPluginRegistrant.swift"
-          PODLOCK="ios/Podfile.lock"
+
+          echo "=== Generated iOS files ==="
+          find ios -maxdepth 3 -type f \( -name 'GeneratedPluginRegistrant.*' -o -name 'Podfile.lock' \) -print
+
+          REGISTRANT="$(find ios -type f -name 'GeneratedPluginRegistrant.*' -print -quit)"
+          PODLOCK="$(find ios -type f -name 'Podfile.lock' -print -quit)"
           ARCHIVE="build/ios/archive/Runner.xcarchive"
-          APP="$ARCHIVE/Products/Applications/Runner.app"
-          test -f "$REGISTRANT"
-          test -f "$PODLOCK"
-          test -d "$ARCHIVE"
-          test -d "$APP"
-          test -f "$APP/Info.plist"
-          echo "=== GeneratedPluginRegistrant.swift evidence ==="
+          APP="$(find "$ARCHIVE/Products/Applications" -maxdepth 2 -type d -name '*.app' -print -quit)"
+
+          test -n "$REGISTRANT" || { echo "FAIL: GeneratedPluginRegistrant not found"; exit 1; }
+          test -n "$PODLOCK" || { echo "FAIL: Podfile.lock not found"; exit 1; }
+          test -d "$ARCHIVE" || { echo "FAIL: Xcode archive not found: $ARCHIVE"; exit 1; }
+          test -n "$APP" || { echo "FAIL: archived .app not found under $ARCHIVE/Products/Applications"; exit 1; }
+          test -f "$APP/Info.plist" || { echo "FAIL: archived app Info.plist not found: $APP/Info.plist"; exit 1; }
+
+          printf 'REGISTRANT=%s\n' "$REGISTRANT" >> "$GITHUB_ENV"
+          printf 'PODLOCK=%s\n' "$PODLOCK" >> "$GITHUB_ENV"
+          printf 'ARCHIVE=%s\n' "$ARCHIVE" >> "$GITHUB_ENV"
+          printf 'APP=%s\n' "$APP" >> "$GITHUB_ENV"
+
+          echo "=== GeneratedPluginRegistrant evidence ==="
           grep -nEi 'flutter_tts|speech_to_text|FlutterTts|SpeechToText|register' "$REGISTRANT" || true
           echo "=== Podfile.lock evidence ==="
           grep -nEi 'flutter_tts|speech_to_text|FlutterTts|SpeechToText' "$PODLOCK" || true
-          echo "PASS: generated iOS project and Runner.app exist; plugin evidence recorded without assuming generated symbol names"
+          echo "Archive: $ARCHIVE"
+          echo "App: $APP"
+          echo "PASS: generated iOS project and Xcode archive contain a valid Runner app"
 
       - name: Verify iOS app and branding
         working-directory: apps/research_os_flutter
         shell: bash
         run: |
-          APP="build/ios/iphoneos/Runner.app"
+          set -euo pipefail
           test -d "$APP"
           test -f ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
@@ -129,8 +142,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ARCHIVE="build/ios/archive/Runner.xcarchive"
-          APP="$ARCHIVE/Products/Applications/Runner.app"
           test -d "$ARCHIVE"
           test -d "$APP"
           mkdir -p build/ios/ipa/Payload
@@ -145,6 +156,7 @@ jobs:
           cp "$IPA" "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa"
           shasum -a 256 "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa" > "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
           cat "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
+
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
