@@ -63,10 +63,15 @@ jobs:
           HEAD: ${{ steps.target.outputs.head }}
         run: |
           set -euo pipefail
+          # Resolve the PR by historical commit association, not by the PR current head SHA.
+          # A workflow_run can race with a later push to the same PR, so
+          # current head != workflow_run.head_sha is historical drift, not
+          # a missing PR.
           prs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls" --paginate)"
-          pr="$(python3 -c 'import json,sys; rows=json.load(sys.stdin); matches=[p for p in rows if p.get("state")=="open" and p.get("head",{}).get("sha")==sys.argv[1]]; print(matches[0]["number"] if len(matches)==1 else "")' "$HEAD" <<< "$prs")"
+          pr="$(python3 -c 'import json,sys; rows=json.load(sys.stdin); matches=[p for p in rows if p.get("state")=="open"]; print(matches[0]["number"] if len(matches)==1 else "")' <<< "$prs")"
           test -n "$pr"
           echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "lineage_mode=historical_commit" >> "$GITHUB_OUTPUT"
 
       - name: Finalize target identity
         id: identity
@@ -91,13 +96,15 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Fetch exact PR HEAD without executing PR workflow code
+      - name: Fetch exact historical target without executing PR workflow code
         env:
-          PR_NUMBER: ${{ steps.identity.outputs.pr }}
           EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
         run: |
           set -euo pipefail
-          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/aeos-target"
+          # The PR ref is mutable. The workflow_run head SHA is immutable for
+          # this completed run, so fetch that exact commit instead of the
+          # PR current head ref.
+          git fetch --no-tags origin "+$EXPECTED_HEAD:refs/remotes/origin/aeos-target"
           ACTUAL_HEAD="$(git rev-parse refs/remotes/origin/aeos-target)"
           test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
           git cat-file -e "$EXPECTED_HEAD^{commit}"
