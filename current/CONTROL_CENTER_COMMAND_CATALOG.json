@@ -1,0 +1,44 @@
+{
+  "catalog": "CONTROL_CENTER_COMMANDS",
+  "version": "1.0",
+  "status": "ACTIVE",
+  "commands": [
+    {
+      "command_id": "CMD-GENERATE-ORCHESTRATOR",
+      "label": "Run Generate Orchestrator",
+      "intent": "Run the existing Generate Orchestrator workflow at an exact target SHA.",
+      "target": "generate-orchestrator.yml",
+      "risk": "LOW",
+      "default_mode": "SIMULATION",
+      "requires_human_authorization_for_live": true,
+      "keywords": ["generate", "orchestrator", "workflow", "actions", "build"]
+    },
+    {
+      "command_id": "CMD-REFRESH-RUNTIME",
+      "label": "Refresh Runtime",
+      "intent": "Observe current Owner Friend runtime status.",
+      "target": "owner-runtime",
+      "risk": "LOW",
+      "default_mode": "LIVE",
+      "requires_human_authorization_for_live": false,
+      "keywords": ["runtime", "status", "health", "refresh"]
+    },
+    {
+      "command_id": "CMD-INSPECT-EVIDENCE",
+      "label": "Inspect Evidence",
+      "intent": "Open bounded evidence inspection without granting authority.",
+      "target": "evidence",
+      "risk": "LOW",
+      "default_mode": "SIMULATION",
+      "requires_human_authorization_for_live": false,
+      "keywords": ["evidence", "provenance", "hash", "artifact", "inspect"]
+    }
+  ],
+  "invariants": [
+    "command_is_not_execution",
+    "simulation_is_not_execution",
+    "observation_is_not_authorization",
+    "evidence_is_not_authority",
+    "unknown_is_not_known"
+  ]
+}
