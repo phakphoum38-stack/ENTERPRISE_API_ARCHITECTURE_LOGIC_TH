@@ -49,6 +49,25 @@ final class _FakeOwnerFriendApi implements OwnerFriendApi {
     'helpers': <String, dynamic>{},
     'factory': <String, dynamic>{'stages': <String>[]},
   };
+
+  @override
+  Future<Map<String, dynamic>> authStatus() async => <String, dynamic>{'authenticated': false};
+
+  @override
+  Future<Map<String, dynamic>> startGoogleIdentity() async => <String, dynamic>{'started': false};
+
+  @override
+  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) async =>
+      <String, dynamic>{'exchanged': false, 'state': state};
+
+  @override
+  Future<Map<String, dynamic>> signOut() async => <String, dynamic>{'signed_out': true};
+
+  @override
+  void setSession(String token) {}
+
+  @override
+  void clearSession() {}
 }
 
 void main() {
