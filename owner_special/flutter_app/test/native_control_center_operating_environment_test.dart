@@ -94,6 +94,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('Live System Map'), findsOneWidget);
     expect(find.text('ROOT'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('ASSURANCE'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('ASSURANCE'), findsOneWidget);
 
     await tester.tap(find.text('Failures'));
