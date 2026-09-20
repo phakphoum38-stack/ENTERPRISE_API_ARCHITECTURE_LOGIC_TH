@@ -8,6 +8,10 @@ abstract class OwnerFriendApi {
   Future<Map<String, dynamic>> providerStatus();
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey});
   Future<Map<String, dynamic>> testProvider();
+  Future<List<Map<String, dynamic>>> friendConnections();
+  Future<Map<String, dynamic>> saveFriendConnection(Map<String, dynamic> connection);
+  Future<Map<String, dynamic>> testFriendConnection(String id, {String? password});
+  void setFriendConnection(String id, {String? password});
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]});
 
   Future<Map<String, dynamic>> authStatus() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS identity is not implemented by this API client'));
@@ -40,6 +44,8 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
   final Duration timeout;
   final Duration chatTimeout;
   String? _sessionToken;
+  String _friendConnectionId = 'default';
+  String? _friendConnectionPassword;
 
   @override
   Future<Map<String, dynamic>> health() => _request('GET', '/owner/health', authenticated: false);
@@ -65,6 +71,34 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
       requestedSkills: requestedSkills,
       requestedTools: requestedTools,
     );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> friendConnections() async {
+    final result = await _researchRequest('GET', '/v1/friend/connections', authenticated: false, headers: <String, String>{'X-Research-OS-Owner': ownerId});
+    final raw = result['connections'];
+    if (raw is! List) return const <Map<String, dynamic>>[];
+    return raw.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> saveFriendConnection(Map<String, dynamic> connection) {
+    return _researchRequest('POST', '/v1/friend/connections', authenticated: false, headers: <String, String>{
+      'X-Research-OS-Owner': ownerId,
+    }, body: connection);
+  }
+
+  @override
+  Future<Map<String, dynamic>> testFriendConnection(String id, {String? password}) {
+    return _researchRequest('POST', '/v1/friend/connections/test', authenticated: false, headers: <String, String>{
+      'X-Research-OS-Owner': ownerId,
+    }, body: <String, dynamic>{'id': id, if (password != null) 'password': password});
+  }
+
+  @override
+  void setFriendConnection(String id, {String? password}) {
+    _friendConnectionId = id.trim().isEmpty ? 'default' : id.trim();
+    _friendConnectionPassword = password;
   }
 
   @override
@@ -124,7 +158,9 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
       final request = await client.postUrl(uri).timeout(requestTimeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
-      if (_sessionToken != null) request.headers.set('X-Research-OS-Session', _sessionToken!);
+      request.headers.set('X-Research-OS-Owner', ownerId);
+      request.headers.set('X-Research-OS-Profile', profileId);
+      request.headers.set('X-Research-OS-Session', _sessionToken ?? sessionId);
       final payload = utf8.encode(jsonEncode(<String, dynamic>{
         'prompt': text,
         'complexity': complexity,
@@ -133,8 +169,7 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
         'helper_budget': helperBudget,
         if (requestedSkills.isNotEmpty) 'requested_skills': requestedSkills,
         if (requestedTools.isNotEmpty) 'requested_tools': requestedTools,
-        'session_id': sessionId,
-      }));
+        'session_id': sessionId,\n        'connection_id': _friendConnectionId,\n        if (_friendConnectionPassword != null && _friendConnectionPassword!.isNotEmpty) 'connection_password': _friendConnectionPassword,\n      }));
       request.contentLength = payload.length;
       request.add(payload);
       final response = await request.close().timeout(requestTimeout);
