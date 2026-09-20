@@ -1,0 +1,100 @@
+name: ROOT Strict GatewayRoute Target Bridge Gate
+
+on:
+  push:
+    branches:
+      - forensic/root-resolve-binding-execute-20260921
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gatewayroute-target-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all refs
+        run: git fetch --all --prune --tags
+
+      - name: Strict semantic bridge forensic gate
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p forensic-output
+          out=forensic-output/gatewayroute-target-bridge.txt
+          : > "$out"
+
+          echo "ROOT STRICT GATE: GatewayRoute.target -> resolve/binding/adapter -> execute" | tee -a "$out"
+          echo "HEAD=$(git rev-parse HEAD)" | tee -a "$out"
+          echo "DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$out"
+          echo | tee -a "$out"
+
+          echo "=== CURRENT TREE: GatewayRoute / target consumers ===" | tee -a "$out"
+          git grep -n -I -E 'GatewayRoute|gateway_route' -- . ':!.git' 2>/dev/null | tee -a "$out" || true
+          echo | tee -a "$out"
+
+          echo "=== CURRENT TREE: target access patterns ===" | tee -a "$out"
+          git grep -n -I -E '\\b(route|gateway_route|obj|record)\\.(target)\\b|\\[["'"'"']target["'"'"']\\]' -- . ':!.git' 2>/dev/null | tee -a "$out" || true
+          echo | tee -a "$out"
+
+          echo "=== CURRENT TREE: resolver/binding/adapter/executor symbols ===" | tee -a "$out"
+          git grep -n -I -E 'resolve|resolver|binding|adapter|delegate|execute|executor|dispatch|invoke' -- . ':!.git' 2>/dev/null | tee -a "$out" || true
+          echo | tee -a "$out"
+
+          echo "=== HISTORY: commits touching GatewayRoute ===" | tee -a "$out"
+          git log --all --oneline --decorate --find-renames --find-copies -- 'GatewayRoute' 'gateway_route' 2>/dev/null | head -200 | tee -a "$out" || true
+          echo | tee -a "$out"
+
+          echo "=== HISTORY: exact target access ===" | tee -a "$out"
+          for term in 'GatewayRoute.target' 'gateway_route.target' '.target' '["target"]'; do
+            echo "--- $term ---" | tee -a "$out"
+            git log --all --oneline -S"$term" --find-renames --find-copies -- 2>/dev/null | head -100 | tee -a "$out" || true
+          done
+          echo | tee -a "$out"
+
+          echo "=== STRICT TEST DEFINITION ===" | tee -a "$out"
+          echo "FOUND requires a concrete source-level target read AND a resolver/binding/adapter/executor handoff in the same implementation file." | tee -a "$out"
+          echo "Documentation-only statements, generic target fields, unrelated resolve/execute functions, and management serialization do not count." | tee -a "$out"
+          echo | tee -a "$out"
+
+          bridge_file=""
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            if grep -Eiq 'GatewayRoute|gateway_route' "$f" &&                grep -Eiq '\\b(target|["'"'"']target["'"'"'])\\b' "$f" &&                grep -Eiq 'resolve|resolver|binding|adapter|delegate|execute|executor|dispatch|invoke' "$f"; then
+              bridge_file="$f"
+              break
+            fi
+          done < <(git ls-files)
+
+          if [ -n "$bridge_file" ]; then
+            echo "STRICT_BRIDGE=FOUND" | tee -a "$out"
+            echo "BRIDGE_FILE=$bridge_file" | tee -a "$out"
+          else
+            echo "STRICT_BRIDGE=NOT_FOUND" | tee -a "$out"
+            echo "BRIDGE_FILE=NONE" | tee -a "$out"
+          fi
+
+          echo | tee -a "$out"
+          echo "=== INTERPRETATION ===" | tee -a "$out"
+          if [ -n "$bridge_file" ]; then
+            echo "A concrete same-file semantic bridge candidate exists; independent review is still required before ROOT closure." | tee -a "$out"
+            exit 0
+          else
+            echo "No concrete same-file semantic bridge was found under this strict test." | tee -a "$out"
+            echo "This is evidence of NOT_FOUND under the gate, not proof of MISSING_GENERATION." | tee -a "$out"
+            echo "Historical deletion/supersession/reissue/alternate-branch reconciliation remains open." | tee -a "$out"
+            exit 1
+          fi
+
+      - name: Upload strict forensic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: root-gatewayroute-target-bridge
+          path: forensic-output/gatewayroute-target-bridge.txt
+          if-no-files-found: error
