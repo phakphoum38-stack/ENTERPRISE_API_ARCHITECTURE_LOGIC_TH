@@ -90,6 +90,27 @@ jobs:
           flutter build ios --release --no-codesign
           --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
 
+      - name: Verify native plugin registration
+        working-directory: apps/research_os_flutter
+        shell: bash
+        run: |
+          set -euo pipefail
+          REGISTRANT="ios/Runner/GeneratedPluginRegistrant.swift"
+          PODLOCK="ios/Podfile.lock"
+          test -f "$REGISTRANT"
+          test -f "$PODLOCK"
+          echo "Generated plugin registrant: $REGISTRANT"
+          grep -q "FlutterTtsPlugin" "$REGISTRANT"
+          grep -q "SpeechToTextPlugin" "$REGISTRANT"
+          echo "PASS: flutter_tts and speech_to_text are registered in GeneratedPluginRegistrant.swift"
+          grep -qi "flutter_tts" "$PODLOCK"
+          grep -qi "speech_to_text" "$PODLOCK"
+          echo "PASS: flutter_tts and speech_to_text are present in Podfile.lock"
+          APP="build/ios/iphoneos/Runner.app"
+          test -d "$APP"
+          test -f "$APP/Info.plist"
+          echo "PASS: native plugin assurance reached final Runner.app"
+
       - name: Verify iOS app and branding
         working-directory: apps/research_os_flutter
         shell: bash
