@@ -232,7 +232,7 @@ class _FriendConnectionsPageState extends State<FriendConnectionsPage> {
                 leading: Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked),
                 title: Text(connection['name']?.toString() ?? id),
                 subtitle: Text('${connection['username'] ?? '-'} • ${transport.toUpperCase()} • ${connection['endpoint'] ?? '-'}'),
-                trailing: Wrap(mainAxisSize: MainAxisSize.min, children: [
+                trailing: Wrap(children: [
                   IconButton(tooltip: 'Test', onPressed: _busy ? null : () => _test(id), icon: const Icon(Icons.health_and_safety_outlined)),
                   IconButton(tooltip: 'Edit', onPressed: _busy ? null : () => _showEditor(connection), icon: const Icon(Icons.edit_outlined)),
                   IconButton(tooltip: 'Use', onPressed: () async {
