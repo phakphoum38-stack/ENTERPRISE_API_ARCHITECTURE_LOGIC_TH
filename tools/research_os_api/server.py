@@ -39,6 +39,8 @@ from oauth_handoff import consume_handoff
 from providers import ProviderError, build_provider
 import copilot_service
 
+from friend_connector import FriendConnectionError, FriendConnectionProfile, FriendConnector
+
 ROOT = Path(__file__).resolve().parents[2]
 CURATOR_PATH = ROOT / "tools" / "research_curator" / "curator.py"
 KNOWLEDGE_OPS_PATH = ROOT / "tools" / "research_curator" / "knowledge_ops.py"
@@ -60,22 +62,26 @@ def _load_module(name: str, path: Path):
 
 FRIEND_BASE_URL = os.getenv("RESEARCH_OS_FRIEND_URL", "http://127.0.0.1:8790").rstrip("/")
 FRIEND_OWNER_ID = os.getenv("RESEARCH_OS_FRIEND_OWNER", "owner")
+FRIEND_DATA_ROOT = Path(os.getenv("RESEARCH_OS_OWNER_DATA_ROOT", str(Path.home() / ".research_os_owner_special"))).expanduser().resolve()
+_FRIEND_CONNECTOR: FriendConnector | None = None
 
 
-def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 3, risk: int = 1, parallelism: int = 2, helper_budget: int = 0) -> dict[str, Any]:
+def _friend_connector() -> FriendConnector:
+    global _FRIEND_CONNECTOR
+    if _FRIEND_CONNECTOR is None:
+        _FRIEND_CONNECTOR = FriendConnector(owner_id=FRIEND_OWNER_ID, data_root=FRIEND_DATA_ROOT, repository_root=ROOT)
+        if not _FRIEND_CONNECTOR.profiles.list():
+            _FRIEND_CONNECTOR.profiles.upsert(FriendConnectionProfile(
+                id="default", name="Owner Friend", username=FRIEND_OWNER_ID,
+                transport=os.getenv("RESEARCH_OS_FRIEND_TRANSPORT", "auto").strip().lower() or "auto",
+                endpoint=FRIEND_BASE_URL,
+            ))
+    return _FRIEND_CONNECTOR
+
+
+def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 3, risk: int = 1, parallelism: int = 2, helper_budget: int = 0, connection_id: str = "default") -> dict[str, Any]:
     payload = {"text": text, "complexity": max(1, int(complexity)), "risk": max(1, int(risk)), "parallelism": max(1, int(parallelism)), "helper_budget": max(0, int(helper_budget))}
-    request = urllib.request.Request(f"{FRIEND_BASE_URL}/owner/chat", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers={"Content-Type": "application/json; charset=utf-8", "X-Research-OS-Owner": FRIEND_OWNER_ID, "X-Research-OS-Profile": "default", "X-Research-OS-Session": session_id or "main-api"}, method="POST")
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            value = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Friend service HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Friend service unavailable at {FRIEND_BASE_URL}: {exc.reason}") from exc
-    if not isinstance(value, dict):
-        raise RuntimeError("Friend service returned an invalid response")
-    return value
+    return _friend_connector().chat(connection_id, payload, session_id=session_id or "main-api")
 
 
 def _json_bytes(payload: Any) -> bytes:
