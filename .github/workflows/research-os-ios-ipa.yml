@@ -25,9 +25,7 @@ concurrency:
 
 jobs:
   build-ios-unsigned-ipa:
-    # iOS is intentionally excluded from PR #177 validation.
-    # Keep push/manual execution available for the dedicated iOS workstream.
-    if: github.event_name != 'pull_request'
+    # iOS PR validation is intentionally enabled to expose source/build regressions.
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
