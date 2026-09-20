@@ -115,20 +115,26 @@ class ConnectionCredentialStore:
     """
 
     def __init__(self, root: Path, owner_id: str) -> None:
-        if os.name != "nt":
-            raise RuntimeError("connection password storage requires the owner desktop secure store")
-        path = Path(root).resolve() / "owners" / owner_id / "connections" / "credentials.dpapi"
-        self._store = WindowsDpapiSecretStore(path)
+        self._store: WindowsDpapiSecretStore | None = None
+        if os.name == "nt":
+            path = Path(root).resolve() / "owners" / owner_id / "connections" / "credentials.dpapi"
+            self._store = WindowsDpapiSecretStore(path)
 
     def set(self, profile_id: str, password: str) -> None:
+        if self._store is None:
+            raise RuntimeError("connection password storage requires the owner desktop secure store")
         current = self._read_map()
         current[profile_id] = password
         self._store.write(json.dumps(current, sort_keys=True))
 
     def get(self, profile_id: str) -> str | None:
+        if self._store is None:
+            return None
         return self._read_map().get(profile_id)
 
     def _read_map(self) -> dict[str, str]:
+        if self._store is None:
+            return {}
         raw = self._store.read()
         if not raw:
             return {}
