@@ -1,0 +1,72 @@
+{
+  "contract": "CONTROL_CENTER_WORKFLOW_EXECUTION",
+  "version": "1.0",
+  "status": "ACTIVE",
+  "purpose": "Bind canonical Control Center commands to existing GitHub Actions workflows without creating a second workflow engine or authority path.",
+  "flow": [
+    "CommandSpec",
+    "WorkflowResolver",
+    "ResolvedWorkflow",
+    "HumanControlBoundary",
+    "WorkflowExecutionAdapter",
+    "workflow_dispatch",
+    "workflow_run_discovery",
+    "exact_head_sha_verification",
+    "completion_observation",
+    "EvidenceReference",
+    "ActivityEvent",
+    "State"
+  ],
+  "authority": {
+    "execution_adapter_grants_authority": false,
+    "execution_adapter_approves": false,
+    "execution_adapter_merges": false,
+    "execution_adapter_mutates_branch_protection": false,
+    "live_execution_requires_caller_authorization": true,
+    "authorization_is_consumed_not_created": true
+  },
+  "identity": {
+    "target_sha_algorithm": "sha256",
+    "target_sha_length": 64,
+    "workflow_run_head_sha_must_equal_target_sha": true,
+    "resolution_fingerprint_required": true,
+    "observation_fingerprint_required": true
+  },
+  "dispatch": {
+    "endpoint": "GitHub Actions workflow_dispatch",
+    "ref_is_exact_target_sha": true,
+    "declared_inputs_only": true,
+    "target_sha_input_preferred": true,
+    "ref_input_fallback_supported": true
+  },
+  "discovery": {
+    "event": "workflow_dispatch",
+    "match_target_sha": true,
+    "match_recent_created_at": true,
+    "ambiguous_or_missing_run": "HARD_STOP"
+  },
+  "completion": {
+    "completed_status_required": true,
+    "head_sha_rechecked": true,
+    "conclusion_observed": true,
+    "success_requires_conclusion_success": true
+  },
+  "modes": {
+    "SIMULATION": "no I/O",
+    "DRY_RUN": "no I/O",
+    "REPLAY": "no live dispatch",
+    "LIVE": "dispatch and observe after caller authorization"
+  },
+  "forbidden": [
+    "create_new_workflow_engine",
+    "self_authorize",
+    "self_approve",
+    "rewrite_history",
+    "change_branch_protection",
+    "merge_as_execution_step",
+    "fabricate_evidence",
+    "treat_observation_as_authority",
+    "accept_stale_head_sha"
+  ],
+  "evidence_reference": "github-actions://<repository>/runs/<run_id>@<target_sha>"
+}
