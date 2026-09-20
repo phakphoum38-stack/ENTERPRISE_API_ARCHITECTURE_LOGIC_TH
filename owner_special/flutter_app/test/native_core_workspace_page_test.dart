@@ -65,6 +65,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
+    await tester.ensureVisible(find.text('Inspector'));
+    await tester.pump();
     await tester.tap(find.text('Inspector'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
