@@ -8,10 +8,10 @@ abstract class OwnerFriendApi {
   Future<Map<String, dynamic>> providerStatus();
   Future<Map<String, dynamic>> configureProvider({required String baseUrl, required String model, String? apiKey});
   Future<Map<String, dynamic>> testProvider();
-  Future<List<Map<String, dynamic>>> friendConnections();
-  Future<Map<String, dynamic>> saveFriendConnection(Map<String, dynamic> connection);
-  Future<Map<String, dynamic>> testFriendConnection(String id, {String? password});
-  void setFriendConnection(String id, {String? password});
+  Future<List<Map<String, dynamic>>> friendConnections() => Future<List<Map<String, dynamic>>>.error(UnsupportedError('Friend connection profiles are not implemented by this API client'));
+  Future<Map<String, dynamic>> saveFriendConnection(Map<String, dynamic> connection) => Future<Map<String, dynamic>>.error(UnsupportedError('Friend connection profiles are not implemented by this API client'));
+  Future<Map<String, dynamic>> testFriendConnection(String id, {String? password}) => Future<Map<String, dynamic>>.error(UnsupportedError('Friend connection diagnostics are not implemented by this API client'));
+  void setFriendConnection(String id, {String? password}) {}
   Future<Map<String, dynamic>> chat(String text, {int complexity = 4, int risk = 2, int parallelism = 2, int helperBudget = 0, List<String> requestedSkills = const <String>[], List<String> requestedTools = const <String>[]});
 
   Future<Map<String, dynamic>> authStatus() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS identity is not implemented by this API client'));
