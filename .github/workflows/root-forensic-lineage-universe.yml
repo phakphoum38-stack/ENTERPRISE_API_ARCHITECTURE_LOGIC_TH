@@ -1,0 +1,137 @@
+name: ROOT Forensic Lineage Universe
+
+on:
+  push:
+    branches:
+      - forensic/root-resolve-binding-execute-20260921
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lineage-universe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch all refs
+        run: git fetch --all --prune --tags
+      - name: Enumerate every suspect family independently
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p forensic-output
+          out=forensic-output/root-forensic-lineage-universe.txt
+          : > "$out"
+
+          echo "ROOT 10^1000 FORENSIC LINEAGE UNIVERSE" | tee -a "$out"
+          echo "HEAD=$(git rev-parse HEAD)" | tee -a "$out"
+          echo "RULE: every family is independent; NOT_FOUND means continue, never closure." | tee -a "$out"
+          echo | tee -a "$out"
+
+          run_family() {
+            local id="$1"; shift
+            local patterns="$*"
+            echo "===== FAMILY: $id =====" | tee -a "$out"
+            local found=0
+            while IFS= read -r p; do
+              [ -n "$p" ] || continue
+              echo "--- PATTERN: $p ---" | tee -a "$out"
+              if git grep -n -I -E "$p" -- . ':!.git' 2>/dev/null | head -120 | tee -a "$out" | grep -q .; then
+                found=1
+              fi
+              git log --all --oneline --find-renames --find-copies -S"$p" -- 2>/dev/null | head -80 | tee -a "$out" || true
+            done <<< "$patterns"
+            if [ "$found" -eq 1 ]; then
+              echo "FAMILY_RESULT=FOUND" | tee -a "$out"
+            else
+              echo "FAMILY_RESULT=NOT_FOUND" | tee -a "$out"
+            fi
+            echo | tee -a "$out"
+          }
+
+          run_family "IDENTITY" 'GatewayRoute|gateway_route
+APIEndpoint|endpoint_id
+operation_id|operationId
+capability_id|capability
+route_id|binding_id|adapter_id'
+
+          run_family "RESOLUTION" 'resolve|resolver|resolution
+resolve_target|resolve_route|resolve_endpoint|resolve_operation
+resolve_capability|resolve_binding|resolve_adapter
+resolve_provider|resolve_service|resolve_handler'
+
+          run_family "BINDING" 'binding|bind|bound
+capability_binding|route_binding|endpoint_binding|operation_binding
+target_binding|adapter_binding|executor_binding
+integration_binding|runtime_binding'
+
+          run_family "DELEGATION" 'delegate|delegated|delegation
+delegate_target|delegate_capability|delegate_operation
+delegate_adapter|delegated_step'
+
+          run_family "EXECUTION" 'execute|executor|execution
+dispatch|dispatcher|invoke|invocation
+run_agent|handle_request|handle
+execute_target|execute_route|execute_operation'
+
+          run_family "ADAPTER" 'adapter|Adapter
+APIAdapter|RouteAdapter|TargetAdapter
+ProviderAdapter|HTTPAdapter|ControlHTTPAdapter
+adapter_registry|executor_registry'
+
+          run_family "RUNTIME_ROUTING" 'AgentRouter|GovernedAgentRouter
+ResourceControlPlane|ResourceAdmissionGate
+routing_execution|runtime.*route|route.*runtime
+AI_GATEWAY|resolve_provider|provider.*route'
+
+          run_family "API_PLATFORM" 'API Management Platform|api_management
+Gateway|Route|gateway_route
+API_PLATFORM_CONTRACT|API_PLATFORM_CAPABILITY_MATRIX
+management.*runtime|runtime.*management
+Integration|Adapter'
+
+          run_family "ENDPOINT_FLOW" 'ApiEndpointStore|research_os_api_base_url
+base_url|endpoint_url|FRIEND_BASE_URL
+/v1/ai/generate|/owner/chat
+operation_id|endpoint_id'
+
+          run_family "TOOL_SKILL_AGENT" 'ToolRequest|ResearchTool|SkillExecutor
+Tool Platform|tool.*resolve|skill.*resolve
+AgentOrchestrator|AgentRuntime
+capability.*resolve|capability.*execute'
+
+          run_family "CONTROL_CENTER" 'Command.*Target|Target.*Resolve
+Universal Control Surface|Native Control Center
+Command.*Delegate|Delegate.*Execute
+capability_binding|binding registry'
+
+          run_family "HISTORICAL_RECONCILIATION" 'supersed|replac|migrat|reconcil
+delet|remove duplicate|successor|legacy
+reissue|reissued|renam|relocat|move'
+
+          run_family "EVIDENCE_PROVENANCE" 'PROVENANCE|evidence|ledger|proof
+artifact.*sha256|contract_sha256|lineage
+forensic|authority|canonical'
+
+          echo "===== CROSS-FAMILY CANDIDATE COMMITS =====" | tee -a "$out"
+          git log --all --oneline --find-renames --find-copies --grep='route|gateway|adapter|binding|resolve|execute|integration' -i 2>/dev/null | head -500 | tee -a "$out" || true
+
+          echo | tee -a "$out"
+          echo "===== BRANCH / REF SURFACE =====" | tee -a "$out"
+          git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads refs/remotes refs/tags 2>/dev/null | tee -a "$out" || true
+
+          echo | tee -a "$out"
+          echo "===== FINAL STATUS =====" | tee -a "$out"
+          echo "This workflow is an evidence enumerator. It intentionally never converts NOT_FOUND into MISSING_GENERATION." | tee -a "$out"
+
+      - name: Upload lineage universe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: root-forensic-lineage-universe
+          path: forensic-output/root-forensic-lineage-universe.txt
+          if-no-files-found: error
