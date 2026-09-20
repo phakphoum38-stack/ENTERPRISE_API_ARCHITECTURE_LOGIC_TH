@@ -155,8 +155,8 @@ class FriendConnector:
                 )
             return self._runtime
 
-    def _http_request(self, profile: FriendConnectionProfile, payload: dict[str, object], session_id: str) -> dict[str, object]:
-        password = self.credentials.get(profile.id)
+    def _http_request(self, profile: FriendConnectionProfile, payload: dict[str, object], session_id: str, password_override: str | None = None) -> dict[str, object]:
+        password = password_override if password_override is not None else self.credentials.get(profile.id)
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json; charset=utf-8",
@@ -209,7 +209,7 @@ class FriendConnector:
             "metadata": response.metadata,
         }
 
-    def _attempt(self, profile: FriendConnectionProfile, transport: str, payload: dict[str, object], session_id: str) -> dict[str, object]:
+    def _attempt(self, profile: FriendConnectionProfile, transport: str, payload: dict[str, object], session_id: str, password_override: str | None = None) -> dict[str, object]:
         circuit = self._circuits.setdefault(f"{profile.id}:{transport}", _Circuit())
         if circuit.open():
             raise FriendConnectionError("circuit_open")
@@ -217,7 +217,7 @@ class FriendConnector:
             if transport == "direct":
                 value = self._direct_chat(payload, session_id)
             else:
-                value = self._http_request(profile, payload, session_id)
+                value = self._http_request(profile, payload, session_id, password_override=password_override)
             circuit.failures = 0
             circuit.opened_until = 0.0
             return value
@@ -227,7 +227,7 @@ class FriendConnector:
                 circuit.opened_until = time.monotonic() + 10.0
             raise
 
-    def chat(self, profile_id: str, payload: dict[str, object], *, session_id: str = "main-api") -> dict[str, object]:
+    def chat(self, profile_id: str, payload: dict[str, object], *, session_id: str = "main-api", password: str | None = None) -> dict[str, object]:
         profile = self.profiles.get(profile_id)
         if not profile.enabled:
             raise FriendConnectionError("connection profile is disabled")
@@ -235,7 +235,7 @@ class FriendConnector:
         errors: list[dict[str, str]] = []
         for transport in transports:
             try:
-                result = self._attempt(profile, transport, payload, session_id)
+                result = self._attempt(profile, transport, payload, session_id, password_override=password)
                 return {
                     **result,
                     "connection_id": profile.id,
@@ -256,7 +256,7 @@ class FriendConnector:
             "attempts": errors,
         }, sort_keys=True))
 
-    def test(self, profile_id: str) -> dict[str, object]:
+    def test(self, profile_id: str, *, password: str | None = None) -> dict[str, object]:
         profile = self.profiles.get(profile_id)
         result: dict[str, object] = {
             "connection_id": profile.id,
