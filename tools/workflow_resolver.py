@@ -201,15 +201,3 @@ def _dispatch_input_keys(source: str) -> set[str]:
     return keys
 
 
-def _workflow_file_from_source(declared_name: str, stages: Sequence[Any]) -> str:
-    # Prefer the registry's file whose human-readable role/name contains the
-    # declared workflow name; this helper only participates in name matching.
-    wanted = _norm(declared_name)
-    for raw in stages:
-        if not isinstance(raw, Mapping):
-            continue
-        file = str(raw.get("file") or "").strip()
-        role = str(raw.get("role") or "").strip()
-        if wanted in {_norm(file), _norm(_workflow_file(file)), _norm(role)}:
-            return file
-    return declared_name
