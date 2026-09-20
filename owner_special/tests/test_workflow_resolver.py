@@ -56,6 +56,16 @@ class WorkflowResolverTests(unittest.TestCase):
         self.assertEqual(result.input_keys, ("mode", "ref"))
         self.assertEqual(len(result.resolution_fingerprint), 64)
 
+    def test_resolves_by_declared_workflow_name(self):
+        command = CommandSpec(
+            command_id="CMD-GENERATE-NAME",
+            label="Run Generate Orchestrator",
+            intent="Run the existing orchestrator",
+            target="Run Generate Orchestrator",
+        )
+        result = resolve_workflow(command, REGISTRY, workflow_source=SOURCE)
+        self.assertEqual(result.workflow.file, "generate-orchestrator.yml")
+
     def test_resolves_by_registry_role(self):
         command = CommandSpec(
             command_id="CMD-CI-001",
