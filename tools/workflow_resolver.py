@@ -14,7 +14,7 @@ import json
 import re
 from typing import Any, Mapping, Sequence
 
-from universal_control_surface import CommandSpec
+from .universal_control_surface import CommandSpec
 
 
 WORKFLOW_DISPATCH = "workflow_dispatch"
