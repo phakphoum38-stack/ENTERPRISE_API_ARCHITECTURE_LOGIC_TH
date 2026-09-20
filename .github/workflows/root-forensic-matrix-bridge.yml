@@ -1,0 +1,85 @@
+name: ROOT Forensic Matrix Bridge
+
+on:
+  push:
+    branches:
+      - forensic/root-resolve-binding-execute-20260921
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forensic-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch all refs
+        run: git fetch --all --prune --tags
+      - name: Scan every suspected bridge independently
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p forensic-output
+          out=forensic-output/root-forensic-matrix-bridge.txt
+          : > "$out"
+          echo "ROOT FORENSIC MATRIX" | tee -a "$out"
+          echo "HEAD=$(git rev-parse HEAD)" | tee -a "$out"
+          echo | tee -a "$out"
+
+          check() {
+            local id="$1"; shift
+            local pattern="$1"; shift
+            local found=1
+            for f in "$@"; do
+              [ -f "$f" ] || continue
+              if grep -Eiq "$pattern" "$f"; then found=0; break; fi
+            done
+            if [ "$found" -eq 0 ]; then
+              printf '%-34s FOUND\n' "$id" | tee -a "$out"
+            else
+              printf '%-34s NOT_FOUND\n' "$id" | tee -a "$out"
+            fi
+          }
+
+          files=$(git ls-files)
+          check "GatewayRoute identity" 'GatewayRoute|gateway_route' $files
+          check "target field" '\btarget\b|["'"'"']target["'"'"']' $files
+          check "target semantic read" '\.(target)\b|["'"'"']target["'"'"']' $files
+          check "target parser" 'parse.*target|target.*parse|urlparse|URI' $files
+          check "target resolver" 'resolve.*target|target.*resolve|resolve_route|route_resolver' $files
+          check "target binding" 'bind.*target|target.*bind|binding.*target|target.*binding' $files
+          check "route adapter" 'route.*adapter|adapter.*route|target.*adapter|adapter.*target' $files
+          check "route executor" 'route.*execute|execute.*route|target.*execute|execute.*target' $files
+          check "operation resolver" 'resolve.*operation|operation.*resolve|operation_id.*resolve' $files
+          check "operation handler" 'operation_id.*handler|operationId.*handler|operation_id.*dispatch|operation_id.*invoke' $files
+          check "endpoint resolver" 'resolve.*endpoint|endpoint.*resolve|endpoint_id.*resolve' $files
+          check "endpoint execution" 'endpoint_id.*execute|execute.*endpoint_id|endpoint.*dispatch' $files
+          check "API Platform runtime bridge" 'api_management.*runtime|management.*adapter|platform.*adapter.*runtime' $files
+          check "ApiEndpointStore bridge" 'ApiEndpointStore.*GatewayRoute|GatewayRoute.*ApiEndpointStore|research_os_api_base_url.*GatewayRoute' $files
+          check "target HTTP execution" 'target.*requests?\.|target.*http|http.*target|target.*base_url|target.*url' $files
+          check "target Friend execution" 'target.*friend|friend.*target' $files
+          check "target Provider execution" 'target.*provider|provider.*target' $files
+          check "target AgentRouter execution" 'target.*AgentRouter|AgentRouter.*target' $files
+          check "target ResourceControl execution" 'target.*ResourceControl|ResourceControl.*target' $files
+
+          echo | tee -a "$out"
+          echo "=== HISTORICAL SYMBOL PRESENCE ===" | tee -a "$out"
+          for term in GatewayRoute gateway_route target operation_id endpoint_id binding adapter resolve delegate execute; do
+            echo "--- $term ---" | tee -a "$out"
+            git log --all --oneline -S"$term" --find-renames --find-copies -- 2>/dev/null | head -80 | tee -a "$out" || true
+          done
+
+          echo | tee -a "$out"
+          echo "=== FINAL RULE ===" | tee -a "$out"
+          echo "Each item is independently FOUND or NOT_FOUND. NOT_FOUND means continue forensic search; it never means MISSING_GENERATION." | tee -a "$out"
+      - name: Upload matrix evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: root-forensic-matrix-bridge
+          path: forensic-output/root-forensic-matrix-bridge.txt
+          if-no-files-found: error
