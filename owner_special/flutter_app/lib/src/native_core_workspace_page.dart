@@ -586,52 +586,102 @@ class _Metric extends StatelessWidget {
 
 final class _CommandDefinition {
   const _CommandDefinition({required this.id, required this.label, required this.target, required this.risk, required this.defaultMode, required this.description, required this.keywords});
-  final String id; final String label; final String target; final String risk; final String defaultMode; final String description; final String keywords;
+  final String id;
+  final String label;
+  final String target;
+  final String risk;
+  final String defaultMode;
+  final String description;
+  final String keywords;
 }
 
 final class _CommandPreviewDialog extends StatefulWidget {
   const _CommandPreviewDialog({required this.command, required this.initialMode, required this.targetShaController});
-  final _CommandDefinition command; final String initialMode; final TextEditingController targetShaController;
+  final _CommandDefinition command;
+  final String initialMode;
+  final TextEditingController targetShaController;
   @override State<_CommandPreviewDialog> createState() => _CommandPreviewDialogState();
 }
 
 class _CommandPreviewDialogState extends State<_CommandPreviewDialog> {
-  late String _mode; bool _humanAuthorized = false;
-  @override void initState() { super.initState(); _mode = widget.initialMode; }
-  bool get _shaValid => RegExp(r'^[0-9a-f]{64}
-  const _OwnerRuntimeCapability(this.api);
-  final OwnerFriendApi api;
-
+  late String _mode;
+  bool _humanAuthorized = false;
   @override
-  Future<Map<String, dynamic>> runtimeStatus() => api.status();
-}
-).hasMatch(widget.targetShaController.text.trim());
-  @override Widget build(BuildContext context) {
+  void initState() {
+    super.initState();
+    _mode = widget.initialMode;
+  }
+  bool get _shaValid => RegExp(r'^[0-9a-f]{64}$').hasMatch(widget.targetShaController.text.trim());
+  @override
+  Widget build(BuildContext context) {
     final live = _mode == 'LIVE';
     return AlertDialog(
       title: Row(children: [const Icon(Icons.bolt_outlined), const SizedBox(width: 10), Expanded(child: Text(widget.command.label))]),
-      content: SizedBox(width: 620, child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(widget.command.description), const SizedBox(height: 16),
-        Wrap(spacing: 8, runSpacing: 8, children: [Chip(label: Text(widget.command.id)), Chip(label: Text('Target: \${widget.command.target}')), Chip(label: Text('Risk: \${widget.command.risk}'))]),
-        const SizedBox(height: 14),
-        SegmentedButton<String>(segments: const [ButtonSegment(value: 'SIMULATION', label: Text('SIMULATION'), icon: Icon(Icons.science_outlined)), ButtonSegment(value: 'LIVE', label: Text('LIVE'), icon: Icon(Icons.lock_outline))], selected: {_mode}, onSelectionChanged: (value) => setState(() => _mode = value.first)),
-        const SizedBox(height: 14),
-        TextField(controller: widget.targetShaController, onChanged: (_) => setState(() {}), decoration: InputDecoration(labelText: 'Exact target SHA-256', hintText: '64 lowercase hexadecimal characters', errorText: widget.targetShaController.text.isEmpty || _shaValid ? null : 'Must be exactly 64 lowercase hexadecimal characters', prefixIcon: const Icon(Icons.fingerprint))),
-        const SizedBox(height: 12),
-        Card(child: ListTile(leading: Icon(live ? Icons.warning_amber_outlined : Icons.science_outlined), title: Text(live ? 'Human authorization required' : 'No live execution'), subtitle: Text(live ? 'Preview reaches the authorization boundary only. The UI does not self-authorize, merge, release, or dispatch a real workflow.' : 'Prepared for inspection only. Simulation is not execution.'))),
-        if (live) ...[
-          CheckboxListTile(value: _humanAuthorized, onChanged: (value) => setState(() => _humanAuthorized = value ?? false), title: const Text('I explicitly authorize the LIVE execution boundary'), subtitle: const Text('Authorization is a human decision and is never inferred from observation or confidence.'), controlAffinity: ListTileControlAffinity.leading),
-          const Text('LIVE dispatch is intentionally not invoked from this UI surface yet; no real GitHub Actions run will be started by this preview.'),
-        ],
-      ]))),
-      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')), FilledButton.icon(onPressed: _shaValid ? () => Navigator.of(context).pop(_mode) : null, icon: Icon(live && _humanAuthorized ? Icons.lock_open : Icons.play_arrow), label: Text(live ? (_humanAuthorized ? 'Authorize Boundary' : 'Review LIVE') : 'Prepare Simulation'))],
+      content: SizedBox(
+        width: 620,
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(widget.command.description),
+            const SizedBox(height: 16),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              Chip(label: Text(widget.command.id)),
+              Chip(label: Text('Target: ${widget.command.target}')),
+              Chip(label: Text('Risk: ${widget.command.risk}')),
+            ]),
+            const SizedBox(height: 14),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'SIMULATION', label: Text('SIMULATION'), icon: Icon(Icons.science_outlined)),
+                ButtonSegment(value: 'LIVE', label: Text('LIVE'), icon: Icon(Icons.lock_outline)),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (value) => setState(() => _mode = value.first),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: widget.targetShaController,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Exact target SHA-256',
+                hintText: '64 lowercase hexadecimal characters',
+                errorText: widget.targetShaController.text.isEmpty || _shaValid ? null : 'Must be exactly 64 lowercase hexadecimal characters',
+                prefixIcon: const Icon(Icons.fingerprint),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(child: ListTile(
+              leading: Icon(live ? Icons.warning_amber_outlined : Icons.science_outlined),
+              title: Text(live ? 'Human authorization required' : 'No live execution'),
+              subtitle: Text(live ? 'Preview reaches the authorization boundary only. The UI does not self-authorize, merge, release, or dispatch a real workflow.' : 'Prepared for inspection only. Simulation is not execution.'),
+            )),
+            if (live) ...[
+              CheckboxListTile(
+                value: _humanAuthorized,
+                onChanged: (value) => setState(() => _humanAuthorized = value ?? false),
+                title: const Text('I explicitly authorize the LIVE execution boundary'),
+                subtitle: const Text('Authorization is a human decision and is never inferred from observation or confidence.'),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              const Text('LIVE dispatch is intentionally not invoked from this UI surface yet; no real GitHub Actions run will be started by this preview.'),
+            ],
+          ]),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton.icon(
+          onPressed: _shaValid ? () => Navigator.of(context).pop(_mode) : null,
+          icon: Icon(live && _humanAuthorized ? Icons.lock_open : Icons.play_arrow),
+          label: Text(live ? (_humanAuthorized ? 'Authorize Boundary' : 'Review LIVE') : 'Prepare Simulation'),
+        ),
+      ],
     );
   }
 }
+
 final class _OwnerRuntimeCapability implements RuntimeStatusCapability {
   const _OwnerRuntimeCapability(this.api);
   final OwnerFriendApi api;
-
   @override
   Future<Map<String, dynamic>> runtimeStatus() => api.status();
 }
