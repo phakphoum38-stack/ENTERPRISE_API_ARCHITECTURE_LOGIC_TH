@@ -17,118 +17,58 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Fetch all refs
         run: git fetch --all --prune --tags
-      - name: Enumerate every suspect family independently
+
+      - name: Enumerate lineage families
         shell: bash
         run: |
-          set -uo pipefail
+          set -u
           mkdir -p forensic-output
-          out=forensic-output/root-forensic-lineage-universe.txt
-          : > "$out"
+          OUT="forensic-output/root-forensic-lineage-universe.txt"
+          echo "ROOT 10^1000 FORENSIC LINEAGE UNIVERSE" > "$OUT"
+          echo "HEAD=$(git rev-parse HEAD)" >> "$OUT"
+          echo "RULE=independent families; NOT_FOUND never means MISSING_GENERATION" >> "$OUT"
 
-          echo "ROOT 10^1000 FORENSIC LINEAGE UNIVERSE" | tee -a "$out"
-          echo "HEAD=$(git rev-parse HEAD)" | tee -a "$out"
-          echo "RULE: every family is independent; NOT_FOUND means continue, never closure." | tee -a "$out"
-          echo | tee -a "$out"
+          for family in IDENTITY RESOLUTION BINDING DELEGATION EXECUTION ADAPTER RUNTIME_ROUTING API_PLATFORM ENDPOINT_FLOW TOOL_SKILL_AGENT CONTROL_CENTER HISTORICAL_RECONCILIATION EVIDENCE_PROVENANCE; do
+            echo "===== FAMILY: $family =====" | tee -a "$OUT"
+            case "$family" in
+              IDENTITY) PATTERN='GatewayRoute|gateway_route|APIEndpoint|endpoint_id|operation_id|operationId|capability_id|route_id|binding_id|adapter_id' ;;
+              RESOLUTION) PATTERN='resolve|resolver|resolution|resolve_target|resolve_route|resolve_endpoint|resolve_operation|resolve_capability|resolve_binding|resolve_adapter|resolve_provider|resolve_service|resolve_handler' ;;
+              BINDING) PATTERN='binding|bind|bound|capability_binding|route_binding|endpoint_binding|operation_binding|target_binding|adapter_binding|executor_binding|integration_binding|runtime_binding' ;;
+              DELEGATION) PATTERN='delegate|delegated|delegation|delegate_target|delegate_capability|delegate_operation|delegate_adapter|delegated_step' ;;
+              EXECUTION) PATTERN='execute|executor|execution|dispatch|dispatcher|invoke|invocation|run_agent|handle_request|execute_target|execute_route|execute_operation' ;;
+              ADAPTER) PATTERN='adapter|Adapter|APIAdapter|RouteAdapter|TargetAdapter|ProviderAdapter|HTTPAdapter|ControlHTTPAdapter|adapter_registry|executor_registry' ;;
+              RUNTIME_ROUTING) PATTERN='AgentRouter|GovernedAgentRouter|ResourceControlPlane|ResourceAdmissionGate|routing_execution|AI_GATEWAY|resolve_provider' ;;
+              API_PLATFORM) PATTERN='API Management Platform|api_management|Gateway|Route|gateway_route|API_PLATFORM_CONTRACT|API_PLATFORM_CAPABILITY_MATRIX|management.*runtime|runtime.*management|Integration|Adapter' ;;
+              ENDPOINT_FLOW) PATTERN='ApiEndpointStore|research_os_api_base_url|base_url|endpoint_url|FRIEND_BASE_URL|/v1/ai/generate|/owner/chat|operation_id|endpoint_id' ;;
+              TOOL_SKILL_AGENT) PATTERN='ToolRequest|ResearchTool|SkillExecutor|Tool Platform|tool.*resolve|skill.*resolve|AgentOrchestrator|AgentRuntime|capability.*resolve|capability.*execute' ;;
+              CONTROL_CENTER) PATTERN='Command.*Target|Target.*Resolve|Universal Control Surface|Native Control Center|Command.*Delegate|Delegate.*Execute|capability_binding|binding registry' ;;
+              HISTORICAL_RECONCILIATION) PATTERN='supersed|replac|migrat|reconcil|delet|remove duplicate|successor|legacy|reissue|reissued|renam|relocat|move' ;;
+              EVIDENCE_PROVENANCE) PATTERN='PROVENANCE|evidence|ledger|proof|artifact.*sha256|contract_sha256|lineage|forensic|authority|canonical' ;;
+            esac
 
-          run_family() {
-            local id="$1"; shift
-            local patterns="$*"
-            echo "===== FAMILY: $id =====" | tee -a "$out"
-            local found=0
-            while IFS= read -r p; do
-              [ -n "$p" ] || continue
-              echo "--- PATTERN: $p ---" | tee -a "$out"
-              matches="$(git grep -n -I -E "$p" -- . 2>/dev/null | head -120 || true)"
-              if [ -n "$matches" ]; then
-                found=1
-                printf '%s\n' "$matches" | tee -a "$out"
-              fi
-              git log --all --oneline --find-renames --find-copies -S"$p" -- 2>/dev/null | head -80 | tee -a "$out" || true
-            done <<< "$patterns"
-            if [ "$found" -eq 1 ]; then
-              echo "FAMILY_RESULT=FOUND" | tee -a "$out"
+            CURRENT=$(git grep -n -I -E "$PATTERN" -- . 2>/dev/null | head -80 || true)
+            HISTORY=$(git log --all --oneline --find-renames --find-copies --grep="$PATTERN" -i 2>/dev/null | head -80 || true)
+
+            if [ -n "$CURRENT" ] || [ -n "$HISTORY" ]; then
+              echo "FAMILY_RESULT=FOUND" | tee -a "$OUT"
             else
-              echo "FAMILY_RESULT=NOT_FOUND" | tee -a "$out"
+              echo "FAMILY_RESULT=NOT_FOUND" | tee -a "$OUT"
             fi
-            echo | tee -a "$out"
-          }
+            printf '%s\n' "$CURRENT" >> "$OUT"
+            printf '%s\n' "$HISTORY" >> "$OUT"
+          done
 
-          run_family "IDENTITY" 'GatewayRoute|gateway_route
-APIEndpoint|endpoint_id
-operation_id|operationId
-capability_id|capability
-route_id|binding_id|adapter_id'
+          echo "===== CROSS-FAMILY COMMITS =====" | tee -a "$OUT"
+          git log --all --oneline --find-renames --find-copies --grep='route|gateway|adapter|binding|resolve|execute|integration' -i 2>/dev/null | head -500 >> "$OUT" || true
 
-          run_family "RESOLUTION" 'resolve|resolver|resolution
-resolve_target|resolve_route|resolve_endpoint|resolve_operation
-resolve_capability|resolve_binding|resolve_adapter
-resolve_provider|resolve_service|resolve_handler'
+          echo "===== REF SURFACE =====" | tee -a "$OUT"
+          git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads refs/remotes refs/tags >> "$OUT" || true
 
-          run_family "BINDING" 'binding|bind|bound
-capability_binding|route_binding|endpoint_binding|operation_binding
-target_binding|adapter_binding|executor_binding
-integration_binding|runtime_binding'
-
-          run_family "DELEGATION" 'delegate|delegated|delegation
-delegate_target|delegate_capability|delegate_operation
-delegate_adapter|delegated_step'
-
-          run_family "EXECUTION" 'execute|executor|execution
-dispatch|dispatcher|invoke|invocation
-run_agent|handle_request|handle
-execute_target|execute_route|execute_operation'
-
-          run_family "ADAPTER" 'adapter|Adapter
-APIAdapter|RouteAdapter|TargetAdapter
-ProviderAdapter|HTTPAdapter|ControlHTTPAdapter
-adapter_registry|executor_registry'
-
-          run_family "RUNTIME_ROUTING" 'AgentRouter|GovernedAgentRouter
-ResourceControlPlane|ResourceAdmissionGate
-routing_execution|runtime.*route|route.*runtime
-AI_GATEWAY|resolve_provider|provider.*route'
-
-          run_family "API_PLATFORM" 'API Management Platform|api_management
-Gateway|Route|gateway_route
-API_PLATFORM_CONTRACT|API_PLATFORM_CAPABILITY_MATRIX
-management.*runtime|runtime.*management
-Integration|Adapter'
-
-          run_family "ENDPOINT_FLOW" 'ApiEndpointStore|research_os_api_base_url
-base_url|endpoint_url|FRIEND_BASE_URL
-/v1/ai/generate|/owner/chat
-operation_id|endpoint_id'
-
-          run_family "TOOL_SKILL_AGENT" 'ToolRequest|ResearchTool|SkillExecutor
-Tool Platform|tool.*resolve|skill.*resolve
-AgentOrchestrator|AgentRuntime
-capability.*resolve|capability.*execute'
-
-          run_family "CONTROL_CENTER" 'Command.*Target|Target.*Resolve
-Universal Control Surface|Native Control Center
-Command.*Delegate|Delegate.*Execute
-capability_binding|binding registry'
-
-          run_family "HISTORICAL_RECONCILIATION" 'supersed|replac|migrat|reconcil
-delet|remove duplicate|successor|legacy
-reissue|reissued|renam|relocat|move'
-
-          run_family "EVIDENCE_PROVENANCE" 'PROVENANCE|evidence|ledger|proof
-artifact.*sha256|contract_sha256|lineage
-forensic|authority|canonical'
-
-          echo "===== CROSS-FAMILY CANDIDATE COMMITS =====" | tee -a "$out"
-          git log --all --oneline --find-renames --find-copies --grep='route|gateway|adapter|binding|resolve|execute|integration' -i 2>/dev/null | head -500 | tee -a "$out" || true
-
-          echo | tee -a "$out"
-          echo "===== BRANCH / REF SURFACE =====" | tee -a "$out"
-          git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads refs/remotes refs/tags 2>/dev/null | tee -a "$out" || true
-
-          echo | tee -a "$out"
-          echo "===== FINAL STATUS =====" | tee -a "$out"
-          echo "This workflow is an evidence enumerator. It intentionally never converts NOT_FOUND into MISSING_GENERATION." | tee -a "$out"
+          echo "===== FINAL STATUS =====" | tee -a "$OUT"
+          echo "NOT_FOUND is continuation, not closure." | tee -a "$OUT"
 
       - name: Upload lineage universe evidence
         if: always()
