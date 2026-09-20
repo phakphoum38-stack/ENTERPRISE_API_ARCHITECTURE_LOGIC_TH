@@ -80,7 +80,8 @@ void main() {
       ),
     );
 
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.text('Native Core Workspace'), findsOneWidget);
     expect(find.text('System Map'), findsOneWidget);
@@ -89,17 +90,20 @@ void main() {
     expect(find.text('Simulation'), findsOneWidget);
 
     await tester.tap(find.text('System Map'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('Live System Map'), findsOneWidget);
     expect(find.text('ROOT'), findsOneWidget);
     expect(find.text('ASSURANCE'), findsOneWidget);
 
     await tester.tap(find.text('Failures'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('No failure feed exposed'), findsOneWidget);
 
     await tester.tap(find.text('History'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('Runtime status observed'), findsOneWidget);
   });
 }
