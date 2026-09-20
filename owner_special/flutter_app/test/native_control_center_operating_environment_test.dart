@@ -101,11 +101,15 @@ void main() {
     );
     expect(find.text('ASSURANCE'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Failures'));
+    await tester.pump();
     await tester.tap(find.text('Failures'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('No failure feed exposed'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('History'));
+    await tester.pump();
     await tester.tap(find.text('History'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
