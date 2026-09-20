@@ -1,0 +1,53 @@
+{
+  "contract_id": "research-os-platform-integration-v1",
+  "version": 1,
+  "status": "IMPLEMENTATION_DRAFT",
+  "purpose": "Compose existing Research OS planes into one platform boundary without duplicating authoritative runtime, governance, memory, or assurance subsystems.",
+  "canonical_baseline": "5e16741bb42f6f888542d74b37781e723a7d6643",
+  "planes": {
+    "CORE": {"role": "runtime_and_domain_capabilities", "authority": "existing_core_contracts", "may_create_duplicate_subsystems": false},
+    "ASSURANCE": {"role": "verification_evidence_provenance_and_reconciliation", "authority": "existing_assurance_fabric", "may_create_duplicate_subsystems": false},
+    "PLATFORM": {"role": "composition_integration_lifecycle_and_release", "authority": "platform_contract_only", "may_create_duplicate_subsystems": false},
+    "EXPERIENCE": {"role": "gui_ux_ui_and_human_interaction", "authority": "experience_contract", "may_create_duplicate_subsystems": false}
+  },
+  "existing_authorities": [
+    "current/UNIVERSAL_LEARNING_CONTRACT.json",
+    "current/PROOF_CARRYING_CHANGE_CONTRACT.json",
+    "current/AEOS_ASSURANCE_ONTOLOGY.json",
+    "docs/PROOF_CARRYING_ENGINEERING_OS.md"
+  ],
+  "integration_objects": ["component_identity","contract_reference","dependency_edge","capability_binding","evidence_handoff","lifecycle_state","release_binding","authority_context"],
+  "required_component_identity": ["component_id","plane","capability","owner_boundary","contract_refs"],
+  "allowed_dependency_direction": ["EXPERIENCE->PLATFORM","EXPERIENCE->CORE","PLATFORM->CORE","PLATFORM->ASSURANCE","CORE->ASSURANCE"],
+  "forbidden_dependency_direction": ["ASSURANCE->PLATFORM_AUTHORITY","ASSURANCE->MERGE_AUTHORITY","LEARNING->MERGE_AUTHORITY","EXPERIENCE->DIRECT_RUNTIME_MUTATION"],
+  "existing_system_reuse": {
+    "memory": "reuse_existing_memory_and_continuity",
+    "learning": "reuse_universal_learning_root",
+    "resource_governance": "reuse_existing_resource_control_plane",
+    "assurance": "reuse_existing_aeos_and_assurance_fabric",
+    "provenance": "reuse_existing_provenance_contracts",
+    "runtime": "reuse_existing_core_and_v3_runtime",
+    "release": "compose_existing_proof_carrying_release_controls"
+  },
+  "forbidden_duplicate_subsystems": ["global_scheduler","worker_pool","task_queue","memory_store","learning_root","resource_control_plane","provider_credential_engine","assurance_engine","merge_authority","branch_protection_controller"],
+  "evidence_contract": {
+    "platform_change_requires": ["exact_target_revision","contract_refs","dependency_resolution","test_evidence","provenance_evidence","authority_boundary_evidence"],
+    "unknown_state": "HOLD",
+    "conflict_state": "HOLD",
+    "evidence_is_authority": false
+  },
+  "lifecycle": ["PROPOSED","ANALYZING","INTEGRATING","VERIFYING","CERTIFIED","RELEASED","MONITORED","RECONCILING"],
+  "authority": {
+    "platform_may_compose": true,
+    "platform_may_mutate_core_authority": false,
+    "platform_may_grant_permissions": false,
+    "platform_may_approve_reviews": false,
+    "platform_may_merge": false,
+    "platform_may_enable_auto_merge": false,
+    "platform_may_rewrite_history": false,
+    "owner_authority": "unchanged",
+    "merge_authority": "unchanged"
+  },
+  "mathematical_root": {"symbol": "10^1000", "interpretation": "logical_coverage", "materialization": "forbidden", "execution": "bounded"},
+  "fail_closed_rules": ["missing_component_identity -> HOLD","missing_contract_reference -> HOLD","unresolved_dependency -> HOLD","conflicting_authority -> HOLD","unknown_evidence -> HOLD","stale_exact_revision -> HOLD","duplicate_authoritative_subsystem -> HOLD"]
+}
