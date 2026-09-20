@@ -43,8 +43,9 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
+    return Material(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
         final compact = constraints.maxWidth < 1000;
         final header = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -108,8 +109,9 @@ class _GitHubWorkbenchPageState extends State<GitHubWorkbenchPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [header, body],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
