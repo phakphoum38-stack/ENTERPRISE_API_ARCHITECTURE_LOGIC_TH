@@ -40,10 +40,11 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
   final String ownerId;
   final String profileId;
   final String sessionId;
-  final String researchOsBaseUrl;
+  String researchOsBaseUrl;
   final Duration timeout;
   final Duration chatTimeout;
   String? _sessionToken;
+  void setResearchOsBaseUrl(String value) => researchOsBaseUrl = _normalizeBaseUrl(value.trim());
   String _friendConnectionId = 'default';
   String? _friendConnectionPassword;
 
