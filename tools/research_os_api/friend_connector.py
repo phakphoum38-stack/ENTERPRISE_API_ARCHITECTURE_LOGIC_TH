@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import sys
 import threading
 import time
 import urllib.error
@@ -16,6 +17,10 @@ import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from owner_special.research_os_friend.provider_settings import WindowsDpapiSecretStore
 from owner_special.research_os_friend.resource_control_runtime import install_friend_resource_control
