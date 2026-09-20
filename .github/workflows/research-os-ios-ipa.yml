@@ -131,7 +131,7 @@ jobs:
           test -n "$IPA"
           test -s "$IPA"
           echo "IPA: $IPA"
-          unzip -Z1 "$IPA" | grep -Eq '^Payload/[^/]+\\.app/Info.plist$'
+          unzip -Z1 "$IPA" | grep -Eq '^Payload/[^/]+\.app/Info.plist$'
           mkdir -p build/artifacts
           cp "$IPA" "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa"
           shasum -a 256 "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa" > "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
@@ -144,20 +144,5 @@ jobs:
           path: |
             apps/research_os_flutter/build/artifacts/Research-OS-iOS-responsive-${{ github.sha }}.ipa
             apps/research_os_flutter/build/artifacts/Research-OS-iOS-responsive-${{ github.sha }}.ipa.sha256
-          if-no-files-found: error
-          retention-days: 30
-
-          mkdir -p build/artifacts
-          cp "$IPA" "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa"
-          shasum -a 256 "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa" > "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
-          cat "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
-
-      - name: Upload unsigned IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Research-OS-iOS-responsive-${{ github.sha }}
-          path: |
-            apps/research_os_flutter/build/Research-OS-iOS-responsive-unsigned.ipa
-            apps/research_os_flutter/build/Research-OS-iOS-responsive-unsigned.ipa.sha256
           if-no-files-found: error
           retention-days: 30
