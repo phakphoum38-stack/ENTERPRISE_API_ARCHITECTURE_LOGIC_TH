@@ -79,9 +79,9 @@ def _friend_connector() -> FriendConnector:
     return _FRIEND_CONNECTOR
 
 
-def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 3, risk: int = 1, parallelism: int = 2, helper_budget: int = 0, connection_id: str = "default") -> dict[str, Any]:
+def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 3, risk: int = 1, parallelism: int = 2, helper_budget: int = 0, connection_id: str = "default", connection_password: str | None = None) -> dict[str, Any]:
     payload = {"text": text, "complexity": max(1, int(complexity)), "risk": max(1, int(risk)), "parallelism": max(1, int(parallelism)), "helper_budget": max(0, int(helper_budget))}
-    return _friend_connector().chat(connection_id, payload, session_id=session_id or "main-api")
+    return _friend_connector().chat(connection_id, payload, session_id=session_id or "main-api", password=connection_password)
 
 
 def _json_bytes(payload: Any) -> bytes:
@@ -416,16 +416,16 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     locked=bool(body.get("locked", existing.locked if existing else False)),
                 )
                 connector.profiles.upsert(profile)
-                if body.get("password") is not None:
+                if body.get("password") is not None and bool(body.get("persist_password", False)):
                     connector.credentials.set(profile.id, str(body.get("password", "")))
-                self._send(HTTPStatus.OK, {"saved": True, "connection": profile.public_dict(), "password_configured": connector.credentials.get(profile.id) is not None})
+                self._send(HTTPStatus.OK, {"saved": True, "connection": profile.public_dict(), "password_persisted": bool(body.get("password") is not None and body.get("persist_password", False)), "password_configured": connector.credentials.get(profile.id) is not None})
                 return
             if path == "/v1/friend/connections/test":
                 if self.headers.get("X-Research-OS-Owner", "").strip() != FRIEND_OWNER_ID:
                     self._send(HTTPStatus.FORBIDDEN, {"error": "owner_required"})
                     return
                 connection_id = str(body.get("id", "default")).strip()
-                self._send(HTTPStatus.OK, _friend_connector().test(connection_id))
+                self._send(HTTPStatus.OK, _friend_connector().test(connection_id, password=str(body.get("password")) if body.get("password") is not None else None))
                 return
             if path == "/v1/ai/generate":
                 prompt = str(body.get("prompt", "")).strip()
@@ -436,7 +436,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     result = build_provider(body.get("provider")).generate(prompt, system=str(body.get("system", "")), model=body.get("model"))
                     self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "session_id": body.get("session_id"), "route": "direct-provider"})
                     return
-                friend = _friend_chat(prompt, session_id=str(body.get("session_id") or "main-api"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)))
+                friend = _friend_chat(prompt, session_id=str(body.get("session_id") or "main-api"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)), connection_id=str(body.get("connection_id", "default")), connection_password=str(body.get("connection_password")) if body.get("connection_password") is not None else None)
                 self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers"), "metadata": friend.get("metadata")})
                 return
             if path == "/v1/ai/answer-with-memory":
@@ -453,7 +453,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     result = build_provider(body.get("provider")).generate(prompt, system=system, model=body.get("model"))
                     self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "direct-provider"})
                     return
-                friend = _friend_chat(f"{system}\n\n{prompt}", session_id=str(body.get("session_id") or "main-api-memory"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)))
+                friend = _friend_chat(f"{system}\n\n{prompt}", session_id=str(body.get("session_id") or "main-api-memory"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)), connection_id=str(body.get("connection_id", "default")), connection_password=str(body.get("connection_password")) if body.get("connection_password") is not None else None)
                 self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers")})
                 return
             if path == "/v1/copilot/chat":
