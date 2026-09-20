@@ -51,9 +51,7 @@ class FriendConnectionProfile:
             raise ValueError("invalid connection id")
 
     def public_dict(self) -> dict[str, object]:
-        payload = asdict(self)
-        payload["password_configured"] = None
-        return payload
+        return asdict(self)
 
 
 class ConnectionProfileStore:
@@ -89,6 +87,19 @@ class ConnectionProfileStore:
             )
             os.replace(temporary, self.path)
         return profile
+
+
+class MemoryConnectionCredentialStore:
+    """Test-only credential store; never selected automatically in production."""
+
+    def __init__(self) -> None:
+        self._values: dict[str, str] = {}
+
+    def set(self, profile_id: str, password: str) -> None:
+        self._values[profile_id] = password
+
+    def get(self, profile_id: str) -> str | None:
+        return self._values.get(profile_id)
 
 
 class ConnectionCredentialStore:
@@ -134,12 +145,12 @@ class _Circuit:
 class FriendConnector:
     """Switchable Owner-only Friend connector."""
 
-    def __init__(self, *, owner_id: str, data_root: Path, repository_root: Path | None = None) -> None:
+    def __init__(self, *, owner_id: str, data_root: Path, repository_root: Path | None = None, credential_store: ConnectionCredentialStore | MemoryConnectionCredentialStore | None = None) -> None:
         self.owner_id = owner_id
         self.data_root = Path(data_root).resolve()
         self.repository_root = Path(repository_root).resolve() if repository_root else None
         self.profiles = ConnectionProfileStore(self.data_root, owner_id)
-        self.credentials = ConnectionCredentialStore(self.data_root, owner_id)
+        self.credentials = credential_store or ConnectionCredentialStore(self.data_root, owner_id)
         self._runtime: FriendRuntime | None = None
         self._circuits: dict[str, _Circuit] = {}
         self._lock = threading.RLock()
