@@ -205,7 +205,7 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
     }
   }
 
-  Future<Map<String, dynamic>> _researchRequest(String method, String path, {bool authenticated = true, Map<String, String>? headers}) async {
+  Future<Map<String, dynamic>> _researchRequest(String method, String path, {bool authenticated = true, Map<String, String>? headers, Map<String, dynamic>? body}) async {
     final client = HttpClient();
     final uri = Uri.parse('$researchOsBaseUrl$path');
     try {
@@ -214,8 +214,9 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
       if (authenticated && _sessionToken != null) request.headers.set('X-Research-OS-Session', _sessionToken!);
       headers?.forEach(request.headers.set);
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
-      request.contentLength = 2;
-      request.add(const <int>[123, 125]);
+      final payload = utf8.encode(jsonEncode(body ?? <String, dynamic>{}));
+      request.contentLength = payload.length;
+      request.add(payload);
       final response = await request.close().timeout(timeout);
       return await _decodeResponse(response, uri, timeout);
     } finally {
