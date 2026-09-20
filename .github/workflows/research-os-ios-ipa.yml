@@ -97,9 +97,11 @@ jobs:
           set -euo pipefail
           REGISTRANT="ios/Runner/GeneratedPluginRegistrant.swift"
           PODLOCK="ios/Podfile.lock"
-          APP="build/ios/iphoneos/Runner.app"
+          ARCHIVE="build/ios/archive/Runner.xcarchive"
+          APP="$ARCHIVE/Products/Applications/Runner.app"
           test -f "$REGISTRANT"
           test -f "$PODLOCK"
+          test -d "$ARCHIVE"
           test -d "$APP"
           test -f "$APP/Info.plist"
           echo "=== GeneratedPluginRegistrant.swift evidence ==="
@@ -122,21 +124,27 @@ jobs:
           test "$BUNDLE_ID" = "com.phakphoum38.researchos"
           test "$DISPLAY_NAME" = "Research OS"
 
-      - name: Verify and hash unsigned IPA
+      - name: Package and hash unsigned IPA
         working-directory: apps/research_os_flutter
         shell: bash
         run: |
           set -euo pipefail
-          IPA="$(find build/ios/ipa -maxdepth 1 -type f -name '*.ipa' -print -quit)"
-          test -n "$IPA"
+          ARCHIVE="build/ios/archive/Runner.xcarchive"
+          APP="$ARCHIVE/Products/Applications/Runner.app"
+          test -d "$ARCHIVE"
+          test -d "$APP"
+          mkdir -p build/ios/ipa/Payload
+          cp -R "$APP" build/ios/ipa/Payload/
+          IPA="build/ios/ipa/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa"
+          (cd build/ios/ipa && /usr/bin/zip -qry "$(basename "$IPA")" Payload)
+          rm -rf build/ios/ipa/Payload
           test -s "$IPA"
           echo "IPA: $IPA"
-          unzip -Z1 "$IPA" | grep -Eq '^Payload/[^/]+\.app/Info.plist$'
+          unzip -Z1 "$IPA" | grep -Eq "^Payload/[^/]+\\.app/Info.plist$"
           mkdir -p build/artifacts
           cp "$IPA" "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa"
           shasum -a 256 "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa" > "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
           cat "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
-
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
