@@ -22,7 +22,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
   final _targetSha = TextEditingController();
   Map<String, dynamic>? _status;
   bool _loading = false;
-  bool _simulation = false;
+  bool _simulation = true;
   String _selectedObject = '';
   final List<String> _events = <String>[
     'Control Center initialized',
@@ -32,7 +32,6 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
 
   static const commands = <_CommandDefinition>[
     _CommandDefinition(id: 'CMD-GENERATE-ORCHESTRATOR', label: 'Run Generate Orchestrator', target: 'generate-orchestrator.yml', risk: 'LOW', defaultMode: 'SIMULATION', description: 'Resolve the canonical workflow binding and prepare a workflow_dispatch preview.', keywords: 'generate orchestrator workflow actions build'),
-    _CommandDefinition(id: 'CMD-REFRESH-RUNTIME', label: 'Refresh Runtime', target: 'owner-runtime', risk: 'LOW', defaultMode: 'LIVE', description: 'Observe the existing Owner Friend runtime status.', keywords: 'refresh runtime health status observe'),
     _CommandDefinition(id: 'CMD-INSPECT-EVIDENCE', label: 'Inspect Evidence', target: 'evidence', risk: 'LOW', defaultMode: 'SIMULATION', description: 'Open the evidence projection without fabricating missing lineage.', keywords: 'inspect evidence provenance lineage hash'),
   ];
   static const _navigationCommands = <String>[
