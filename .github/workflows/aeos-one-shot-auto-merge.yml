@@ -63,8 +63,10 @@ jobs:
           HEAD: ${{ steps.target.outputs.head }}
         run: |
           set -euo pipefail
-          prs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls" --paginate)"
-          pr="$(python3 -c 'import json,sys; rows=json.load(sys.stdin); matches=[p for p in rows if p.get("state")=="open" and p.get("head",{}).get("sha")==sys.argv[1]]; print(matches[0]["number"] if len(matches)==1 else "")' "$HEAD" <<< "$prs")"
+          # --paginate emits one JSON document per page; --slurp wraps all
+          # pages into a single JSON array so Python receives valid JSON.
+          prs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls" --paginate --slurp)"
+          pr="$(python3 -c 'import json,sys; pages=json.load(sys.stdin); rows=[p for page in pages for p in page]; matches=[p for p in rows if p.get("state")=="open" and p.get("head",{}).get("sha")==sys.argv[1]]; print(matches[0]["number"] if len(matches)==1 else "")' "$HEAD" <<< "$prs")"
           test -n "$pr"
           echo "pr=$pr" >> "$GITHUB_OUTPUT"
 
