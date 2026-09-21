@@ -1,0 +1,44 @@
+name: Forensic Control Center Payload Extraction
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload_ref:
+        description: "Exact payload commit SHA to inspect"
+        required: true
+        default: "7d6db9ccca7c3565288411a4cf01f5b5219bdb07"
+      base_ref:
+        description: "Exact base commit SHA for changed-file comparison"
+        required: true
+        default: "37b2276f2ed8a31d58ff92a266e46f1c9a7098a4"
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full lineage
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate exact refs
+        shell: bash
+        run: |
+          git cat-file -e "${{ inputs.payload_ref }}^{commit}"
+          git cat-file -e "${{ inputs.base_ref }}^{commit}"
+
+      - name: Extract Control Center payload
+        run: |
+          python tools/forensic/control_center_payload.py \
+            --payload-ref "${{ inputs.payload_ref }}" \
+            --base-ref "${{ inputs.base_ref }}"
+
+      - name: Publish forensic manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-center-521-forensic-${{ inputs.payload_ref }}
+          path: reports/forensic/control-center-payload/CONTROL_CENTER_521_FORENSIC.json
+          if-no-files-found: error
