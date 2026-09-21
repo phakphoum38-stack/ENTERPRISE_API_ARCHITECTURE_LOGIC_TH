@@ -72,30 +72,6 @@ final class _FakeOwnerApi implements OwnerFriendApi {
 
 
   @override
-  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) async =>
-      <String, dynamic>{'exchanged': false, 'state': state};
-
-  @override
-  Future<Map<String, dynamic>> researchGet(
-    String path, {
-    Map<String, String>? query,
-    Map<String, String>? headers,
-  }) async {
-    gets.add(path);
-    return <String, dynamic>{'path': path};
-  }
-
-  @override
-  Future<Map<String, dynamic>> researchPost(
-    String path, {
-    Map<String, dynamic>? body,
-    Map<String, String>? headers,
-  }) async {
-    posts.add(path);
-    return <String, dynamic>{'path': path};
-  }
-
-  @override
   void setSession(String token) {}
 
   @override
