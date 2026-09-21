@@ -28,6 +28,10 @@ permissions:
 
 jobs:
   comprehensive-review:
+    # A workflow_run emitted from main is a post-merge completion event, not an open PR target.
+    # Keep the assurance workflow fail-closed for real PR targets while avoiding a false failure
+    # when an upstream gate completes on main after merge.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.head_branch != 'main' }}
     runs-on: ubuntu-latest
     steps:
       - name: Resolve target identity
