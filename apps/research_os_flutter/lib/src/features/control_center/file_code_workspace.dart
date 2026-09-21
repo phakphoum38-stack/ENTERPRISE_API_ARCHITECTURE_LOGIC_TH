@@ -169,6 +169,16 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
               subtitle: Text(_error!),
             ),
           ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.shield_outlined),
+            title: const Text('Authority boundary'),
+            subtitle: const Text(
+              'This workspace observes or prepares content only. '
+              'Repository writes, repair, merge and release remain outside this viewer.',
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
         Card(
           child: Padding(
