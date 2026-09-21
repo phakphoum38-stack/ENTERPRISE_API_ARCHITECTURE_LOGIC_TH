@@ -386,8 +386,8 @@ class _ControlCenterNavigation extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-              }),
+                );
+              },),
             ),
           ),
         ),
