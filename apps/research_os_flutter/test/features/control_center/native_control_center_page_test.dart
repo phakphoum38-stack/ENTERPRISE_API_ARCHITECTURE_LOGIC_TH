@@ -57,13 +57,17 @@ void main() {
     expect(find.text('Control'), findsOneWidget);
     expect(find.text('LIVE'), findsNWidgets(2));
 
-    await tester.tap(find.text('Failures'));
-    await tester.pumpAndSettle();
+    final failures = find.text('Failures');
+    await tester.ensureVisible(failures);
+    await tester.tap(failures);
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Failure Center'), findsOneWidget);
     expect(find.text('UNKNOWN is preserved'), findsOneWidget);
 
-    await tester.tap(find.text('Control'));
-    await tester.pumpAndSettle();
+    final control = find.text('Control');
+    await tester.ensureVisible(control);
+    await tester.tap(control);
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Human authority required'), findsOneWidget);
 
     api.close();
@@ -89,7 +93,7 @@ void main() {
     final suggestion = find.text('Show resources', skipOffstage: false);
     expect(suggestion, findsOneWidget);
     await tester.tap(suggestion);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('Resource Center'), findsOneWidget);
     expect(find.textContaining('Runtime resource telemetry'), findsOneWidget);
