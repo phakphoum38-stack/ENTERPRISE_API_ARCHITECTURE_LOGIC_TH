@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 import '../../api/research_os_api_client.dart';
 
 class NativeControlCenterPage extends StatefulWidget {
-  const NativeControlCenterPage({required this.apiClient, super.key});
+  const NativeControlCenterPage({required this.apiClient, this.onNavigate, super.key});
   final ResearchOSApiClient apiClient;
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<NativeControlCenterPage> createState() => _NativeControlCenterPageState();
@@ -18,6 +19,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   late final AnimationController _pulse;
   final _command = TextEditingController();
   Timer? _timer;
+  final _commandFocus = FocusNode();
   bool _loading = false;
   bool _simulation = false;
   Map<String, dynamic>? _health, _brain, _providers, _agents;
@@ -27,9 +29,11 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   ];
 
   static const _commands = <String>[
-    'Refresh system', 'Open Research', 'Open Friend', 'Open Runtime',
-    'Open Evidence', 'Inspect object', 'Show system map', 'Show failures',
-    'Show resources', 'Simulation mode', 'Dry run', 'Replay',
+    'Refresh system', 'Open Home', 'Open Friend', 'Open Agents',
+    'Open Library', 'Open Knowledge Graph', 'Open GitHub', 'Open Runtime',
+    'Open Settings', 'Open Brain Skills', 'Open Evidence', 'Inspect object',
+    'Show system map', 'Show failures', 'Show resources', 'Design Studio',
+    'Simulation mode', 'Dry run', 'Replay',
   ];
 
   @override
@@ -50,6 +54,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     _pulse.dispose();
     _tabs.dispose();
     _command.dispose();
+    _commandFocus.dispose();
     super.dispose();
   }
 
@@ -82,12 +87,40 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     }
   }
 
+  void _focusCommand() {
+    _commandFocus.requestFocus();
+    _command.selection = TextSelection.collapsed(offset: _command.text.length);
+    setState(() {});
+  }
+
   void _commandRun(String raw) {
     final value = raw.trim();
     if (value.isEmpty) return;
     _command.clear();
     if (value == 'Refresh system') {
       _refresh();
+      return;
+    }
+    const navigation = <String, int>{
+      'Open Home': 0,
+      'Open Friend': 1,
+      'Open Agents': 2,
+      'Open Library': 3,
+      'Open Knowledge Graph': 4,
+      'Open GitHub': 5,
+      'Open Runtime': 8,
+      'Open Settings': 9,
+      'Open Brain Skills': 11,
+    };
+    final destination = navigation[value];
+    if (destination != null && widget.onNavigate != null) {
+      widget.onNavigate!(destination);
+      setState(() => _activity.insert(0, '$value navigated'));
+      return;
+    }
+    if (value == 'Design Studio') {
+      _tabs.animateTo(8);
+      setState(() => _activity.insert(0, 'Design Studio opened'));
       return;
     }
     if (value == 'Simulation mode') {
@@ -127,7 +160,17 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
         .toList();
     final online = _health?['status']?.toString().toLowerCase() == 'ok';
 
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _focusCommand,
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _focusCommand,
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          _command.clear();
+          FocusManager.instance.primaryFocus?.unfocus();
+          setState(() {});
+        },
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Research OS • Control Center'),
         actions: <Widget>[
@@ -213,6 +256,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
               Tab(text: 'Failures', icon: Icon(Icons.warning_amber_outlined)),
               Tab(text: 'Resources', icon: Icon(Icons.memory_outlined)),
               Tab(text: 'Control', icon: Icon(Icons.lock_outline)),
+              Tab(text: 'Design', icon: Icon(Icons.palette_outlined)),
             ],
           ),
           Expanded(
@@ -269,11 +313,12 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                   message:
                       'Runtime resource telemetry is not exposed by the current API. UNKNOWN is preserved.',
                 ),
-                const _ControlBoundary(),
+                _DesignStudio(),
               ],
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -281,6 +326,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
 
 class _Overview extends StatelessWidget {
   const _Overview({
+    required this.onNavigate,
     required this.health,
     required this.brain,
     required this.providers,
@@ -288,6 +334,7 @@ class _Overview extends StatelessWidget {
     required this.simulation,
     required this.pulse,
   });
+  final ValueChanged<int>? onNavigate;
   final Map<String, dynamic>? health, brain, providers, agents;
   final bool simulation;
   final AnimationController pulse;
@@ -375,6 +422,48 @@ class _Overview extends StatelessWidget {
                     ),
                   ))
               .toList(),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
+                _QuickAction(
+                  label: 'Friend',
+                  icon: Icons.forum_outlined,
+                  onPressed: onNavigate == null ? null : () => onNavigate!(1),
+                ),
+                _QuickAction(
+                  label: 'Agents',
+                  icon: Icons.smart_toy_outlined,
+                  onPressed: onNavigate == null ? null : () => onNavigate!(2),
+                ),
+                _QuickAction(
+                  label: 'Knowledge',
+                  icon: Icons.account_tree_outlined,
+                  onPressed: onNavigate == null ? null : () => onNavigate!(4),
+                ),
+                _QuickAction(
+                  label: 'GitHub',
+                  icon: Icons.code_outlined,
+                  onPressed: onNavigate == null ? null : () => onNavigate!(5),
+                ),
+                _QuickAction(
+                  label: 'Runtime',
+                  icon: Icons.monitor_heart_outlined,
+                  onPressed: onNavigate == null ? null : () => onNavigate!(8),
+                ),
+                _QuickAction(
+                  label: 'Settings',
+                  icon: Icons.settings_outlined,
+                  onPressed: onNavigate == null ? null : () => onNavigate!(9),
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         const Card(
@@ -599,4 +688,199 @@ class _JsonView extends StatelessWidget {
               )),
         ],
       );
+}
+
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+      );
+}
+
+class _DesignStudio extends StatefulWidget {
+  @override
+  State<_DesignStudio> createState() => _DesignStudioState();
+}
+
+class _DesignStudioState extends State<_DesignStudio> {
+  int _selected = 0;
+  bool _reducedMotion = false;
+  bool _darkPreview = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = <String>['Canvas', 'Tokens', 'Components', 'States', 'Motion', 'Accessibility'];
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: <Widget>[
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: <Widget>[
+                const Icon(Icons.palette_outlined, size: 30),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Native Design Studio',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                Switch(
+                  value: _darkPreview,
+                  onChanged: (value) => setState(() => _darkPreview = value),
+                ),
+                const Text('Preview'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SegmentedButton<int>(
+          segments: List<DropdownMenuItem<int>>.empty().isEmpty
+              ? sections.asMap().entries
+                  .map((entry) => ButtonSegment<int>(
+                        value: entry.key,
+                        label: Text(entry.value),
+                      ))
+                  .toList()
+              : const <ButtonSegment<int>>[],
+          selected: <int>{_selected},
+          onSelectionChanged: (values) => setState(() => _selected = values.first),
+          multiSelectionEnabled: false,
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: _DesignSection(
+              index: _selected,
+              darkPreview: _darkPreview,
+              reducedMotion: _reducedMotion,
+              onReducedMotionChanged: (value) => setState(() => _reducedMotion = value),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DesignSection extends StatelessWidget {
+  const _DesignSection({
+    required this.index,
+    required this.darkPreview,
+    required this.reducedMotion,
+    required this.onReducedMotionChanged,
+  });
+  final int index;
+  final bool darkPreview;
+  final bool reducedMotion;
+  final ValueChanged<bool> onReducedMotionChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (index) {
+      case 0:
+        return Container(
+          height: 260,
+          decoration: BoxDecoration(
+            color: darkPreview ? Colors.black : Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(Icons.grid_4x4, size: 42, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 10),
+                const Text('Native canvas / layout preview'),
+                const SizedBox(height: 8),
+                const Text('Grid • alignment • responsive • constraints'),
+              ],
+            ),
+          ),
+        );
+      case 1:
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: const <Widget>[
+            Chip(label: Text('Brand')),
+            Chip(label: Text('Surface')),
+            Chip(label: Text('Background')),
+            Chip(label: Text('Text')),
+            Chip(label: Text('Interactive')),
+            Chip(label: Text('Success')),
+            Chip(label: Text('Warning')),
+            Chip(label: Text('Error')),
+            Chip(label: Text('Focus')),
+            Chip(label: Text('Selection')),
+          ],
+        );
+      case 2:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text('State-complete components'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
+                FilledButton(onPressed: () {}, child: const Text('Primary')),
+                OutlinedButton(onPressed: () {}, child: const Text('Secondary')),
+                const Chip(label: Text('Loading')),
+                const Chip(label: Text('Error')),
+                const Chip(label: Text('Offline')),
+              ],
+            ),
+          ],
+        );
+      case 3:
+        return const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('State coverage'),
+            SizedBox(height: 10),
+            Text('Default → Loading → Empty → Error → Offline → Degraded → Recovery'),
+          ],
+        );
+      case 4:
+        return Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                reducedMotion
+                    ? 'Reduced motion: enabled. Non-essential animation is suppressed.'
+                    : 'Motion follows state transitions and remains descriptive.',
+              ),
+            ),
+            Switch(value: reducedMotion, onChanged: onReducedMotionChanged),
+          ],
+        );
+      default:
+        return const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Accessibility'),
+            SizedBox(height: 10),
+            Text('Contrast • keyboard • focus • semantics • reduced motion • responsive layout'),
+          ],
+        );
+    }
+  }
 }
