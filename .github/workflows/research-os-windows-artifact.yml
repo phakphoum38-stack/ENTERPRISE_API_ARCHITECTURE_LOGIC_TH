@@ -76,6 +76,17 @@ jobs:
           Get-ChildItem -Path $source -Force | ForEach-Object {
             Copy-Item $_.FullName -Destination $workspace -Recurse -Force
           }
+
+          # The app uses a sibling path dependency for the shared contracts package.
+          $packageSource = Join-Path $env:GITHUB_WORKSPACE 'packages\\research_os_contracts'
+          $packageTarget = Join-Path (Split-Path (Split-Path $workspace -Parent) -Parent) 'packages\\research_os_contracts'
+          if (-not (Test-Path (Join-Path $packageSource 'pubspec.yaml') -PathType Leaf)) {
+            throw 'Shared Research OS contracts package is missing.'
+          }
+          if (Test-Path $packageTarget) { Remove-Item $packageTarget -Recurse -Force }
+          New-Item -ItemType Directory -Path $packageTarget -Force | Out-Null
+          Copy-Item "$packageSource\\*" $packageTarget -Recurse -Force
+
           Set-Location $workspace
           flutter config --enable-windows-desktop
           flutter create --platforms=windows --project-name=$env:APP_PROJECT_NAME .
