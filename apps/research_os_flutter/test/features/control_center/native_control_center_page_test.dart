@@ -62,6 +62,7 @@ void main() {
     expect(find.text('Resources'), findsOneWidget);
     expect(find.text('Control'), findsOneWidget);
     expect(find.text('Design'), findsOneWidget);
+    expect(find.text('Files / Code'), findsOneWidget);
     expect(find.text('LIVE'), findsNWidgets(2));
     expect(find.text('ROOT Closure Mesh'), findsOneWidget);
     expect(find.text('CLOSED 0/15'), findsOneWidget);
@@ -87,6 +88,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Native Design Studio'), findsOneWidget);
     expect(find.text('Canvas'), findsOneWidget);
+
+    final files = find.text('Files / Code');
+    await tester.ensureVisible(files);
+    await tester.tap(files);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Source buffer'), findsOneWidget);
+    expect(find.text('Authority boundary'), findsOneWidget);
 
     final friendAction = find.widgetWithText(OutlinedButton, 'Friend');
     expect(friendAction, findsOneWidget);
