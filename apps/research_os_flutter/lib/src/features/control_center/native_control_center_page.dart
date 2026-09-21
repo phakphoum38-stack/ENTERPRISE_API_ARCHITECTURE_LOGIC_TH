@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../api/research_os_api_client.dart';
+import 'file_code_workspace.dart';
 import 'root_closure_panel.dart';
 
 class NativeControlCenterPage extends StatefulWidget {
@@ -41,7 +42,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 10, vsync: this);
+    _tabs = TabController(length: 11, vsync: this);
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -141,6 +142,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       'Inspect object': 5,
       'Show failures': 6,
       'Show resources': 7,
+      'Files / Code': 10,
     }[value];
     if (tab != null) {
       _tabs.index = tab;
@@ -309,6 +311,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                 ),
                 const _ControlBoundary(),
                 _DesignStudio(),
+                const FileCodeWorkspace(),
                 ],
               ),
             ),
@@ -340,6 +343,7 @@ class _ControlCenterNavigation extends StatelessWidget {
     (label: 'Resources', icon: Icons.memory_outlined),
     (label: 'Control', icon: Icons.lock_outline),
     (label: 'Design', icon: Icons.palette_outlined),
+    (label: 'Files / Code', icon: Icons.folder_code_outlined),
   ];
 
   @override
