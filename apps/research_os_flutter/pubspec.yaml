@@ -12,6 +12,7 @@ dependencies:
   research_os_contracts:
     path: ../../packages/research_os_contracts
   flutter_markdown: ^0.7.3
+  file_picker: ^8.1.7
   flutter_tts: ^4.2.5
   http: ^1.2.2
   shared_preferences: ^2.5.3
