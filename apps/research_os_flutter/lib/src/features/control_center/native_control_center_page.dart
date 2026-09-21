@@ -18,7 +18,7 @@ class NativeControlCenterPage extends StatefulWidget {
 }
 
 class _NativeControlCenterPageState extends State<NativeControlCenterPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final TabController _tabs;
   late final AnimationController _pulse;
   final _commandController = TextEditingController();
