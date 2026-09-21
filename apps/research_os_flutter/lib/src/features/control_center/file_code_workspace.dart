@@ -15,7 +15,7 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
   final _path = TextEditingController();
   final _content = TextEditingController();
   String _kind = 'TEXT';
-  String? _sha256;
+  String? _fingerprint;
   String? _error;
   bool _readOnly = true;
 
@@ -47,7 +47,7 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
   Future<void> _openFile() async {
     setState(() {
       _error = null;
-      _sha256 = null;
+      _fingerprint = null;
     });
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -66,14 +66,14 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
       _path.text = file.path ?? file.name;
       _content.text = content;
       _kind = _detectKind(file.name);
-      _sha256 = _sha256Hex(bytes);
+      _fingerprint = _localFingerprint(bytes);
       _readOnly = true;
     });
   }
 
-  String _sha256Hex(List<int> bytes) {
-    // A deterministic content fingerprint is shown only as a local preview
-    // identity; it is not a Git blob SHA and never substitutes for evidence.
+  String _localFingerprint(List<int> bytes) {
+    // A deterministic local preview fingerprint; it is not a Git object SHA
+    // or artifact SHA-256 and never substitutes for evidence.
     var h = 0xcbf29ce484222325;
     for (final byte in bytes) {
       h ^= byte;
@@ -151,10 +151,10 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
                   children: <Widget>[
                     Chip(label: Text(_kind)),
                     if (_content.text.isNotEmpty) Chip(label: Text('$lineCount lines')),
-                    if (_sha256 != null)
+                    if (_fingerprint != null)
                       Chip(
                         avatar: const Icon(Icons.fingerprint, size: 17),
-                        label: Text('local fingerprint: $_sha256'),
+                        label: Text('local fingerprint: $_fingerprint'),
                       ),
                   ],
                 ),
