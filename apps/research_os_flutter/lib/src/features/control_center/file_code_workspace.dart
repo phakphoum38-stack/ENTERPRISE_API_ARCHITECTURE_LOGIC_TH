@@ -212,6 +212,40 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
         ),
         const SizedBox(height: 12),
         Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(children: <Widget>[
+                  const Icon(Icons.account_tree_outlined),
+                  const SizedBox(width: 8),
+                  Text('Forensic lineage', style: Theme.of(context).textTheme.titleMedium),
+                ]),
+                const SizedBox(height: 10),
+                const Text('Project → Repository → Branch → PR → SHA → Blob → File → Symbol → Consumer'),
+                const SizedBox(height: 8),
+                const Wrap(
+                  spacing: 8, runSpacing: 8,
+                  children: <Widget>[
+                    Chip(label: Text('PROJECT UNKNOWN')),
+                    Chip(label: Text('REPOSITORY UNKNOWN')),
+                    Chip(label: Text('BRANCH UNKNOWN')),
+                    Chip(label: Text('PR UNKNOWN')),
+                    Chip(label: Text('COMMIT SHA UNKNOWN')),
+                    Chip(label: Text('BLOB SHA UNKNOWN')),
+                    Chip(label: Text('SYMBOL UNKNOWN')),
+                    Chip(label: Text('CONSUMER UNKNOWN')),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text('Local file selection does not prove Git lineage. Authoritative lineage must come from repository evidence.'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
           child: ListTile(
             leading: const Icon(Icons.shield_outlined),
             title: const Text('Authority boundary'),
