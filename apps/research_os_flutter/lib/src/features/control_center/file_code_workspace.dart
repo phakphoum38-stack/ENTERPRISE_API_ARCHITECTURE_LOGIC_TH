@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class FileCodeWorkspace extends StatefulWidget {
   const FileCodeWorkspace({super.key});
@@ -107,7 +106,7 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    const Icon(Icons.folder_code_outlined, size: 30),
+                    const Icon(Icons.folder_open_outlined, size: 30),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
