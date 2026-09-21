@@ -25,6 +25,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   final _commandFocus = FocusNode();
   bool _loading = false;
   bool _simulation = false;
+  int _selectedTab = 0;
   Map<String, dynamic>? _health, _brain, _providers, _agents;
   final List<String> _activity = <String>[
     'Control Center initialized',
@@ -96,6 +97,11 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     setState(() {});
   }
 
+  void _selectTab(int index) {
+    _tabs.index = index;
+    if (mounted) setState(() => _selectedTab = index);
+  }
+
   void _commandRun(String raw) {
     final value = raw.trim();
     if (value.isEmpty) return;
@@ -122,7 +128,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       return;
     }
     if (value == 'Design Studio') {
-      _tabs.index = 9;
+      _selectTab(9);
       setState(() => _activity.insert(0, 'Design Studio opened'));
       return;
     }
@@ -145,7 +151,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       'Files / Code': 10,
     }[value];
     if (tab != null) {
-      _tabs.index = tab;
+      _selectTab(tab);
       setState(() => _activity.insert(0, '$value opened'));
       return;
     }
@@ -250,13 +256,13 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
             ),
           _ControlCenterNavigation(
             controller: _tabs,
-            onSelected: (index) => _tabs.index = index,
+            onSelected: _selectTab,
           ),
           Expanded(
             child: AnimatedBuilder(
               animation: _tabs,
               builder: (context, _) => IndexedStack(
-                index: _tabs.index,
+                index: _selectedTab,
                 children: <Widget>[
                 _Overview(
                   onNavigate: widget.onNavigate,
