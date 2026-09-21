@@ -136,6 +136,7 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "v3/research_os_v3/execution.py:FactoryExecutionEngine",
         "v3/research_os_v3/execution.py",
         "v3/research_os_v3/execution.py",
+        "v3/research_os_v3/execution.py",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
         "PARTIAL",
         "V3 execution is canonical for V3; Control Center must delegate rather than duplicate it.",
