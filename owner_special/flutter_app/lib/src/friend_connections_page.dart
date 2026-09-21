@@ -176,9 +176,15 @@ class _FriendConnectionsPageState extends State<FriendConnectionsPage> {
                     endpoint: endpoint.text.trim(),
                     locked: locked,
                   );
-                  if (context.mounted) Navigator.pop(context, true);
+                  if (context.mounted) {
+                    Navigator.pop(context, true);
+                  }
                 } catch (error) {
-                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$error')),
+                    );
+                  }
                 }
               },
               child: const Text('Save'),
