@@ -120,7 +120,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       return;
     }
     if (value == 'Design Studio') {
-      _tabs.animateTo(9);
+      _tabs.index = 9;
       setState(() => _activity.insert(0, 'Design Studio opened'));
       return;
     }
@@ -142,7 +142,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       'Show resources': 7,
     }[value];
     if (tab != null) {
-      _tabs.animateTo(tab);
+      _tabs.index = tab;
       setState(() => _activity.insert(0, '$value opened'));
       return;
     }
