@@ -153,7 +153,7 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "current/NATIVE_CONTROL_SURFACE_CONTRACT.json",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
         "PARTIAL",
-        "Evidence exists in canonical runtimes, but a universal cross-engine evidence binding is not yet established on main.",
+        "Evidence exists in canonical runtimes, but a universal cross-engine evidence binding is not yet established.",
     ),
 )
 
