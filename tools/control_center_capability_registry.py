@@ -121,6 +121,7 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "tools/research_os_api/github_status.py",
         "tools/research_os_api/github_status.py",
         "tools/research_os_api/github_status.py",
+        "tools/research_os_api/github_status.py",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
         "PARTIAL",
         "GitHub inspection is present; canonical command→workflow execution is a separate binding gap.",
