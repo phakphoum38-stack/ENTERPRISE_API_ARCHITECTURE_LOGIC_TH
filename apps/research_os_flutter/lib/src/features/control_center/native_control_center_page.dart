@@ -262,9 +262,11 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
             ],
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabs,
-              children: <Widget>[
+            child: AnimatedBuilder(
+              animation: _tabs,
+              builder: (context, _) => IndexedStack(
+                index: _tabs.index,
+                children: <Widget>[
                 _Overview(
                   onNavigate: widget.onNavigate,
                   health: _health,
@@ -318,7 +320,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                 ),
                 const _ControlBoundary(),
                 _DesignStudio(),
-              ],
+                ],
+              ),
             ),
           ),
         ],
