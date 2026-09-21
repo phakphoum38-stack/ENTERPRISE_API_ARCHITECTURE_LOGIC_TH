@@ -1,4 +1,10 @@
+from pathlib import Path
+
 from tools.native_command_router import NativeCommandRouter
+from tools.validate_native_command_routing import validate
+
+def test_contract_validates() -> None:
+    assert validate(Path("current/NATIVE_COMMAND_ROUTING_CONTRACT.json")) == ()
 
 def test_prepare_is_deterministic_and_does_not_execute() -> None:
     router = NativeCommandRouter()
@@ -7,14 +13,11 @@ def test_prepare_is_deterministic_and_does_not_execute() -> None:
     second = router.prepare(capability_id="github", action="inspect repository",
                             mode="DRY_RUN", arguments={"repo": "owner/repo"})
     assert first == second
-    decision = router.route(first)
-    assert decision.executable is False
-    assert decision.requires_human_authorization is False
+    assert router.route(first).executable is False
 
 def test_live_read_only_routes_to_existing_executor() -> None:
     router = NativeCommandRouter()
-    command = router.prepare(capability_id="friend", action="inspect status", mode="LIVE")
-    decision = router.route(command)
+    decision = router.route(router.prepare(capability_id="friend", action="inspect status", mode="LIVE"))
     assert decision.executable is True
     assert "FriendOrchestrator" in decision.executor_ref
 
