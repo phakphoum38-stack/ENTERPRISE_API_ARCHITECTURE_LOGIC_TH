@@ -16,6 +16,21 @@ abstract class OwnerFriendApi {
   Future<Map<String, dynamic>> signOut() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS sign-out is not implemented by this API client'));
   void setSession(String token) {}
   void clearSession() {}
+  Future<Map<String, dynamic>> researchGet(
+    String path, {
+    Map<String, String>? query,
+    Map<String, String>? headers,
+  }) => Future<Map<String, dynamic>>.error(
+    UnsupportedError('Research OS GET is not implemented by this API client'),
+  );
+
+  Future<Map<String, dynamic>> researchPost(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) => Future<Map<String, dynamic>>.error(
+    UnsupportedError('Research OS POST is not implemented by this API client'),
+  );
 }
 
 OwnerFriendApi? _activeOwnerFriendApi;
@@ -87,6 +102,32 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
 
   @override
   void clearSession() => _sessionToken = null;
+
+  @override
+  Future<Map<String, dynamic>> researchGet(
+    String path, {
+    Map<String, String>? query,
+    Map<String, String>? headers,
+  }) =>
+      _researchJsonRequest(
+        'GET',
+        path,
+        query: query,
+        headers: headers,
+      );
+
+  @override
+  Future<Map<String, dynamic>> researchPost(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) =>
+      _researchJsonRequest(
+        'POST',
+        path,
+        headers: headers,
+        body: body,
+      );
 
   Stream<Map<String, dynamic>> launchDesk(String text) async* {
     final client = HttpClient();
@@ -181,6 +222,43 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
       request.contentLength = 2;
       request.add(const <int>[123, 125]);
+      final response = await request.close().timeout(timeout);
+      return await _decodeResponse(response, uri, timeout);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _researchJsonRequest(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+  }) async {
+    final client = HttpClient();
+    final base = Uri.parse('$researchOsBaseUrl$path');
+    final uri = query == null || query.isEmpty
+        ? base
+        : base.replace(queryParameters: query);
+    try {
+      final request = method == 'POST'
+          ? await client.postUrl(uri).timeout(timeout)
+          : await client.getUrl(uri).timeout(timeout);
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      if (_sessionToken != null) {
+        request.headers.set('X-Research-OS-Session', _sessionToken!);
+      }
+      headers?.forEach(request.headers.set);
+      if (body != null) {
+        final payload = utf8.encode(jsonEncode(body));
+        request.headers.set(
+          HttpHeaders.contentTypeHeader,
+          'application/json; charset=utf-8',
+        );
+        request.contentLength = payload.length;
+        request.add(payload);
+      }
       final response = await request.close().timeout(timeout);
       return await _decodeResponse(response, uri, timeout);
     } finally {
