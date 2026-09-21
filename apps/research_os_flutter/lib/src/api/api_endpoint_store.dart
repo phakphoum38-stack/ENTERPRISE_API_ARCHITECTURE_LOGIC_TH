@@ -5,11 +5,9 @@ class ApiEndpointStore {
 
   static const _storageKey = 'research_os_api_base_url_v1';
   static const localDefault = 'http://127.0.0.1:8787';
-  static const renderDefault = 'https://research-os-api-phakphoum.onrender.com';
-
   static const buildDefault = String.fromEnvironment(
     'RESEARCH_OS_API_BASE_URL',
-    defaultValue: renderDefault,
+    defaultValue: localDefault,
   );
 
   static Future<String> load() async {
@@ -18,13 +16,6 @@ class ApiEndpointStore {
     if (saved == null || saved.isEmpty) return normalize(buildDefault);
 
     final normalized = normalize(saved);
-    // Older Windows builds persisted the development loopback endpoint.
-    // Release builds should migrate that stale value to the public API so a
-    // fresh install can start without a locally running Research OS server.
-    if (normalized == localDefault && buildDefault != localDefault) {
-      await prefs.setString(_storageKey, buildDefault);
-      return normalize(buildDefault);
-    }
     return normalized;
   }
 
