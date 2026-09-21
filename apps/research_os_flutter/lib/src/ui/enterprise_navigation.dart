@@ -24,6 +24,7 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
   ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
   ResearchNavItem('Account', 'Google Sign-In', Icons.account_circle_outlined, 12),
+  ResearchNavItem('Control', 'Control Center', Icons.tune_outlined, 14),
 ];
 
 class ResearchSidebar extends StatelessWidget {
