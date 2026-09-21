@@ -150,6 +150,7 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
         "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
         "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
+        "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
         "current/NATIVE_CONTROL_SURFACE_CONTRACT.json",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
         "PARTIAL",
