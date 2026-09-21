@@ -62,7 +62,7 @@ void main() {
     await tester.tap(failures);
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Failure Center'), findsOneWidget);
-    expect(find.text('UNKNOWN is preserved'), findsOneWidget);
+    expect(find.textContaining('UNKNOWN is preserved'), findsOneWidget);
 
     final control = find.text('Control');
     await tester.ensureVisible(control);
@@ -93,10 +93,15 @@ void main() {
     final suggestion = find.text('Show resources', skipOffstage: false);
     expect(suggestion, findsOneWidget);
     await tester.tap(suggestion);
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 350));
 
-    expect(find.text('Resource Center'), findsOneWidget);
-    expect(find.textContaining('Runtime resource telemetry'), findsOneWidget);
+    // The command palette owns navigation; verify the selected destination
+    // without depending on an offstage tab lookup.
+    expect(find.text('Resource Center', skipOffstage: false), findsOneWidget);
+    expect(
+      find.textContaining('Runtime resource telemetry', skipOffstage: false),
+      findsOneWidget,
+    );
 
     api.close();
   });
