@@ -42,7 +42,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: NativeControlCenterPage(apiClient: api)),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.text('Control Center'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
