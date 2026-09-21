@@ -320,6 +320,7 @@ class _Overview extends StatelessWidget {
     super.key,
     required this.health,
     required this.brain,
+    required this.skills,
     required this.providers,
     required this.agents,
     required this.simulation,
