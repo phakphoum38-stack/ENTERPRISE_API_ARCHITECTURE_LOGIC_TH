@@ -165,11 +165,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         icon: const Icon(Icons.computer_outlined),
                         label: const Text('Local 127.0.0.1'),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: _savingEndpoint ? null : () => _saveEndpoint(ApiEndpointStore.renderDefault),
-                        icon: const Icon(Icons.cloud_outlined),
-                        label: const Text('Render'),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
