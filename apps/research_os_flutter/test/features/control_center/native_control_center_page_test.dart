@@ -39,13 +39,19 @@ class _FakeClient extends http.BaseClient {
 void main() {
   testWidgets('Control Center exposes the live operating environment',
       (tester) async {
+    var navigated = -1;
     final api = ResearchOSApiClient(
       baseUrl: 'http://127.0.0.1:8787',
       client: _FakeClient(),
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: NativeControlCenterPage(apiClient: api)),
+      MaterialApp(
+        home: NativeControlCenterPage(
+          apiClient: api,
+          onNavigate: (index) => navigated = index,
+        ),
+      ),
     );
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -55,6 +61,7 @@ void main() {
     expect(find.text('Failures'), findsOneWidget);
     expect(find.text('Resources'), findsOneWidget);
     expect(find.text('Control'), findsOneWidget);
+    expect(find.text('Design'), findsOneWidget);
     expect(find.text('LIVE'), findsNWidgets(2));
 
     final failures = find.text('Failures');
@@ -69,6 +76,13 @@ void main() {
     await tester.tap(control);
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Human authority required'), findsOneWidget);
+
+    final design = find.text('Design');
+    await tester.ensureVisible(design);
+    await tester.tap(design);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Native Design Studio'), findsOneWidget);
+    expect(find.text('Canvas'), findsOneWidget);
 
     api.close();
   });
