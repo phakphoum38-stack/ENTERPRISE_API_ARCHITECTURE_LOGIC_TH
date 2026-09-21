@@ -6,9 +6,9 @@ import 'contracts/owner_friend_capability_adapter.dart';
 import 'contracts/owner_research_capability_adapter.dart';
 import 'package:research_os_contracts/research_os_contracts.dart';
 import 'friend_module_shell.dart';
-import 'friend_connections_page.dart';
 import 'friend_theme.dart';
 import 'google_identity_page.dart';
+import 'github_workbench_page.dart';
 import 'launch_desk_page.dart';
 import 'mission_control_desktop_page.dart';
 import 'native_core_workspace_page.dart';
@@ -48,7 +48,7 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
       _ProviderPage(api: widget.api),
       _TeamPage(team: _currentTeam),
       GoogleIdentityPage(api: widget.api),
-      FriendConnectionsPage(api: widget.api),
+      const GitHubWorkbenchPage(),
     ];
 
     return MaterialApp(
