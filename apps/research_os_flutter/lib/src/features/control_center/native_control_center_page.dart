@@ -217,6 +217,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
+              focusNode: _commandFocus,
               controller: _command,
               onChanged: (_) => setState(() {}),
               onSubmitted: _commandRun,
@@ -314,6 +315,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                   message:
                       'Runtime resource telemetry is not exposed by the current API. UNKNOWN is preserved.',
                 ),
+                const _ControlBoundary(),
                 _DesignStudio(),
               ],
             ),
@@ -336,7 +338,6 @@ class _Overview extends StatelessWidget {
     required this.simulation,
     required this.pulse,
   });
-  final ValueChanged<int>? onNavigate;
   final ValueChanged<int>? onNavigate;
   final Map<String, dynamic>? health, brain, providers, agents;
   final bool simulation;
