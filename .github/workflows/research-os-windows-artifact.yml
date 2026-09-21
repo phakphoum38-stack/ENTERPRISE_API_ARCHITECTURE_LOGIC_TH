@@ -9,6 +9,7 @@ on:
       - fix/friend-github-tool
     paths:
       - "apps/research_os_flutter/**"
+      - "apps/research_os_flutter/**"
       - "packages/research_os_contracts/**"
       - ".github/workflows/research-os-windows-artifact.yml"
 
@@ -71,22 +72,10 @@ jobs:
         shell: pwsh
         run: |
           $repoWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
-          $appWorkspace = Join-Path $repoWorkspace 'appsesearch_os_flutter'
-          $contractsWorkspace = Join-Path $repoWorkspace 'packagesesearch_os_contracts'
-          if (Test-Path $repoWorkspace) { Remove-Item $repoWorkspace -Recurse -Force }
-          New-Item -ItemType Directory -Path $appWorkspace -Force | Out-Null
-          New-Item -ItemType Directory -Path $contractsWorkspace -Force | Out-Null
+          & "$env:GITHUB_WORKSPACE/tools/ci/prepare_flutter_isolated_workspace.ps1" -RepositoryRoot $env:GITHUB_WORKSPACE -AppRelativePath 'apps/research_os_flutter' -WorkspaceRoot $repoWorkspace
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter workspace preparation failed.' }
 
-          $source = Join-Path $env:GITHUB_WORKSPACE 'apps/research_os_flutter'
-          Get-ChildItem -Path $source -Force | ForEach-Object {
-            Copy-Item $_.FullName -Destination $appWorkspace -Recurse -Force
-          }
-
-          $contractsSource = Join-Path $env:GITHUB_WORKSPACE 'packages/research_os_contracts'
-          Get-ChildItem -Path $contractsSource -Force | ForEach-Object {
-            Copy-Item $_.FullName -Destination $contractsWorkspace -Recurse -Force
-          }
-
+          $appWorkspace = Join-Path $repoWorkspace 'apps\research_os_flutter'
           Set-Location $appWorkspace
           flutter config --enable-windows-desktop
           flutter create --platforms=windows --project-name=$env:APP_PROJECT_NAME .
@@ -94,22 +83,18 @@ jobs:
           if (-not (Test-Path 'windows/CMakeLists.txt')) { throw 'Isolated Windows CMakeLists.txt was not generated.' }
           if (-not (Test-Path 'windows/runner/main.cpp')) { throw 'Isolated Windows runner was not generated.' }
           if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Isolated Windows identity file was not generated.' }
-          if (-not (Test-Path (Join-Path $repoWorkspace 'packages/research_os_contracts/pubspec.yaml'))) { throw 'Isolated research_os_contracts package was not copied.' }
           Write-Host 'RESEARCH_OS_ISOLATED_WINDOWS_BOOTSTRAP=PASS'
-          Write-Host 'RESEARCH_OS_ISOLATED_PACKAGE_PATH=PASS'
-
       - name: Apply Research OS Windows branding in isolated workspace
         shell: pwsh
         run: |
-          $repoWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
-          $appWorkspace = Join-Path $repoWorkspace 'appsesearch_os_flutter'
-          Set-Location $appWorkspace
-          $mainCpp = 'windowsunnermain.cpp'
+          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
+          Set-Location $workspace
+          $mainCpp = 'windows\runner\main.cpp'
           $mainText = Get-Content $mainCpp -Raw
           $mainText = $mainText -replace 'Create\(L"research_os_flutter"', 'Create(L"Research OS"'
           Set-Content -Path $mainCpp -Value $mainText -Encoding utf8
 
-          $runnerRc = 'windowsunnerRunner.rc'
+          $runnerRc = 'windows\runner\Runner.rc'
           $rc = Get-Content $runnerRc -Raw
           $rc = $rc -replace 'VALUE "CompanyName", ".*?"', 'VALUE "CompanyName", "Research OS Team"'
           $rc = $rc -replace 'VALUE "FileDescription", ".*?"', 'VALUE "FileDescription", "Research OS"'
@@ -128,9 +113,8 @@ jobs:
       - name: Build isolated Research OS Windows release
         shell: pwsh
         run: |
-          $repoWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
-          $appWorkspace = Join-Path $repoWorkspace 'appsesearch_os_flutter'
-          Set-Location $appWorkspace
+          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
+          Set-Location $workspace
           flutter pub get
           if ($LASTEXITCODE -ne 0) { throw 'Research OS isolated flutter pub get failed.' }
           flutter build windows --release
@@ -159,8 +143,7 @@ jobs:
           Desktop commit: $env:GITHUB_SHA
           Identity isolation gate: PASS
           UI gate: flutter analyze + full tests + desktop shell test
-          Windows bootstrap: isolated temporary repository workspace
-          Isolated package path: packages/research_os_contracts
+          Windows bootstrap: isolated temporary workspace only
           Windows branding: Research OS / Research OS Team
           "@ | Set-Content (Join-Path $stage 'RESEARCH_OS_BUILD_INFO.txt') -Encoding utf8
 
