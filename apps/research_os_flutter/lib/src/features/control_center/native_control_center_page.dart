@@ -245,21 +245,9 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                     .toList(),
               ),
             ),
-          TabBar(
+          _ControlCenterNavigation(
             controller: _tabs,
-            isScrollable: true,
-            tabs: const <Tab>[
-              Tab(text: 'Overview', icon: Icon(Icons.dashboard_outlined)),
-              Tab(text: 'Activity', icon: Icon(Icons.timeline_outlined)),
-              Tab(text: 'State', icon: Icon(Icons.account_tree_outlined)),
-              Tab(text: 'System Map', icon: Icon(Icons.hub_outlined)),
-              Tab(text: 'Evidence', icon: Icon(Icons.fact_check_outlined)),
-              Tab(text: 'Inspector', icon: Icon(Icons.manage_search_outlined)),
-              Tab(text: 'Failures', icon: Icon(Icons.warning_amber_outlined)),
-              Tab(text: 'Resources', icon: Icon(Icons.memory_outlined)),
-              Tab(text: 'Control', icon: Icon(Icons.lock_outline)),
-              Tab(text: 'Design', icon: Icon(Icons.palette_outlined)),
-            ],
+            onSelected: (index) => _tabs.index = index,
           ),
           Expanded(
             child: AnimatedBuilder(
@@ -329,6 +317,87 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
         ),
     );
   }
+}
+
+class _ControlCenterNavigation extends StatelessWidget {
+  const _ControlCenterNavigation({
+    required this.controller,
+    required this.onSelected,
+  });
+
+  final TabController controller;
+  final ValueChanged<int> onSelected;
+
+  static const _items = <({String label, IconData icon})>[
+    (label: 'Overview', icon: Icons.dashboard_outlined),
+    (label: 'Activity', icon: Icons.timeline_outlined),
+    (label: 'State', icon: Icons.account_tree_outlined),
+    (label: 'System Map', icon: Icons.hub_outlined),
+    (label: 'Evidence', icon: Icons.fact_check_outlined),
+    (label: 'Inspector', icon: Icons.manage_search_outlined),
+    (label: 'Failures', icon: Icons.warning_amber_outlined),
+    (label: 'Resources', icon: Icons.memory_outlined),
+    (label: 'Control', icon: Icons.lock_outline),
+    (label: 'Design', icon: Icons.palette_outlined),
+  ];
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) => Material(
+          color: Theme.of(context).colorScheme.surface,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: _items.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                final selected = controller.index == index;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Semantics(
+                    button: true,
+                    selected: selected,
+                    label: item.label,
+                    child: Material(
+                      color: selected
+                          ? Theme.of(context).colorScheme.secondaryContainer
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => onSelected(index),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Icon(item.icon, size: 19),
+                              const SizedBox(width: 7),
+                              Text(
+                                item.label,
+                                style: TextStyle(
+                                  fontWeight: selected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      );
 }
 
 class _Overview extends StatelessWidget {
