@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../api/research_os_api_client.dart';
+import 'root_closure_panel.dart';
 
 class NativeControlCenterPage extends StatefulWidget {
   const NativeControlCenterPage({required this.apiClient, this.onNavigate, super.key});
@@ -462,7 +463,9 @@ class _Overview extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        RootClosurePanel(runtimeObserved: health != null),
+        const SizedBox(height: 16),
         Wrap(
           spacing: 12,
           runSpacing: 12,
