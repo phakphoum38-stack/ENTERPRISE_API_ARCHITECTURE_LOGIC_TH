@@ -353,7 +353,10 @@ class _ControlCenterNavigation extends StatelessWidget {
           color: Theme.of(context).colorScheme.surface,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Wrap(
+            child: SizedBox(
+              height: 156,
+              child: SingleChildScrollView(
+                child: Wrap(
               spacing: 4,
               runSpacing: 4,
               children: List<Widget>.generate(_items.length, (index) {
