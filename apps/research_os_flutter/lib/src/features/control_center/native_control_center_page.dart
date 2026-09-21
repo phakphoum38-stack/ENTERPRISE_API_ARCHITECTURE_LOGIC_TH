@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -21,6 +23,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     with TickerProviderStateMixin {
   late final TabController _tabs;
   late final AnimationController _pulse;
+  late final Timer _refreshTimer;
   final _commandController = TextEditingController();
   final _commandFocus = FocusNode();
 
@@ -62,10 +65,14 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       upperBound: 1,
     )..repeat(reverse: true);
     _refresh();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!_simulation) _refresh();
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer.cancel();
     _tabs.dispose();
     _pulse.dispose();
     _commandController.dispose();
