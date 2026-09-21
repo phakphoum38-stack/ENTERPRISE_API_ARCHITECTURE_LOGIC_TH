@@ -62,7 +62,9 @@ class _FriendConnectionsPageState extends State<FriendConnectionsPage> {
     if (widget.api is HttpOwnerFriendApi) {
       (widget.api as HttpOwnerFriendApi).setResearchOsBaseUrl(value);
     }
-    if (mounted) setState(() => _message = 'Research OS API URL saved locally');
+    if (mounted) {
+      setState(() => _message = 'Research OS API URL saved locally');
+    }
   }
 
   Future<void> _saveConnection({
@@ -139,7 +141,7 @@ class _FriendConnectionsPageState extends State<FriendConnectionsPage> {
                   TextFormField(controller: username, decoration: const InputDecoration(labelText: 'Username'), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
                   TextFormField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Password', helperText: 'Stored in OS secure storage; never returned by the API.')),
                   DropdownButtonFormField<String>(
-                    value: transport,
+                    initialValue: transport,
                     decoration: const InputDecoration(labelText: 'Transport'),
                     items: const [
                       DropdownMenuItem(value: 'auto', child: Text('AUTO — Direct → HTTP')),
