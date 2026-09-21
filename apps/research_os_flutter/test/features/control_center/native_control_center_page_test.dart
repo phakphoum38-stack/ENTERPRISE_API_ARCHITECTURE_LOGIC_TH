@@ -55,7 +55,7 @@ void main() {
     expect(find.text('Failures'), findsOneWidget);
     expect(find.text('Resources'), findsOneWidget);
     expect(find.text('Control'), findsOneWidget);
-    expect(find.text('LIVE'), findsOneWidget);
+    expect(find.text('LIVE'), findsNWidgets(2));
 
     await tester.tap(find.text('Failures'));
     await tester.pumpAndSettle();
@@ -81,9 +81,14 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
 
-    await tester.enterText(find.byType(TextField), 'show resources');
-    expect(find.text('Show resources'), findsOneWidget);
-    await tester.tap(find.text('Show resources'));
+    final commandField = find.byType(TextField);
+    expect(commandField, findsOneWidget);
+    await tester.enterText(commandField, 'show resources');
+    await tester.pump();
+
+    final suggestion = find.text('Show resources', skipOffstage: false);
+    expect(suggestion, findsOneWidget);
+    await tester.tap(suggestion);
     await tester.pumpAndSettle();
 
     expect(find.text('Resource Center'), findsOneWidget);
