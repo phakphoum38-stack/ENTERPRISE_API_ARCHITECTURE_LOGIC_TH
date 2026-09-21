@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:research_os_contracts/research_os_contracts.dart';
 
 import 'owner_api.dart';
+import 'control_center_engines.dart';
 
 class NativeCoreWorkspacePage extends StatefulWidget {
   const NativeCoreWorkspacePage({required this.api, this.runtimeCapability, this.onNavigate, super.key});
@@ -28,6 +29,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     'Human authority boundary active',
   ];
   int _livePulse = 0;
+  final ResearchOSEngineHub _engines = ResearchOSEngineHub();
 
   static const commands = <String>[
     'Open Research', 'Open Friend', 'Open Runtime', 'Open Evidence',
@@ -71,6 +73,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     final command = value.trim();
     if (command.isEmpty) return;
     _command.clear();
+    _engines.control.dispatch(ControlCommand(command));
     if (command == 'Refresh runtime') {
       _load();
       return;
@@ -78,6 +81,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
     if (command == 'Simulation mode') {
       setState(() {
         _simulation = !_simulation;
+        _engines.control.setMode(_simulation ? ControlMode.simulation : ControlMode.live);
         _events.insert(0, _simulation ? 'Simulation mode enabled' : 'Simulation mode disabled');
       });
       _tabs.animateTo(0);
@@ -118,6 +122,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
                 selected: _simulation,
                 onSelected: (value) => setState(() {
                   _simulation = value;
+                  _engines.control.setMode(value ? ControlMode.simulation : ControlMode.live);
                   _events.insert(0, value ? 'Simulation mode enabled' : 'Simulation mode disabled');
                 }),
                 avatar: const Icon(Icons.science_outlined, size: 17),
@@ -182,7 +187,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
             ]),
             const SizedBox(height: 8),
             Expanded(child: TabBarView(controller: _tabs, children: [
-              _Overview(key: ValueKey('overview-$_livePulse'), status: _status, simulation: _simulation),
+              _Overview(key: ValueKey('overview-$_livePulse'), status: _status, simulation: _simulation, engines: _engines),
               _Activity(events: _events),
               _StateView(status: _status),
               _SystemMap(status: _status),
@@ -197,6 +202,7 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
               _HistoryView(events: _events),
               _Simulation(enabled: _simulation, onToggle: (value) => setState(() {
                 _simulation = value;
+                _engines.control.setMode(value ? ControlMode.simulation : ControlMode.live);
                 _events.insert(0, value ? 'Simulation mode enabled' : 'Simulation mode disabled');
               })),
             ])),
@@ -208,9 +214,10 @@ class _NativeCoreWorkspacePageState extends State<NativeCoreWorkspacePage>
 }
 
 class _Overview extends StatelessWidget {
-  const _Overview({super.key, required this.status, required this.simulation});
+  const _Overview({super.key, required this.status, required this.simulation, required this.engines});
   final Map<String, dynamic>? status;
   final bool simulation;
+  final ResearchOSEngineHub engines;
 
   @override
   Widget build(BuildContext context) {
@@ -238,8 +245,58 @@ class _Overview extends StatelessWidget {
       const SizedBox(height: 12),
       _LiveSystemCard(online: status != null),
       const SizedBox(height: 12),
+      Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: engines.snapshot(status: status, loading: false)
+            .map((snapshot) => _EngineCard(snapshot: snapshot))
+            .toList(growable: false),
+      ),
+      const SizedBox(height: 12),
       const _BoundaryCard(),
     ]);
+  }
+}
+
+class _EngineCard extends StatelessWidget {
+  const _EngineCard({required this.snapshot});
+  final EngineSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final state = snapshot.state.name.toUpperCase();
+    return SizedBox(
+      width: 220,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Expanded(child: Text(snapshot.name, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800))),
+                Icon(
+                  snapshot.state == EngineState.ready || snapshot.state == EngineState.observed
+                      ? Icons.circle
+                      : Icons.circle_outlined,
+                  size: 10,
+                ),
+              ]),
+              const SizedBox(height: 7),
+              Text(state, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 5),
+              Text(
+                snapshot.details.entries.take(2).map((entry) => '\${entry.key}: \${entry.value}').join(' • '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
