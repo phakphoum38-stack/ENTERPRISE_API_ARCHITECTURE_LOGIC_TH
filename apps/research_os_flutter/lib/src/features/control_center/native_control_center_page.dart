@@ -27,6 +27,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   String _selectedObject = '';
   Map<String, dynamic>? _health;
   Map<String, dynamic>? _brain;
+  Map<String, dynamic>? _skills;
   Map<String, dynamic>? _providers;
   Map<String, dynamic>? _agents;
   final List<String> _events = <String>[
@@ -66,6 +67,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       final values = await Future.wait(<Future<Map<String, dynamic>>>[
         widget.apiClient.getHealth(),
         widget.apiClient.getBrainCapacity(),
+        widget.apiClient.getBrainSkills(),
         widget.apiClient.getProviders(),
         widget.apiClient.getAgents(),
       ]);
@@ -73,8 +75,9 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       setState(() {
         _health = values[0];
         _brain = values[1];
-        _providers = values[2];
-        _agents = values[3];
+        _skills = values[2];
+        _providers = values[3];
+        _agents = values[4];
         _livePulse++;
         _events.insert(0, 'Runtime state observed');
       });
@@ -206,6 +209,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                   key: ValueKey('overview-$_livePulse'),
                   health: _health,
                   brain: _brain,
+                  skills: _skills,
                   providers: _providers,
                   agents: _agents,
                   simulation: _simulation,
@@ -323,6 +327,7 @@ class _Overview extends StatelessWidget {
 
   final Map<String, dynamic>? health;
   final Map<String, dynamic>? brain;
+  final Map<String, dynamic>? skills;
   final Map<String, dynamic>? providers;
   final Map<String, dynamic>? agents;
   final bool simulation;
@@ -332,7 +337,7 @@ class _Overview extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final status = health?['status']?.toString() ?? 'UNKNOWN';
     final capabilities = (health?['capabilities'] as List?)?.length ?? 0;
-    final skills = (brain?['skills'] as List?)?.length ?? 0;
+    final skills = (_skills?['skills'] as List?)?.length ?? 0;
     final providerCount = (providers?['providers'] as List?)?.length ?? 0;
     final agentCount = (agents?['agents'] as List?)?.length ?? 0;
 
