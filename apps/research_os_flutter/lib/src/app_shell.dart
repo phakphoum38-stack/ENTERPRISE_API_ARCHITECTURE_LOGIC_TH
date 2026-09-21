@@ -62,10 +62,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         BrainSkillsPage(apiClient: widget.apiClient),
         GoogleLoginPage(apiClient: widget.apiClient),
         FriendConnectPage(apiClient: widget.apiClient),
-        NativeControlCenterPage(
-          apiClient: widget.apiClient,
-          onNavigate: _select,
-        ),
+        NativeControlCenterPage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
