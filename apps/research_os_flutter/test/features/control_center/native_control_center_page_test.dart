@@ -16,7 +16,10 @@ class _FakeClient extends http.BaseClient {
           'status': 'ok',
           'capabilities': <Object>['brain', 'evidence'],
         },
-      '/v1/brain/capacity' => <String, Object?>{'skills': <Object>['analysis']},
+      '/v1/brain/capacity' => <String, Object?>{'capacity': 36},
+      '/v1/brain/skills' => <String, Object?>{
+        'skills': <Object>['analysis'],
+      },
       '/v1/providers' => <String, Object?>{'providers': <Object>['owner-mock']},
       '/v1/agents' => <String, Object?>{'agents': <Object>['friend']},
       _ => <String, Object?>{},
@@ -44,7 +47,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Control Center'), findsOneWidget);
+    expect(find.text('Native Core Workspace'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('System Map'), findsOneWidget);
     expect(find.text('LIVE'), findsOneWidget);
