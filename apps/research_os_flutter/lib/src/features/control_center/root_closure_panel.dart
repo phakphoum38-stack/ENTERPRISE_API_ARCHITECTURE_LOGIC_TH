@@ -1,18 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum RootClosureStatus { closed, repaired, verified, blocked, unknown }
-
-class RootClosureNode {
-  const RootClosureNode({
-    required this.name,
-    required this.status,
-    required this.description,
-  });
-
-  final String name;
-  final RootClosureStatus status;
-  final String description;
-}
+import 'root_closure_model.dart';
 
 class RootClosurePanel extends StatelessWidget {
   const RootClosurePanel({
@@ -22,78 +10,78 @@ class RootClosurePanel extends StatelessWidget {
 
   final bool runtimeObserved;
 
-  List<RootClosureNode> get nodes => <RootClosureNode>[
-        const RootClosureNode(
+  List<RootClosureRecord> get nodes => <RootClosureRecord>[
+        const RootClosureRecord(
           name: 'SOURCE',
           status: RootClosureStatus.unknown,
           description: 'Authoritative repository/source identity must be bound.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'PROVENANCE',
           status: RootClosureStatus.unknown,
           description: 'Agent → run → PR → SHA lineage is not inferred from UI state.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'CHANGE',
           status: RootClosureStatus.unknown,
           description: 'Changed objects require exact-SHA correlation.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'SEMANTIC',
           status: RootClosureStatus.unknown,
           description: 'File → symbol → value → behavior semantics require evidence.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'CONSUMER',
           status: RootClosureStatus.unknown,
           description: 'Affected consumers and blast radius require lineage evidence.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'FAILURE',
           status: RootClosureStatus.unknown,
           description: 'Root versus cascade failure requires normalized CI evidence.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'REPAIR',
           status: RootClosureStatus.unknown,
           description: 'Repair must identify a bounded target and preserve authority.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'DIFF',
           status: RootClosureStatus.unknown,
           description: 'Semantic diff must explain what changed and why.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'REGRESSION',
           status: RootClosureStatus.unknown,
           description: 'Repair requires independent regression verification.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'GENERATED',
           status: RootClosureStatus.unknown,
           description: 'Generated artifacts require authoritative generation lineage.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'SUPERSEDED',
           status: RootClosureStatus.unknown,
           description: 'Superseded work must be traced before closure.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'DELETED',
           status: RootClosureStatus.unknown,
           description: 'Deleted implementations must be ruled out by lineage evidence.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'EVIDENCE',
           status: RootClosureStatus.unknown,
           description: 'Evidence must be fresh, bound, and independently verified.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'VERIFICATION',
           status: RootClosureStatus.unknown,
           description: 'Analyze/test/build results must bind to the same identity.',
         ),
-        const RootClosureNode(
+        const RootClosureRecord(
           name: 'AUTHORITY',
           status: RootClosureStatus.blocked,
           description: 'Approval, authorization, merge, and release remain external.',
