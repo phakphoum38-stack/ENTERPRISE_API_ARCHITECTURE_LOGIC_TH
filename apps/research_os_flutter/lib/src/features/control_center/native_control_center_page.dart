@@ -356,9 +356,8 @@ class _ControlCenterNavigation extends StatelessWidget {
             child: Wrap(
               spacing: 4,
               runSpacing: 4,
-              children: _items.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
+              children: List<Widget>.generate(_items.length, (index) {
+                final item = _items[index];
                 final selected = controller.index == index;
                 return Semantics(
                   button: true,
@@ -388,7 +387,7 @@ class _ControlCenterNavigation extends StatelessWidget {
                     ),
                   ),
                 ),
-              }).toList(),
+              }),
             ),
           ),
         ),
