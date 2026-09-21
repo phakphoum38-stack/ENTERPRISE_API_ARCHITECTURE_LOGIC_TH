@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../api/research_os_api_client.dart';
 
@@ -444,7 +445,7 @@ class _Overview extends StatelessWidget {
 
   ValueChanged<int>? widgetOnNavigate(BuildContext context) {
     final state = context.findAncestorStateOfType<_NativeControlCenterPageState>();
-    return state == null ? null : state.widget.onNavigate;
+    return state?.widget.onNavigate;
   }
 }
 
