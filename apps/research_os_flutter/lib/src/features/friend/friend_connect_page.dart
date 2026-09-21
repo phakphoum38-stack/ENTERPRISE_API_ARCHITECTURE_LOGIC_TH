@@ -62,7 +62,9 @@ class _FriendConnectPageState extends State<FriendConnectPage> {
     setState(() => _loadingConnections = true);
     try {
       final rows = await widget.apiClient.getFriendConnections();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _connections = rows);
       if (rows.isNotEmpty) {
         final id = rows.first['id']?.toString() ?? 'default';
