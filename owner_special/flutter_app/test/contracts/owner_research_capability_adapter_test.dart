@@ -72,6 +72,10 @@ final class _FakeOwnerApi implements OwnerFriendApi {
 
 
   @override
+  Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) async =>
+      <String, dynamic>{'exchanged': false, 'state': state};
+
+  @override
   void setSession(String token) {}
 
   @override
