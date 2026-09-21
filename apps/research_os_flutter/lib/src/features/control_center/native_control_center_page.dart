@@ -351,48 +351,46 @@ class _ControlCenterNavigation extends StatelessWidget {
         animation: controller,
         builder: (context, _) => Material(
           color: Theme.of(context).colorScheme.surface,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 4,
               children: _items.asMap().entries.map((entry) {
                 final index = entry.key;
                 final item = entry.value;
                 final selected = controller.index == index;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Semantics(
-                    button: true,
-                    selected: selected,
-                    label: item.label,
-                    child: Material(
-                      color: selected
-                          ? Theme.of(context).colorScheme.secondaryContainer
-                          : Colors.transparent,
+                return Semantics(
+                  button: true,
+                  selected: selected,
+                  label: item.label,
+                  child: Material(
+                    color: selected
+                        ? Theme.of(context).colorScheme.secondaryContainer
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => onSelected(index),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              Icon(item.icon, size: 19),
-                              const SizedBox(width: 7),
-                              Text(
-                                item.label,
-                                style: TextStyle(
-                                  fontWeight: selected
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                ),
+                      onTap: () => onSelected(index),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Icon(item.icon, size: 19),
+                            const SizedBox(width: 7),
+                            Text(
+                              item.label,
+                              style: TextStyle(
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
