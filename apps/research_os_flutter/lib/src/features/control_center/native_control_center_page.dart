@@ -353,51 +353,50 @@ class _ControlCenterNavigation extends StatelessWidget {
           color: Theme.of(context).colorScheme.surface,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: SizedBox(
-              height: 156,
-              child: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: List<Widget>.generate(_items.length, (index) {
-                    final item = _items[index];
-                    final selected = controller.index == index;
-                    return Semantics(
-                      button: true,
-                      selected: selected,
-                      label: item.label,
-                      child: OutlinedButton.icon(
-                        key: ValueKey<String>(
-                          'control-center-tab-${item.label}',
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 96),
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: List<Widget>.generate(_items.length, (index) {
+                  final item = _items[index];
+                  final selected = controller.index == index;
+                  return Semantics(
+                    button: true,
+                    selected: selected,
+                    label: item.label,
+                    child: OutlinedButton.icon(
+                      key: ValueKey<String>(
+                        'control-center-tab-${item.label}',
+                      ),
+                      onPressed: () => onSelected(index),
+                      icon: Icon(item.icon, size: 19),
+                      label: Text(item.label),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                        onPressed: () => onSelected(index),
-                        icon: Icon(item.icon, size: 19),
-                        label: Text(item.label),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          backgroundColor: selected
-                              ? Theme.of(context)
+                        minimumSize: const Size(0, 40),
+                        backgroundColor: selected
+                            ? Theme.of(context)
+                                .colorScheme
+                                .secondaryContainer
+                            : null,
+                        side: BorderSide(
+                          color: selected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context)
                                   .colorScheme
-                                  .secondaryContainer
-                              : null,
-                          side: BorderSide(
-                            color: selected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .outlineVariant,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                                  .outlineVariant,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    );
-                  }),
-                ),
+                    ),
+                  );
+                }),
               ),
             ),
           ),
