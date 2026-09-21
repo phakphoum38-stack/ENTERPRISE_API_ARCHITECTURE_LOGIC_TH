@@ -334,10 +334,9 @@ class _Overview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final status = health?['status']?.toString() ?? 'UNKNOWN';
     final capabilities = (health?['capabilities'] as List?)?.length ?? 0;
-    final skills = (_skills?['skills'] as List?)?.length ?? 0;
+    final skillsCount = (skills?['skills'] as List?)?.length ?? 0;
     final providerCount = (providers?['providers'] as List?)?.length ?? 0;
     final agentCount = (agents?['agents'] as List?)?.length ?? 0;
 
@@ -360,7 +359,7 @@ class _Overview extends StatelessWidget {
           children: <Widget>[
             _Metric('Runtime', status, Icons.dns_outlined),
             _Metric('Capabilities', '$capabilities', Icons.extension_outlined),
-            _Metric('Brain skills', '$skills', Icons.psychology_alt_outlined),
+            _Metric('Brain skills', '$skillsCount', Icons.psychology_alt_outlined),
             _Metric('Providers', '$providerCount', Icons.cloud_outlined),
             _Metric('Agents', '$agentCount', Icons.smart_toy_outlined),
           ],
