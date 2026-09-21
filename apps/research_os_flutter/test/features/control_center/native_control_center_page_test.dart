@@ -10,15 +10,20 @@ import 'package:research_os_flutter/src/features/control_center/native_control_c
 class _FakeClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    final path = request.url.path;
-    final payload = switch (path) {
+    final payload = switch (request.url.path) {
       '/health' => <String, Object?>{
           'status': 'ok',
           'capabilities': <Object>['brain', 'evidence'],
         },
-      '/v1/brain/capacity' => <String, Object?>{'skills': <Object>['analysis']},
-      '/v1/providers' => <String, Object?>{'providers': <Object>['owner-mock']},
-      '/v1/agents' => <String, Object?>{'agents': <Object>['friend']},
+      '/v1/brain/capacity' => <String, Object?>{
+          'skills': <Object>['analysis'],
+        },
+      '/v1/providers' => <String, Object?>{
+          'providers': <Object>['owner-mock'],
+        },
+      '/v1/agents' => <String, Object?>{
+          'agents': <Object>['friend'],
+        },
       _ => <String, Object?>{},
     };
     final bytes = utf8.encode(jsonEncode(payload));
@@ -32,7 +37,7 @@ class _FakeClient extends http.BaseClient {
 }
 
 void main() {
-  testWidgets('Control Center is reachable from the canonical app feature tree',
+  testWidgets('Control Center exposes the live operating environment',
       (tester) async {
     final api = ResearchOSApiClient(
       baseUrl: 'http://127.0.0.1:8787',
@@ -42,12 +47,47 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: NativeControlCenterPage(apiClient: api)),
     );
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Control Center'), findsOneWidget);
+    expect(find.text('Research OS • Control Center'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('System Map'), findsOneWidget);
+    expect(find.text('Failures'), findsOneWidget);
+    expect(find.text('Resources'), findsOneWidget);
+    expect(find.text('Control'), findsOneWidget);
     expect(find.text('LIVE'), findsOneWidget);
+
+    await tester.tap(find.text('Failures'));
+    await tester.pumpAndSettle();
+    expect(find.text('Failure Center'), findsOneWidget);
+    expect(find.text('UNKNOWN is preserved'), findsOneWidget);
+
+    await tester.tap(find.text('Control'));
+    await tester.pumpAndSettle();
+    expect(find.text('Human authority required'), findsOneWidget);
+
+    api.close();
+  });
+
+  testWidgets('command search navigates without executing live work',
+      (tester) async {
+    final api = ResearchOSApiClient(
+      baseUrl: 'http://127.0.0.1:8787',
+      client: _FakeClient(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: NativeControlCenterPage(apiClient: api)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.enterText(find.byType(TextField), 'show resources');
+    expect(find.text('Show resources'), findsOneWidget);
+    await tester.tap(find.text('Show resources'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Resource Center'), findsOneWidget);
+    expect(find.textContaining('Runtime resource telemetry'), findsOneWidget);
 
     api.close();
   });
