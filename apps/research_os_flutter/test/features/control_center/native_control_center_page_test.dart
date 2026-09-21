@@ -63,6 +63,10 @@ void main() {
     expect(find.text('Control'), findsOneWidget);
     expect(find.text('Design'), findsOneWidget);
     expect(find.text('LIVE'), findsNWidgets(2));
+    expect(find.text('ROOT Closure Mesh'), findsOneWidget);
+    expect(find.text('CLOSED 0/15'), findsOneWidget);
+    expect(find.text('AUTHORITY'), findsOneWidget);
+    expect(find.text('UNKNOWN 14'), findsOneWidget);
 
     final failures = find.text('Failures');
     await tester.ensureVisible(failures);
