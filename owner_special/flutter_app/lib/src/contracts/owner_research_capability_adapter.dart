@@ -107,7 +107,7 @@ final class OwnerResearchCapabilityAdapter implements ResearchOSCapabilities {
 
   @override
   Future<Map<String, dynamic>> orchestration(String runId) =>
-      api.researchGet('/v1/agents/orchestrations/' + Uri.encodeComponent(runId));
+      api.researchGet('/v1/agents/orchestrations/${Uri.encodeComponent(runId)}');
 
   @override
   Future<Map<String, dynamic>> createOrchestration({
@@ -125,7 +125,7 @@ final class OwnerResearchCapabilityAdapter implements ResearchOSCapabilities {
     bool confirmed = false,
   }) =>
       api.researchPost(
-        '/v1/agents/orchestrations/' + Uri.encodeComponent(runId) + '/execute',
+        '/v1/agents/orchestrations/${Uri.encodeComponent(runId)}/execute',
         body: <String, dynamic>{'confirmed': confirmed},
       );
 }
