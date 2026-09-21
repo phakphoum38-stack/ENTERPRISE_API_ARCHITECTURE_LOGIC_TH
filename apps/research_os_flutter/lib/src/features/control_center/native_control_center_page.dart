@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import '../../api/research_os_api_client.dart';
 
 class NativeControlCenterPage extends StatefulWidget {
-  const NativeControlCenterPage({required this.apiClient, super.key});
+  const NativeControlCenterPage({
+    required this.apiClient,
+    this.onNavigate,
+    super.key,
+  });
 
   final ResearchOSApiClient apiClient;
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<NativeControlCenterPage> createState() => _NativeControlCenterPageState();
@@ -14,62 +19,71 @@ class NativeControlCenterPage extends StatefulWidget {
 class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
-  final _commandController = TextEditingController();
+  final _command = TextEditingController();
+  final _inspector = TextEditingController();
   bool _loading = false;
   bool _simulation = false;
+  int _livePulse = 0;
+  String _selectedObject = '';
   Map<String, dynamic>? _health;
   Map<String, dynamic>? _brain;
+  Map<String, dynamic>? _skills;
   Map<String, dynamic>? _providers;
   Map<String, dynamic>? _agents;
-  final List<String> _activity = <String>[
+  final List<String> _events = <String>[
     'Control Center initialized',
     'Human authority boundary active',
   ];
 
-  static const _commands = <String>[
-    'Refresh system',
+  static const commands = <String>[
     'Open Research',
     'Open Friend',
     'Open Runtime',
     'Open Evidence',
+    'Inspect object',
     'Simulation mode',
+    'Refresh runtime',
   ];
 
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 6, vsync: this);
-    _refresh();
+    _tabs = TabController(length: 9, vsync: this);
+    _load();
   }
 
   @override
   void dispose() {
     _tabs.dispose();
-    _commandController.dispose();
+    _command.dispose();
+    _inspector.dispose();
     super.dispose();
   }
 
-  Future<void> _refresh() async {
+  Future<void> _load() async {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final results = await Future.wait(<Future<Map<String, dynamic>>>[
+      final values = await Future.wait(<Future<Map<String, dynamic>>>[
         widget.apiClient.getHealth(),
         widget.apiClient.getBrainCapacity(),
+        widget.apiClient.getBrainSkills(),
         widget.apiClient.getProviders(),
         widget.apiClient.getAgents(),
       ]);
       if (!mounted) return;
       setState(() {
-        _health = results[0];
-        _brain = results[1];
-        _providers = results[2];
-        _agents = results[3];
-        _activity.insert(0, 'System state observed');
+        _health = values[0];
+        _brain = values[1];
+        _skills = values[2];
+        _providers = values[3];
+        _agents = values[4];
+        _livePulse++;
+        _events.insert(0, 'Runtime state observed');
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _activity.insert(0, 'System observation unavailable: $error'));
+      setState(() => _events.insert(0, 'Runtime observation unavailable: $error'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -78,69 +92,71 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   void _runCommand(String value) {
     final command = value.trim();
     if (command.isEmpty) return;
-    _commandController.clear();
-    if (command == 'Refresh system') {
-      _refresh();
+    _command.clear();
+
+    if (command == 'Refresh runtime') {
+      _load();
       return;
     }
     if (command == 'Simulation mode') {
       setState(() {
         _simulation = !_simulation;
-        _activity.insert(
+        _events.insert(
           0,
-          _simulation
-              ? 'Simulation mode enabled'
-              : 'Simulation mode disabled',
+          _simulation ? 'Simulation mode enabled' : 'Simulation mode disabled',
         );
       });
+      _tabs.animateTo(0);
       return;
     }
-    setState(() => _activity.insert(0, '$command prepared'));
+
+    const routes = <String, int>{
+      'Open Research': 0,
+      'Open Friend': 13,
+      'Open Runtime': 8,
+    };
+    final route = routes[command];
+    if (route != null) {
+      widget.onNavigate?.call(route);
+      setState(() => _events.insert(0, '$command prepared'));
+      return;
+    }
+
+    if (command == 'Open Evidence') {
+      _tabs.animateTo(4);
+    } else if (command == 'Inspect object') {
+      _tabs.animateTo(5);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final query = _commandController.text.trim().toLowerCase();
-    final matches = _commands
+    final query = _command.text.trim().toLowerCase();
+    final matches = commands
         .where((item) => item.toLowerCase().contains(query))
+        .take(8)
         .toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Control Center'),
-        actions: <Widget>[
-          FilterChip(
-            selected: _simulation,
-            avatar: const Icon(Icons.science_outlined, size: 17),
-            label: Text(_simulation ? 'SIMULATION' : 'LIVE'),
-            onSelected: (_) => _runCommand('Simulation mode'),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'Refresh system',
-            onPressed: _loading ? null : _refresh,
-            icon: _loading
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
+    return Material(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          _Header(
+            simulation: _simulation,
+            loading: _loading,
+            onSimulation: () => _runCommand('Simulation mode'),
+            onRefresh: _loading ? null : _load,
+          ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: TextField(
-              controller: _commandController,
+              controller: _command,
               onChanged: (_) => setState(() {}),
               onSubmitted: _runCommand,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),
-                hintText: 'Command, navigation, inspect…',
                 suffixText: 'Ctrl/⌘ K',
+                hintText: 'Command, navigation, inspect…',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -151,15 +167,25 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
             Card(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Column(
-                children: matches.map((item) {
-                  return ListTile(
-                    leading: const Icon(Icons.bolt_outlined),
-                    title: Text(item),
-                    onTap: () => _runCommand(item),
-                  );
-                }).toList(),
+                children: matches.isEmpty
+                    ? <Widget>[
+                        const ListTile(title: Text('No matching command')),
+                      ]
+                    : matches
+                        .map(
+                          (item) => ListTile(
+                            leading: const Icon(Icons.bolt_outlined),
+                            title: Text(item),
+                            subtitle: const Text(
+                              'Prepared through the native control lifecycle',
+                            ),
+                            onTap: () => _runCommand(item),
+                          ),
+                        )
+                        .toList(),
               ),
             ),
+          if (_loading) const LinearProgressIndicator(minHeight: 2),
           TabBar(
             controller: _tabs,
             isScrollable: true,
@@ -170,6 +196,9 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
               Tab(text: 'System Map', icon: Icon(Icons.hub_outlined)),
               Tab(text: 'Evidence', icon: Icon(Icons.fact_check_outlined)),
               Tab(text: 'Inspector', icon: Icon(Icons.manage_search_outlined)),
+              Tab(text: 'Failures', icon: Icon(Icons.warning_amber_outlined)),
+              Tab(text: 'History', icon: Icon(Icons.history_outlined)),
+              Tab(text: 'Simulation', icon: Icon(Icons.science_outlined)),
             ],
           ),
           Expanded(
@@ -177,21 +206,43 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
               controller: _tabs,
               children: <Widget>[
                 _Overview(
+                  key: ValueKey('overview-$_livePulse'),
                   health: _health,
                   brain: _brain,
+                  skills: _skills,
                   providers: _providers,
                   agents: _agents,
                   simulation: _simulation,
                 ),
-                _Activity(events: _activity),
+                _Activity(events: _events),
                 _StateView(health: _health, brain: _brain),
-                _SystemMap(health: _health, brain: _brain, agents: _agents),
-                _EvidenceView(health: _health),
-                _Inspector(
+                _SystemMap(
                   health: _health,
                   brain: _brain,
-                  providers: _providers,
                   agents: _agents,
+                ),
+                _EvidenceView(health: _health),
+                _Inspector(
+                  controller: _inspector,
+                  selectedObject: _selectedObject,
+                  onInspect: (id) => setState(() {
+                    _selectedObject = id;
+                    _events.insert(0, 'Inspector opened: $id');
+                  }),
+                ),
+                _FailureView(health: _health),
+                _Activity(events: _events),
+                _Simulation(
+                  enabled: _simulation,
+                  onToggle: (value) => setState(() {
+                    _simulation = value;
+                    _events.insert(
+                      0,
+                      value
+                          ? 'Simulation mode enabled'
+                          : 'Simulation mode disabled',
+                    );
+                  }),
                 ),
               ],
             ),
@@ -202,10 +253,74 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   }
 }
 
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.simulation,
+    required this.loading,
+    required this.onSimulation,
+    required this.onRefresh,
+  });
+
+  final bool simulation;
+  final bool loading;
+  final VoidCallback onSimulation;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Native Core Workspace',
+                  style: theme.textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Command • Activity • State • Evidence • Inspector • Simulation',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FilterChip(
+            selected: simulation,
+            onSelected: (_) => onSimulation(),
+            avatar: const Icon(Icons.science_outlined, size: 17),
+            label: Text(simulation ? 'SIMULATION' : 'LIVE'),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Refresh runtime',
+            onPressed: onRefresh,
+            icon: loading
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Overview extends StatelessWidget {
   const _Overview({
+    super.key,
     required this.health,
     required this.brain,
+    required this.skills,
     required this.providers,
     required this.agents,
     required this.simulation,
@@ -213,16 +328,16 @@ class _Overview extends StatelessWidget {
 
   final Map<String, dynamic>? health;
   final Map<String, dynamic>? brain;
+  final Map<String, dynamic>? skills;
   final Map<String, dynamic>? providers;
   final Map<String, dynamic>? agents;
   final bool simulation;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final status = health?['status']?.toString() ?? 'UNKNOWN';
     final capabilities = (health?['capabilities'] as List?)?.length ?? 0;
-    final skills = (brain?['skills'] as List?)?.length ?? 0;
+    final skillsCount = (skills?['skills'] as List?)?.length ?? 0;
     final providerCount = (providers?['providers'] as List?)?.length ?? 0;
     final agentCount = (agents?['agents'] as List?)?.length ?? 0;
 
@@ -230,95 +345,89 @@ class _Overview extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: <Widget>[
         if (simulation)
-          Card(
-            color: scheme.tertiaryContainer,
-            child: const ListTile(
+          const Card(
+            child: ListTile(
               leading: Icon(Icons.science_outlined),
               title: Text('Simulation mode'),
               subtitle: Text(
-                'Commands are prepared only; live execution is not implied.',
+                'Actions are prepared for inspection and do not imply release authority.',
               ),
             ),
           ),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: 10,
+          runSpacing: 10,
           children: <Widget>[
-            _MetricCard(
-              label: 'Runtime',
-              value: status,
-              icon: Icons.dns_outlined,
-            ),
-            _MetricCard(
-              label: 'Capabilities',
-              value: '$capabilities',
-              icon: Icons.extension_outlined,
-            ),
-            _MetricCard(
-              label: 'Brain skills',
-              value: '$skills',
-              icon: Icons.psychology_alt_outlined,
-            ),
-            _MetricCard(
-              label: 'Providers',
-              value: '$providerCount',
-              icon: Icons.cloud_outlined,
-            ),
-            _MetricCard(
-              label: 'Agents',
-              value: '$agentCount',
-              icon: Icons.smart_toy_outlined,
-            ),
+            _Metric('Runtime', status, Icons.dns_outlined),
+            _Metric('Capabilities', '$capabilities', Icons.extension_outlined),
+            _Metric('Brain skills', '$skillsCount', Icons.psychology_alt_outlined),
+            _Metric('Providers', '$providerCount', Icons.cloud_outlined),
+            _Metric('Agents', '$agentCount', Icons.smart_toy_outlined),
           ],
         ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: Icon(
+              status == 'ok'
+                  ? Icons.check_circle_outline
+                  : Icons.help_outline,
+            ),
+            title: Text(
+              status == 'ok'
+                  ? 'LIVE SYSTEM — runtime observed'
+                  : 'SYSTEM STATE — UNKNOWN',
+            ),
+            subtitle: const Text(
+              'Observation is sourced from existing Research OS API surfaces.',
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const _BoundaryCard(),
       ],
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
+class _Metric extends StatelessWidget {
+  const _Metric(this.label, this.value, this.icon);
   final String label;
   final String value;
   final IconData icon;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 190,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: <Widget>[
-              Icon(icon),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(label, style: Theme.of(context).textTheme.labelMedium),
-                    const SizedBox(height: 4),
-                    Text(
-                      value,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                  ],
+  Widget build(BuildContext context) => SizedBox(
+        width: 190,
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: <Widget>[
+                Icon(icon),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(label, style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 4),
+                      Text(
+                        value,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _Activity extends StatelessWidget {
@@ -326,18 +435,17 @@ class _Activity extends StatelessWidget {
   final List<String> events;
 
   @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: events.length,
-      itemBuilder: (context, index) => Card(
-        child: ListTile(
-          leading: const Icon(Icons.bolt_outlined),
+  Widget build(BuildContext context) => ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: events.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (_, index) => ListTile(
+          dense: true,
+          leading: const Icon(Icons.circle_outlined, size: 18),
           title: Text(events[index]),
+          subtitle: const Text('OBSERVED'),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _StateView extends StatelessWidget {
@@ -346,15 +454,13 @@ class _StateView extends StatelessWidget {
   final Map<String, dynamic>? brain;
 
   @override
-  Widget build(BuildContext context) {
-    return _JsonView(
-      title: 'Current state',
-      data: <String, dynamic>{
-        'health': health ?? const <String, dynamic>{},
-        'brain': brain ?? const <String, dynamic>{},
-      },
-    );
-  }
+  Widget build(BuildContext context) => _JsonView(
+        title: 'Current state',
+        data: <String, dynamic>{
+          'health': health ?? <String, dynamic>{},
+          'brain': brain ?? <String, dynamic>{},
+        },
+      );
 }
 
 class _SystemMap extends StatelessWidget {
@@ -371,25 +477,37 @@ class _SystemMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nodes = <String, Map<String, dynamic>>{
-      'CORE': health ?? const <String, dynamic>{},
-      'BRAIN': brain ?? const <String, dynamic>{},
-      'AGENTS': agents ?? const <String, dynamic>{},
+      'ROOT': <String, dynamic>{'state': 'OBSERVED'},
+      'CORE': health ?? <String, dynamic>{},
+      'BRAIN': brain ?? <String, dynamic>{},
+      'AGENTS': agents ?? <String, dynamic>{},
+      'ASSURANCE': <String, dynamic>{},
+      'REALITY': <String, dynamic>{},
     };
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: nodes.entries
-          .map(
-            (entry) => Card(
-              child: ListTile(
-                leading: const Icon(Icons.hub_outlined),
-                title: Text(entry.key),
-                subtitle: Text(
-                  entry.value.isEmpty ? 'UNKNOWN' : 'Observed',
-                ),
+      children: <Widget>[
+        const Card(
+          child: ListTile(
+            leading: Icon(Icons.hub_outlined),
+            title: Text('Live System Map'),
+            subtitle: Text(
+              'Observations only — no authority grant and no fabricated state.',
+            ),
+          ),
+        ),
+        ...nodes.entries.map(
+          (entry) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.account_tree_outlined),
+              title: Text(entry.key),
+              subtitle: Text(
+                entry.value.isEmpty ? 'UNKNOWN / NOT EXPOSED' : 'OBSERVED',
               ),
             ),
-          )
-          .toList(),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -399,69 +517,188 @@ class _EvidenceView extends StatelessWidget {
   final Map<String, dynamic>? health;
 
   @override
-  Widget build(BuildContext context) {
-    return _JsonView(
-      title: 'Evidence / observation',
-      data: health ?? const <String, dynamic>{},
-    );
-  }
+  Widget build(BuildContext context) => _JsonView(
+        title: 'Evidence / observation',
+        data: health ?? <String, dynamic>{},
+      );
 }
 
 class _Inspector extends StatelessWidget {
   const _Inspector({
-    required this.health,
-    required this.brain,
-    required this.providers,
-    required this.agents,
+    required this.controller,
+    required this.selectedObject,
+    required this.onInspect,
   });
 
+  final TextEditingController controller;
+  final String selectedObject;
+  final ValueChanged<String> onInspect;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  onSubmitted: onInspect,
+                  decoration: const InputDecoration(
+                    labelText: 'Object ID',
+                    hintText: 'task, source, evidence, service…',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton(
+                onPressed: () => onInspect(controller.text.trim()),
+                child: const Text('Inspect'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.manage_search_outlined),
+              title: Text(
+                selectedObject.isEmpty ? 'No object selected' : selectedObject,
+              ),
+              subtitle: Text(
+                selectedObject.isEmpty
+                    ? 'UNKNOWN until an object is selected.'
+                    : 'Selection only; inspection does not grant execution authority.',
+              ),
+            ),
+          ),
+        ],
+      );
+}
+
+class _FailureView extends StatelessWidget {
+  const _FailureView({required this.health});
   final Map<String, dynamic>? health;
-  final Map<String, dynamic>? brain;
-  final Map<String, dynamic>? providers;
-  final Map<String, dynamic>? agents;
 
   @override
   Widget build(BuildContext context) {
-    return _JsonView(
-      title: 'Universal Inspector',
-      data: <String, dynamic>{
-        'health': health ?? const <String, dynamic>{},
-        'brain': brain ?? const <String, dynamic>{},
-        'providers': providers ?? const <String, dynamic>{},
-        'agents': agents ?? const <String, dynamic>{},
-      },
+    final failures = health?['failures'];
+    if (failures is! List || failures.isEmpty) {
+      return const Card(
+        child: ListTile(
+          leading: Icon(Icons.info_outline),
+          title: Text('Failure feed unavailable'),
+          subtitle: Text(
+            'This is not interpreted as zero failures. The current API does not expose a failure collection.',
+          ),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: failures.length,
+      itemBuilder: (_, index) => ListTile(
+        leading: const Icon(Icons.warning_amber_outlined),
+        title: Text(
+          failures[index] is Map
+              ? (failures[index] as Map)['id']?.toString() ?? 'Failure'
+              : failures[index].toString(),
+        ),
+      ),
     );
   }
 }
 
+class _Simulation extends StatelessWidget {
+  const _Simulation({required this.enabled, required this.onToggle});
+  final bool enabled;
+  final ValueChanged<bool> onToggle;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
+          Card(
+            child: SwitchListTile(
+              value: enabled,
+              onChanged: onToggle,
+              title: const Text('Simulation / Dry Run'),
+              subtitle: const Text(
+                'Prepare and inspect a lifecycle without treating preparation as authorization.',
+              ),
+              secondary: const Icon(Icons.science_outlined),
+            ),
+          ),
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'INTENT → VALIDATE → AUTHORIZE → EXECUTE → OBSERVE → EVIDENCE → COMPLETE',
+              ),
+            ),
+          ),
+        ],
+      );
+}
+
+class _BoundaryCard extends StatelessWidget {
+  const _BoundaryCard();
+
+  @override
+  Widget build(BuildContext context) => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              Chip(avatar: Icon(Icons.check, size: 16), label: Text('Observe')),
+              Chip(avatar: Icon(Icons.check, size: 16), label: Text('Analyze')),
+              Chip(avatar: Icon(Icons.check, size: 16), label: Text('Research')),
+              Chip(avatar: Icon(Icons.check, size: 16), label: Text('Prepare')),
+              Chip(
+                avatar: Icon(Icons.lock_outline, size: 16),
+                label: Text('Approve — human'),
+              ),
+              Chip(
+                avatar: Icon(Icons.lock_outline, size: 16),
+                label: Text('Authorize — human'),
+              ),
+              Chip(
+                avatar: Icon(Icons.lock_outline, size: 16),
+                label: Text('Release — human'),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
 class _JsonView extends StatelessWidget {
   const _JsonView({required this.title, required this.data});
-
   final String title;
   final Map<String, dynamic> data;
 
   @override
-  Widget build(BuildContext context) {
-    final entries = data.entries.toList();
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: <Widget>[
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
+          Text(
+            title,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          ...data.entries.map(
+            (entry) => Card(
+              child: ListTile(
+                title: Text(entry.key),
+                subtitle: SelectableText(entry.value.toString()),
               ),
-        ),
-        const SizedBox(height: 12),
-        ...entries.map(
-          (entry) => Card(
-            child: ListTile(
-              title: Text(entry.key),
-              subtitle: SelectableText(entry.value.toString()),
             ),
           ),
-        ),
-      ],
-    );
-  }
+        ],
+      );
 }
