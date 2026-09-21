@@ -12,8 +12,8 @@ void main() {
     final handled = server.first.then((request) async {
       expect(request.method, 'POST');
       expect(request.uri.path, '/v1/ai/generate');
-      expect(request.headers.value('X-Research-OS-Owner'), isNull);
-      expect(request.headers.value('X-Research-OS-Profile'), isNull);
+      expect(request.headers.value('X-Research-OS-Owner'), 'owner');
+      expect(request.headers.value('X-Research-OS-Profile'), 'work');
       expect(request.headers.value('X-Research-OS-Session'), 'research-session');
 
       final declaredLength = int.tryParse(

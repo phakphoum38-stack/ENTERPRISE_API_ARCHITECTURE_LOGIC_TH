@@ -1,0 +1,51 @@
+{
+  "status": "ACTIVE",
+  "version": "1",
+  "scope": "Owner-only Friend connection profiles and transport switching",
+  "canonical_execution_layer": "FriendRuntime",
+  "transports": ["direct", "http"],
+  "modes": ["auto", "direct", "http"],
+  "rules": [
+    "AUTO prefers direct FriendRuntime and may fall back to HTTP 8790",
+    "DIRECT never uses HTTP",
+    "HTTP never uses direct runtime",
+    "8790 is an optional transport boundary, not the canonical execution layer",
+    "connection profiles are owner-only",
+    "passwords are never stored in profile JSON",
+    "passwords use OS secure storage",
+    "iOS clients use Keychain-backed secure storage and may send credentials transiently for a test/chat request",
+    "server-side persistent credentials are optional and Windows-only DPAPI protected",
+    "a failed transport is reported; mock success is forbidden",
+    "manual lock prevents AUTO failover",
+    "three consecutive transport failures open a short circuit",
+    "Render is outside this connection architecture",
+    "transport identity is returned with every successful chat",
+    "mobile clients must not assume 127.0.0.1 refers to the Windows Friend host"
+  ],
+  "profile_fields": [
+    "id",
+    "name",
+    "username",
+    "transport",
+    "endpoint",
+    "enabled",
+    "locked",
+    "owner_scope"
+  ],
+  "diagnostics": [
+    "owner_verified",
+    "credential_configured",
+    "direct_runtime",
+    "http_bridge",
+    "selected_transport",
+    "failure_reason",
+    "selected_connection_id"
+  ],
+  "forbidden": [
+    "plaintext password in repository",
+    "implicit Render connection",
+    "8787-to-8790-to-8787 circular dependency",
+    "fake offline recovery",
+    "self-authorized merge or release"
+  ]
+}
