@@ -343,7 +343,7 @@ class _ControlCenterNavigation extends StatelessWidget {
     (label: 'Resources', icon: Icons.memory_outlined),
     (label: 'Control', icon: Icons.lock_outline),
     (label: 'Design', icon: Icons.palette_outlined),
-    (label: 'Files / Code', icon: Icons.folder_code_outlined),
+    (label: 'Files / Code', icon: Icons.folder_open_outlined),
   ];
 
   @override
