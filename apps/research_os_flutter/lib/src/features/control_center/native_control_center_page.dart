@@ -79,22 +79,23 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     final command = value.trim();
     if (command.isEmpty) return;
     _commandController.clear();
-    switch (command) {
-      case 'Refresh system':
-        _refresh();
-      case 'Simulation mode':
-        setState(() {
-          _simulation = !_simulation;
-          _activity.insert(
-            0,
-            _simulation
-                ? 'Simulation mode enabled'
-                : 'Simulation mode disabled',
-          );
-        });
-      default:
-        setState(() => _activity.insert(0, '$command prepared'));
+    if (command == 'Refresh system') {
+      _refresh();
+      return;
     }
+    if (command == 'Simulation mode') {
+      setState(() {
+        _simulation = !_simulation;
+        _activity.insert(
+          0,
+          _simulation
+              ? 'Simulation mode enabled'
+              : 'Simulation mode disabled',
+        );
+      });
+      return;
+    }
+    setState(() => _activity.insert(0, '$command prepared'));
   }
 
   @override
