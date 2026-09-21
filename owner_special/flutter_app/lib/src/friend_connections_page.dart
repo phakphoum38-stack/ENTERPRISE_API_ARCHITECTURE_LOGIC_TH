@@ -246,19 +246,23 @@ class _FriendConnectionsPageState extends State<FriendConnectionsPage> {
                   IconButton(tooltip: 'Use', onPressed: () async {
                     final password = await _password(id);
                     widget.api.setFriendConnection(id, password: password);
-                    if (mounted) setState(() {
-                      _selected = id;
-                      _message = 'Selected $id • ${transport.toUpperCase()}';
-                    });
+                    if (mounted) {
+                      setState(() {
+                        _selected = id;
+                        _message = 'Selected $id • ${transport.toUpperCase()}';
+                      });
+                    }
                   }, icon: const Icon(Icons.check_circle_outline)),
                 ]),
                 onTap: () async {
                   final password = await _password(id);
                   widget.api.setFriendConnection(id, password: password);
-                  if (mounted) setState(() {
-                    _selected = id;
-                    _message = 'Selected $id • ${transport.toUpperCase()}';
-                  });
+                  if (mounted) {
+                    setState(() {
+                      _selected = id;
+                      _message = 'Selected $id • ${transport.toUpperCase()}';
+                    });
+                  }
                 },
               ),
             );
