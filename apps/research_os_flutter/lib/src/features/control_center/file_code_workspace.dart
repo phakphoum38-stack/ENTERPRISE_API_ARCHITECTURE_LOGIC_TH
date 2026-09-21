@@ -87,7 +87,7 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
       _path.clear();
       _content.clear();
       _kind = 'TEXT';
-      _sha256 = null;
+      _fingerprint = null;
       _error = null;
       _readOnly = true;
     });
@@ -194,7 +194,7 @@ class _FileCodeWorkspaceState extends State<FileCodeWorkspace> {
                   readOnly: _readOnly,
                   maxLines: 24,
                   minLines: 12,
-                  onChanged: (_) => setState(() => _sha256 = null),
+                  onChanged: (_) => setState(() => _fingerprint = null),
                   style: const TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 13,
