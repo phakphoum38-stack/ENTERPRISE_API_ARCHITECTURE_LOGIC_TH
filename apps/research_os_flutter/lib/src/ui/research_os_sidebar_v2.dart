@@ -218,6 +218,9 @@ class ResearchOSSidebarV2 extends StatelessWidget {
       _Entry('account', 'Google Identity', Icons.account_circle_outlined, 12),
       _Entry('settings', 'Settings', Icons.settings_outlined, 9),
     ];
+    const control = <_Entry>[
+      _Entry('control-center', 'Control Center', Icons.tune_outlined, 14),
+    ];
 
     return AnimatedContainer(
       key: const Key('research-os-sidebar-v2'),
@@ -250,6 +253,8 @@ class ResearchOSSidebarV2 extends StatelessWidget {
                 ),
                 _section(context, 'Account'),
                 for (final entry in account) _destination(context, entry),
+                _section(context, 'Control'),
+                for (final entry in control) _destination(context, entry),
               ],
             ),
           ),
