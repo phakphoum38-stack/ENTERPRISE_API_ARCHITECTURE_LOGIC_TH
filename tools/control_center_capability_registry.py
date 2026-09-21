@@ -121,6 +121,7 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "tools/research_os_api/github_status.py",
         "tools/research_os_api/github_status.py",
         "tools/research_os_api/github_status.py",
+        "tools/research_os_api/github_status.py",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
         "PARTIAL",
         "GitHub inspection is present; canonical command→workflow execution is a separate binding gap.",
@@ -133,6 +134,7 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "docs/RESEARCH_OS_SYSTEM_PLATFORM_MATRIX.md",
         "v3/research_os_v3/execution.py:FactoryExecutionEngine",
         "v3/research_os_v3/execution.py:FactoryExecutionEngine",
+        "v3/research_os_v3/execution.py",
         "v3/research_os_v3/execution.py",
         "v3/research_os_v3/execution.py",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
@@ -148,10 +150,11 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
         "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
         "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
+        "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
         "current/NATIVE_CONTROL_SURFACE_CONTRACT.json",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
         "PARTIAL",
-        "Evidence exists in canonical runtimes, but a universal cross-engine evidence binding is not yet established on main.",
+        "Evidence exists in canonical runtimes, but a universal cross-engine evidence binding is not yet established.",
     ),
 )
 

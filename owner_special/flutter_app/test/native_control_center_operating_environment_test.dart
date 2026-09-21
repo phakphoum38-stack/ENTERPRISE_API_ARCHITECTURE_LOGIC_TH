@@ -63,6 +63,23 @@ final class _FakeOwnerFriendApi implements OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> signOut() async => <String, dynamic>{'signed_out': true};
 
+
+  @override
+  Future<Map<String, dynamic>> researchGet(
+    String path, {
+    Map<String, String>? query,
+    Map<String, String>? headers,
+  }) async =>
+      <String, dynamic>{'path': path};
+
+  @override
+  Future<Map<String, dynamic>> researchPost(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async =>
+      <String, dynamic>{'path': path};
+
   @override
   void setSession(String token) {}
 
