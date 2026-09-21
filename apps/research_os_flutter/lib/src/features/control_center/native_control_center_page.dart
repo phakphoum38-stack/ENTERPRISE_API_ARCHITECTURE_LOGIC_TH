@@ -39,7 +39,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 9, vsync: this);
+    _tabs = TabController(length: 10, vsync: this);
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -119,7 +119,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
       return;
     }
     if (value == 'Design Studio') {
-      _tabs.animateTo(8);
+      _tabs.animateTo(9);
       setState(() => _activity.insert(0, 'Design Studio opened'));
       return;
     }
@@ -171,7 +171,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
         },
       },
       child: Scaffold(
-      appBar: AppBar(
+        appBar: AppBar(
         title: const Text('Research OS • Control Center'),
         actions: <Widget>[
           AnimatedBuilder(
@@ -212,8 +212,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
           ),
         ],
       ),
-      body: Column(
-        children: <Widget>[
+        body: Column(
+          children: <Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
@@ -264,6 +264,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
               controller: _tabs,
               children: <Widget>[
                 _Overview(
+                  onNavigate: widget.onNavigate,
                   health: _health,
                   brain: _brain,
                   providers: _providers,
@@ -319,6 +320,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
           ),
         ],
       ),
+        ),
       ),
     );
   }
@@ -334,6 +336,7 @@ class _Overview extends StatelessWidget {
     required this.simulation,
     required this.pulse,
   });
+  final ValueChanged<int>? onNavigate;
   final ValueChanged<int>? onNavigate;
   final Map<String, dynamic>? health, brain, providers, agents;
   final bool simulation;
