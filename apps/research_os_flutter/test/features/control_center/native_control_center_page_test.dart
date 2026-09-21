@@ -84,6 +84,11 @@ void main() {
     expect(find.text('Native Design Studio'), findsOneWidget);
     expect(find.text('Canvas'), findsOneWidget);
 
+    final friendAction = find.widgetWithText(OutlinedButton, 'Friend');
+    expect(friendAction, findsOneWidget);
+    await tester.tap(friendAction);
+    expect(navigated, 1);
+
     api.close();
   });
 
