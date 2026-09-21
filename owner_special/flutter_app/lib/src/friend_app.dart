@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'friend_app_shell.dart';
 import 'contracts/control_center_capabilities.dart';
 import 'contracts/owner_friend_capability_adapter.dart';
+import 'contracts/owner_research_capability_adapter.dart';
 import 'package:research_os_contracts/research_os_contracts.dart';
 import 'friend_module_shell.dart';
 import 'friend_theme.dart';
@@ -32,9 +33,10 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
 
   @override
   Widget build(BuildContext context) {
+    final ownerCapabilities = OwnerFriendCapabilityAdapter(widget.api);
     final capabilities = ControlCenterCapabilities(
-      owner: OwnerFriendCapabilityAdapter(widget.api),
-      research: widget.researchCapabilities,
+      owner: ownerCapabilities,
+      research: widget.researchCapabilities ?? OwnerResearchCapabilityAdapter(widget.api),
     );
     final pages = <Widget>[
       MissionControlDesktopPage(projection: null),
