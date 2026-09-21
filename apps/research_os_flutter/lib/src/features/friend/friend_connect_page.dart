@@ -111,7 +111,7 @@ class _FriendConnectPageState extends State<FriendConnectPage> {
           TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
           TextField(controller: username, decoration: const InputDecoration(labelText: 'Username')),
           TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Password', helperText: 'Saved only in OS secure storage.')),
-          DropdownButtonFormField<String>(value: transport, decoration: const InputDecoration(labelText: 'Transport'), items: const [
+          DropdownButtonFormField<String>(initialValue: transport, decoration: const InputDecoration(labelText: 'Transport'), items: const [
             DropdownMenuItem(value: 'auto', child: Text('AUTO — Direct → HTTP')),
             DropdownMenuItem(value: 'direct', child: Text('DIRECT — FriendRuntime')),
             DropdownMenuItem(value: 'http', child: Text('HTTP — 8790')),
@@ -151,7 +151,9 @@ class _FriendConnectPageState extends State<FriendConnectPage> {
 
   Future<void> _ask() async {
     final question = _controller.text.trim();
-    if (question.isEmpty || _sending) return;
+    if (question.isEmpty || _sending) {
+      return;
+    }
 
     _controller.clear();
     setState(() {
