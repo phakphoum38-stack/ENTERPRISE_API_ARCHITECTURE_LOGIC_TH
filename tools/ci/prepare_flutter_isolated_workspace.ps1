@@ -31,26 +31,24 @@ function Get-LocalPathDependencies {
     $lines = Get-Content -LiteralPath $PubspecPath
     $section = $null
     $sectionIndent = -1
-    $dependencyIndent = -1
     $currentDependencyIndent = -1
     $currentDependency = $null
     $results = @()
 
     foreach ($line in $lines) {
-        if ($line -match '^\s*(?:#.*)?$') { continue }
+        if ([string]::IsNullOrWhiteSpace($line) -or $line.TrimStart().StartsWith('#')) { continue }
 
         $indent = $line.Length - $line.TrimStart().Length
         $trimmed = $line.Trim()
 
-        if ($indent -eq 0 -and $trimmed -match '^(dependencies|dev_dependencies|dependency_overrides):\s*$') {
-            $section = $Matches[1]
+        if ($indent -eq 0 -and ($trimmed -eq 'dependencies:' -or $trimmed -eq 'dev_dependencies:' -or $trimmed -eq 'dependency_overrides:')) {
+            $section = $trimmed.Substring(0, $trimmed.Length - 1)
             $sectionIndent = $indent
-            $dependencyIndent = -1
             $currentDependency = $null
             continue
         }
 
-        if ($indent -eq 0 -and $trimmed -match '^[A-Za-z0-9_.-]+:\s*') {
+        if ($indent -eq 0 -and $trimmed.Contains(':')) {
             $section = $null
             $currentDependency = $null
             continue
@@ -58,14 +56,20 @@ function Get-LocalPathDependencies {
 
         if ($null -eq $section) { continue }
 
-        if ($currentDependency -eq $null -and $trimmed -match '^([A-Za-z0-9_.-]+):\s*$') {
-            $currentDependency = $Matches[1]
+        if ($currentDependency -ne $null -and $indent -eq $currentDependencyIndent -and $trimmed.EndsWith(':')) {
+            $currentDependency = $trimmed.Substring(0, $trimmed.Length - 1)
             $currentDependencyIndent = $indent
             continue
         }
 
-        if ($currentDependency -ne $null -and $indent -gt $currentDependencyIndent -and $trimmed -match '^path:\s*(.+?)\s*$') {
-            $value = $Matches[1].Trim().Trim('"').Trim("'")
+        if ($currentDependency -eq $null -and $trimmed.EndsWith(':')) {
+            $currentDependency = $trimmed.Substring(0, $trimmed.Length - 1)
+            $currentDependencyIndent = $indent
+            continue
+        }
+
+        if ($currentDependency -ne $null -and $indent -gt $currentDependencyIndent -and $trimmed.StartsWith('path:')) {
+            $value = $trimmed.Substring(5).Trim().Trim('"').Trim("'")
             if ([string]::IsNullOrWhiteSpace($value)) {
                 throw "Empty local path dependency in '$PubspecPath'."
             }
