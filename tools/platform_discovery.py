@@ -299,7 +299,14 @@ class DiscoveryEngine:
         level = start_level
 
         for _ in range(self.budget.max_depth + 1):
-            self._check_budget(started, nodes_examined)
+            try:
+                self._check_budget(started, nodes_examined)
+            except DiscoveryHalt as exc:
+                return self._response(
+                    discovery_id, DiscoveryResult.TIMEOUT, None, virtual_space, root_id,
+                    target, levels, candidates, nodes_examined, peers_examined, remote_calls,
+                    False, True, started, str(exc),
+                )
             if self._stop.is_set():
                 return self._response(
                     discovery_id, DiscoveryResult.EMERGENCY_STOP, None, virtual_space, root_id,
@@ -443,16 +450,42 @@ class DiscoveryEngine:
             )
         return DiscoveryResponse(result, node_id, proof)
 
-    def _proof(self, *args: Any) -> DiscoveryProof:
-        latency_ms = int((self.clock() - args[10]) * 1000)
+    def _proof(
+        self,
+        discovery_id: str,
+        result: DiscoveryResult,
+        virtual_space: str | None,
+        root_id: str | None,
+        target: str,
+        levels: list[int],
+        candidates: list[DiscoveryCandidate],
+        nodes_examined: int,
+        peers_examined: int,
+        remote_calls: int,
+        cache_hit: bool,
+        index_hit: bool,
+        started: float,
+        reason: str,
+    ) -> DiscoveryProof:
+        latency_ms = int((self.clock() - started) * 1000)
         if latency_ms > self.budget.max_time_ms:
             raise DiscoveryHalt("proof_exceeded_budget")
         return DiscoveryProof(
-            args[0], args[1], args[2], args[3], args[4],
-            tuple(args[5]), tuple(c.node_id for c in args[6]),
-            args[7], args[8], args[9], args[10] >= 0, args[11],
-            latency_ms, args[12],
-            tuple(sorted({e for c in args[6] for e in c.evidence})),
+            discovery_id,
+            result,
+            virtual_space,
+            root_id,
+            target,
+            tuple(levels),
+            tuple(c.node_id for c in candidates),
+            nodes_examined,
+            peers_examined,
+            remote_calls,
+            cache_hit,
+            index_hit,
+            latency_ms,
+            reason,
+            tuple(sorted({e for c in candidates for e in c.evidence})),
         )
 
     @staticmethod
