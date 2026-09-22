@@ -74,6 +74,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
     await tester.tap(find.text('Preview Diff'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Preview Diff'), findsWidgets);
