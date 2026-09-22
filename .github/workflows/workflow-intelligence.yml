@@ -11,6 +11,7 @@ on:
       - Research OS Unified 10x10 Exact SHA Gate
       - Research OS Candidate
       - Research OS Release
+      - Research OS Release Spine Gate
       - CI Lite
       - Assistant Mesh 30
       - Generate Orchestrator
