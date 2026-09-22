@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/developer_access_api_client.dart';
+import 'flutter_code_tool_page.dart';
 
 class DeveloperAccessPage extends StatefulWidget {
   DeveloperAccessPage({DeveloperAccessApiClient? client, super.key})
@@ -145,6 +146,11 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
                     children: <Widget>[
                       _HeaderCard(principal: _principal ?? 'Authenticated owner'),
                       const SizedBox(height: 18),
+                      FlutterCodeToolPage(
+                        client: widget.client,
+                        principal: _principal ?? 'Authenticated owner',
+                      ),
+                      const SizedBox(height: 22),
                       Text('คำขอที่รออนุมัติ (${_requests.length})', style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: 10),
                       if (_requests.isEmpty)
