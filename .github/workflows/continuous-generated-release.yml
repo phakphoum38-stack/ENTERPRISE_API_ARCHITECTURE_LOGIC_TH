@@ -60,7 +60,7 @@ jobs:
           set -euo pipefail
           workflow="research-os-windows-artifact.yml"
           for attempt in $(seq 1 180); do
-            run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 50 --json databaseId,status,conclusion,createdAt,event,headSha --jq --argjson started "$STARTED_EPOCH" --arg sha "$SOURCE_SHA" 'map(select(.event == "workflow_dispatch" and .headSha == $sha and (.createdAt|fromdateiso8601) >= ($started - 30))) | sort_by(.createdAt) | last')"
+            run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 50 --json databaseId,status,conclusion,createdAt,event,headSha | jq -c --argjson started "$STARTED_EPOCH" --arg sha "$SOURCE_SHA" 'map(select(.event == "workflow_dispatch" and .headSha == $sha and (.createdAt|fromdateiso8601) >= ($started - 30))) | sort_by(.createdAt) | last')"
             if [[ -n "$run" && "$run" != "null" ]]; then
               id="$(jq -r '.databaseId' <<< "$run")"
               status="$(jq -r '.status' <<< "$run")"
