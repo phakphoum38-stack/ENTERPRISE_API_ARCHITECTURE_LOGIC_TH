@@ -552,6 +552,7 @@ def build_nodes_from_platform_registry(registry: Mapping[str, Any], scope: Disco
                 nodes.append(DiscoveryNode(
                     node_id, level, part, "WORKSPACE_LEVEL",
                     parent_id=parent, virtual_space="PLATFORM", root_id="platform-root",
+                    scope=scope, authority=DiscoveryEngine.authority_for(scope),
                 ))
             parent = node_id
             level += 1
