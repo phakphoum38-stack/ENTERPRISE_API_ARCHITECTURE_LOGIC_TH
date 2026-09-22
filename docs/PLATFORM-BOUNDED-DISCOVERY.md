@@ -96,3 +96,7 @@ unreferenced resources are reported as archive candidates only; deletion remains
 outside Discovery and stays under the existing authority/final-gate controls.
 
 **Rule:** `ค้นให้เร็ว แต่ห้ามเดา และห้ามสร้างซ้ำ`.
+
+## Internal / External boundary
+
+Discovery uses one unified registry with two source scopes. `INTERNAL` may establish canonical system structure; `EXTERNAL` is observation-only and may correlate with the system but cannot establish system authority or a canonical root. Unknown scope is fail-closed and stops discovery.
