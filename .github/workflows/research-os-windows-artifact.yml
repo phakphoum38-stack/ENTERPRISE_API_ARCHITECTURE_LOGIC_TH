@@ -163,7 +163,7 @@ jobs:
           Project: $env:APP_PROJECT_NAME
           Executable: $env:APP_EXE_NAME
           Publisher/Team: $env:APP_COMPANY_NAME
-          Desktop commit: $(git rev-parse HEAD)
+          Desktop commit: $((git rev-parse HEAD).Trim())
           Identity isolation gate: PASS
           UI gate: flutter analyze + full tests + desktop shell test
           Windows bootstrap: isolated temporary workspace only
