@@ -531,6 +531,7 @@ class DiscoveryEngine:
             tuple(c.node_id for c in candidates), nodes_examined, peers_examined,
             remote_calls, cache_hit, index_hit, 0, reason,
             tuple(sorted({e for c in candidates for e in c.evidence})),
+            DiscoveryScope.INTERNAL, DiscoveryAuthority.SYSTEM,
         )
 
 
