@@ -27,38 +27,48 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Generate build manifest
+      - name: Capture exact source SHA
+        id: dispatch
         shell: bash
         run: |
           set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          test -n "$SOURCE_SHA"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "started_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate build manifest and dispatch Windows artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
+        run: |
+          set -euo pipefail
           mkdir -p build/manifest
-          cat > build/manifest/build-info.json <> "$GITHUB_OUTPUT"
-          gh workflow run research-os-windows-artifact.yml --repo "$GITHUB_REPOSITORY" --ref main
-          echo "Windows workflow dispatched from main."
+          printf '{"source_sha":"%s","artifact":"Research-OS-Windows-x64-%s"}\n' "$SOURCE_SHA" "$SOURCE_SHA" > build/manifest/build-info.json
+          gh workflow run research-os-windows-artifact.yml --repo "$GITHUB_REPOSITORY" --ref main -f source_sha="$SOURCE_SHA"
+          echo "Windows workflow dispatched from main for SHA $SOURCE_SHA."
 
       - name: Wait for Windows build result
         id: wait_windows
         env:
           GH_TOKEN: ${{ github.token }}
           STARTED_EPOCH: ${{ steps.dispatch.outputs.started_epoch }}
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
         shell: bash
         run: |
           set -euo pipefail
           workflow="research-os-windows-artifact.yml"
           for attempt in $(seq 1 180); do
-            run="\((gh run list --repo "\)GITHUB_REPOSITORY" --workflow "\(workflow" --branch main --event workflow_dispatch --limit 20 --json databaseId,status,conclusion,createdAt --jq 'map(select((.createdAt|fromdateiso8601) >= ('"\)STARTED_EPOCH"' - 30))) | sort_by(.createdAt) | last')"
-            if [[ -n "\(run" && "\)run" != "null" ]]; then
-              id="\((jq -r '.databaseId' <<< "\)run")"
-              status="\((jq -r '.status' <<< "\)run")"
-              conclusion="\((jq -r '.conclusion // ""' <<< "\)run")"
-              echo "Windows run=\(id status=\)status conclusion=$conclusion"
+            run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 50 --json databaseId,status,conclusion,createdAt,event,headSha --jq --argjson started "$STARTED_EPOCH" --arg sha "$SOURCE_SHA" 'map(select(.event == "workflow_dispatch" and .headSha == $sha and (.createdAt|fromdateiso8601) >= ($started - 30))) | sort_by(.createdAt) | last')"
+            if [[ -n "$run" && "$run" != "null" ]]; then
+              id="$(jq -r '.databaseId' <<< "$run")"
+              status="$(jq -r '.status' <<< "$run")"
+              conclusion="$(jq -r '.conclusion // ""' <<< "$run")"
+              echo "Windows run=$id status=$status conclusion=$conclusion sha=$SOURCE_SHA"
               if [[ "$status" == "completed" ]]; then
-                if [[ "$conclusion" != "success" ]]; then
-                  echo "Windows artifact build failed: $id"
-                  exit 1
-                fi
-                echo "windows_run_id=\(id" >> "\)GITHUB_OUTPUT"
-                echo "Windows artifact build passed: $id"
+                if [[ "$conclusion" != "success" ]]; then exit 1; fi
+                echo "windows_run_id=$id" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
@@ -71,36 +81,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           WINDOWS_RUN_ID: ${{ steps.wait_windows.outputs.windows_run_id }}
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$WINDOWS_RUN_ID" ]]; then
-            echo "Missing Windows run id from completed build."
-            exit 1
-          fi
-          
-          artifacts="\((gh api "repos/\)GITHUB_REPOSITORY/actions/runs/$WINDOWS_RUN_ID/artifacts" --jq '.artifacts')"
-          if [[ -z "\(artifacts" || "\)artifacts" == "null" ]]; then
-            artifacts="[]"
-          fi
-          
-          echo "$artifacts" | jq -r '.[]? | [.name, .size_in_bytes, .expired] | @tsv'
-          expected="Research-OS-Windows-x64-${GITHUB_SHA}"
-          
-          match="\((jq -r --arg expected "\)expected" 'map(select(.name == \(expected and .expired == false)) | length' <<< "\)artifacts")"
-          if [[ "$match" != "1" ]]; then
-            echo "Required Research OS Windows artifact not found: $expected"
-            echo "Artifacts returned by Windows run:"
-            echo "$artifacts" | jq -r '.[].name'
-            exit 1
-          fi
-          
-          size="\((jq -r --arg expected "\)expected" '.[] | select(.name == \(expected) | .size_in_bytes' <<< "\)artifacts")"
-          if [[ "$size" -le 0 ]]; then
-            echo "Required Research OS Windows artifact is empty: $expected"
-            exit 1
-          fi
-          
+          test -n "$WINDOWS_RUN_ID"
+          run_sha="$(gh run view "$WINDOWS_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          test "$run_sha" = "$SOURCE_SHA"
+          artifacts="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$WINDOWS_RUN_ID/artifacts" --jq '.artifacts')"
+          if [[ -z "$artifacts" || "$artifacts" == "null" ]]; then artifacts="[]"; fi
+          expected="Research-OS-Windows-x64-${SOURCE_SHA}"
+          match="$(jq -r --arg expected "$expected" 'map(select(.name == $expected and .expired == false)) | length' <<< "$artifacts")"
+          test "$match" = "1"
+          size="$(jq -r --arg expected "$expected" '.[] | select(.name == $expected) | .size_in_bytes' <<< "$artifacts")"
+          test "$size" -gt 0
+          echo "RESEARCH_OS_WINDOWS_SOURCE_SHA=$SOURCE_SHA"
           echo "RESEARCH_OS_WINDOWS_ARTIFACT=PASS"
           echo "artifact=$expected"
           echo "size_bytes=$size"
