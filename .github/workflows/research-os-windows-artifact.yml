@@ -110,8 +110,12 @@ jobs:
       - name: Apply Research OS Windows branding in isolated workspace
         shell: pwsh
         run: |
-          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
-          Set-Location $workspace
+          $appWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows\apps\research_os_flutter'
+          if (-not (Test-Path -LiteralPath $appWorkspace -PathType Container)) {
+            throw "Isolated Research OS app workspace is missing: $appWorkspace"
+          }
+          Set-Location $appWorkspace
+
           $mainCpp = 'windows\runner\main.cpp'
           $mainText = Get-Content $mainCpp -Raw
           $mainText = $mainText -replace 'Create\(L"research_os_flutter"', 'Create(L"Research OS"'
@@ -136,8 +140,12 @@ jobs:
       - name: Build isolated Research OS Windows release
         shell: pwsh
         run: |
-          $workspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
-          Set-Location $workspace
+          $appWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows\apps\research_os_flutter'
+          if (-not (Test-Path -LiteralPath $appWorkspace -PathType Container)) {
+            throw "Isolated Research OS app workspace is missing: $appWorkspace"
+          }
+          Set-Location $appWorkspace
+
           flutter pub get
           if ($LASTEXITCODE -ne 0) { throw 'Research OS isolated flutter pub get failed.' }
           flutter build windows --release
