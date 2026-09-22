@@ -339,14 +339,14 @@ class DiscoveryEngine:
                 return self._response(
                     discovery_id, DiscoveryResult.TIMEOUT, None, virtual_space, root_id,
                     target, levels, candidates, nodes_examined, peers_examined, remote_calls,
-                    False, True, started, str(exc),
+                    False, True, started, str(exc), scope,
                 )
 
             if self._stop.is_set():
                 return self._response(
                     discovery_id, DiscoveryResult.EMERGENCY_STOP, None, virtual_space, root_id,
                     target, levels, candidates, nodes_examined, peers_examined, remote_calls,
-                    False, False, started, getattr(self, "_emergency_reason", "stopped"),
+                    False, False, started, getattr(self, "_emergency_reason", "stopped"), scope,
                 )
 
             levels.append(level)
@@ -360,7 +360,7 @@ class DiscoveryEngine:
                         return self._response(
                             discovery_id, DiscoveryResult.TIMEOUT, None, virtual_space, root_id,
                             target, levels, candidates, nodes_examined, peers_examined, remote_calls,
-                            False, True, started, "node_budget_exhausted",
+                            False, True, started, "node_budget_exhausted", scope,
                         )
                     score, evidence = self._score(node, target_norm)
                     if score > 0:
@@ -380,13 +380,13 @@ class DiscoveryEngine:
                 return self._response(
                     discovery_id, DiscoveryResult.FOUND_AT, node_id, virtual_space, root_id,
                     target, levels, candidates, nodes_examined, peers_examined, remote_calls,
-                    False, True, started, "same_level_exact_match",
+                    False, True, started, "same_level_exact_match", scope,
                 )
             if len(exact) > 1:
                 return self._response(
                     discovery_id, DiscoveryResult.AMBIGUOUS, None, virtual_space, root_id,
                     target, levels, candidates, nodes_examined, peers_examined, remote_calls,
-                    False, True, started, "multiple_same_level_matches",
+                    False, True, started, "multiple_same_level_matches", scope,
                 )
 
             frontier = sorted(set(next_frontier))
