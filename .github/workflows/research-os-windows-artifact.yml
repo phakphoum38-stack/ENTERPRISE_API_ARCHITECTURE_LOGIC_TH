@@ -163,7 +163,7 @@ jobs:
           Project: $env:APP_PROJECT_NAME
           Executable: $env:APP_EXE_NAME
           Publisher/Team: $env:APP_COMPANY_NAME
-          Desktop commit: $env:GITHUB_SHA
+          Desktop commit: $(git rev-parse HEAD)
           Identity isolation gate: PASS
           UI gate: flutter analyze + full tests + desktop shell test
           Windows bootstrap: isolated temporary workspace only
@@ -198,7 +198,7 @@ jobs:
       - name: Upload Research OS Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Research-OS-Windows-x64-${{ github.sha }}
+          name: Research-OS-Windows-x64-${{ inputs.source_sha || github.sha }}
           path: |
             ${{ runner.temp }}/Research-OS-Windows-x64.zip
             ${{ runner.temp }}/Research-OS-Windows-x64.zip.sha256
