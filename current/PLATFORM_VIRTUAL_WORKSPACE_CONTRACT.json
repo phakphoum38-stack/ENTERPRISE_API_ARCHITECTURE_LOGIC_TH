@@ -110,6 +110,17 @@
     "capability_duplicate_detection": true,
     "stale_candidate_detection": true,
     "emergency_stop": true,
-    "proof_required": true
+    "proof_required": true,
+    "scope_model": {
+      "mode": "UNIFIED_REGISTRY_WITH_SCOPE_ADAPTERS",
+      "scopes": [
+        "INTERNAL",
+        "EXTERNAL"
+      ],
+      "internal_authority": "SYSTEM",
+      "external_authority": "OBSERVATION_ONLY",
+      "external_must_not_establish_canonical_root": true,
+      "unknown_scope_policy": "STOP"
+    }
   }
 }
