@@ -7,6 +7,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 import uuid
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -30,7 +31,7 @@ class FlutterCodeToolHttpTests(unittest.TestCase):
         )}
         os.environ.update({
             "RESEARCH_OS_DATA_DIR": str(root / "data"),
-            "RESEARCH_OS_IDENTITY_PROXY_SECRET": "test-secret",
+            "RESEARCH_OS_IDENTITY_PROXY_SECRET": "test-secret-0123456789",
             "RESEARCH_OS_CODE_ROOT": str(root),
             "RESEARCH_OS_CODE_OWNER_IDS": "user:owner",
         })
@@ -53,7 +54,7 @@ class FlutterCodeToolHttpTests(unittest.TestCase):
         conn = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=5)
         issued_at = int(time.time())
         nonce = uuid.uuid4().hex
-        signature = IdentityAssertionVerifier("test-secret").signature_for(principal, issued_at, nonce)
+        signature = IdentityAssertionVerifier("test-secret-0123456789").signature_for(principal, issued_at, nonce)
         headers = {
             "Content-Type": "application/json",
             "X-ResearchOS-Principal": principal,
