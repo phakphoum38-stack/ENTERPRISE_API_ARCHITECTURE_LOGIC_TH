@@ -27,26 +27,41 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Generate build manifest
+      - name: Capture exact source SHA
+        id: dispatch
         shell: bash
         run: |
           set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          test -n "$SOURCE_SHA"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "started_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+          echo "Windows source SHA=$SOURCE_SHA"
+
+      - name: Generate build manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
+        run: |
+          set -euo pipefail
           mkdir -p build/manifest
-          cat > build/manifest/build-info.json <> "$GITHUB_OUTPUT"
-          gh workflow run research-os-windows-artifact.yml --repo "$GITHUB_REPOSITORY" --ref main
-          echo "Windows workflow dispatched from main."
+          printf '{"source_sha":"%s","artifact":"Research-OS-Windows-x64-%s"}\n' "$SOURCE_SHA" "$SOURCE_SHA" > build/manifest/build-info.json
+          gh workflow run research-os-windows-artifact.yml --repo "$GITHUB_REPOSITORY" --ref main -f source_sha="$SOURCE_SHA"
+          echo "Windows workflow dispatched from main for SHA $SOURCE_SHA."
 
       - name: Wait for Windows build result
         id: wait_windows
         env:
           GH_TOKEN: ${{ github.token }}
           STARTED_EPOCH: ${{ steps.dispatch.outputs.started_epoch }}
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
         shell: bash
         run: |
           set -euo pipefail
           workflow="research-os-windows-artifact.yml"
           for attempt in $(seq 1 180); do
-            run="\((gh run list --repo "\)GITHUB_REPOSITORY" --workflow "\(workflow" --branch main --event workflow_dispatch --limit 20 --json databaseId,status,conclusion,createdAt --jq 'map(select((.createdAt|fromdateiso8601) >= ('"\)STARTED_EPOCH"' - 30))) | sort_by(.createdAt) | last')"
+            run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 20 --json databaseId,status,conclusion,createdAt,event,headSha               --jq --argjson started "$STARTED_EPOCH" --arg sha "$SOURCE_SHA"               'map(select(.event == "workflow_dispatch" and .headSha == $sha and (.createdAt|fromdateiso8601) >= ($started - 30))) | sort_by(.createdAt) | last')"
             if [[ -n "\(run" && "\)run" != "null" ]]; then
               id="\((jq -r '.databaseId' <<< "\)run")"
               status="\((jq -r '.status' <<< "\)run")"
@@ -85,7 +100,8 @@ jobs:
           fi
           
           echo "$artifacts" | jq -r '.[]? | [.name, .size_in_bytes, .expired] | @tsv'
-          expected="Research-OS-Windows-x64-${GITHUB_SHA}"
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
+          expected="Research-OS-Windows-x64-${SOURCE_SHA}"
           
           match="\((jq -r --arg expected "\)expected" 'map(select(.name == \(expected and .expired == false)) | length' <<< "\)artifacts")"
           if [[ "$match" != "1" ]]; then
