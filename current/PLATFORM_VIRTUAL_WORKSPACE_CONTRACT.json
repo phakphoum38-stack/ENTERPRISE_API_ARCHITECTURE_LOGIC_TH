@@ -1,17 +1,126 @@
 {
-  "contract_id":"research-os-platform-virtual-workspace-v1",
-  "version":1,
-  "purpose":"Logical metadata-only workspace for locating Platform work without a second physical tree.",
-  "storage_model":"single_registry",
-  "registry_path":"current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
-  "categories":["FOUNDATION","INTEGRATION","EVOLUTION","FEDERATION","RESOURCE","SECURITY","RELEASE","OPERATIONS"],
-  "statuses":["PLANNED","IN_PROGRESS","BLOCKED","HOLD","UNKNOWN","DONE","SUPERSEDED"],
-  "resolution_states":["FOUND","PARTIAL","GAP","UNKNOWN"],
-  "required_record_fields":["work_id","virtual_path","name","purpose","category","status","resolution","source_refs","dependencies","evidence_refs"],
-  "fail_closed":["missing_identity","missing_locator","duplicate_work_id","duplicate_virtual_path","unknown_done","invalid_category","invalid_status","invalid_resolution","missing_source_refs"],
-  "gap_policy":{"UNKNOWN":"INVESTIGATE","GAP":"BUILD_AFTER_INVESTIGATION","AMBIGUOUS":"HOLD"},
-  "authority":{"descriptive_only":true,"may_merge":false,"may_approve":false,"may_grant_permissions":false,"may_change_branch_protection":false,"may_rewrite_history":false},
-  "duplicate_systems_forbidden":["global_scheduler","worker_pool","task_queue","memory_store","learning_root","resource_control_plane","assurance_engine","merge_authority"],
-  "lineage":["contract_refs","source_refs","dependency_refs","evidence_refs","revision"],
-  "resource_policy":{"new_directories_required":false,"duplicate_artifacts_forbidden":true,"10^1000_materialization":"forbidden","execution":"bounded"}
+  "contract_id": "research-os-platform-virtual-workspace-v1",
+  "version": 2,
+  "purpose": "Logical metadata-only workspace for locating Platform work without a second physical tree.",
+  "storage_model": "single_registry",
+  "registry_path": "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+  "categories": [
+    "FOUNDATION",
+    "INTEGRATION",
+    "EVOLUTION",
+    "FEDERATION",
+    "RESOURCE",
+    "SECURITY",
+    "RELEASE",
+    "OPERATIONS"
+  ],
+  "statuses": [
+    "PLANNED",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "HOLD",
+    "UNKNOWN",
+    "DONE",
+    "SUPERSEDED"
+  ],
+  "resolution_states": [
+    "FOUND",
+    "PARTIAL",
+    "GAP",
+    "UNKNOWN"
+  ],
+  "required_record_fields": [
+    "work_id",
+    "virtual_path",
+    "name",
+    "purpose",
+    "category",
+    "status",
+    "resolution",
+    "source_refs",
+    "dependencies",
+    "evidence_refs"
+  ],
+  "fail_closed": [
+    "missing_identity",
+    "missing_locator",
+    "duplicate_work_id",
+    "duplicate_virtual_path",
+    "unknown_done",
+    "invalid_category",
+    "invalid_status",
+    "invalid_resolution",
+    "missing_source_refs"
+  ],
+  "gap_policy": {
+    "UNKNOWN": "INVESTIGATE",
+    "GAP": "BUILD_AFTER_INVESTIGATION",
+    "AMBIGUOUS": "HOLD"
+  },
+  "authority": {
+    "descriptive_only": true,
+    "may_merge": false,
+    "may_approve": false,
+    "may_grant_permissions": false,
+    "may_change_branch_protection": false,
+    "may_rewrite_history": false
+  },
+  "duplicate_systems_forbidden": [
+    "global_scheduler",
+    "worker_pool",
+    "task_queue",
+    "memory_store",
+    "learning_root",
+    "resource_control_plane",
+    "assurance_engine",
+    "merge_authority"
+  ],
+  "lineage": [
+    "contract_refs",
+    "source_refs",
+    "dependency_refs",
+    "evidence_refs",
+    "revision"
+  ],
+  "resource_policy": {
+    "new_directories_required": false,
+    "duplicate_artifacts_forbidden": true,
+    "10^1000_materialization": "forbidden",
+    "execution": "bounded",
+    "discovery_budget": "bounded"
+  },
+  "discovery": {
+    "mode": "bounded_hierarchical",
+    "same_level_first": true,
+    "virtual_space_required": true,
+    "root_required_before_create": true,
+    "ambiguous_policy": "HOLD",
+    "root_unresolved_policy": "STOP",
+    "timeout_policy": "RETURN_PROOF",
+    "max_time_ms": 60000,
+    "max_depth": 32,
+    "max_nodes": 100000,
+    "max_workers": 8,
+    "max_remote_calls": 128,
+    "max_queue": 256,
+    "negative_cache": true,
+    "positive_cache": true,
+    "self_healing_index": true,
+    "cross_space_duplicate_detection": true,
+    "capability_duplicate_detection": true,
+    "stale_candidate_detection": true,
+    "emergency_stop": true,
+    "proof_required": true,
+    "scope_model": {
+      "mode": "UNIFIED_REGISTRY_WITH_SCOPE_ADAPTERS",
+      "scopes": [
+        "INTERNAL",
+        "EXTERNAL"
+      ],
+      "internal_authority": "SYSTEM",
+      "external_authority": "OBSERVATION_ONLY",
+      "external_must_not_establish_canonical_root": true,
+      "unknown_scope_policy": "STOP"
+    }
+  }
 }
