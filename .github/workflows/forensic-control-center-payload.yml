@@ -1,16 +1,7 @@
-name: Forensic Control Center Payload Extraction
+name: Forensic Control Center Payload Sets Extraction
 
 on:
   workflow_dispatch:
-    inputs:
-      payload_ref:
-        description: "Exact payload commit SHA to inspect"
-        required: true
-        default: "7d6db9ccca7c3565288411a4cf01f5b5219bdb07"
-      base_ref:
-        description: "Exact base commit SHA for changed-file comparison"
-        required: true
-        default: "37b2276f2ed8a31d58ff92a266e46f1c9a7098a4"
 
 permissions:
   contents: read
@@ -18,6 +9,18 @@ permissions:
 jobs:
   extract:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - set: "518"
+            payload_ref: "b1e66f0cf77d894f7e00fa6d06b98f02f058bc7d"
+          - set: "519"
+            payload_ref: "268751a9a2dbc6f9e61ccafbf04b1c6622118fd6"
+          - set: "520"
+            payload_ref: "4d33c6bfa5ab6124009214bef9e27566767cddda"
+          - set: "521"
+            payload_ref: "7d6db9ccca7c3565288411a4cf01f5b5219bdb07"
     steps:
       - name: Checkout full lineage
         uses: actions/checkout@v4
@@ -26,19 +29,23 @@ jobs:
 
       - name: Validate exact refs
         shell: bash
+        env:
+          PAYLOAD_REF: ${{ matrix.payload_ref }}
         run: |
-          git cat-file -e "${{ inputs.payload_ref }}^{commit}"
-          git cat-file -e "${{ inputs.base_ref }}^{commit}"
+          git cat-file -e "${PAYLOAD_REF}^{commit}"
 
-      - name: Extract Control Center payload
+      - name: Extract payload set
+        shell: bash
+        env:
+          SET_ID: ${{ matrix.set }}
+          PAYLOAD_REF: ${{ matrix.payload_ref }}
+          BASE_REF: "37b2276f2ed8a31d58ff92a266e46f1c9a7098a4"
         run: |
-          python tools/forensic/control_center_payload.py \
-            --payload-ref "${{ inputs.payload_ref }}" \
-            --base-ref "${{ inputs.base_ref }}"
+          python tools/forensic/control_center_payload.py             --payload-ref "${PAYLOAD_REF}"             --base-ref "${BASE_REF}"             --out "reports/forensic/control-center-payload/CONTROL_CENTER_${SET_ID}_FORENSIC.json"
 
       - name: Publish forensic manifest
         uses: actions/upload-artifact@v4
         with:
-          name: control-center-521-forensic-${{ inputs.payload_ref }}
-          path: reports/forensic/control-center-payload/CONTROL_CENTER_521_FORENSIC.json
+          name: control-center-${{ matrix.set }}-forensic-${{ matrix.payload_ref }}
+          path: reports/forensic/control-center-payload/CONTROL_CENTER_${{ matrix.set }}_FORENSIC.json
           if-no-files-found: error
