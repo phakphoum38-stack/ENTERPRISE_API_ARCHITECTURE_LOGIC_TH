@@ -141,3 +141,4 @@ if (-not (Test-Path -LiteralPath (Join-Path $appTarget 'pubspec.yaml') -PathType
 
 Write-Host "RESEARCH_OS_ISOLATED_WORKSPACE=PASS"
 Write-Host "RESEARCH_OS_ISOLATED_APP=$appTarget"
+exit 0
