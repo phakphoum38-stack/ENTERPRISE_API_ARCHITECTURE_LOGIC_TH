@@ -19,6 +19,16 @@ from threading import Event, Lock
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 
+class DiscoveryScope(str, Enum):
+    INTERNAL = 'INTERNAL'
+    EXTERNAL = 'EXTERNAL'
+
+
+class DiscoveryAuthority(str, Enum):
+    SYSTEM = 'SYSTEM'
+    OBSERVATION_ONLY = 'OBSERVATION_ONLY'
+
+
 class DiscoveryResult(str, Enum):
     FOUND = "FOUND"
     FOUND_AT = "FOUND_AT"
@@ -72,6 +82,8 @@ class DiscoveryNode:
     references: tuple[str, ...] = ()
     active: bool = True
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    scope: DiscoveryScope = DiscoveryScope.INTERNAL
+    authority: DiscoveryAuthority = DiscoveryAuthority.SYSTEM
 
     def structural_fingerprint(self) -> str:
         payload = {
@@ -111,6 +123,8 @@ class DiscoveryProof:
     latency_ms: int
     reason: str
     evidence: tuple[str, ...] = ()
+    source_scope: DiscoveryScope = DiscoveryScope.INTERNAL
+    authority: DiscoveryAuthority = DiscoveryAuthority.SYSTEM
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -129,6 +143,8 @@ class DiscoveryProof:
             "latency_ms": self.latency_ms,
             "reason": self.reason,
             "evidence": list(self.evidence),
+            "source_scope": self.source_scope.value,
+            "authority": self.authority.value,
         }
 
 
@@ -240,6 +256,18 @@ class DiscoveryEngine:
         self._stop = Event()
         self._backpressure = Backpressure(self.budget.max_queue)
 
+    @staticmethod
+    def authority_for(scope: DiscoveryScope) -> DiscoveryAuthority:
+        return DiscoveryAuthority.SYSTEM if scope == DiscoveryScope.INTERNAL else DiscoveryAuthority.OBSERVATION_ONLY
+
+    def resolve_scope(self, virtual_space: str | None, root_id: str | None) -> DiscoveryScope:
+        if not virtual_space or not root_id:
+            raise DiscoveryHalt('scope_unresolved')
+        root = self.index.get(root_id)
+        if root is None:
+            raise DiscoveryHalt('root_unresolved')
+        return root.scope
+
     def emergency_stop(self, reason: str = "operator_or_safety_stop") -> None:
         self._stop.set()
         self._emergency_reason = reason
@@ -258,6 +286,7 @@ class DiscoveryEngine:
         target: str,
         start_parent_id: str | None = None,
         start_level: int = 0,
+        scope: DiscoveryScope | None = None,
     ) -> DiscoveryResponse:
         started = self.clock()
         discovery_id = hashlib.sha256(
@@ -485,6 +514,7 @@ class DiscoveryEngine:
             latency_ms,
             reason,
             tuple(sorted({e for c in candidates for e in c.evidence})),
+            scope, self.authority_for(scope),
         )
 
     @staticmethod
@@ -503,10 +533,10 @@ class DiscoveryEngine:
         )
 
 
-def build_nodes_from_platform_registry(registry: Mapping[str, Any]) -> list[DiscoveryNode]:
+def build_nodes_from_platform_registry(registry: Mapping[str, Any], scope: DiscoveryScope = DiscoveryScope.INTERNAL) -> list[DiscoveryNode]:
     """Adapt the existing Platform registry without creating another registry."""
     nodes: list[DiscoveryNode] = []
-    root = DiscoveryNode("platform-root", 0, "PLATFORM", "VIRTUAL_SPACE", root_id="platform-root")
+    root = DiscoveryNode("platform-root", 0, "PLATFORM", "VIRTUAL_SPACE", root_id="platform-root", scope=scope, authority=DiscoveryEngine.authority_for(scope))
     nodes.append(root)
     for record in registry.get("records", []):
         path = str(record.get("virtual_path", ""))
@@ -530,5 +560,6 @@ def build_nodes_from_platform_registry(registry: Mapping[str, Any]) -> list[Disc
             references=tuple(record.get("source_refs", [])),
             active=record.get("status") not in {"SUPERSEDED"},
             metadata={"resolution": record.get("resolution")},
+            scope=scope, authority=DiscoveryEngine.authority_for(scope),
         ))
     return nodes
