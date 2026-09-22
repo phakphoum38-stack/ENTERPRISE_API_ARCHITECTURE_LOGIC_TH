@@ -38,6 +38,17 @@ class PlatformVirtualWorkspaceTests(unittest.TestCase):
     def test_validator_passes(self):
         self.assertEqual(len(validate(self.c, self.r)), 64)
 
+    def test_discovery_is_bounded_and_fail_closed(self):
+        discovery = self.c["discovery"]
+        self.assertEqual(discovery["mode"], "bounded_hierarchical")
+        self.assertTrue(discovery["same_level_first"])
+        self.assertTrue(discovery["root_required_before_create"])
+        self.assertEqual(discovery["ambiguous_policy"], "HOLD")
+        self.assertEqual(discovery["root_unresolved_policy"], "STOP")
+        self.assertEqual(discovery["timeout_policy"], "RETURN_PROOF")
+        self.assertLessEqual(discovery["max_time_ms"], 60000)
+        self.assertTrue(discovery["proof_required"])
+
     def test_no_duplicate_ids(self):
         ids = [x["work_id"] for x in self.r["records"]]
         self.assertEqual(len(ids), len(set(ids)))
