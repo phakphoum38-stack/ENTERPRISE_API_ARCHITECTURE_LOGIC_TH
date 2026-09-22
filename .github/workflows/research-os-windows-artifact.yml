@@ -71,8 +71,10 @@ jobs:
         shell: pwsh
         run: |
           $repoWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
+          # The preparation helper is a PowerShell script with terminating-error semantics.
+          # Do not inspect $LASTEXITCODE here: it can retain a stale native-process exit code
+          # after a successful .ps1 invocation and turn a valid workspace into a false failure.
           & "$env:GITHUB_WORKSPACE/tools/ci/prepare_flutter_isolated_workspace.ps1" -RepositoryRoot $env:GITHUB_WORKSPACE -AppRelativePath 'apps/research_os_flutter' -WorkspaceRoot $repoWorkspace
-          if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter workspace preparation failed.' }
 
           $appWorkspace = Join-Path $repoWorkspace 'apps\research_os_flutter'
           Set-Location $appWorkspace
