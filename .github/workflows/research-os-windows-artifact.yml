@@ -2,6 +2,11 @@ name: Research OS Windows Artifact
 
 on:
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main source SHA to build
+        required: false
+        type: string
   push:
     branches:
       - main
@@ -33,6 +38,23 @@ jobs:
     steps:
       - name: Checkout Research OS desktop source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Assert exact Windows source SHA
+        shell: pwsh
+        env:
+          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          if ($env:EXPECTED_SOURCE_SHA) {
+            $actual = (git rev-parse HEAD).Trim()
+            if ($actual -ne $env:EXPECTED_SOURCE_SHA) {
+              throw "Windows Artifact source SHA mismatch. Expected '$env:EXPECTED_SOURCE_SHA', actual '$actual'."
+            }
+            Write-Host "RESEARCH_OS_SOURCE_SHA=$actual"
+          } else {
+            Write-Host "RESEARCH_OS_SOURCE_SHA=$(git rev-parse HEAD)"
+          }
 
       - name: Assert this pipeline cannot build Owner Special
         shell: pwsh
