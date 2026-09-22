@@ -13,6 +13,11 @@ on:
         required: true
         type: string
 
+      release_spine_run_id:
+        description: Successful Research OS Release Spine Gate run ID
+        required: true
+        type: string
+
       tag_name:
         description: Release tag, for example v3.0.0
         required: false
@@ -40,6 +45,7 @@ jobs:
     env:
       TARGET_SHA: ${{ inputs.target_sha }}
       CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      RELEASE_SPINE_RUN_ID: ${{ inputs.release_spine_run_id }}
 
     steps:
       - name: Checkout exact candidate commit
@@ -101,6 +107,22 @@ jobs:
 
           echo "Candidate workflow validation passed."
 
+      - name: Validate exact release spine certification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SPINE_RUN_ID"
+          workflow="$(gh run view "$RELEASE_SPINE_RUN_ID" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+          status="$(gh run view "$RELEASE_SPINE_RUN_ID" --repo "${{ github.repository }}" --json status --jq '.status')"
+          conclusion="$(gh run view "$RELEASE_SPINE_RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+          head_sha="$(gh run view "$RELEASE_SPINE_RUN_ID" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+          test "$workflow" = "Research OS Release Spine Gate"
+          test "$status" = completed
+          test "$conclusion" = success
+          test "$head_sha" = "$TARGET_SHA"
+          echo "RELEASE_SPINE_CERTIFICATION=PASS"
       - name: Download verified V3 candidate
         shell: bash
         env:
@@ -343,6 +365,7 @@ jobs:
             echo
             echo "- Target SHA: \`$TARGET_SHA\`"
             echo "- Candidate run: \`$CANDIDATE_RUN_ID\`"
+            echo "- Release spine run: \`$RELEASE_SPINE_RUN_ID\`"
             echo "- Publish requested: \`${{ inputs.publish }}\`"
             if [ -n "${RELEASE_TAG:-}" ]; then
               echo "- Release tag: \`$RELEASE_TAG\`"
