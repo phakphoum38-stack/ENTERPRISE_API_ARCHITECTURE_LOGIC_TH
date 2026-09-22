@@ -494,6 +494,7 @@ class DiscoveryEngine:
         index_hit: bool,
         started: float,
         reason: str,
+        scope: DiscoveryScope = DiscoveryScope.INTERNAL,
     ) -> DiscoveryProof:
         latency_ms = int((self.clock() - started) * 1000)
         if latency_ms > self.budget.max_time_ms:
