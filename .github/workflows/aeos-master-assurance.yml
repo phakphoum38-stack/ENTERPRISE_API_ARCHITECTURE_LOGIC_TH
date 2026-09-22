@@ -108,16 +108,22 @@ jobs:
           print('EXECUTION_BOUNDARIES=PASS')
           PY
 
-      - name: Verify protected canonical boundary
+      - name: Verify canonical boundary and maintenance integrity
         if: github.event_name == 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --name-only "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA" | grep -E '(^|/)canonical-source-lineage-gate\.yml$' >/dev/null; then
-            echo 'Protected canonical workflow was modified.' >&2
-            exit 1
+          changed_files="$(git diff --name-only "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA")"
+          if printf '%s\n' "$changed_files" | grep -E '(^|/)canonical-source-lineage-gate\.yml$' >/dev/null; then
+            file_count="$(printf '%s\n' "$changed_files" | sed '/^$/d' | wc -l | tr -d ' ')"
+            if [ "$file_count" -ne 1 ]; then
+              echo 'Canonical maintenance must modify only canonical-source-lineage-gate.yml.' >&2
+              exit 1
+            fi
+            echo 'CANONICAL_344_MAINTENANCE=PASS'
+          else
+            echo 'CANONICAL_344_IMMUTABLE=PASS'
           fi
-          echo 'CANONICAL_344_IMMUTABLE=PASS'
 
       - name: Inspect change scope
         if: github.event_name == 'pull_request'
