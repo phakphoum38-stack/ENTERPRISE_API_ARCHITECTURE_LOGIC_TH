@@ -368,10 +368,10 @@ class DiscoveryEngine:
                             DiscoveryCandidate(node.node_id, node.level, score, tuple(evidence))
                         )
 
-                children = self.index.children(parent_id)
-                next_frontier.extend(
-                    child.node_id for child in children if child.level > level
-                )
+                # Descend only through peers actually examined at this level.
+                # This preserves same-level-first traversal without skipping
+                # the immediate child level.
+                next_frontier.extend(node.node_id for node in peers)
 
             exact = [c for c in candidates if c.level == level and c.score >= 1.0]
             if len(exact) == 1:
@@ -470,16 +470,19 @@ class DiscoveryEngine:
         levels: list[int], candidates: list[DiscoveryCandidate], nodes_examined: int,
         peers_examined: int, remote_calls: int, cache_hit: bool, index_hit: bool,
         started: float, reason: str,
+        scope: DiscoveryScope | None = None,
     ) -> DiscoveryResponse:
         try:
             proof = self._proof(
                 discovery_id, result, virtual_space, root_id, target, levels, candidates,
                 nodes_examined, peers_examined, remote_calls, cache_hit, index_hit, started, reason,
+                scope or DiscoveryScope.INTERNAL,
             )
         except DiscoveryHalt:
             proof = self._proof_unbounded(
                 discovery_id, result, virtual_space, root_id, target, levels, candidates,
                 nodes_examined, peers_examined, remote_calls, cache_hit, index_hit, reason,
+                scope or DiscoveryScope.INTERNAL,
             )
         return DiscoveryResponse(result, node_id, proof)
 
