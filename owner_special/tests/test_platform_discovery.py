@@ -9,6 +9,7 @@ from tools.platform_discovery import (
     DiscoveryEngine,
     DiscoveryNode,
     DiscoveryResult,
+    DiscoveryScope,
     build_nodes_from_platform_registry,
 )
 
@@ -42,6 +43,17 @@ def nodes():
 
 
 class BoundedDiscoveryTests(unittest.TestCase):
+    def test_internal_and_external_authority_are_separate(self):
+        internal = DiscoveryEngine(nodes())
+        self.assertEqual(internal.resolve_scope('PLATFORM', 'root'), DiscoveryScope.INTERNAL)
+        self.assertEqual(internal.authority_for(DiscoveryScope.INTERNAL).value, 'SYSTEM')
+        external_nodes = [DiscoveryNode(**{**n.__dict__, 'scope': DiscoveryScope.EXTERNAL, 'authority': internal.authority_for(DiscoveryScope.EXTERNAL)}) for n in nodes()]
+        external = DiscoveryEngine(external_nodes)
+        self.assertEqual(external.resolve_scope('FLUTTER-1', 'root'), DiscoveryScope.EXTERNAL)
+        response = external.discover(virtual_space='FLUTTER-1', root_id='root', target='API Integration')
+        self.assertEqual(response.proof.source_scope, DiscoveryScope.EXTERNAL)
+        self.assertEqual(response.proof.authority.value, 'OBSERVATION_ONLY')
+
     def test_root_is_required(self):
         engine = DiscoveryEngine(nodes())
         response = engine.discover(virtual_space="PLATFORM", root_id=None, target="API Integration")
