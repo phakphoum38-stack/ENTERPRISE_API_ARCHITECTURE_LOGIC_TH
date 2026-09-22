@@ -50,8 +50,9 @@ jobs:
           # GitHub Actions interpolates ${{ github.sha }} before Bash runs, so
           # construct the literal expression from shell fragments instead.
           expected_artifact='Research-OS-Windows-x64-$'
-          expected_artifact+='{{ github.sha }}'
+          expected_artifact+='{{ inputs.source_sha || github.sha }}'
           grep -qF "name: $expected_artifact" "$workflow"
+          grep -qF 'ref: ${{ inputs.source_sha || github.sha }}' "$workflow"
           grep -qF 'uses: actions/upload-artifact@v4' "$workflow"
 
           # Research OS owns the generic Windows artifact. Friend Complete is
