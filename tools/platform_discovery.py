@@ -295,10 +295,10 @@ class DiscoveryEngine:
             return DiscoveryResponse(DiscoveryResult.ABSENT_FROM_SCOPE, None, proof)
 
         target_norm = target.casefold()
-        parent_id = start_parent_id or root_id
+        frontier = [start_parent_id or root_id]
         level = start_level
 
-        for _ in range(self.budget.max_depth + 1):
+        while frontier and level <= self.budget.max_depth:
             try:
                 self._check_budget(started, nodes_examined)
             except DiscoveryHalt as exc:
@@ -307,6 +307,7 @@ class DiscoveryEngine:
                     target, levels, candidates, nodes_examined, peers_examined, remote_calls,
                     False, True, started, str(exc),
                 )
+
             if self._stop.is_set():
                 return self._response(
                     discovery_id, DiscoveryResult.EMERGENCY_STOP, None, virtual_space, root_id,
@@ -315,29 +316,30 @@ class DiscoveryEngine:
                 )
 
             levels.append(level)
-            peers = self.index.peers(parent_id, level)
-            peers_examined += len(peers)
-            if not peers:
-                if parent_id == root_id:
-                    break
-                parent = self.index.get(parent_id)
-                parent_id = parent.parent_id if parent else root_id
-                level += 1
-                continue
+            next_frontier: list[str] = []
+            for parent_id in frontier:
+                peers = self.index.peers(parent_id, level)
+                peers_examined += len(peers)
+                for node in peers:
+                    nodes_examined += 1
+                    if nodes_examined > self.budget.max_nodes:
+                        return self._response(
+                            discovery_id, DiscoveryResult.TIMEOUT, None, virtual_space, root_id,
+                            target, levels, candidates, nodes_examined, peers_examined, remote_calls,
+                            False, True, started, "node_budget_exhausted",
+                        )
+                    score, evidence = self._score(node, target_norm)
+                    if score > 0:
+                        candidates.append(
+                            DiscoveryCandidate(node.node_id, node.level, score, tuple(evidence))
+                        )
 
-            for node in peers:
-                nodes_examined += 1
-                if nodes_examined > self.budget.max_nodes:
-                    return self._response(
-                        discovery_id, DiscoveryResult.TIMEOUT, None, virtual_space, root_id,
-                        target, levels, candidates, nodes_examined, peers_examined, remote_calls,
-                        False, True, started, "node_budget_exhausted",
-                    )
-                score, evidence = self._score(node, target_norm)
-                if score > 0:
-                    candidates.append(DiscoveryCandidate(node.node_id, node.level, score, tuple(evidence)))
+                children = self.index.children(parent_id)
+                next_frontier.extend(
+                    child.node_id for child in children if child.level > level
+                )
 
-            exact = [c for c in candidates if c.score >= 1.0]
+            exact = [c for c in candidates if c.level == level and c.score >= 1.0]
             if len(exact) == 1:
                 node_id = exact[0].node_id
                 self._positive_cache[cache_key] = node_id
@@ -353,11 +355,8 @@ class DiscoveryEngine:
                     False, True, started, "multiple_same_level_matches",
                 )
 
-            children = self.index.children(parent_id)
-            if not children:
-                break
-            parent_id = sorted(children, key=lambda x: (x.level, x.node_id))[0].node_id
-            level = parent_id and (self.index.get(parent_id).level if self.index.get(parent_id) else level + 1) or level + 1
+            frontier = sorted(set(next_frontier))
+            level += 1
 
         result = DiscoveryResult.ABSENT_FROM_SCOPE
         proof = self._proof(
