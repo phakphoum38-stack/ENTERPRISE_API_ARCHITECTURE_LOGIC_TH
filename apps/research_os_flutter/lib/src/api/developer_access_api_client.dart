@@ -57,7 +57,7 @@ class DeveloperAccessApiClient {
     String path, {
     String project = 'research_os_flutter',
   }) async {
-    final uri = _uri('/v2/developer/code/file/\\${Uri.encodeComponent(path)}').replace(
+    final uri = _uri('/v2/developer/code/file/${Uri.encodeComponent(path)}').replace(
       queryParameters: <String, String>{'project': project},
     );
     return _request(() => _client.get(uri));
