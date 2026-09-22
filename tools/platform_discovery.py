@@ -297,6 +297,11 @@ class DiscoveryEngine:
         nodes_examined = peers_examined = remote_calls = 0
         cache_key = (virtual_space or "", root_id or "", target.casefold())
 
+        if scope is None:
+            try:
+                scope = self.resolve_scope(virtual_space, root_id)
+            except DiscoveryHalt as exc:
+                return self._response(discovery_id, DiscoveryResult.ROOT_UNRESOLVED, None, virtual_space, root_id, target, levels, candidates, nodes_examined, peers_examined, remote_calls, False, False, started, str(exc), DiscoveryScope.INTERNAL)
         if self._stop.is_set():
             return self._response(
                 discovery_id, DiscoveryResult.EMERGENCY_STOP, None, virtual_space, root_id,
@@ -325,7 +330,7 @@ class DiscoveryEngine:
 
         target_norm = target.casefold()
         frontier = [start_parent_id or root_id]
-        level = start_level
+        level = start_level + 1
 
         while frontier and level <= self.budget.max_depth:
             try:
