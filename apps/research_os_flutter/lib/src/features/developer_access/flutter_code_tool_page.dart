@@ -180,7 +180,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _projects.contains(_project) ? _project : null,
+                    initialValue: _projects.contains(_project) ? _project : null,
                     decoration: const InputDecoration(
                       labelText: 'Project',
                       border: OutlineInputBorder(),
@@ -223,7 +223,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: _files.contains(_path) ? _path : null,
+              initialValue: _files.contains(_path) ? _path : null,
               decoration: const InputDecoration(
                 labelText: 'File',
                 border: OutlineInputBorder(),
