@@ -72,7 +72,8 @@ jobs:
         run: |
           $repoWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows'
           & "$env:GITHUB_WORKSPACE/tools/ci/prepare_flutter_isolated_workspace.ps1" -RepositoryRoot $env:GITHUB_WORKSPACE -AppRelativePath 'apps/research_os_flutter' -WorkspaceRoot $repoWorkspace
-          if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter workspace preparation failed.' }
+          $scriptExitCode = $LASTEXITCODE
+          if ($scriptExitCode -ne 0) { throw "Isolated Flutter workspace preparation failed with exit code $scriptExitCode." }
 
           $appWorkspace = Join-Path $repoWorkspace 'apps\research_os_flutter'
           Set-Location $appWorkspace
@@ -83,6 +84,7 @@ jobs:
           if (-not (Test-Path 'windows/runner/main.cpp')) { throw 'Isolated Windows runner was not generated.' }
           if (-not (Test-Path 'windows/runner/Runner.rc')) { throw 'Isolated Windows identity file was not generated.' }
           Write-Host 'RESEARCH_OS_ISOLATED_WINDOWS_BOOTSTRAP=PASS'
+
       - name: Apply Research OS Windows branding in isolated workspace
         shell: pwsh
         run: |
