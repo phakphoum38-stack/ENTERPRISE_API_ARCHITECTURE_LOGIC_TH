@@ -139,6 +139,8 @@ jobs:
 
       - name: Build isolated Research OS Windows release
         shell: pwsh
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
         run: |
           $appWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-flutter-windows\apps\research_os_flutter'
           if (-not (Test-Path -LiteralPath $appWorkspace -PathType Container)) {
@@ -159,6 +161,9 @@ jobs:
           if ($version.InternalName -eq 'research_os_owner_special') { throw 'Owner Special InternalName leaked into Research OS artifact.' }
           if ($version.OriginalFilename -match 'owner_special') { throw 'Owner Special OriginalFilename leaked into Research OS artifact.' }
 
+          $sourceSha = $env:SOURCE_SHA
+          if (-not $sourceSha) { throw 'Research OS source SHA is missing from build environment.' }
+
           $release = $exe.Directory.FullName
           $stage = Join-Path $env:RUNNER_TEMP 'Research-OS-Windows'
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
@@ -171,7 +176,7 @@ jobs:
           Project: $env:APP_PROJECT_NAME
           Executable: $env:APP_EXE_NAME
           Publisher/Team: $env:APP_COMPANY_NAME
-          Desktop commit: $((git rev-parse HEAD).Trim())
+          Desktop commit: $sourceSha
           Identity isolation gate: PASS
           UI gate: flutter analyze + full tests + desktop shell test
           Windows bootstrap: isolated temporary workspace only
