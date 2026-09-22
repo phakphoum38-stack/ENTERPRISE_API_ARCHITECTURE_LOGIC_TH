@@ -482,7 +482,6 @@ class DiscoveryEngine:
             proof = self._proof_unbounded(
                 discovery_id, result, virtual_space, root_id, target, levels, candidates,
                 nodes_examined, peers_examined, remote_calls, cache_hit, index_hit, reason,
-                scope or DiscoveryScope.INTERNAL,
             )
         return DiscoveryResponse(result, node_id, proof)
 
