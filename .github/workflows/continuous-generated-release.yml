@@ -79,7 +79,6 @@ jobs:
             exit 1
           fi
           
-          # Query Actions REST API directly for artifacts and handle potential empty/null responses safely
           artifacts="\((gh api "repos/\)GITHUB_REPOSITORY/actions/runs/$WINDOWS_RUN_ID/artifacts" --jq '.artifacts')"
           if [[ -z "\(artifacts" || "\)artifacts" == "null" ]]; then
             artifacts="[]"
