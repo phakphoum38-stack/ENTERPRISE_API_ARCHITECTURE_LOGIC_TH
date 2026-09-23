@@ -69,9 +69,16 @@ jobs:
           # --paginate emits one JSON document per page; --slurp wraps all
           # pages into a single JSON array so Python receives valid JSON.
           prs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls" --paginate --slurp)"
-          pr="$(python3 -c 'import json,sys; pages=json.load(sys.stdin); rows=[p for page in pages for p in page]; matches=[p for p in rows if p.get("state")=="open" and p.get("head",{}).get("sha")==sys.argv[1]]; print(matches[0]["number"] if len(matches)==1 else "")' "$HEAD" <<< "$prs")"
+          pr="$(python3 -c 'import json,sys; pages=json.load(sys.stdin); rows=[p for page in pages for p in page]; matches=[p for p in rows if p.get("state")=="open"]; print(matches[0]["number"] if len(matches)==1 else "")' <<< "$prs")"
           test -n "$pr"
+
+          # workflow_run can refer to an earlier commit after the PR was synchronized.
+          # Resolve the PR from that commit, then pin the review to the PR current HEAD.
+          current="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr")"
+          current_head="$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("head",{}).get("sha",""))' <<< "$current")"
+          test -n "$current_head"
           echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "head=$current_head" >> "$GITHUB_OUTPUT"
 
       - name: Finalize target identity
         id: identity
@@ -88,7 +95,7 @@ jobs:
           fi
           test -n "$PR"
           echo "pr=$PR" >> "$GITHUB_OUTPUT"
-          echo "head=${{ steps.target.outputs.head }}" >> "$GITHUB_OUTPUT"
+          echo "head=${{ steps.workflow-pr.outputs.head || steps.target.outputs.head }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout trusted main
         uses: actions/checkout@v4

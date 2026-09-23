@@ -82,8 +82,11 @@ void main() {
 
     expect(find.byKey(const Key('developer-access-page')), findsOneWidget);
     expect(find.text('user:owner'), findsOneWidget);
+    await tester.ensureVisible(find.textContaining('คำขอที่รออนุมัติ (1)'));
     expect(find.textContaining('คำขอที่รออนุมัติ (1)'), findsOneWidget);
     expect(find.text('Owner file.md'), findsOneWidget);
+
+    await tester.ensureVisible(find.textContaining('สิทธิ์ที่กำลังใช้งาน (1)'));
     expect(find.textContaining('สิทธิ์ที่กำลังใช้งาน (1)'), findsOneWidget);
     expect(find.text('Approved file.md'), findsOneWidget);
     expect(find.text('Revoke'), findsOneWidget);
