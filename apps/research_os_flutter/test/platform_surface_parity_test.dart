@@ -22,7 +22,7 @@ void main() {
 
       for (final item in researchNavigationItems) {
         final finder = find.byKey(
-          Key('mobile-nav-\${item.index}'),
+          Key('mobile-nav-${item.index}'),
           skipOffstage: false,
         );
         await tester.scrollUntilVisible(
