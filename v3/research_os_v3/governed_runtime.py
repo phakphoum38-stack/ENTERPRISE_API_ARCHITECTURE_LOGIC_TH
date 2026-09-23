@@ -7,6 +7,7 @@ from v3.dlq.service import DLQService
 from v3.dlq.sqlite_store import SQLiteDLQStore
 
 from .event_delivery import Delivery, DurableEventDelivery
+from .final_gate_evidence import FinalGateEvidence, build_final_gate_evidence
 from .resource_lineage import (
     ConflictEvidence,
     ResourceVersion,
@@ -17,11 +18,7 @@ from .worker_pool import StatelessWorkerPool, WorkerResult
 
 
 class GovernedWorkflowRuntime:
-    """Compose delivery, bounded workers, lineage and terminal DLQ recovery.
-
-    This is an integration boundary only: it reuses the existing durable
-    delivery ledger and existing DLQ. It does not introduce another queue.
-    """
+    """Compose delivery, workers, lineage, DLQ and final-gate evidence."""
 
     def __init__(
         self,
@@ -32,9 +29,7 @@ class GovernedWorkflowRuntime:
         worker_prefix: str = "runner",
     ) -> None:
         root.mkdir(parents=True, exist_ok=True)
-        self.delivery = DurableEventDelivery(
-            root / "event_delivery.sqlite3",
-        )
+        self.delivery = DurableEventDelivery(root / "event_delivery.sqlite3")
         self.lineage = ResourceVersionStore(root / "resource_lineage.sqlite3")
         self.dlq_store = SQLiteDLQStore(str(root / "dlq.sqlite3"))
         self.dlq = DLQService(self.dlq_store)
@@ -62,6 +57,27 @@ class GovernedWorkflowRuntime:
             worker_prefix=self.worker_prefix,
         )
         return pool.run_once(delivery_ids)
+
+    def build_final_gate_evidence(
+        self,
+        *,
+        workflow_id: str,
+        run_id: str,
+        execution_id: str,
+        delivery_ids: tuple[str, ...] = (),
+        resource_versions: tuple[str, ...] = (),
+        terminal_status: str = "unknown",
+        extra: dict[str, object] | None = None,
+    ) -> FinalGateEvidence:
+        return build_final_gate_evidence(
+            workflow_id=workflow_id,
+            run_id=run_id,
+            execution_id=execution_id,
+            delivery_ids=delivery_ids,
+            resource_versions=resource_versions,
+            terminal_status=terminal_status,
+            extra=extra,
+        )
 
     def update_resource(
         self,
