@@ -46,7 +46,7 @@ void main() {
     expect(find.text('Continue with Google'), findsNothing);
     expect(find.text('Continue with Microsoft'), findsNothing);
     expect(find.text('Continue with GitHub'), findsNothing);
-    expect(find.text('Research OS'), findsOneWidget);
+    expect(find.text('Research OS'), findsNWidgets(2));
     expect(find.text('Developer Runtime'), findsNothing);
 
     await tester.tap(find.text('Login'));
