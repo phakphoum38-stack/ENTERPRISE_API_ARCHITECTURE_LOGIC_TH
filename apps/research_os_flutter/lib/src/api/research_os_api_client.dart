@@ -21,8 +21,45 @@ class ResearchOSApiClient {
   final String baseUrl;
   final String? preferredProvider;
   final http.Client _client;
+  String? _sessionToken;
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
+
+  void setSession(String token) {
+    final value = token.trim();
+    if (value.isEmpty) {
+      throw const ResearchOSApiException('Research OS session token is empty.');
+    }
+    _sessionToken = value;
+  }
+
+  void clearSession() => _sessionToken = null;
+
+  Future<Map<String, dynamic>> getAuthStatus() =>
+      _getJson('/v1/auth/status');
+
+  Future<Map<String, dynamic>> getIdentityProviders() =>
+      _getJson('/v1/auth/providers');
+
+  Future<Map<String, dynamic>> startProviderLogin(String provider) =>
+      _postJson('/v1/auth/providers/login', <String, Object?>{
+        'provider': provider,
+      });
+
+  Future<Map<String, dynamic>> exchangeProviderHandoff(String state) async {
+    final response = await _client.post(
+      _uri('/v1/auth/providers/handoff'),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'X-Research-OS-OAuth-State': state,
+      },
+      body: '{}',
+    );
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> signOut() =>
+      _postJson('/v1/auth/signout', const <String, Object?>{});
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
@@ -296,7 +333,10 @@ class ResearchOSApiClient {
   }
 
   Future<Map<String, dynamic>> _getJson(String path) async {
-    final response = await _client.get(_uri(path));
+    final response = await _client.get(
+      _uri(path),
+      headers: _sessionHeaders(),
+    );
     return _decode(response);
   }
 
@@ -306,7 +346,10 @@ class ResearchOSApiClient {
   ) async {
     final response = await _client.post(
       _uri(path),
-      headers: const <String, String>{'Content-Type': 'application/json'},
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        ..._sessionHeaders(),
+      },
       body: jsonEncode(payload),
     );
     return _decode(response);
@@ -337,6 +380,11 @@ class ResearchOSApiClient {
     }
     return decoded;
   }
+
+  Map<String, String> _sessionHeaders() => <String, String>{
+        if (_sessionToken != null && _sessionToken!.isNotEmpty)
+          'X-Research-OS-Session': _sessionToken!,
+      };
 
   void close() => _client.close();
 }
