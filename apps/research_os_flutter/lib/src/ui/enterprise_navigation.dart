@@ -191,7 +191,10 @@ class ResearchMobileDrawer extends StatelessWidget {
             key: Key('mobile-nav-${item.index}'),
             selected: selectedIndex == item.index,
             leading: Icon(item.icon),
-            title: Text(item.label),
+            title: Text(
+              item.label,
+              key: Key('mobile-nav-label-${item.index}'),
+            ),
             onTap: () => onSelected(item.index),
           ),
         ),
