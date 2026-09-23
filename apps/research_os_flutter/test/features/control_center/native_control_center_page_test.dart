@@ -18,18 +18,18 @@ class _FakeClient extends http.BaseClient {
         },
       '/v1/brain/capacity' => <String, Object?>{'capacity': 36},
       '/v1/brain/skills' => <String, Object?>{
-        'skills': <Object>['analysis'],
-      },
+          'skills': <Object>['analysis'],
+        },
       '/v1/providers' => <String, Object?>{'providers': <Object>['owner-mock']},
       '/v1/agents' => <String, Object?>{'agents': <Object>['friend']},
       '/v1/agents/readiness' => <String, Object?>{'status': 'ready'},
       '/v1/agents/orchestrations' => <String, Object?>{
-        'orchestrations': <Object>[
-          <String, Object?>{'run_id': 'run-1', 'status': 'completed'},
-          <String, Object?>{'run_id': 'run-2', 'status': 'running'},
-          <String, Object?>{'run_id': 'run-3', 'status': 'failed'},
-        ],
-      },
+          'orchestrations': <Object>[
+            <String, Object?>{'run_id': 'run-1', 'status': 'completed'},
+            <String, Object?>{'run_id': 'run-2', 'status': 'running'},
+            <String, Object?>{'run_id': 'run-3', 'status': 'failed'},
+          ],
+        },
       _ => <String, Object?>{},
     };
     final bytes = utf8.encode(jsonEncode(payload));
@@ -69,14 +69,24 @@ void main() {
     );
     expect(overview, findsOneWidget);
 
-    // The workflow surface is below the initially built viewport. Scroll the
-    // actual ListView directly; do not use scrollUntilVisible/ensureVisible,
-    // which require the target child to already exist in the widget tree.
-    await tester.drag(overview, const Offset(0, -600));
+    // Resolve the actual Scrollable from the stable, already-built ListView.
+    // Do not derive it from the lazy target child: that child may not exist
+    // until scrolling has brought it into the viewport.
+    final overviewScrollable = find
+        .ancestor(
+          of: overview,
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    expect(overviewScrollable, findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Workflow control surface'),
+      500,
+      scrollable: overviewScrollable,
+    );
     await tester.pumpAndSettle();
 
-    // The earlier metric cards may be recycled by ListView after scrolling,
-    // so assert them before the scroll and assert the lower surface after it.
     expect(find.text('Workflow control surface'), findsOneWidget);
 
     api.close();
