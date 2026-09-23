@@ -22,6 +22,7 @@ class FinalGateEvidence:
     delivery_ids: tuple[str, ...] = ()
     resource_versions: tuple[str, ...] = ()
     terminal_status: str = "unknown"
+    extra: tuple[tuple[str, object], ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -33,6 +34,7 @@ class FinalGateEvidence:
             "delivery_ids": list(self.delivery_ids),
             "resource_versions": list(self.resource_versions),
             "terminal_status": self.terminal_status,
+            "extra": dict(self.extra),
         }
 
 
@@ -63,6 +65,7 @@ def build_final_gate_evidence(
         delivery_ids=delivery_ids,
         resource_versions=resource_versions,
         terminal_status=terminal_status,
+        extra=tuple(sorted((extra or {}).items())),
     )
 
 
