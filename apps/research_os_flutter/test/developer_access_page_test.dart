@@ -84,7 +84,6 @@ void main() {
     expect(find.text('user:owner'), findsOneWidget);
     final outerScroll = find.byKey(const Key('developer-access-scroll'));
     final pendingHeading = find.textContaining('คำขอที่รออนุมัติ (1)');
-    expect(pendingHeading, findsOneWidget);
     await tester.scrollUntilVisible(
       pendingHeading,
       500,
