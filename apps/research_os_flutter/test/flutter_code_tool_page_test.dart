@@ -74,6 +74,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 50));
 
+    await tester.tap(find.widgetWithText(OutlinedButton, 'อ่าน Code'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
 
