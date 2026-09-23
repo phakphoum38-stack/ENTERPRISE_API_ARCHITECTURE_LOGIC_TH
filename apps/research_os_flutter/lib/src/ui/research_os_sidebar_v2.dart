@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'enterprise_navigation.dart';
+
 /// Shared desktop navigation for the Research OS application surface.
 /// All destinations are sourced from the same registry used by the mobile drawer.
 class ResearchOSSidebarV2 extends StatelessWidget {
@@ -200,7 +202,7 @@ class ResearchOSSidebarV2 extends StatelessWidget {
     List<Widget> entries() {
       final widgets = <Widget>[];
       String? section;
-      for (final item of researchNavigationItems) {
+      for (final item in researchNavigationItems) {
         if (expanded && section != item.section) {
           section = item.section;
           widgets.add(_section(context, item.section));
