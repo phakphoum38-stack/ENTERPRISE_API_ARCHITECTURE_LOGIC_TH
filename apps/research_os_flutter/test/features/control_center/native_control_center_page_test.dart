@@ -62,9 +62,15 @@ void main() {
     expect(find.text('Agent readiness'), findsOneWidget);
     expect(find.text('Workflow runs'), findsOneWidget);
 
+    final workflowSurface = find.text('Workflow control surface').last;
+    final workflowScrollable = find.ancestor(
+      of: workflowSurface,
+      matching: find.byType(Scrollable),
+    );
     await tester.scrollUntilVisible(
-      find.text('Workflow control surface').last,
+      workflowSurface,
       500,
+      scrollable: workflowScrollable,
     );
     await tester.pumpAndSettle();
 
