@@ -61,6 +61,13 @@ void main() {
     expect(find.text('LIVE'), findsOneWidget);
     expect(find.text('Agent readiness'), findsOneWidget);
     expect(find.text('Workflow runs'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Workflow control surface'),
+      500,
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Workflow control surface'), findsOneWidget);
     expect(find.text('Running'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
