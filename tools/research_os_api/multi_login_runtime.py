@@ -77,6 +77,23 @@ def _github_verified_email(token: str) -> str | None:
     return str(chosen.get("email")).strip() if chosen else None
 
 
+def _configured_owner(principal: dict[str, Any]) -> bool:
+    """Resolve Owner from trusted server configuration, never client input."""
+    user_id = str(principal.get("user_id") or "").strip().casefold()
+    email = str(principal.get("email") or "").strip().casefold()
+    owner_ids = {
+        value.strip().casefold()
+        for value in (os.getenv("RESEARCH_OS_CODE_OWNER_IDS") or "").split(",")
+        if value.strip()
+    }
+    owner_emails = {
+        value.strip().casefold()
+        for value in (os.getenv("RESEARCH_OS_OWNER_EMAILS") or "").split(",")
+        if value.strip()
+    }
+    return user_id in owner_ids or email in owner_emails
+
+
 def _secure_cookie(redirect_uri: str) -> bool:
     configured = os.getenv("RESEARCH_OS_COOKIE_SECURE")
     if configured is not None:
@@ -98,7 +115,7 @@ def complete_runtime_login(code: str, state: str) -> dict[str, Any]:
     if provider.name == "github" and isinstance(profile, dict) and not profile.get("email"):
         profile["email"] = _github_verified_email(access_token)
     principal = normalize_callback(provider.name, profile)
-    principal["role"] = "USER"
+    principal["role"] = "OWNER" if _configured_owner(principal) else "USER"
     principal["user_id"] = f"{provider.name}:{principal['sub']}"
     session = issue_session(principal)
     return {"provider": provider.name, "principal": principal, "session": session, "set_cookie": cookie_header(session, secure=_secure_cookie(pending.redirect_uri))}
