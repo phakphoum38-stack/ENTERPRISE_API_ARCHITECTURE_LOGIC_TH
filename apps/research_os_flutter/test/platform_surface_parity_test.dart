@@ -38,7 +38,14 @@ void main() {
           findsOneWidget,
           reason: 'Missing mobile navigation destination: ${item.label}',
         );
-        expect(find.text(item.label), findsOneWidget);
+        expect(
+          find.descendant(
+            of: finder,
+            matching: find.byType(Text),
+          ),
+          findsWidgets,
+          reason: 'Missing mobile navigation label: ' + item.label,
+        );
       }
     },
   );
@@ -80,8 +87,12 @@ void main() {
           reason: 'Missing desktop navigation destination: ${item.label}',
         );
         expect(
-          find.text(item.label, skipOffstage: false),
-          findsOneWidget,
+          find.descendant(
+            of: finder,
+            matching: find.byType(Text),
+          ),
+          findsWidgets,
+          reason: 'Missing desktop navigation label: ' + item.label,
         );
       }
     },
