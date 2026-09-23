@@ -73,28 +73,15 @@ void main() {
     await tester.tap(find.text('lib/main.dart').last);
     await tester.pumpAndSettle();
 
-    final codeToolScroll = find.byKey(const Key('flutter-code-tool-scroll'));
-    await tester.scrollUntilVisible(
-      find.textContaining('Read SHA: old-sha'),
-      300,
-      scrollable: codeToolScroll,
-    );
+    await tester.ensureVisible(find.textContaining('Read SHA: old-sha'));
     expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
-    await tester.scrollUntilVisible(
-      find.text('Preview Diff'),
-      300,
-      scrollable: codeToolScroll,
-    );
+    await tester.ensureVisible(find.text('Preview Diff'));
     await tester.tap(find.text('Preview Diff'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Preview Diff'), findsWidgets);
 
-    await tester.scrollUntilVisible(
-      find.text('Apply Change'),
-      300,
-      scrollable: codeToolScroll,
-    );
+    await tester.ensureVisible(find.text('Apply Change'));
     await tester.tap(find.text('Apply Change'));
     await tester.pumpAndSettle();
     expect(applied, isTrue);
