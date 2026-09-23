@@ -3,17 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../api/api_endpoint_store.dart';
 import '../../api/research_os_api_client.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
     required this.apiClient,
     required this.onAuthenticated,
+    required this.onConnectionChanged,
+    required this.connectionProfile,
     super.key,
   });
 
   final ResearchOSApiClient apiClient;
   final VoidCallback onAuthenticated;
+  final Future<void> Function(String baseUrl) onConnectionChanged;
+  final String connectionProfile;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -118,6 +123,13 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return false;
     }
     return false;
+  }
+
+  Future<void> _selectConnection(String profile) async {
+    if (profile == ApiEndpointStore.profileForUrl(widget.apiClient.baseUrl)) {
+      return;
+    }
+    await widget.onConnectionChanged(ApiEndpointStore.profileUrl(profile));
   }
 
   IconData _providerIcon(String id) {
@@ -229,6 +241,44 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                             ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).dividerColor),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: ExpansionTile(
+                        initiallyExpanded: false,
+                        leading: const Icon(Icons.link_outlined),
+                        title: const Text(
+                          'Connection',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          ApiEndpointStore.profileLabel(widget.connectionProfile),
+                        ),
+                        childrenPadding:
+                            const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                        children: <Widget>[
+                          RadioListTile<String>(
+                            value: ApiEndpointStore.connectionResearchOs,
+                            groupValue: widget.connectionProfile,
+                            title: const Text('Research OS'),
+                            onChanged: (value) {
+                              if (value != null) _selectConnection(value);
+                            },
+                          ),
+                          RadioListTile<String>(
+                            value: ApiEndpointStore.connectionDeveloperRuntime,
+                            groupValue: widget.connectionProfile,
+                            title: const Text('Developer Runtime'),
+                            onChanged: (value) {
+                              if (value != null) _selectConnection(value);
+                            },
+                          ),
                         ],
                       ),
                     ),
