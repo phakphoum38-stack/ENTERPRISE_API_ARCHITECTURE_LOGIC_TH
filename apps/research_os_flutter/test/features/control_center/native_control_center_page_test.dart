@@ -69,11 +69,12 @@ void main() {
     );
     expect(overview, findsOneWidget);
 
-    // Resolve the actual Scrollable from the stable, already-built ListView.
-    // Do not derive it from the lazy target child: that child may not exist
-    // until scrolling has brought it into the viewport.
+    // ListView is the keyed owner of the overview scroll region. Its actual
+    // Scrollable is a child created by ListView, not an ancestor of ListView.
+    // Resolve that child so scrollUntilVisible can operate on the correct
+    // scroll position without depending on other Scrollables in the page.
     final overviewScrollable = find
-        .ancestor(
+        .descendant(
           of: overview,
           matching: find.byType(Scrollable),
         )
