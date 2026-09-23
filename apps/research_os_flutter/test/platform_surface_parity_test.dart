@@ -42,6 +42,7 @@ void main() {
           find.descendant(
             of: finder,
             matching: find.byType(Text),
+            skipOffstage: false,
           ),
           findsWidgets,
           reason: 'Missing mobile navigation label: ${item.label}',
@@ -90,6 +91,7 @@ void main() {
           find.descendant(
             of: finder,
             matching: find.byType(Text),
+            skipOffstage: false,
           ),
           findsWidgets,
           reason: 'Missing desktop navigation label: ${item.label}',
