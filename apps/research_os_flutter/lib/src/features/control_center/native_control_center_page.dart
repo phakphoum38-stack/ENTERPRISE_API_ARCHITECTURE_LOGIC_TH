@@ -30,6 +30,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   Map<String, dynamic>? _skills;
   Map<String, dynamic>? _providers;
   Map<String, dynamic>? _agents;
+  Map<String, dynamic>? _agentReadiness;
+  Map<String, dynamic>? _orchestrations;
   final List<String> _events = <String>[
     'Control Center initialized',
     'Human authority boundary active',
@@ -70,6 +72,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
         widget.apiClient.getBrainSkills(),
         widget.apiClient.getProviders(),
         widget.apiClient.getAgents(),
+        widget.apiClient.getAgentReadiness(),
+        widget.apiClient.getOrchestrations(limit: 20),
       ]);
       if (!mounted) return;
       setState(() {
@@ -78,6 +82,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
         _skills = values[2];
         _providers = values[3];
         _agents = values[4];
+        _agentReadiness = values[5];
+        _orchestrations = values[6];
         _livePulse++;
         _events.insert(0, 'Runtime state observed');
       });
@@ -212,6 +218,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                   skills: _skills,
                   providers: _providers,
                   agents: _agents,
+                  agentReadiness: _agentReadiness,
+                  orchestrations: _orchestrations,
                   simulation: _simulation,
                 ),
                 _Activity(events: _events),
@@ -331,6 +339,8 @@ class _Overview extends StatelessWidget {
   final Map<String, dynamic>? skills;
   final Map<String, dynamic>? providers;
   final Map<String, dynamic>? agents;
+  final Map<String, dynamic>? agentReadiness;
+  final Map<String, dynamic>? orchestrations;
   final bool simulation;
 
   @override
@@ -340,6 +350,10 @@ class _Overview extends StatelessWidget {
     final skillsCount = (skills?['skills'] as List?)?.length ?? 0;
     final providerCount = (providers?['providers'] as List?)?.length ?? 0;
     final agentCount = (agents?['agents'] as List?)?.length ?? 0;
+    final readiness = agentReadiness?['status']?.toString() ??
+        agentReadiness?['readiness']?.toString() ?? 'UNKNOWN';
+    final runs = orchestrations?['orchestrations'];
+    final orchestrationCount = runs is List ? runs.length : 0;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -363,6 +377,8 @@ class _Overview extends StatelessWidget {
             _Metric('Brain skills', '$skillsCount', Icons.psychology_alt_outlined),
             _Metric('Providers', '$providerCount', Icons.cloud_outlined),
             _Metric('Agents', '$agentCount', Icons.smart_toy_outlined),
+            _Metric('Agent readiness', readiness, Icons.health_and_safety_outlined),
+            _Metric('Workflow runs', '$orchestrationCount', Icons.account_tree_outlined),
           ],
         ),
         const SizedBox(height: 12),
@@ -380,6 +396,18 @@ class _Overview extends StatelessWidget {
             ),
             subtitle: const Text(
               'Observation is sourced from existing Research OS API surfaces.',
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.route_outlined),
+            title: const Text('Workflow control surface'),
+            subtitle: Text(
+              'Existing orchestration API observed: $orchestrationCount run(s). '
+              'Agent readiness: $readiness. Execution remains behind existing human authorization.',
             ),
           ),
         ),
