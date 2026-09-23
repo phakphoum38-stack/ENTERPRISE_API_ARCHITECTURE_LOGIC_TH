@@ -238,7 +238,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                     _events.insert(0, 'Inspector opened: $id');
                   }),
                 ),
-                _FailureView(health: _health),
+                _FailureView(health: _health, orchestrations: _orchestrations),
                 _Activity(events: _events),
                 _Simulation(
                   enabled: _simulation,
@@ -379,6 +379,8 @@ class _Overview extends StatelessWidget {
             _Metric('Agents', '$agentCount', Icons.smart_toy_outlined),
             _Metric('Agent readiness', readiness, Icons.health_and_safety_outlined),
             _Metric('Workflow runs', '$orchestrationCount', Icons.account_tree_outlined),
+            _Metric('Running', '${_statusCount(runs, 'running')}', Icons.play_circle_outline),
+            _Metric('Failed', '${_statusCount(runs, 'failed')}', Icons.error_outline),
           ],
         ),
         const SizedBox(height: 12),
@@ -605,13 +607,18 @@ class _Inspector extends StatelessWidget {
 }
 
 class _FailureView extends StatelessWidget {
-  const _FailureView({required this.health});
+  const _FailureView({required this.health, this.orchestrations});
   final Map<String, dynamic>? health;
+  final Map<String, dynamic>? orchestrations;
 
   @override
   Widget build(BuildContext context) {
+    final rawRuns = orchestrations?['orchestrations'];
+    final failedRuns = rawRuns is List
+        ? rawRuns.where((item) => item is Map && item['status']?.toString().toLowerCase() == 'failed').toList()
+        : const <Object>[];
     final failures = health?['failures'];
-    if (failures is! List || failures.isEmpty) {
+    if ((failures is! List || failures.isEmpty) && failedRuns.isEmpty) {
       return const Card(
         child: ListTile(
           leading: Icon(Icons.info_outline),
@@ -729,4 +736,9 @@ class _JsonView extends StatelessWidget {
           ),
         ],
       );
+}
+
+int _statusCount(Object? raw, String status) {
+  if (raw is! List) return 0;
+  return raw.where((item) => item is Map && item['status']?.toString().toLowerCase() == status).length;
 }
