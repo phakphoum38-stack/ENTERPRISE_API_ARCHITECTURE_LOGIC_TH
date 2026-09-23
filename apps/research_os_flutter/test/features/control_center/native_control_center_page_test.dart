@@ -61,6 +61,8 @@ void main() {
     expect(find.text('LIVE'), findsOneWidget);
     expect(find.text('Agent readiness'), findsOneWidget);
     expect(find.text('Workflow runs'), findsOneWidget);
+    expect(find.text('Running'), findsOneWidget);
+    expect(find.text('Failed'), findsOneWidget);
 
     final overview = find.byKey(
       const ValueKey('control-center-overview-scroll'),
@@ -73,9 +75,9 @@ void main() {
     await tester.drag(overview, const Offset(0, -600));
     await tester.pumpAndSettle();
 
+    // The earlier metric cards may be recycled by ListView after scrolling,
+    // so assert them before the scroll and assert the lower surface after it.
     expect(find.text('Workflow control surface'), findsOneWidget);
-    expect(find.text('Running'), findsOneWidget);
-    expect(find.text('Failed'), findsOneWidget);
 
     api.close();
   });
