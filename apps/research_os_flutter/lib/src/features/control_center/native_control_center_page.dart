@@ -354,7 +354,7 @@ class _Overview extends StatelessWidget {
     final agentCount = (agents?['agents'] as List?)?.length ?? 0;
     final readiness = agentReadiness?['status']?.toString() ??
         agentReadiness?['readiness']?.toString() ?? 'UNKNOWN';
-    final runs = orchestrations?['orchestrations'];
+    final runs = _orchestrationItems(orchestrations);
     final orchestrationCount = runs is List ? runs.length : 0;
 
     return ListView(
@@ -615,10 +615,8 @@ class _FailureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rawRuns = orchestrations?['orchestrations'];
-    final failedRuns = rawRuns is List
-        ? rawRuns.where((item) => item is Map && item['status']?.toString().toLowerCase() == 'failed').toList()
-        : const <Object>[];
+    final rawRuns = _orchestrationItems(orchestrations);
+    final failedRuns = rawRuns.where((item) => item['status']?.toString().toLowerCase() == 'failed').toList();
     final failures = health?['failures'];
     if ((failures is! List || failures.isEmpty) && failedRuns.isEmpty) {
       return const Card(
@@ -743,4 +741,10 @@ class _JsonView extends StatelessWidget {
 int _statusCount(Object? raw, String status) {
   if (raw is! List) return 0;
   return raw.where((item) => item is Map && item['status']?.toString().toLowerCase() == status).length;
+}
+
+List<Map<String, dynamic>> _orchestrationItems(Map<String, dynamic>? payload) {
+  final raw = payload?['runs'] ?? payload?['orchestrations'];
+  if (raw is! List) return <Map<String, dynamic>>[];
+  return raw.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
 }
