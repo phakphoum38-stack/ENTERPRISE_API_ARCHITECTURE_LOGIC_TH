@@ -21,63 +21,6 @@ class ResearchOSSidebarV2 extends StatelessWidget {
   static const compactWidth = 76.0;
   static const expandedWidth = 264.0;
 
-  void _tap(BuildContext context, _Entry entry) {
-    if (!entry.available) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${entry.label} อยู่ในแผนงานถัดไป'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    onSelected(entry.index);
-  }
-
-  Widget _destination(BuildContext context, _Entry entry) {
-    final scheme = Theme.of(context).colorScheme;
-    final selected = entry.available && selectedIndex == entry.index;
-    final foreground = entry.available
-        ? (selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant)
-        : scheme.onSurface.withValues(alpha: .38);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: expanded ? 10 : 8, vertical: 2),
-      child: Material(
-        color: selected ? scheme.secondaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(13),
-        child: InkWell(
-          key: Key('v2-nav-${entry.keyName}'),
-          borderRadius: BorderRadius.circular(13),
-          onTap: () => _tap(context, entry),
-          child: SizedBox(
-            height: 43,
-            child: Row(
-              children: <Widget>[
-                SizedBox(
-                  width: expanded ? 44 : 58,
-                  child: Icon(entry.icon, color: foreground, size: 21),
-                ),
-                if (expanded)
-                  Expanded(
-                    child: Text(
-                      entry.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: foreground,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _section(BuildContext context, String title) {
     if (!expanded) return const SizedBox(height: 8);
     return Padding(
@@ -285,17 +228,6 @@ class ResearchOSSidebarV2 extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Entry {
-  const _Entry(this.keyName, this.label, this.icon, this.index,
-      {this.available = true});
-
-  final String keyName;
-  final String label;
-  final IconData icon;
-  final int index;
-  final bool available;
 }
 
 class _ResearchMark extends StatelessWidget {
