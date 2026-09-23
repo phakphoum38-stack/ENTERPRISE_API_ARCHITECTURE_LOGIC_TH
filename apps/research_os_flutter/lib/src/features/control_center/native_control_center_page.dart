@@ -355,7 +355,7 @@ class _Overview extends StatelessWidget {
     final readiness = agentReadiness?['status']?.toString() ??
         agentReadiness?['readiness']?.toString() ?? 'UNKNOWN';
     final runs = _orchestrationItems(orchestrations);
-    final orchestrationCount = runs is List ? runs.length : 0;
+    final orchestrationCount = runs.length;
 
     return ListView(
       padding: const EdgeInsets.all(16),
