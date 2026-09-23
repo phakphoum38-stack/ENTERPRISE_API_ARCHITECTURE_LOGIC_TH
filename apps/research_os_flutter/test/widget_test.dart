@@ -135,7 +135,10 @@ Future<void> openSidebarDestination(
   await tester.scrollUntilVisible(
     finder,
     300,
-    scrollable: find.byKey(const Key('desktop-navigation-list-v2')),
+    scrollable: find.descendant(
+      of: find.byKey(const Key('desktop-navigation-list-v2')),
+      matching: find.byType(Scrollable),
+    ),
   );
   expect(finder, findsOneWidget);
   await tester.tap(finder);
@@ -189,8 +192,20 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpShell(tester);
 
-    expect(find.byKey(const Key('v2-nav-12')), findsOneWidget);
-    expect(find.text('Google Sign-In'), findsOneWidget);
+    final googleNav = find.byKey(
+      const Key('v2-nav-12'),
+      skipOffstage: false,
+    );
+    await tester.scrollUntilVisible(
+      googleNav,
+      300,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('desktop-navigation-list-v2')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(googleNav, findsOneWidget);
+    expect(find.text('Google Sign-In', skipOffstage: false), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
