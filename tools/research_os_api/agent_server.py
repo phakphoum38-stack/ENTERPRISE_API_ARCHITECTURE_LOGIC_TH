@@ -46,6 +46,16 @@ class AgentResearchOSHandler(ResearchOSHandler):
             )
         return None
 
+    def _require_owner(self) -> dict[str, object] | None:
+        principal = self._require_principal()
+        if not principal:
+            return None
+        role = str(principal.get("role") or "").strip().casefold()
+        if role != "owner":
+            self._send(HTTPStatus.FORBIDDEN, {"error": "owner_authorization_required", "detail": "Owner authority is required for workflow control actions"})
+            return None
+        return principal
+
     def _signed_in_email(self) -> str:
         principal = self._require_principal()
         if not principal:
@@ -249,6 +259,8 @@ class AgentResearchOSHandler(ResearchOSHandler):
                 return
             run_id, action = parts
             try:
+                if action in {"execute", "confirm", "retry", "cancel"} and not self._require_owner():
+                    return
                 body = self._read_json()
                 if action == "execute":
                     run = ORCHESTRATOR.execute(run_id, confirmed=bool(body.get("confirmed", False)))
