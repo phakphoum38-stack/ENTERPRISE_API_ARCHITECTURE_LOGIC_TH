@@ -81,7 +81,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('flutter-code-tool-status')), findsOneWidget);
     final readSha = find.textContaining('Read SHA: old-sha');
-    await tester.ensureVisible(readSha);
+    await tester.scrollUntilVisible(
+      readSha,
+      300,
+      scrollable: find.byKey(const Key('flutter-code-tool-scroll')),
+    );
     expect(readSha, findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
 
