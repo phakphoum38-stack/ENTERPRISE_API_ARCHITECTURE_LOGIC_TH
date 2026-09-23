@@ -68,12 +68,12 @@ void main() {
     expect(find.byKey(const Key('flutter-code-tool')), findsOneWidget);
     expect(find.text('research_os_flutter'), findsOneWidget);
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>).last);
+    await tester.tap(find.byKey(const Key('flutter-code-tool-file')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('lib/main.dart').last);
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.ensureVisible(find.textContaining('Read SHA: old-sha'));
     expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
     await tester.ensureVisible(find.text('Preview Diff'));
