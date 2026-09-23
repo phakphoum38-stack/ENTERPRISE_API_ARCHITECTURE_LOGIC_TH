@@ -82,10 +82,10 @@ void main() {
 
     expect(find.byKey(const Key('developer-access-page')), findsOneWidget);
     expect(find.text('user:owner'), findsOneWidget);
-    final inboxScroll = find.ancestor(
+    final inboxScroll = find.descendant(
       of: find.byKey(const Key('developer-access-scroll')),
       matching: find.byType(Scrollable),
-    ).first;
+    );
     expect(inboxScroll, findsOneWidget);
     await tester.scrollUntilVisible(
       find.textContaining('คำขอที่รออนุมัติ (1)'),
