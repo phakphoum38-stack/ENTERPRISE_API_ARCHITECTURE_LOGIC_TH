@@ -63,7 +63,7 @@ void main() {
     expect(find.text('Workflow runs'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Workflow control surface'),
+      find.text('Workflow control surface').last,
       500,
     );
     await tester.pumpAndSettle();
