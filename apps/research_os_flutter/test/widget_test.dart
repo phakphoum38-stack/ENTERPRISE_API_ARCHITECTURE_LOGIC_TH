@@ -5,6 +5,7 @@ import 'package:research_os_flutter/src/app_shell.dart';
 import 'package:research_os_flutter/src/features/github/github_dashboard_page.dart';
 import 'package:research_os_flutter/src/features/graph/knowledge_graph_page.dart';
 import 'package:research_os_flutter/src/features/home/home_page.dart';
+import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeResearchOSApiClient extends ResearchOSApiClient {
@@ -126,11 +127,18 @@ Future<void> pumpShell(WidgetTester tester) async {
 
 Future<void> openSidebarDestination(
   WidgetTester tester,
-  String keyName,
+  int index,
 ) async {
-  final finder = find.byKey(Key('v2-nav-$keyName'));
+  final finder = find.byKey(
+    Key('v2-nav-$index'),
+    skipOffstage: false,
+  );
+  await tester.scrollUntilVisible(
+    finder,
+    300,
+    scrollable: find.byKey(const Key('desktop-navigation-list-v2')),
+  );
   expect(finder, findsOneWidget);
-  await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
@@ -165,7 +173,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpShell(tester);
-    await openSidebarDestination(tester, 'conversation');
+    await openSidebarDestination(tester, 1);
 
     expect(find.text('สนทนา AI'), findsOneWidget);
     expect(find.text('Friend AI • Text + Voice • Local-first'), findsOneWidget);
@@ -182,7 +190,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpShell(tester);
 
-    expect(find.byKey(const Key('v2-nav-account')), findsOneWidget);
+    expect(find.byKey(const Key('v2-nav-12')), findsOneWidget);
+    expect(find.text('Google Sign-In'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -191,7 +200,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpShell(tester);
-    await openSidebarDestination(tester, 'library');
+    await openSidebarDestination(tester, 3);
 
     expect(find.text('Conversation to Knowledge'), findsOneWidget);
     expect(find.textContaining('active'), findsWidgets);
@@ -253,7 +262,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
-    await openSidebarDestination(tester, 'settings');
+    await openSidebarDestination(tester, 9);
 
     expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsWidgets);
