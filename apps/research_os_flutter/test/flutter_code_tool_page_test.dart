@@ -70,9 +70,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('flutter-code-tool-file')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('lib/main.dart').last);
+    final fileMenuItem = find.byWidgetPredicate(
+      (widget) => widget is DropdownMenuItem<String> && widget.value == 'lib/main.dart',
+    );
+    expect(fileMenuItem, findsOneWidget);
+    await tester.tap(fileMenuItem);
     await tester.pumpAndSettle();
-    await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
