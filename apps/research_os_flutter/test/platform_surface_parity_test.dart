@@ -31,7 +31,7 @@ void main() {
           scrollable: find.descendant(
             of: find.byType(ResearchMobileDrawer),
             matching: find.byType(Scrollable),
-          ),
+          ).first,
         );
         expect(
           finder,
