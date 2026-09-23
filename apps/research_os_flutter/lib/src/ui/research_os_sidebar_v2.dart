@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Futuristic ChatGPT-style navigation for the Research OS desktop shell.
-/// Existing feature indices remain stable; staged items are visibly disabled
-/// until their real workspace is implemented.
+/// Shared desktop navigation for the Research OS application surface.
+/// All destinations are sourced from the same registry used by the mobile drawer.
 class ResearchOSSidebarV2 extends StatelessWidget {
   const ResearchOSSidebarV2({
     required this.expanded,
