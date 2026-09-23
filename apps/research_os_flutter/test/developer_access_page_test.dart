@@ -87,7 +87,7 @@ void main() {
     await tester.scrollUntilVisible(
       pendingHeading,
       500,
-      scrollable: find.descendant(
+      scrollable: find.ancestor(
         of: outerScroll,
         matching: find.byType(Scrollable),
       ),
@@ -99,7 +99,7 @@ void main() {
     await tester.scrollUntilVisible(
       activeHeading,
       500,
-      scrollable: find.descendant(
+      scrollable: find.ancestor(
         of: outerScroll,
         matching: find.byType(Scrollable),
       ),
