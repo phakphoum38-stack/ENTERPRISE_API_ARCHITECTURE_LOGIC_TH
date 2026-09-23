@@ -62,11 +62,18 @@ void main() {
     expect(find.text('Agent readiness'), findsOneWidget);
     expect(find.text('Workflow runs'), findsOneWidget);
 
-    final workflowSurface = find.text('Workflow control surface');
-    await tester.ensureVisible(workflowSurface);
+    final overview = find.byKey(
+      const ValueKey('control-center-overview-scroll'),
+    );
+    expect(overview, findsOneWidget);
+
+    // The workflow surface is below the initially built viewport. Scroll the
+    // actual ListView directly; do not use scrollUntilVisible/ensureVisible,
+    // which require the target child to already exist in the widget tree.
+    await tester.drag(overview, const Offset(0, -600));
     await tester.pumpAndSettle();
 
-    expect(workflowSurface, findsOneWidget);
+    expect(find.text('Workflow control surface'), findsOneWidget);
     expect(find.text('Running'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
 
