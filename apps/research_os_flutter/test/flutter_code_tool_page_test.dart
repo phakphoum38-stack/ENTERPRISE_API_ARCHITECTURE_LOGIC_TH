@@ -90,7 +90,10 @@ void main() {
     await tester.scrollUntilVisible(
       readSha,
       300,
-      scrollable: find.byKey(const Key('flutter-code-tool-scroll')),
+      scrollable: find.descendant(
+        of: find.byKey(const Key('flutter-code-tool-scroll')),
+        matching: find.byType(Scrollable),
+      ).first,
     );
     expect(readSha, findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
