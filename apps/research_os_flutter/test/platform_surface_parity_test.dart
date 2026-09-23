@@ -44,7 +44,7 @@ void main() {
             matching: find.byType(Text),
           ),
           findsWidgets,
-          reason: 'Missing mobile navigation label: ' + item.label,
+          reason: 'Missing mobile navigation label: ${item.label}',
         );
       }
     },
@@ -92,7 +92,7 @@ void main() {
             matching: find.byType(Text),
           ),
           findsWidgets,
-          reason: 'Missing desktop navigation label: ' + item.label,
+          reason: 'Missing desktop navigation label: ${item.label}',
         );
       }
     },
