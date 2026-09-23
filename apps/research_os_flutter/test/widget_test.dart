@@ -5,7 +5,6 @@ import 'package:research_os_flutter/src/app_shell.dart';
 import 'package:research_os_flutter/src/features/github/github_dashboard_page.dart';
 import 'package:research_os_flutter/src/features/graph/knowledge_graph_page.dart';
 import 'package:research_os_flutter/src/features/home/home_page.dart';
-import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeResearchOSApiClient extends ResearchOSApiClient {
