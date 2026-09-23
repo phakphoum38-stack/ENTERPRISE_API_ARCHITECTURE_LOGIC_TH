@@ -74,10 +74,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 50));
 
-    final readButton = find.widgetWithText(OutlinedButton, 'อ่าน Code');
+    final readButton = find.byKey(const Key('flutter-code-tool-read'));
+    expect(readButton, findsOneWidget);
     await tester.ensureVisible(readButton);
     await tester.tap(readButton);
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('flutter-code-tool-status')), findsOneWidget);
     expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
 
