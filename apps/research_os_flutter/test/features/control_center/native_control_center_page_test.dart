@@ -22,6 +22,12 @@ class _FakeClient extends http.BaseClient {
       },
       '/v1/providers' => <String, Object?>{'providers': <Object>['owner-mock']},
       '/v1/agents' => <String, Object?>{'agents': <Object>['friend']},
+      '/v1/agents/readiness' => <String, Object?>{'status': 'ready'},
+      '/v1/agents/orchestrations' => <String, Object?>{
+        'orchestrations': <Object>[
+          <String, Object?>{'run_id': 'run-1', 'status': 'completed'},
+        ],
+      },
       _ => <String, Object?>{},
     };
     final bytes = utf8.encode(jsonEncode(payload));
@@ -51,6 +57,9 @@ void main() {
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('System Map'), findsOneWidget);
     expect(find.text('LIVE'), findsOneWidget);
+    expect(find.text('Agent readiness'), findsOneWidget);
+    expect(find.text('Workflow runs'), findsOneWidget);
+    expect(find.text('Workflow control surface'), findsOneWidget);
 
     api.close();
   });
