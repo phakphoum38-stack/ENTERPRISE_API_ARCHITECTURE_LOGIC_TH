@@ -76,13 +76,19 @@ void main() {
 
     expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
-    await tester.ensureVisible(find.text('Preview Diff'));
-    await tester.tap(find.text('Preview Diff'));
+
+    final previewButton = find.widgetWithText(FilledButton, 'Preview Diff');
+    expect(previewButton, findsOneWidget);
+    await tester.ensureVisible(previewButton);
+    await tester.tap(previewButton);
     await tester.pumpAndSettle();
+
     expect(find.textContaining('Preview Diff'), findsWidgets);
 
-    await tester.ensureVisible(find.text('Apply Change'));
-    await tester.tap(find.text('Apply Change'));
+    final applyButton = find.widgetWithText(FilledButton, 'Apply Change');
+    expect(applyButton, findsOneWidget);
+    await tester.ensureVisible(applyButton);
+    await tester.tap(applyButton);
     await tester.pumpAndSettle();
     expect(applied, isTrue);
   });
