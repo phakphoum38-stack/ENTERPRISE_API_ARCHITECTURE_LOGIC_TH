@@ -44,7 +44,7 @@ def validate_final_gate(
         "delivery_ids": list(evidence.delivery_ids),
         "resource_versions": list(evidence.resource_versions),
         "terminal_status": evidence.terminal_status,
-        "extra": {},
+        "extra": dict(evidence.extra),
     }
     if evidence.canonical_sha256 != canonical_sha256(canonical_payload):
         reasons.append("canonical evidence SHA mismatch")
