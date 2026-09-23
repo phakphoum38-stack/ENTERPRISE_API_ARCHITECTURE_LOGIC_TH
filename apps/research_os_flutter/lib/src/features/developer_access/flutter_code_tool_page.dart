@@ -245,7 +245,11 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
                 border: OutlineInputBorder(),
               ),
               items: _files
-                  .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                  .map((item) => DropdownMenuItem(
+                value: item,
+                key: ValueKey('flutter-code-file-$item'),
+                child: Text(item),
+              ))
                   .toList(),
               onChanged: _busy
                   ? null
