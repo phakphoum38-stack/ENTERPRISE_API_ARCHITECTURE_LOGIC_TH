@@ -32,6 +32,17 @@ class MultiLoginRuntimeTests(unittest.TestCase):
         with self.assertRaises(multi_login_runtime.MultiLoginRuntimeError):
             multi_login_runtime.complete_runtime_login("code", state)
 
+    def test_configured_owner_role_comes_from_server_identity(self):
+        with patch.dict(os.environ, {"RESEARCH_OS_OWNER_EMAILS": "owner@example.com"}, clear=False):
+            self.assertEqual(
+                multi_login_runtime._configured_owner({"user_id": "google:123", "email": "owner@example.com"}),
+                True,
+            )
+            self.assertEqual(
+                multi_login_runtime._configured_owner({"user_id": "google:456", "email": "user@example.com"}),
+                False,
+            )
+
     def test_unified_status_and_signout(self):
         with patch.dict(os.environ, {"RESEARCH_OS_SESSION_SECRET": "test-secret"}, clear=False):
             token = issue_session({"user_id": "google:123", "email": "user@example.com", "role": "USER"})
