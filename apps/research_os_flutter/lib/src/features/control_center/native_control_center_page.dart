@@ -331,6 +331,8 @@ class _Overview extends StatelessWidget {
     required this.skills,
     required this.providers,
     required this.agents,
+    required this.agentReadiness,
+    required this.orchestrations,
     required this.simulation,
   });
 
