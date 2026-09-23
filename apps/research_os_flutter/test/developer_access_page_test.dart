@@ -88,11 +88,10 @@ void main() {
     );
     // The keyed ListView owns nested scrollables (including the code editor).
     // Use the outer scrollable rather than assuming the descendant count is one.
-    final inboxScrollable = inboxScroll.first;
     await tester.scrollUntilVisible(
       find.textContaining('คำขอที่รออนุมัติ (1)'),
       500,
-      scrollable: inboxScroll,
+      scrollable: inboxScroll.first,
     );
     await tester.pumpAndSettle();
     expect(find.textContaining('คำขอที่รออนุมัติ (1)'), findsOneWidget);
