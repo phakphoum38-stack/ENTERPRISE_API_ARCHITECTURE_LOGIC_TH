@@ -19,6 +19,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from api_auth import extract_session_token, require_session
 from auth_session import clear_cookie_header, revoke_session, verify_session
+from developer_identity import IdentityAssertionError
+from developer_identity_gateway import mint_developer_assertion
 from conversation_store import (
     authorize as authorize_sync,
     delete_session as delete_cloud_session,
@@ -315,6 +317,32 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/auth/google/start":
                 self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
+                return
+            if path == "/v1/auth/developer/assertion":
+                token = extract_session_token(self.headers)
+                try:
+                    principal = verify_session(token)
+                except ValueError as exc:
+                    self._send(
+                        HTTPStatus.UNAUTHORIZED,
+                        {"error": "invalid_session", "detail": str(exc)},
+                    )
+                    return
+                try:
+                    assertion = mint_developer_assertion(principal)
+                except IdentityAssertionError as exc:
+                    message = str(exc)
+                    status = (
+                        HTTPStatus.SERVICE_UNAVAILABLE
+                        if "not configured" in message
+                        else HTTPStatus.UNAUTHORIZED
+                    )
+                    self._send(
+                        status,
+                        {"error": "developer_identity_unavailable", "detail": message},
+                    )
+                    return
+                self._send(HTTPStatus.OK, assertion)
                 return
             if path == "/v1/auth/google/handoff":
                 handoff_code = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()
