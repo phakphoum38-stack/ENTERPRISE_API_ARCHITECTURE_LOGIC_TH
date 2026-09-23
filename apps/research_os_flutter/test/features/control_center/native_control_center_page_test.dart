@@ -63,14 +63,7 @@ void main() {
     expect(find.text('Workflow runs'), findsOneWidget);
 
     final workflowSurface = find.text('Workflow control surface');
-    final overviewScrollable = find.byKey(
-      const ValueKey('control-center-overview-scroll'),
-    );
-    await tester.scrollUntilVisible(
-      workflowSurface,
-      500,
-      scrollable: overviewScrollable,
-    );
+    await tester.ensureVisible(workflowSurface);
     await tester.pumpAndSettle();
 
     expect(workflowSurface, findsOneWidget);
