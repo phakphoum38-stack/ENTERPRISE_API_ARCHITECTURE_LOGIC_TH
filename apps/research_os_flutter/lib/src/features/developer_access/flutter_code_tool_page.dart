@@ -308,6 +308,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
