@@ -29,12 +29,12 @@ class ResearchOSEndToEndTests(unittest.TestCase):
         else:
             os.environ["RESEARCH_OS_AI_ROUTE"] = cls.previous_ai_route
 
-    def request_json(self, path, payload=None):
+    def request_json(self, path, payload=None, headers=None):
         data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
             self.base_url + path,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", **(headers or {})},
             method="POST" if payload is not None else "GET",
         )
         with urllib.request.urlopen(request, timeout=5) as response:
@@ -67,6 +67,7 @@ class ResearchOSEndToEndTests(unittest.TestCase):
                 "prompt": "ช่วยสรุปภารกิจของบ้าน",
                 "session_id": session_id,
             },
+            headers={"X-Research-OS-Owner": "owner"},
         )
         self.assertEqual(status, 200)
         self.assertEqual(generated["route"], "friend")

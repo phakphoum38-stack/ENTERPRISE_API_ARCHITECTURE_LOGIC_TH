@@ -25,9 +25,7 @@ concurrency:
 
 jobs:
   build-ios-unsigned-ipa:
-    # iOS is intentionally excluded from PR #177 validation.
-    # Keep push/manual execution available for the dedicated iOS workstream.
-    if: github.event_name != 'pull_request'
+    # iOS PR validation is intentionally enabled to expose source/build regressions.
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -86,17 +84,50 @@ jobs:
         working-directory: apps/research_os_flutter
         run: flutter test test/check_in_page_test.dart --reporter expanded
 
-      - name: Build unsigned iOS app
+      - name: Build unsigned iOS IPA
         working-directory: apps/research_os_flutter
         run: >-
-          flutter build ios --release --no-codesign
+          flutter build ipa --release --no-codesign
           --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
+
+      - name: Locate and verify native iOS build outputs
+        working-directory: apps/research_os_flutter
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== Generated iOS files ==="
+          find ios -maxdepth 3 -type f \( -name 'GeneratedPluginRegistrant.*' -o -name 'Podfile.lock' \) -print
+
+          REGISTRANT="$(find ios -type f -name 'GeneratedPluginRegistrant.*' -print -quit)"
+          PODLOCK="$(find ios -type f -name 'Podfile.lock' -print -quit)"
+          ARCHIVE="build/ios/archive/Runner.xcarchive"
+          APP="$(find "$ARCHIVE/Products/Applications" -maxdepth 2 -type d -name '*.app' -print -quit)"
+
+          test -n "$REGISTRANT" || { echo "FAIL: GeneratedPluginRegistrant not found"; exit 1; }
+          test -n "$PODLOCK" || { echo "FAIL: Podfile.lock not found"; exit 1; }
+          test -d "$ARCHIVE" || { echo "FAIL: Xcode archive not found: $ARCHIVE"; exit 1; }
+          test -n "$APP" || { echo "FAIL: archived .app not found under $ARCHIVE/Products/Applications"; exit 1; }
+          test -f "$APP/Info.plist" || { echo "FAIL: archived app Info.plist not found: $APP/Info.plist"; exit 1; }
+
+          printf 'REGISTRANT=%s\n' "$REGISTRANT" >> "$GITHUB_ENV"
+          printf 'PODLOCK=%s\n' "$PODLOCK" >> "$GITHUB_ENV"
+          printf 'ARCHIVE=%s\n' "$ARCHIVE" >> "$GITHUB_ENV"
+          printf 'APP=%s\n' "$APP" >> "$GITHUB_ENV"
+
+          echo "=== GeneratedPluginRegistrant evidence ==="
+          grep -nEi 'flutter_tts|speech_to_text|FlutterTts|SpeechToText|register' "$REGISTRANT" || true
+          echo "=== Podfile.lock evidence ==="
+          grep -nEi 'flutter_tts|speech_to_text|FlutterTts|SpeechToText' "$PODLOCK" || true
+          echo "Archive: $ARCHIVE"
+          echo "App: $APP"
+          echo "PASS: generated iOS project and Xcode archive contain a valid Runner app"
 
       - name: Verify iOS app and branding
         working-directory: apps/research_os_flutter
         shell: bash
         run: |
-          APP="build/ios/iphoneos/Runner.app"
+          set -euo pipefail
           test -d "$APP"
           test -f ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
@@ -106,25 +137,32 @@ jobs:
           test "$BUNDLE_ID" = "com.phakphoum38.researchos"
           test "$DISPLAY_NAME" = "Research OS"
 
-      - name: Package unsigned IPA
+      - name: Package and hash unsigned IPA
         working-directory: apps/research_os_flutter
         shell: bash
         run: |
-          rm -rf build/unsigned_ipa
-          mkdir -p build/unsigned_ipa/Payload
-          cp -R build/ios/iphoneos/Runner.app build/unsigned_ipa/Payload/ResearchOS.app
-          cd build/unsigned_ipa
-          zip -qry ../Research-OS-iOS-responsive-unsigned.ipa Payload
-          cd ..
-          shasum -a 256 Research-OS-iOS-responsive-unsigned.ipa | tee Research-OS-iOS-responsive-unsigned.ipa.sha256
-          test -s Research-OS-iOS-responsive-unsigned.ipa
+          set -euo pipefail
+          test -d "$ARCHIVE"
+          test -d "$APP"
+          mkdir -p build/ios/ipa/Payload
+          cp -R "$APP" build/ios/ipa/Payload/
+          IPA="build/ios/ipa/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa"
+          (cd build/ios/ipa && /usr/bin/zip -qry "$(basename "$IPA")" Payload)
+          rm -rf build/ios/ipa/Payload
+          test -s "$IPA"
+          echo "IPA: $IPA"
+          unzip -Z1 "$IPA" | grep -Eq "^Payload/[^/]+\\.app/Info.plist$"
+          mkdir -p build/artifacts
+          cp "$IPA" "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa"
+          shasum -a 256 "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa" > "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
+          cat "build/artifacts/Research-OS-iOS-responsive-${GITHUB_SHA}.ipa.sha256"
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
           name: Research-OS-iOS-responsive-${{ github.sha }}
           path: |
-            apps/research_os_flutter/build/Research-OS-iOS-responsive-unsigned.ipa
-            apps/research_os_flutter/build/Research-OS-iOS-responsive-unsigned.ipa.sha256
+            apps/research_os_flutter/build/artifacts/Research-OS-iOS-responsive-${{ github.sha }}.ipa
+            apps/research_os_flutter/build/artifacts/Research-OS-iOS-responsive-${{ github.sha }}.ipa.sha256
           if-no-files-found: error
           retention-days: 30

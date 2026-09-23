@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import hmac
 import json
 import os
 import re
@@ -92,6 +94,13 @@ class OwnerFriendService:
                 claimed_owner = self.headers.get(OWNER_HEADER, "").strip()
                 if not claimed_owner or not service.runtime.owner.matches(claimed_owner):
                     raise PermissionError("owner identity rejected")
+                configured_password = os.environ.get("RESEARCH_OS_FRIEND_HTTP_PASSWORD", "")
+                if configured_password:
+                    authorization = self.headers.get("Authorization", "")
+                    expected_user = os.environ.get("RESEARCH_OS_FRIEND_HTTP_USERNAME", claimed_owner)
+                    expected = base64.b64encode(f"{expected_user}:{configured_password}".encode("utf-8")).decode("ascii")
+                    if not authorization.startswith("Basic ") or not hmac.compare_digest(authorization[6:].strip(), expected):
+                        raise PermissionError("owner credential rejected")
                 profile_id = _safe_scope(self.headers.get(PROFILE_HEADER, "default"), "profile_id")
                 session_id = _safe_scope(self.headers.get(SESSION_HEADER, "default"), "session_id")
                 return claimed_owner, profile_id, session_id

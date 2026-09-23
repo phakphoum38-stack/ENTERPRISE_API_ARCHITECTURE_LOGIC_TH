@@ -20,11 +20,41 @@ class ResearchOSApiClient {
 
   final String baseUrl;
   final String? preferredProvider;
+  final String ownerId = const String.fromEnvironment('RESEARCH_OS_OWNER_ID', defaultValue: 'owner');
+  String _friendConnectionId = 'default';
+  String? _friendConnectionPassword;
   final http.Client _client;
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
+  Future<List<Map<String, dynamic>>> getFriendConnections() async {
+    final result = await _getJson('/v1/friend/connections', headers: <String, String>{
+      'X-Research-OS-Owner': ownerId,
+    });
+    final raw = result['connections'];
+    if (raw is! List) return const <Map<String, dynamic>>[];
+    return raw.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<Map<String, dynamic>> saveFriendConnection(Map<String, Object?> connection) {
+    return _postJson('/v1/friend/connections', connection, headers: <String, String>{
+      'X-Research-OS-Owner': ownerId,
+    });
+  }
+
+  Future<Map<String, dynamic>> testFriendConnection(String id, {String? password}) {
+    return _postJson('/v1/friend/connections/test', <String, Object?>{
+      'id': id,
+      if (password != null) 'password': password,
+    }, headers: <String, String>{'X-Research-OS-Owner': ownerId});
+  }
+
+  void setFriendConnection(String id, {String? password}) {
+    _friendConnectionId = id.trim().isEmpty ? 'default' : id.trim();
+    _friendConnectionPassword = password;
+  }
+
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
@@ -193,7 +223,12 @@ class ResearchOSApiClient {
   }
 
   Future<Map<String, dynamic>> generateText(String prompt) {
-    return _postJson('/v1/ai/generate', _aiPayload('prompt', prompt));
+    return _postJson('/v1/ai/generate', <String, Object?>{
+      ..._aiPayload('prompt', prompt),
+      'connection_id': _friendConnectionId,
+      if (_friendConnectionPassword != null && _friendConnectionPassword!.isNotEmpty)
+        'connection_password': _friendConnectionPassword,
+    }, headers: <String, String>{'X-Research-OS-Owner': ownerId});
   }
 
   Future<Map<String, dynamic>> answerWithMemory(String question) {
@@ -295,18 +330,19 @@ class ResearchOSApiClient {
     });
   }
 
-  Future<Map<String, dynamic>> _getJson(String path) async {
-    final response = await _client.get(_uri(path));
+  Future<Map<String, dynamic>> _getJson(String path, {Map<String, String>? headers}) async {
+    final response = await _client.get(_uri(path), headers: headers);
     return _decode(response);
   }
 
   Future<Map<String, dynamic>> _postJson(
     String path,
-    Map<String, Object?> payload,
-  ) async {
+    Map<String, Object?> payload, {
+    Map<String, String>? headers,
+  }) async {
     final response = await _client.post(
       _uri(path),
-      headers: const <String, String>{'Content-Type': 'application/json'},
+      headers: <String, String>{'Content-Type': 'application/json', ...?headers},
       body: jsonEncode(payload),
     );
     return _decode(response);

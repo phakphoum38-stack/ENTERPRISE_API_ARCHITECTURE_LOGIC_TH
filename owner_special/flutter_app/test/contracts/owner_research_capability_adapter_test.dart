@@ -42,6 +42,18 @@ final class _FakeOwnerApi implements OwnerFriendApi {
   }) async => <String, dynamic>{};
 
   @override
+  Future<List<Map<String, dynamic>>> friendConnections() async => const <Map<String, dynamic>>[];
+
+  @override
+  Future<Map<String, dynamic>> saveFriendConnection(Map<String, dynamic> connection) async => <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> testFriendConnection(String id, {String? password}) async => <String, dynamic>{};
+
+  @override
+  void setFriendConnection(String id, {String? password}) {}
+
+  @override
   Future<Map<String, dynamic>> authStatus() async => <String, dynamic>{};
 
   @override

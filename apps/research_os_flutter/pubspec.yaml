@@ -13,6 +13,7 @@ dependencies:
     path: ../../packages/research_os_contracts
   flutter_markdown: ^0.7.3
   flutter_tts: ^4.2.5
+  flutter_secure_storage: ^10.3.4
   http: ^1.2.2
   shared_preferences: ^2.5.3
   speech_to_text: ^7.4.0

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../api/research_os_api_client.dart';
 
@@ -45,6 +46,103 @@ class _FriendConnectPageState extends State<FriendConnectPage> {
   final List<_Turn> _turns = <_Turn>[];
   _Advisor _selectedAdvisor = _advisors[0];
   bool _sending = false;
+  bool _loadingConnections = false;
+  List<Map<String, dynamic>> _connections = <Map<String, dynamic>>[];
+  String _selectedConnection = 'default';
+  String _connectionMessage = '';
+  static const _secureStorage = FlutterSecureStorage();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConnections();
+  }
+
+  Future<void> _loadConnections() async {
+    setState(() => _loadingConnections = true);
+    try {
+      final rows = await widget.apiClient.getFriendConnections();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _connections = rows);
+      if (rows.isNotEmpty) {
+        final id = rows.first['id']?.toString() ?? 'default';
+        final password = await _secureStorage.read(key: 'friend.connection.$id.password');
+        widget.apiClient.setFriendConnection(id, password: password);
+        if (mounted) setState(() => _selectedConnection = id);
+      }
+    } catch (error) {
+      if (mounted) setState(() => _connectionMessage = '$error');
+    } finally {
+      if (mounted) setState(() => _loadingConnections = false);
+    }
+  }
+
+  Future<void> _selectConnection(String id) async {
+    final password = await _secureStorage.read(key: 'friend.connection.$id.password');
+    widget.apiClient.setFriendConnection(id, password: password);
+    if (mounted) setState(() {
+      _selectedConnection = id;
+      _connectionMessage = 'Selected $id';
+    });
+  }
+
+  Future<void> _testConnection(String id) async {
+    setState(() => _connectionMessage = 'Testing $id…');
+    try {
+      final password = await _secureStorage.read(key: 'friend.connection.$id.password');
+      final result = await widget.apiClient.testFriendConnection(id, password: password);
+      if (mounted) setState(() => _connectionMessage = 'TEST: ${result['status'] ?? 'UNKNOWN'} • ${result['transport'] ?? '-'}');
+    } catch (error) {
+      if (mounted) setState(() => _connectionMessage = 'TEST FAILED: $error');
+    }
+  }
+
+  Future<void> _addConnection() async {
+    final name = TextEditingController();
+    final username = TextEditingController(text: 'owner');
+    final password = TextEditingController();
+    final endpoint = TextEditingController(text: 'http://127.0.0.1:8790');
+    var transport = 'auto';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
+        title: const Text('Add Friend Connection'),
+        content: SizedBox(width: 520, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+          TextField(controller: username, decoration: const InputDecoration(labelText: 'Username')),
+          TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Password', helperText: 'Saved only in OS secure storage.')),
+          DropdownButtonFormField<String>(initialValue: transport, decoration: const InputDecoration(labelText: 'Transport'), items: const [
+            DropdownMenuItem(value: 'auto', child: Text('AUTO — Direct → HTTP')),
+            DropdownMenuItem(value: 'direct', child: Text('DIRECT — FriendRuntime')),
+            DropdownMenuItem(value: 'http', child: Text('HTTP — 8790')),
+          ], onChanged: (value) => setDialogState(() => transport = value ?? 'auto')),
+          TextField(controller: endpoint, decoration: const InputDecoration(labelText: 'HTTP endpoint')),
+        ]))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () async {
+            final trimmed = name.text.trim();
+            if (trimmed.isEmpty) return;
+            final id = trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9._-]+'), '-');
+            await widget.apiClient.saveFriendConnection(<String, Object?>{
+              'id': id,
+              'name': trimmed,
+              'username': username.text.trim(),
+              'transport': transport,
+              'endpoint': endpoint.text.trim(),
+              'enabled': true,
+            });
+            if (password.text.isNotEmpty) await _secureStorage.write(key: 'friend.connection.$id.password', value: password.text);
+            if (context.mounted) Navigator.pop(context, true);
+          }, child: const Text('Save')),
+        ],
+      )),
+    );
+    name.dispose(); username.dispose(); password.dispose(); endpoint.dispose();
+    if (saved == true) await _loadConnections();
+  }
 
   @override
   void dispose() {
@@ -55,7 +153,9 @@ class _FriendConnectPageState extends State<FriendConnectPage> {
 
   Future<void> _ask() async {
     final question = _controller.text.trim();
-    if (question.isEmpty || _sending) return;
+    if (question.isEmpty || _sending) {
+      return;
+    }
 
     _controller.clear();
     setState(() {
@@ -153,6 +253,17 @@ $question''';
                         controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                         children: <Widget>[
+                          _FriendConnectionPanel(
+                            connections: _connections,
+                            selectedId: _selectedConnection,
+                            loading: _loadingConnections,
+                            message: _connectionMessage,
+                            onSelect: _selectConnection,
+                            onTest: _testConnection,
+                            onAdd: _addConnection,
+                            onRefresh: _loadConnections,
+                          ),
+                          const SizedBox(height: 18),
                           _HeroPanel(advisor: _selectedAdvisor),
                           const SizedBox(height: 18),
                           if (_turns.isEmpty)
@@ -217,6 +328,79 @@ $question''';
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _FriendConnectionPanel extends StatelessWidget {
+  const _FriendConnectionPanel({
+    required this.connections,
+    required this.selectedId,
+    required this.loading,
+    required this.message,
+    required this.onSelect,
+    required this.onTest,
+    required this.onAdd,
+    required this.onRefresh,
+  });
+
+  final List<Map<String, dynamic>> connections;
+  final String selectedId;
+  final bool loading;
+  final String message;
+  final ValueChanged<String> onSelect;
+  final ValueChanged<String> onTest;
+  final VoidCallback onAdd;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.swap_horiz_outlined),
+            const SizedBox(width: 8),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Friend Connection', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text('Owner-only • switch transport without changing FriendRuntime', style: Theme.of(context).textTheme.bodySmall),
+            ])),
+            IconButton(onPressed: loading ? null : onRefresh, icon: const Icon(Icons.refresh)),
+            FilledButton.icon(onPressed: loading ? null : onAdd, icon: const Icon(Icons.add), label: const Text('Add')),
+          ]),
+          const SizedBox(height: 10),
+          if (connections.isEmpty)
+            const Text('No connection profiles. Add one to configure AUTO / DIRECT / HTTP.')
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: connections.map((connection) {
+                final id = connection['id']?.toString() ?? '';
+                final selected = id == selectedId;
+                return FilterChip(
+                  selected: selected,
+                  onSelected: (_) => onSelect(id),
+                  avatar: Icon(selected ? Icons.radio_button_checked : Icons.link_outlined, size: 16),
+                  label: Text('${connection['name'] ?? id} • ${(connection['transport'] ?? 'auto').toString().toUpperCase()}'),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 10),
+          if (connections.isNotEmpty)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.route_outlined, color: scheme.primary),
+              title: Text('Selected: $selectedId'),
+              subtitle: Text('AUTO = Direct FriendRuntime → HTTP 8790 • manual selection stays locked to the chosen mode'),
+              trailing: OutlinedButton(onPressed: () => onTest(selectedId), child: const Text('Test')),
+            ),
+          if (message.isNotEmpty) Text(message, style: Theme.of(context).textTheme.bodySmall),
+        ]),
       ),
     );
   }
