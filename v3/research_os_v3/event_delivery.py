@@ -215,7 +215,7 @@ class DurableEventDelivery:
     def get_delivery(self, delivery_id: str) -> Delivery | None:
         with sqlite3.connect(self.path) as db:
             row = db.execute(
-                "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until "
+                "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until,attempt,max_attempts "
                 "FROM deliveries WHERE delivery_id=?",
                 (delivery_id,),
             ).fetchone()
