@@ -84,7 +84,7 @@ class _LoginPageState extends State<LoginPage> {
       }
       final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!opened) {
-        throw ResearchOSApiException('เปิด ' + name + ' Sign-In ไม่สำเร็จ');
+        throw ResearchOSApiException('เปิด $name Sign-In ไม่สำเร็จ');
       }
       setState(() {
         _message = 'กรุณาเข้าสู่ระบบในเบราว์เซอร์ กำลังรอการยืนยัน…';
@@ -234,8 +234,7 @@ class _LoginPageState extends State<LoginPage> {
                                       _busyProvider ==
                                               provider['id']?.toString()
                                           ? 'กำลังเปิด…'
-                                          : 'Continue with ' +
-                                              provider['name'].toString(),
+                                          : 'Continue with ${provider['name']}',
                                     ),
                                   ),
                                 ),
@@ -263,21 +262,25 @@ class _LoginPageState extends State<LoginPage> {
                         childrenPadding:
                             const EdgeInsets.fromLTRB(14, 0, 14, 14),
                         children: <Widget>[
-                          RadioListTile<String>(
-                            value: ApiEndpointStore.connectionResearchOs,
+                          RadioGroup<String>(
                             groupValue: widget.connectionProfile,
-                            title: const Text('Research OS'),
                             onChanged: (value) {
-                              if (value != null) _selectConnection(value);
+                              if (value != null) {
+                                _selectConnection(value);
+                              }
                             },
-                          ),
-                          RadioListTile<String>(
-                            value: ApiEndpointStore.connectionDeveloperRuntime,
-                            groupValue: widget.connectionProfile,
-                            title: const Text('Developer Runtime'),
-                            onChanged: (value) {
-                              if (value != null) _selectConnection(value);
-                            },
+                            child: Column(
+                              children: <Widget>[
+                                RadioListTile<String>(
+                                  value: ApiEndpointStore.connectionResearchOs,
+                                  title: const Text('Research OS'),
+                                ),
+                                RadioListTile<String>(
+                                  value: ApiEndpointStore.connectionDeveloperRuntime,
+                                  title: const Text('Developer Runtime'),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
