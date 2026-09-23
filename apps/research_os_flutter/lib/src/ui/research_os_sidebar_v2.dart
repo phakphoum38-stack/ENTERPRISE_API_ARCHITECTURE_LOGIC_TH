@@ -197,27 +197,67 @@ class ResearchOSSidebarV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const workspace = <_Entry>[
-      _Entry('search', 'Search', Icons.search_outlined, 0),
-      _Entry('new-chat', 'New chat', Icons.add_comment_outlined, 1),
-      _Entry('conversation', 'สนทนา AI', Icons.chat_bubble_outline, 1),
-      _Entry('friend-connect', 'Friend Connect', Icons.support_agent_outlined, 13),
-      _Entry('images', 'Images', Icons.image_outlined, 1, available: false),
-      _Entry('library', 'Library', Icons.local_library_outlined, 3),
-      _Entry('scheduled', 'Scheduled', Icons.schedule_outlined, 1,
-          available: false),
-      _Entry('plugins', 'Plugins', Icons.extension_outlined, 1,
-          available: false),
-      _Entry('projects', 'Projects', Icons.folder_outlined, 1,
-          available: false),
-    ];
-    const account = <_Entry>[
-      _Entry('pinned', 'Pinned', Icons.push_pin_outlined, 1,
-          available: false),
-      _Entry('recents', 'Recents', Icons.history_outlined, 1),
-      _Entry('account', 'Google Identity', Icons.account_circle_outlined, 12),
-      _Entry('settings', 'Settings', Icons.settings_outlined, 9),
-    ];
+
+    List<Widget> entries() {
+      final widgets = <Widget>[];
+      String? section;
+      for (final item of researchNavigationItems) {
+        if (expanded && section != item.section) {
+          section = item.section;
+          widgets.add(_section(context, item.section));
+        }
+        widgets.add(
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: expanded ? 10 : 8,
+              vertical: 2,
+            ),
+            child: Material(
+              color: selectedIndex == item.index
+                  ? scheme.secondaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(13),
+              child: InkWell(
+                key: Key('v2-nav-${item.index}'),
+                borderRadius: BorderRadius.circular(13),
+                onTap: () => onSelected(item.index),
+                child: SizedBox(
+                  height: 43,
+                  child: Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: expanded ? 44 : 58,
+                        child: Icon(
+                          item.icon,
+                          color: selectedIndex == item.index
+                              ? scheme.onSecondaryContainer
+                              : scheme.onSurfaceVariant,
+                          size: 21,
+                        ),
+                      ),
+                      if (expanded)
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: selectedIndex == item.index
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      return widgets;
+    }
 
     return AnimatedContainer(
       key: const Key('research-os-sidebar-v2'),
@@ -234,23 +274,9 @@ class ResearchOSSidebarV2 extends StatelessWidget {
           const Divider(height: 1),
           Expanded(
             child: ListView(
+              key: const Key('desktop-navigation-list-v2'),
               padding: const EdgeInsets.symmetric(vertical: 6),
-              children: <Widget>[
-                _section(context, 'Workspace'),
-                for (final entry in workspace) _destination(context, entry),
-                _section(context, 'More'),
-                _destination(
-                  context,
-                  const _Entry(
-                    'more',
-                    'More',
-                    Icons.more_horiz_outlined,
-                    2,
-                  ),
-                ),
-                _section(context, 'Account'),
-                for (final entry in account) _destination(context, entry),
-              ],
+              children: entries(),
             ),
           ),
           _securityStatus(context),
