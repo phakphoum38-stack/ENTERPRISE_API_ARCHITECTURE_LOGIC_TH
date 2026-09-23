@@ -80,7 +80,7 @@ void main() {
           scrollable: find.descendant(
             of: find.byKey(const Key('desktop-navigation-list-v2')),
             matching: find.byType(Scrollable),
-          ),
+          ).first,
         );
         expect(
           finder,
