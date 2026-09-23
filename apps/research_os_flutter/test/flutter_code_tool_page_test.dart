@@ -80,7 +80,8 @@ void main() {
     await tester.tap(readButton);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('flutter-code-tool-status')), findsOneWidget);
-    final readSha = find.textContaining('Read SHA: old-sha');
+    final readSha = find.byKey(const Key('flutter-code-tool-read-sha'));
+    expect(readSha, findsOneWidget);
     await tester.scrollUntilVisible(
       readSha,
       300,
