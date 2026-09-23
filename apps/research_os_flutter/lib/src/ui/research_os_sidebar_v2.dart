@@ -183,6 +183,7 @@ class ResearchOSSidebarV2 extends StatelessWidget {
                         Expanded(
                           child: Text(
                             item.label,
+                            key: Key('desktop-nav-label-${item.index}'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
