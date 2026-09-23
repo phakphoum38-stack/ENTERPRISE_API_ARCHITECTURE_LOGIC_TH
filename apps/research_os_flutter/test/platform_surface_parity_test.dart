@@ -44,12 +44,11 @@ void main() {
           reason: 'Missing mobile navigation destination: ${item.label}',
         );
         expect(
-          find.descendant(
-            of: finder,
-            matching: find.byType(Text),
+          find.byKey(
+            Key('mobile-nav-label-${item.index}'),
             skipOffstage: false,
           ),
-          findsWidgets,
+          findsOneWidget,
           reason: 'Missing mobile navigation label: ${item.label}',
         );
       }
@@ -93,12 +92,11 @@ void main() {
           reason: 'Missing desktop navigation destination: ${item.label}',
         );
         expect(
-          find.descendant(
-            of: finder,
-            matching: find.byType(Text),
+          find.byKey(
+            Key('desktop-nav-label-${item.index}'),
             skipOffstage: false,
           ),
-          findsWidgets,
+          findsOneWidget,
           reason: 'Missing desktop navigation label: ${item.label}',
         );
       }
