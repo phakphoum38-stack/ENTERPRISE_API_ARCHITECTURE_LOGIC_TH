@@ -23,7 +23,12 @@ void main() {
           'items': [{'path': 'lib/main.dart', 'bytes': 20}],
         }), 200);
       }
-      if (request.url.path == '/v2/developer/code/file/lib/main.dart') {
+      if (request.url.pathSegments.length == 5 &&
+          request.url.pathSegments[0] == 'v2' &&
+          request.url.pathSegments[1] == 'developer' &&
+          request.url.pathSegments[2] == 'code' &&
+          request.url.pathSegments[3] == 'file' &&
+          request.url.pathSegments[4] == 'lib/main.dart') {
         return http.Response(jsonEncode({
           'api_version': 'v2',
           'project': 'research_os_flutter',
