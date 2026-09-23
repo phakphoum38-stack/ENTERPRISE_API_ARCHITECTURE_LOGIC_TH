@@ -175,8 +175,11 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
               },
               onApiBaseUrlChanged: _changeApiEndpoint,
             )
-              : LoginPage(
+                      : LoginPage(
+                  key: ValueKey(_apiBaseUrl),
                   apiClient: apiClient,
+                  connectionProfile: ApiEndpointStore.profileForUrl(_apiBaseUrl),
+                  onConnectionChanged: _changeApiEndpoint,
                   onAuthenticated: () {
                     setState(() => _authenticated = true);
                   },
