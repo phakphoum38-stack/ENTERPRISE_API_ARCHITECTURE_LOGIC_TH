@@ -5,7 +5,12 @@ import 'package:research_os_flutter/src/app_shell.dart';
 import 'package:research_os_flutter/src/features/github/github_dashboard_page.dart';
 import 'package:research_os_flutter/src/features/graph/knowledge_graph_page.dart';
 import 'package:research_os_flutter/src/features/home/home_page.dart';
+import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+String researchNavigationItemsLabel(int index) {
+  return researchNavigationItems.singleWhere((item) => item.index == index).label;
+}
 
 class FakeResearchOSApiClient extends ResearchOSApiClient {
   FakeResearchOSApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
@@ -205,7 +210,10 @@ void main() {
       ),
     );
     expect(googleNav, findsOneWidget);
-    expect(find.text('Google Sign-In', skipOffstage: false), findsOneWidget);
+    expect(
+      researchNavigationItemsLabel(12),
+      'Google Sign-In',
+    );
     expect(tester.takeException(), isNull);
   });
 
