@@ -155,6 +155,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
       margin: const EdgeInsets.only(top: 18),
       child: Padding(
         padding: const EdgeInsets.all(18),
+        child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -168,7 +169,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
                     style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
                   ),
                 ),
-                Chip(label: Text(widget.principal)),
+                const Chip(label: Text('Owner Code Tool')),
               ],
             ),
             const SizedBox(height: 8),
