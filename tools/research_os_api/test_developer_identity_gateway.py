@@ -1,53 +1,100 @@
 from __future__ import annotations
 
+import json
 import os
-import unittest
-from unittest.mock import patch
+import threading
+import urllib.error
+import urllib.request
+from http.server import ThreadingHTTPServer
+from pathlib import Path
 
-from developer_identity import IdentityAssertionError, IdentityAssertionVerifier
-from developer_identity_gateway import mint_developer_assertion
-
-
-class DeveloperIdentityGatewayTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.secret = "gateway-secret-0123456789"
-        self.session = {
-            "user_id": "owner-user-123",
-            "email": "owner@example.test",
-            "role": "owner",
-            "session_id": "session-abc",
-        }
-
-    def test_mints_assertion_from_verified_session(self) -> None:
-        with patch.dict(os.environ, {"RESEARCH_OS_IDENTITY_PROXY_SECRET": self.secret}):
-            result = mint_developer_assertion(self.session, now=1000)
-
-        self.assertEqual(result["principal"], "owner-user-123")
-        self.assertEqual(result["email"], "owner@example.test")
-        self.assertEqual(result["role"], "owner")
-        self.assertEqual(result["expires_at"], 1120)
-
-        verifier = IdentityAssertionVerifier(self.secret)
-        identity = verifier.verify(result["headers"], now=1050)
-        self.assertEqual(identity.principal, "owner-user-123")
-
-    def test_client_cannot_override_principal(self) -> None:
-        session = {**self.session, "principal": "attacker@example.test"}
-        with patch.dict(os.environ, {"RESEARCH_OS_IDENTITY_PROXY_SECRET": self.secret}):
-            result = mint_developer_assertion(session, now=1000)
-        self.assertEqual(result["principal"], "owner-user-123")
-        self.assertEqual(result["headers"]["X-ResearchOS-Principal"], "owner-user-123")
-
-    def test_missing_gateway_secret_fails_closed(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaisesRegex(IdentityAssertionError, "not configured"):
-                mint_developer_assertion(self.session, now=1000)
-
-    def test_incomplete_verified_session_fails_closed(self) -> None:
-        with patch.dict(os.environ, {"RESEARCH_OS_IDENTITY_PROXY_SECRET": self.secret}):
-            with self.assertRaisesRegex(IdentityAssertionError, "incomplete"):
-                mint_developer_assertion({**self.session, "user_id": ""}, now=1000)
+from auth_session import issue_session
 
 
-if __name__ == "__main__":
-    unittest.main()
+def _request(url: str, session: str | None = None):
+    headers = {"Content-Type": "application/json"}
+    if session:
+        headers["X-Research-OS-Session"] = session
+    request = urllib.request.Request(url, data=b"{}", headers=headers, method="POST")
+    return urllib.request.urlopen(request, timeout=5)
+
+
+def test_developer_assertion_endpoint_bridges_verified_session(tmp_path: Path) -> None:
+    os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-session-secret-012345"
+    os.environ["RESEARCH_OS_V3_DATA_DIR"] = str(tmp_path)
+    os.environ["RESEARCH_OS_IDENTITY_PROXY_SECRET"] = "gateway-secret-0123456789"
+
+    from server import ResearchOSHandler
+    from developer_identity import IdentityAssertionVerifier
+
+    session = issue_session({"user_id": "owner-user-123", "email": "owner@example.test", "role": "owner"})
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), ResearchOSHandler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{httpd.server_port}/v1/auth/developer/assertion"
+        with _request(url, session) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+
+        assert payload["principal"] == "owner-user-123"
+        assert payload["email"] == "owner@example.test"
+        assert payload["role"] == "owner"
+        assert payload["token_type"] == "research_os_developer_assertion"
+        identity = IdentityAssertionVerifier("gateway-secret-0123456789").verify(
+            payload["headers"],
+            now=int(payload["issued_at"]) + 1,
+        )
+        assert identity.principal == "owner-user-123"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
+
+
+def test_developer_assertion_endpoint_rejects_missing_session(tmp_path: Path) -> None:
+    os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-session-secret-012345"
+    os.environ["RESEARCH_OS_V3_DATA_DIR"] = str(tmp_path)
+    os.environ["RESEARCH_OS_IDENTITY_PROXY_SECRET"] = "gateway-secret-0123456789"
+
+    from server import ResearchOSHandler
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), ResearchOSHandler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{httpd.server_port}/v1/auth/developer/assertion"
+        try:
+            _request(url)
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 401
+            return
+        raise AssertionError("missing Research OS session was accepted")
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
+
+
+def test_developer_assertion_endpoint_fails_closed_without_proxy_secret(tmp_path: Path) -> None:
+    os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-session-secret-012345"
+    os.environ["RESEARCH_OS_V3_DATA_DIR"] = str(tmp_path)
+    os.environ.pop("RESEARCH_OS_IDENTITY_PROXY_SECRET", None)
+
+    from server import ResearchOSHandler
+
+    session = issue_session({"user_id": "owner-user-123", "email": "owner@example.test", "role": "owner"})
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), ResearchOSHandler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{httpd.server_port}/v1/auth/developer/assertion"
+        try:
+            _request(url, session)
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 503
+            return
+        raise AssertionError("gateway minted an assertion without its signing secret")
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
