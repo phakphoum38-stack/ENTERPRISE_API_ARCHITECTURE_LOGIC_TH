@@ -26,6 +26,8 @@ class _FakeClient extends http.BaseClient {
       '/v1/agents/orchestrations' => <String, Object?>{
         'orchestrations': <Object>[
           <String, Object?>{'run_id': 'run-1', 'status': 'completed'},
+          <String, Object?>{'run_id': 'run-2', 'status': 'running'},
+          <String, Object?>{'run_id': 'run-3', 'status': 'failed'},
         ],
       },
       _ => <String, Object?>{},
@@ -60,6 +62,8 @@ void main() {
     expect(find.text('Agent readiness'), findsOneWidget);
     expect(find.text('Workflow runs'), findsOneWidget);
     expect(find.text('Workflow control surface'), findsOneWidget);
+    expect(find.text('Running'), findsOneWidget);
+    expect(find.text('Failed'), findsOneWidget);
 
     api.close();
   });
