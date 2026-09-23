@@ -70,7 +70,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('flutter-code-tool-file')));
     await tester.pumpAndSettle();
-    final fileMenuItem = find.text('lib/main.dart');
+    final fileMenuItem = find.byKey(const ValueKey('flutter-code-file-lib/main.dart'));
     expect(fileMenuItem, findsOneWidget);
     await tester.tap(fileMenuItem);
     await tester.pumpAndSettle();
