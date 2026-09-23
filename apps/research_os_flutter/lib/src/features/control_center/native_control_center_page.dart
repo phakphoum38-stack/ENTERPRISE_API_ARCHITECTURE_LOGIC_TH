@@ -30,6 +30,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   Map<String, dynamic>? _skills;
   Map<String, dynamic>? _providers;
   Map<String, dynamic>? _agents;
+  Map<String, dynamic>? _agentReadiness;
+  Map<String, dynamic>? _orchestrations;
   final List<String> _events = <String>[
     'Control Center initialized',
     'Human authority boundary active',
@@ -70,6 +72,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
         widget.apiClient.getBrainSkills(),
         widget.apiClient.getProviders(),
         widget.apiClient.getAgents(),
+        widget.apiClient.getAgentReadiness(),
+        widget.apiClient.getOrchestrations(limit: 20),
       ]);
       if (!mounted) return;
       setState(() {
@@ -78,6 +82,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
         _skills = values[2];
         _providers = values[3];
         _agents = values[4];
+        _agentReadiness = values[5];
+        _orchestrations = values[6];
         _livePulse++;
         _events.insert(0, 'Runtime state observed');
       });
@@ -212,6 +218,8 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                   skills: _skills,
                   providers: _providers,
                   agents: _agents,
+                  agentReadiness: _agentReadiness,
+                  orchestrations: _orchestrations,
                   simulation: _simulation,
                 ),
                 _Activity(events: _events),
@@ -230,7 +238,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                     _events.insert(0, 'Inspector opened: $id');
                   }),
                 ),
-                _FailureView(health: _health),
+                _FailureView(health: _health, orchestrations: _orchestrations),
                 _Activity(events: _events),
                 _Simulation(
                   enabled: _simulation,
@@ -323,6 +331,8 @@ class _Overview extends StatelessWidget {
     required this.skills,
     required this.providers,
     required this.agents,
+    required this.agentReadiness,
+    required this.orchestrations,
     required this.simulation,
   });
 
@@ -331,6 +341,8 @@ class _Overview extends StatelessWidget {
   final Map<String, dynamic>? skills;
   final Map<String, dynamic>? providers;
   final Map<String, dynamic>? agents;
+  final Map<String, dynamic>? agentReadiness;
+  final Map<String, dynamic>? orchestrations;
   final bool simulation;
 
   @override
@@ -340,8 +352,13 @@ class _Overview extends StatelessWidget {
     final skillsCount = (skills?['skills'] as List?)?.length ?? 0;
     final providerCount = (providers?['providers'] as List?)?.length ?? 0;
     final agentCount = (agents?['agents'] as List?)?.length ?? 0;
+    final readiness = agentReadiness?['status']?.toString() ??
+        agentReadiness?['readiness']?.toString() ?? 'UNKNOWN';
+    final runs = _orchestrationItems(orchestrations);
+    final orchestrationCount = runs.length;
 
     return ListView(
+      key: const ValueKey('control-center-overview-scroll'),
       padding: const EdgeInsets.all(16),
       children: <Widget>[
         if (simulation)
@@ -363,6 +380,10 @@ class _Overview extends StatelessWidget {
             _Metric('Brain skills', '$skillsCount', Icons.psychology_alt_outlined),
             _Metric('Providers', '$providerCount', Icons.cloud_outlined),
             _Metric('Agents', '$agentCount', Icons.smart_toy_outlined),
+            _Metric('Agent readiness', readiness, Icons.health_and_safety_outlined),
+            _Metric('Workflow runs', '$orchestrationCount', Icons.account_tree_outlined),
+            _Metric('Running', '${_statusCount(runs, 'running')}', Icons.play_circle_outline),
+            _Metric('Failed', '${_statusCount(runs, 'failed')}', Icons.error_outline),
           ],
         ),
         const SizedBox(height: 12),
@@ -380,6 +401,18 @@ class _Overview extends StatelessWidget {
             ),
             subtitle: const Text(
               'Observation is sourced from existing Research OS API surfaces.',
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.route_outlined),
+            title: const Text('Workflow control surface'),
+            subtitle: Text(
+              'Existing orchestration API observed: $orchestrationCount run(s). '
+              'Agent readiness: $readiness. Execution remains behind existing human authorization.',
             ),
           ),
         ),
@@ -577,13 +610,16 @@ class _Inspector extends StatelessWidget {
 }
 
 class _FailureView extends StatelessWidget {
-  const _FailureView({required this.health});
+  const _FailureView({required this.health, this.orchestrations});
   final Map<String, dynamic>? health;
+  final Map<String, dynamic>? orchestrations;
 
   @override
   Widget build(BuildContext context) {
+    final rawRuns = _orchestrationItems(orchestrations);
+    final failedRuns = rawRuns.where((item) => item['status']?.toString().toLowerCase() == 'failed').toList();
     final failures = health?['failures'];
-    if (failures is! List || failures.isEmpty) {
+    if ((failures is! List || failures.isEmpty) && failedRuns.isEmpty) {
       return const Card(
         child: ListTile(
           leading: Icon(Icons.info_outline),
@@ -701,4 +737,15 @@ class _JsonView extends StatelessWidget {
           ),
         ],
       );
+}
+
+int _statusCount(Object? raw, String status) {
+  if (raw is! List) return 0;
+  return raw.where((item) => item is Map && item['status']?.toString().toLowerCase() == status).length;
+}
+
+List<Map<String, dynamic>> _orchestrationItems(Map<String, dynamic>? payload) {
+  final raw = payload?['runs'] ?? payload?['orchestrations'];
+  if (raw is! List) return <Map<String, dynamic>>[];
+  return raw.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
 }

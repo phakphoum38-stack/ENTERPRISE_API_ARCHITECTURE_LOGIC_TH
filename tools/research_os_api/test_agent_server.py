@@ -20,7 +20,7 @@ class AgentServerTests(unittest.TestCase):
         self.original = agent_server.ORCHESTRATOR
         self.original_secret = os.environ.get("RESEARCH_OS_SESSION_SECRET")
         os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-only-agent-server-session-secret"
-        self.session = issue_session({"sub": "agent-test-user", "email": "agent-test@example.test", "role": "user"})
+        self.session = issue_session({"sub": "agent-test-user", "email": "agent-test@example.test", "role": "owner"})
         self.temp_dir = tempfile.TemporaryDirectory()
         agent_server.ORCHESTRATOR = AgentOrchestrator(
             storage_path=Path(self.temp_dir.name) / "agents" / "orchestrations.json",
@@ -76,6 +76,22 @@ class AgentServerTests(unittest.TestCase):
         self.assertEqual(discovered["count"], 1)
         self.assertEqual(discovered["agents"][0]["agent_id"], "developer")
         self.assertTrue(discovered["filters"]["ready_only"])
+
+    def test_non_owner_cannot_control_workflow(self) -> None:
+        non_owner = issue_session({"sub": "agent-test-user-2", "email": "user@example.test", "role": "user"})
+        original = self.session
+        self.session = non_owner
+        status, created = self.request(
+            "/v1/agents/orchestrations",
+            method="POST",
+            body={"objective": "authorization boundary", "steps": [{"step_id": "research", "objective": "inspect", "requested_agent": "research"}]},
+        )
+        self.assertEqual(status, 201)
+        run_id = created["run"]["run_id"]
+        status, denied = self.request(f"/v1/agents/orchestrations/{run_id}/execute", method="POST", body={})
+        self.assertEqual(status, 403)
+        self.assertEqual(denied["error"], "owner_authorization_required")
+        self.session = original
 
     def test_create_get_list_and_execute(self) -> None:
         status, created = self.request(

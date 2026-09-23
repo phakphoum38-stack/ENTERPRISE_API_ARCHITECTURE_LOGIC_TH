@@ -18,10 +18,18 @@ class _FakeClient extends http.BaseClient {
         },
       '/v1/brain/capacity' => <String, Object?>{'capacity': 36},
       '/v1/brain/skills' => <String, Object?>{
-        'skills': <Object>['analysis'],
-      },
+          'skills': <Object>['analysis'],
+        },
       '/v1/providers' => <String, Object?>{'providers': <Object>['owner-mock']},
       '/v1/agents' => <String, Object?>{'agents': <Object>['friend']},
+      '/v1/agents/readiness' => <String, Object?>{'status': 'ready'},
+      '/v1/agents/orchestrations' => <String, Object?>{
+          'orchestrations': <Object>[
+            <String, Object?>{'run_id': 'run-1', 'status': 'completed'},
+            <String, Object?>{'run_id': 'run-2', 'status': 'running'},
+            <String, Object?>{'run_id': 'run-3', 'status': 'failed'},
+          ],
+        },
       _ => <String, Object?>{},
     };
     final bytes = utf8.encode(jsonEncode(payload));
@@ -51,6 +59,36 @@ void main() {
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('System Map'), findsOneWidget);
     expect(find.text('LIVE'), findsOneWidget);
+    expect(find.text('Agent readiness'), findsOneWidget);
+    expect(find.text('Workflow runs'), findsOneWidget);
+    expect(find.text('Running'), findsOneWidget);
+    expect(find.text('Failed'), findsOneWidget);
+
+    final overview = find.byKey(
+      const ValueKey('control-center-overview-scroll'),
+    );
+    expect(overview, findsOneWidget);
+
+    // ListView is the keyed owner of the overview scroll region. Its actual
+    // Scrollable is a child created by ListView, not an ancestor of ListView.
+    // Resolve that child so scrollUntilVisible can operate on the correct
+    // scroll position without depending on other Scrollables in the page.
+    final overviewScrollable = find
+        .descendant(
+          of: overview,
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    expect(overviewScrollable, findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Workflow control surface'),
+      500,
+      scrollable: overviewScrollable,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Workflow control surface'), findsOneWidget);
 
     api.close();
   });
