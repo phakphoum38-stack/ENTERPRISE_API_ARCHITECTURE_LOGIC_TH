@@ -10,7 +10,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            drawer: ResearchMobileDrawer(
+            body: ResearchMobileDrawer(
               selectedIndex: 0,
               onSelected: (_) {},
             ),
@@ -50,12 +50,24 @@ void main() {
       expect(find.byType(ResearchOSSidebarV2), findsOneWidget);
 
       for (final item in researchNavigationItems) {
+        final finder = find.byKey(
+          Key('v2-nav-${item.index}'),
+          skipOffstage: false,
+        );
+        await tester.scrollUntilVisible(
+          finder,
+          300,
+          scrollable: find.byKey(const Key('desktop-navigation-list-v2')),
+        );
         expect(
-          find.byKey(Key('v2-nav-${item.index}')),
+          finder,
           findsOneWidget,
           reason: 'Missing desktop navigation destination: ${item.label}',
         );
-        expect(find.text(item.label), findsOneWidget);
+        expect(
+          find.text(item.label, skipOffstage: false),
+          findsOneWidget,
+        );
       }
     },
   );
