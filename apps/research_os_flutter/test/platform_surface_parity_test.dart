@@ -7,16 +7,21 @@ void main() {
   testWidgets(
     'mobile Research OS navigation exposes the complete shared application surface',
     (tester) async {
+      final scaffoldKey = GlobalKey<ScaffoldState>();
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: ResearchMobileDrawer(
+            key: scaffoldKey,
+            drawer: ResearchMobileDrawer(
               selectedIndex: 0,
               onSelected: (_) {},
             ),
+            body: const SizedBox.shrink(),
           ),
         ),
       );
+      scaffoldKey.currentState!.openDrawer();
+      await tester.pumpAndSettle();
 
       expect(find.byType(ResearchMobileDrawer), findsOneWidget);
 
