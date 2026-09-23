@@ -21,8 +21,20 @@ void main() {
       expect(find.byType(ResearchMobileDrawer), findsOneWidget);
 
       for (final item in researchNavigationItems) {
+        final finder = find.byKey(
+          Key('mobile-nav-\${item.index}'),
+          skipOffstage: false,
+        );
+        await tester.scrollUntilVisible(
+          finder,
+          300,
+          scrollable: find.descendant(
+            of: find.byType(ResearchMobileDrawer),
+            matching: find.byType(Scrollable),
+          ),
+        );
         expect(
-          find.byKey(Key('mobile-nav-${item.index}')),
+          finder,
           findsOneWidget,
           reason: 'Missing mobile navigation destination: ${item.label}',
         );
@@ -57,7 +69,10 @@ void main() {
         await tester.scrollUntilVisible(
           finder,
           300,
-          scrollable: find.byKey(const Key('desktop-navigation-list-v2')),
+          scrollable: find.descendant(
+            of: find.byKey(const Key('desktop-navigation-list-v2')),
+            matching: find.byType(Scrollable),
+          ),
         );
         expect(
           finder,
