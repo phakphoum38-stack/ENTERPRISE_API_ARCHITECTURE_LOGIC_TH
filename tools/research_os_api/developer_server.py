@@ -187,23 +187,6 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
             if parsed.path == "/v2/developer/session":
                 self._send(HTTPStatus.OK, {"authenticated":True,"principal":principal,"identity_provider":"trusted_gateway","assertion_mode":"signed_hmac_sha256"})
                 return
-            if parsed.path == "/v2/developer/code/preview":
-                self._send(HTTPStatus.OK, preview_flutter_code(
-                    str(body.get("project") or "research_os_flutter"),
-                    str(body.get("path") or ""),
-                    str(body.get("original_sha256") or ""),
-                    str(body.get("content") or ""),
-                ))
-                return
-            if parsed.path == "/v2/developer/code/apply":
-                self._send(HTTPStatus.OK, apply_flutter_code(
-                    str(body.get("project") or "research_os_flutter"),
-                    str(body.get("path") or ""),
-                    str(body.get("original_sha256") or ""),
-                    str(body.get("content") or ""),
-                    principal,
-                ))
-                return
             if parsed.path == "/v2/developer/access-requests":
                 view = (query.get("view") or ["developer"])[0].strip().lower()
                 if view == "owner":
@@ -267,6 +250,23 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
 
             principal = self._principal()
             store = self._store()
+            if parsed.path == "/v2/developer/code/preview":
+                self._send(HTTPStatus.OK, preview_flutter_code(
+                    str(body.get("project") or "research_os_flutter"),
+                    str(body.get("path") or ""),
+                    str(body.get("original_sha256") or ""),
+                    str(body.get("content") or ""),
+                ))
+                return
+            if parsed.path == "/v2/developer/code/apply":
+                self._send(HTTPStatus.OK, apply_flutter_code(
+                    str(body.get("project") or "research_os_flutter"),
+                    str(body.get("path") or ""),
+                    str(body.get("original_sha256") or ""),
+                    str(body.get("content") or ""),
+                    principal,
+                ))
+                return
             if parsed.path == "/v2/developer/access-requests":
                 item = store.request_access(
                     developer_id=principal,
