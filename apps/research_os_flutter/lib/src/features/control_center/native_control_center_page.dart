@@ -358,6 +358,7 @@ class _Overview extends StatelessWidget {
     final orchestrationCount = runs.length;
 
     return ListView(
+      key: const ValueKey('control-center-overview-scroll'),
       padding: const EdgeInsets.all(16),
       children: <Widget>[
         if (simulation)
