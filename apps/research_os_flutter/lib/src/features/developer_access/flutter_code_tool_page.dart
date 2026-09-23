@@ -298,6 +298,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
               const SizedBox(height: 4),
               SelectableText(
                 'Read SHA: $_sha',
+                key: const Key('flutter-code-tool-read-sha'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
