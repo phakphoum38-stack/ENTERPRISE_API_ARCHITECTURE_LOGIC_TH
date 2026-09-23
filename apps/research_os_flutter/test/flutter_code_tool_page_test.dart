@@ -73,8 +73,12 @@ void main() {
     final fileMenuItem = find.byKey(const ValueKey('flutter-code-file-lib/main.dart'));
     expect(fileMenuItem, findsOneWidget);
     await tester.tap(fileMenuItem);
-    await tester.pumpAndSettle();
+    await tester.pump();
 
+    // The selection callback performs an async read; wait for the resulting
+    // state rather than assuming the dropdown route and HTTP future settle in
+    // the same frame.
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
     await tester.ensureVisible(find.text('Preview Diff'));
