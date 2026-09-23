@@ -73,7 +73,7 @@ void main() {
     await tester.tap(find.text('lib/main.dart').last);
     await tester.pumpAndSettle();
 
-    final codeToolScroll = find.byType(Scrollable);
+    final codeToolScroll = find.byKey(const Key('flutter-code-tool-scroll'));
     await tester.scrollUntilVisible(
       find.textContaining('Read SHA: old-sha'),
       300,
