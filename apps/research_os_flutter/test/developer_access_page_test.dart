@@ -99,10 +99,10 @@ void main() {
     await tester.scrollUntilVisible(
       activeHeading,
       500,
-      scrollable: find.ancestor(
+      scrollable: find.descendant(
         of: outerScroll,
         matching: find.byType(Scrollable),
-      ),
+      ).first,
     );
     expect(activeHeading, findsOneWidget);
     expect(find.text('Approved file.md'), findsOneWidget);
