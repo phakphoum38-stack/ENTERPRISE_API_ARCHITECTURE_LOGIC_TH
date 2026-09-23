@@ -143,6 +143,8 @@ PR #553:
 
 ### 3.7 Control Center integration
 PR #554:
+- Latest head: `30480418302a5ae9f98fbf458bbd3f2cf8d2b0f5`
+- Removed a redundant Flutter analyzer type check in `native_control_center_page.dart` that was failing current CI
 - Flutter native Control Center
 - Orchestration APIs
 - Owner authorization
@@ -153,7 +155,17 @@ PR #554:
 - Final Gate evidence/validator
 - API v2 compatibility
 
-### 3.8 AEOS one-shot comprehensive review
+### 3.8 Generic AEOS file lineage verifier
+PR #556:
+- Branch: `feat/aeos-generic-file-lineage-gate`
+- Head: `9ba21d24015a4ba48e60b529aaa7270888070bbd`
+- Adds fail-closed changed-file lineage classification
+- Supports MODIFIED, RENAMED, COPIED, ADDED_WITH_LINEAGE, ADDED_GENESIS, ORPHAN_ADDED
+- Requires explicit predecessor/genesis evidence for new files
+- Produces structured path/fail-code/SHA/evidence records
+- Includes unit coverage for modified, orphan, genesis and rename cases
+
+### 3.9 AEOS one-shot comprehensive review
 Existing workflow:
 - `.github/workflows/aeos-one-shot-auto-merge.yml`
 - Resolves exact PR/head
@@ -169,7 +181,7 @@ Known next improvement:
 - Do not rely on filename-only matching
 - Require existing lineage, rename/move/copy lineage, explicit predecessor, or explicit genesis declaration
 
-### 3.9 FlutterFixCode Adapter
+### 3.10 FlutterFixCode Adapter
 External Flutter repository:
 - `phakphoum38-stack/flutter`
 - PR #5
