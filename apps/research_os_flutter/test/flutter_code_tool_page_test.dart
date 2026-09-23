@@ -80,7 +80,9 @@ void main() {
     await tester.tap(readButton);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('flutter-code-tool-status')), findsOneWidget);
-    expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
+    final readSha = find.textContaining('Read SHA: old-sha');
+    await tester.ensureVisible(readSha);
+    expect(readSha, findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
 
     final previewButton = find.widgetWithText(FilledButton, 'Preview Diff');
