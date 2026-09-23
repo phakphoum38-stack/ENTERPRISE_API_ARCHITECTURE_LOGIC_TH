@@ -82,7 +82,7 @@ void main() {
 
     expect(find.byKey(const Key('developer-access-page')), findsOneWidget);
     expect(find.text('user:owner'), findsOneWidget);
-    final ownerInboxScroll = find.byType(ListView);
+    final ownerInboxScroll = find.byType(Scrollable);
     await tester.scrollUntilVisible(
       find.textContaining('คำขอที่รออนุมัติ (1)'),
       400,
