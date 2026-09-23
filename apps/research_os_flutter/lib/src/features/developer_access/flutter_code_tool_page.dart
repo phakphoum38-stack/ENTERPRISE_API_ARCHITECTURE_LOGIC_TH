@@ -178,53 +178,67 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
               'เลือก Project → เลือก File → อ่าน Code → แก้ Code → Preview Diff → Apply Change → Flutter analyze/test → Evidence',
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _projects.contains(_project) ? _project : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Project',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _projects
-                        .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-                        .toList(),
-                    onChanged: _busy
-                        ? null
-                        : (value) async {
-                            if (value == null) return;
-                            setState(() {
-                              _project = value;
-                              _path = null;
-                              _editor.clear();
-                              _sha = '';
-                              _diff = '';
-                            });
-                            await _loadFiles();
-                          },
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 520;
+                final projectField = DropdownButtonFormField<String>(
+                  initialValue: _projects.contains(_project) ? _project : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Project',
+                    border: OutlineInputBorder(),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _query,
-                    decoration: InputDecoration(
-                      labelText: 'Filter files',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        tooltip: 'Refresh files',
-                        onPressed: _busy ? null : _loadFiles,
-                        icon: const Icon(Icons.refresh),
-                      ),
+                  isExpanded: true,
+                  items: _projects
+                      .map((item) => DropdownMenuItem(value: item, child: Text(item, overflow: TextOverflow.ellipsis)))
+                      .toList(),
+                  onChanged: _busy
+                      ? null
+                      : (value) async {
+                          if (value == null) return;
+                          setState(() {
+                            _project = value;
+                            _path = null;
+                            _editor.clear();
+                            _sha = '';
+                            _diff = '';
+                          });
+                          await _loadFiles();
+                        },
+                );
+                final filterField = TextField(
+                  controller: _query,
+                  decoration: InputDecoration(
+                    labelText: 'Filter files',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      tooltip: 'Refresh files',
+                      onPressed: _busy ? null : _loadFiles,
+                      icon: const Icon(Icons.refresh),
                     ),
-                    onSubmitted: (_) => _loadFiles(),
                   ),
-                ),
-              ],
+                  onSubmitted: (_) => _loadFiles(),
+                );
+                if (compact) {
+                  return Column(
+                    children: [
+                      projectField,
+                      const SizedBox(height: 10),
+                      filterField,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: projectField),
+                    const SizedBox(width: 10),
+                    Expanded(child: filterField),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
+              key: const Key('flutter-code-tool-file'),
               initialValue: _files.contains(_path) ? _path : null,
               decoration: const InputDecoration(
                 labelText: 'File',
