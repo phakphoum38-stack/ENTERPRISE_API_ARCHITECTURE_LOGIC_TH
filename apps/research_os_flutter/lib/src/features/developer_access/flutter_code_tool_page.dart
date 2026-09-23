@@ -156,6 +156,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: SingleChildScrollView(
+        key: const Key('flutter-code-tool-scroll'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
