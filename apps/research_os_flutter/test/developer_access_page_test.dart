@@ -87,7 +87,10 @@ void main() {
     await tester.scrollUntilVisible(
       pendingHeading,
       500,
-      scrollable: outerScroll,
+      scrollable: find.descendant(
+        of: outerScroll,
+        matching: find.byType(Scrollable),
+      ),
     );
     expect(pendingHeading, findsOneWidget);
     expect(find.text('Owner file.md'), findsOneWidget);
