@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from http.cookies import CookieError, SimpleCookie
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from auth_session import SESSION_COOKIE, clear_cookie_header, cookie_header, revoke_session, verify_session
 from google_identity import GoogleIdentityBroker
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
+from oauth_handoff import consume_handoff, create_handoff
 
 
 def _session_token(cookie_header_value: str | None) -> str:
@@ -35,6 +37,12 @@ def auth_callback(provider: str, query: str) -> tuple[dict, str]:
     if not code or not state:
         raise MultiLoginRuntimeError("OAuth callback requires code and state")
     result = complete_runtime_login(code, state)
+    session = str(result.get("session") or "").strip()
+    if not session:
+        raise MultiLoginRuntimeError("identity provider login did not produce a Research OS session")
+    # Keep the signed session out of the browser redirect URL.
+    # Reuse OAuth state as a short-lived, single-use native-client handoff key.
+    create_handoff(Path(__file__).resolve().parents[2], session, "", code=state)
     return result, result["set_cookie"]
 
 
@@ -76,3 +84,13 @@ def auth_signout(cookie_header_value: str | None) -> str:
         except ValueError:
             pass
     return clear_cookie_header()
+
+def auth_provider_handoff(state: str) -> dict:
+    handoff = str(state or "").strip()
+    if not handoff:
+        raise MultiLoginRuntimeError("OAuth handoff state is required")
+    session = consume_handoff(Path(__file__).resolve().parents[2], handoff)
+    if not session:
+        raise MultiLoginRuntimeError("OAuth handoff is missing, expired, or already consumed")
+    principal = verify_session(session)
+    return {"connected": True, "session": session, "account": {"user_id": principal["user_id"], "email": principal["email"], "role": principal["role"]}, "token_type": "research_os_session"}
