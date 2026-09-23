@@ -142,6 +142,7 @@ class _DeveloperAccessPageState extends State<DeveloperAccessPage> {
               : RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView(
+                    key: const Key('developer-access-scroll'),
                     padding: const EdgeInsets.all(20),
                     children: <Widget>[
                       _HeaderCard(principal: _principal ?? 'Authenticated owner'),
