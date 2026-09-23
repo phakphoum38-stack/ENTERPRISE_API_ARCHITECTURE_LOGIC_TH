@@ -34,6 +34,8 @@ void main() {
       MaterialApp(
         home: LoginPage(
           apiClient: client,
+          connectionProfile: 'research_os',
+          onConnectionChanged: (_) async {},
           onAuthenticated: () {},
         ),
       ),
@@ -44,6 +46,8 @@ void main() {
     expect(find.text('Continue with Google'), findsNothing);
     expect(find.text('Continue with Microsoft'), findsNothing);
     expect(find.text('Continue with GitHub'), findsNothing);
+    expect(find.text('Research OS'), findsOneWidget);
+    expect(find.text('Developer Runtime'), findsNothing);
 
     await tester.tap(find.text('Login'));
     await tester.pumpAndSettle();
@@ -51,5 +55,13 @@ void main() {
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Continue with Microsoft'), findsOneWidget);
     expect(find.text('Continue with GitHub'), findsOneWidget);
+
+    // Connection details are collapsed by default and expose names only.
+    expect(find.text('Developer Runtime'), findsNothing);
+    await tester.tap(find.text('Connection'));
+    await tester.pumpAndSettle();
+    expect(find.text('Developer Runtime'), findsOneWidget);
+    expect(find.text('127.0.0.1:8787'), findsNothing);
+    expect(find.text('127.0.0.1:8790'), findsNothing);
   });
 }
