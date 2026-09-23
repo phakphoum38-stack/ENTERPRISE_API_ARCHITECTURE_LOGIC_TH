@@ -82,8 +82,20 @@ void main() {
 
     expect(find.byKey(const Key('developer-access-page')), findsOneWidget);
     expect(find.text('user:owner'), findsOneWidget);
+    final ownerInboxScroll = find.byType(ListView);
+    await tester.scrollUntilVisible(
+      find.textContaining('คำขอที่รออนุมัติ (1)'),
+      400,
+      scrollable: ownerInboxScroll,
+    );
     expect(find.textContaining('คำขอที่รออนุมัติ (1)'), findsOneWidget);
     expect(find.text('Owner file.md'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.textContaining('สิทธิ์ที่กำลังใช้งาน (1)'),
+      400,
+      scrollable: ownerInboxScroll,
+    );
     expect(find.textContaining('สิทธิ์ที่กำลังใช้งาน (1)'), findsOneWidget);
     expect(find.text('Approved file.md'), findsOneWidget);
     expect(find.text('Revoke'), findsOneWidget);
