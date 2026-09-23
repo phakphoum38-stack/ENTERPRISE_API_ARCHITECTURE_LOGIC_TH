@@ -62,7 +62,18 @@ void main() {
     expect(find.text('Agent readiness'), findsOneWidget);
     expect(find.text('Workflow runs'), findsOneWidget);
 
-    expect(find.text('Workflow control surface'), findsOneWidget);
+    final workflowSurface = find.text('Workflow control surface');
+    final overviewScrollable = find.byKey(
+      const ValueKey('control-center-overview-scroll'),
+    );
+    await tester.scrollUntilVisible(
+      workflowSurface,
+      500,
+      scrollable: overviewScrollable,
+    );
+    await tester.pumpAndSettle();
+
+    expect(workflowSurface, findsOneWidget);
     expect(find.text('Running'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
 
