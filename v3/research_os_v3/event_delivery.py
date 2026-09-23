@@ -134,7 +134,7 @@ class DurableEventDelivery:
         with sqlite3.connect(self.path, timeout=30, isolation_level=None) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
-                "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until "
+                "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until,attempt,max_attempts "
                 "FROM deliveries WHERE delivery_id=? AND "
                 "(status='available' OR (status='delivering' AND lease_until<=?))",
                 (delivery_id,now_iso),
