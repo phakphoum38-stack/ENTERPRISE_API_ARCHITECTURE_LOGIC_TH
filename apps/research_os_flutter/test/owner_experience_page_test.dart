@@ -40,12 +40,7 @@ void main() {
     expect(find.text('OWNER session verified'), findsOneWidget);
     expect(find.text('Projects configured'), findsOneWidget);
     expect(find.text('1'), findsWidgets);
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is Text && (widget.data?.contains('FINAL_GATE') ?? false),
-      ),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('owner-release-authority')), findsOneWidget);
     expect(find.textContaining('unrestricted by resource or scope'), findsOneWidget);
   });
 }
