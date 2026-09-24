@@ -14,6 +14,15 @@ void main() {
     );
   });
 
+  test('workflow experience has a stable workspace destination', () {
+    final item = researchNavigationItems.singleWhere(
+      (candidate) => candidate.index == 15,
+    );
+
+    expect(item.label, 'Workflows');
+    expect(item.section, 'Workspace');
+  });
+
   test('control center carries the existing canonical capability identity', () {
     final item = researchNavigationItems.singleWhere(
       (candidate) => candidate.index == 16,
