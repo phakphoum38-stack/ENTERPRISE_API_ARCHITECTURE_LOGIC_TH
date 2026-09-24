@@ -12,7 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
 
-from tools.project_scale_execution import exercise_resource_conflict
+from tools.project_scale_execution import execute_scale_concurrently, exercise_resource_conflict
+from tools.project_scale_readiness import build_project_definitions
+from tools.project_registry import ProjectRegistry
 from tools.lifecycle_evidence import LifecycleEvidence, LifecycleEvidenceLedger
 from v3.research_os_v3.queue import DurableTaskQueue, LeaseOwnershipError, QueueTask
 from v3.research_os_v3.runner import StatelessResearchRunner
@@ -151,6 +153,23 @@ def validate_distribution_contract(root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def prove_100_project_scale(root: Path) -> tuple[str, ...]:
+    with tempfile.TemporaryDirectory() as raw:
+        registry = ProjectRegistry(build_project_definitions(100))
+        summary = execute_scale_concurrently(
+            registry=registry,
+            ledger_path=Path(raw) / "scale-evidence.jsonl",
+            owner_id="owner",
+            source_sha="a" * 40,
+            target_sha="a" * 40,
+            workflow_run_id="platform-hardening-100",
+            max_workers=16,
+        )
+    if summary.project_count != 100 or summary.completed != 100 or summary.evidence_records != 800:
+        return ("100-project concurrent proof did not complete with 100/100 and 800 evidence records",)
+    return ()
+
+
 def validate_scale_contract(root: Path) -> tuple[str, ...]:
     path = root / "current" / "RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json"
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -162,7 +181,7 @@ def validate_scale_contract(root: Path) -> tuple[str, ...]:
 
 
 def run_platform_hardening(root: Path) -> HardeningSummary:
-    scale_failures = validate_scale_contract(root)
+    scale_failures = validate_scale_contract(root) + prove_100_project_scale(root)
     recovery_failures = prove_failure_recovery()
     evidence_failures = prove_evidence_provenance()
     distribution_failures = validate_distribution_contract(root)
@@ -184,5 +203,5 @@ def run_platform_hardening(root: Path) -> HardeningSummary:
     )
 
 
-__all__ = ["HardeningSummary", "prove_failure_recovery", "prove_evidence_provenance",
+__all__ = ["HardeningSummary", "prove_100_project_scale", "prove_failure_recovery", "prove_evidence_provenance",
            "run_platform_hardening", "validate_distribution_contract", "validate_scale_contract"]
