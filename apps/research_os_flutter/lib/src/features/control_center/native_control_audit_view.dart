@@ -70,7 +70,7 @@ class NativeControlAuditView extends StatelessWidget {
     final hasDeferred = checks.any((item) => item['state'] == 'DEFERRED');
     final now = DateTime.now().toUtc();
     return NativeControlAuditSnapshot(
-      auditId: 'audit-\${now.millisecondsSinceEpoch}',
+      auditId: 'audit-${now.millisecondsSinceEpoch}',
       observedAt: now,
       status: hasFail ? 'FAIL' : (hasDeferred ? 'DEFERRED' : 'PASS'),
       checks: checks,
@@ -127,9 +127,9 @@ class NativeControlAuditView extends StatelessWidget {
                         ? Icons.error_outline
                         : Icons.pending_outlined,
               ),
-              title: Text('Latest: \${latest.status}'),
+              title: Text('Latest: ${latest.status}'),
               subtitle: Text(
-                '\${latest.auditId} • \${latest.observedAt.toLocal()}',
+                '${latest.auditId} • ${latest.observedAt.toLocal()}',
               ),
             ),
           ),
@@ -167,14 +167,14 @@ class NativeControlAuditView extends StatelessWidget {
         if (snapshots.length > 1) ...<Widget>[
           const SizedBox(height: 8),
           Text(
-            'Audit History (\${snapshots.length})',
+            'Audit History (${snapshots.length})',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           ...snapshots.skip(1).map(
             (snapshot) => ListTile(
               title: Text(snapshot.auditId),
               subtitle: Text(
-                '\${snapshot.status} • \${snapshot.observedAt.toLocal()}',
+                '${snapshot.status} • ${snapshot.observedAt.toLocal()}',
               ),
             ),
           ),
