@@ -1,0 +1,51 @@
+{
+  "contract_id": "research-os-project-template-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Define one reusable project configuration boundary on top of the existing Research OS platform core.",
+  "authorities": {
+    "capability_registry": "existing canonical capability registry",
+    "authorization": "existing authorization boundary",
+    "execution": "existing shared execution plane",
+    "evidence": "existing shared evidence plane",
+    "release": "FINAL_GATE"
+  },
+  "required_fields": [
+    "project_id",
+    "display_name",
+    "version",
+    "capabilities",
+    "authorization_policy",
+    "workflow_profile",
+    "evidence_namespace",
+    "resource_policy"
+  ],
+  "invariants": [
+    "project_id_is_unique",
+    "project_identity_is_required",
+    "capabilities_must_exist_in_canonical_registry",
+    "authorization_remains_external",
+    "execution_uses_shared_execution_plane",
+    "evidence_uses_shared_evidence_plane",
+    "project_evidence_is_namespace_scoped",
+    "project_id_is_part_of_idempotency_identity",
+    "resource_conflict_is_reject",
+    "same_version_overwrite_is_rejected",
+    "single_final_gate",
+    "no_project_runtime",
+    "no_project_queue",
+    "no_project_evidence_ledger",
+    "no_project_navigation_registry"
+  ],
+  "forbidden": [
+    "new_runtime",
+    "new_scheduler",
+    "new_queue",
+    "new_evidence_ledger",
+    "new_authorization_authority",
+    "new_navigation_registry",
+    "new_release_authority",
+    "capability_execution_from_configuration"
+  ],
+  "reference_project": "current/RESEARCH_OS_PROJECT_001.json"
+}
