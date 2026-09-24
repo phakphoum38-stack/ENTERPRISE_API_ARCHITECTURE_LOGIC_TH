@@ -3,10 +3,10 @@ import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 
 void main() {
   test('navigation registry remains the single destination source of truth', () {
-    expect(researchNavigationItems, hasLength(15));
+    expect(researchNavigationItems, hasLength(16));
     expect(
       researchNavigationItems.map((item) => item.index).toSet(),
-      equals({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}),
+      equals({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}),
     );
     expect(
       researchNavigationItems.map((item) => item.label).toSet(),
@@ -16,7 +16,7 @@ void main() {
 
   test('control center carries the existing canonical capability identity', () {
     final item = researchNavigationItems.singleWhere(
-      (candidate) => candidate.index == 14,
+      (candidate) => candidate.index == 15,
     );
 
     expect(item.label, 'Control Center');
