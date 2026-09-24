@@ -65,11 +65,36 @@ required_workflows:
   - .github/workflows/research-os-platform-surface-matrix.yml
   - .github/workflows/research-os-phase-e-unified-windows-distribution.yml
   - .github/workflows/research-os-release-spine-gate.yml
+  - .github/workflows/research-os-unified-final-gate.yml
 
 required_surface_contracts:
   - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
   - apps/research_os_flutter/test/platform_surface_parity_test.dart
   - apps/research_os_flutter/test/desktop_shell_test.dart
+
+assurance_recheck:
+  authority: existing_aeos_master_assurance
+  execution_boundary: tools/aeos_master_assurance.py
+  evidence_validator: tools/validate_aeos_final_gate_binding.py
+  evidence_schema: AEOS_MASTER_ASSURANCE_V2
+  target_sha: exact_unified_final_gate_target_sha
+  required_decision: PASS
+  required_control_status: PASS
+  required_control_returncode: 0
+  missing_evidence: STOP
+  sha_mismatch: STOP
+  non_pass_decision: STOP
+  non_pass_control: STOP
+  forbidden_states:
+    - UNKNOWN
+    - STALE
+    - CONFLICT
+    - BLOCKED
+    - QUARANTINED
+    - SELF_ATTESTED
+    - REVOKED
+    - EXPIRED
+  release_authority_remains: final_gate
 
 navigation:
   source_of_truth: apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
@@ -101,3 +126,5 @@ fail_closed:
   evidence_mismatch: STOP
   provenance_mismatch: STOP
   unauthorized_release: STOP
+  missing_aeos_recheck: STOP
+  aeos_non_pass: STOP

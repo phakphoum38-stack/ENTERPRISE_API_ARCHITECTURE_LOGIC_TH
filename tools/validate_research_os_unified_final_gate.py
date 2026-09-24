@@ -74,6 +74,9 @@ REQUIRED_FILES = (
     ".github/workflows/research-os-phase-e-unified-windows-distribution.yml",
     ".github/workflows/research-os-release-spine-gate.yml",
     ".github/workflows/research-os-unified-final-gate.yml",
+    "tools/aeos_master_assurance.py",
+    "tools/validate_aeos_final_gate_binding.py",
+    "tools/test_validate_aeos_final_gate_binding.py",
     "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
     "apps/research_os_flutter/test/platform_surface_parity_test.dart",
     "apps/research_os_flutter/test/desktop_shell_test.dart",
@@ -101,6 +104,19 @@ def main() -> None:
         fail("deferred policy is not fail-closed")
     if "release_blocked_by_unresolved_deferred: true" not in text:
         fail("unresolved deferred release policy is missing")
+    required_assurance = (
+        "authority: existing_aeos_master_assurance",
+        "execution_boundary: tools/aeos_master_assurance.py",
+        "evidence_validator: tools/validate_aeos_final_gate_binding.py",
+        "evidence_schema: AEOS_MASTER_ASSURANCE_V2",
+        "target_sha: exact_unified_final_gate_target_sha",
+        "required_decision: PASS",
+        "missing_aeos_recheck: STOP",
+        "aeos_non_pass: STOP",
+    )
+    missing_assurance = [item for item in required_assurance if item not in text]
+    if missing_assurance:
+        fail("AEOS Final Gate binding is incomplete: " + ", ".join(missing_assurance))
     missing = [path for path in REQUIRED_FILES if not (ROOT / path).is_file()]
     if missing:
         fail("missing required anchors: " + ", ".join(missing))
@@ -158,6 +174,8 @@ def main() -> None:
     print(f"NAVIGATION_REGISTRY={len(indexes)}_DESTINATIONS")
     print("RELEASE_AUTHORITY=FINAL_GATE")
     print("DEFERRED_POLICY=EXPLICIT_AND_FAIL_CLOSED")
+    print("AEOS_RECHECK=BOUND_TO_FINAL_GATE")
+    print("AEOS_RELEASE_AUTHORITY=FINAL_GATE")
 
 if __name__ == "__main__":
     main()
