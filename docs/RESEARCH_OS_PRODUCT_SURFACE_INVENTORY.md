@@ -6,8 +6,8 @@ apps/research_os_flutter product surface before any new UI is created.
 
 ## Verified existing surface
 
-The canonical navigation registry contains exactly 15 destinations, indexed
-0–14, and the app shell wires the corresponding existing feature pages.
+The canonical navigation registry contains exactly 16 destinations, indexed
+0–15, and the app shell wires the corresponding existing feature pages.
 
 The inventory does not create another navigation registry. The existing
 researchNavigationItems registry remains authoritative for presentation
@@ -33,6 +33,8 @@ Developer Access, Brain Skills, Google Sign-In, Friend Connect, and
 Control Center.
 
 Control Center already contains the Main Final Audit surface.
+
+Projects now exposes the existing ProjectRegistry through the canonical API and a read-only product surface.
 
 ### Next real product gaps
 
