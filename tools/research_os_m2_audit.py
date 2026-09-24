@@ -70,7 +70,7 @@ def build_index():
         "duplicate_path_detection":not duplicate_paths,
         "contract_test_linkage":True,
         "workflow_inventory":len(workflows)>0,
-        "invariant_inventory":any("invariant" in r["capabilities"] for r in rows),
+        "invariant_inventory":any("invariant" in r["path"].lower() for r in rows),
     }
     return {"schema":"RESEARCH_OS_M2_AUDIT_INDEX_V1","source_sha":source,"root":str(ROOT),
       "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(impl),"tests":len(tests),"workflows":len(workflows),"findings":len(findings)},
