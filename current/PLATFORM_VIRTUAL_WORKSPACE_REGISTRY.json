@@ -1,16 +1,224 @@
 {
-  "registry_id":"research-os-platform-work-registry-v1",
-  "contract_ref":"current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json",
-  "revision":1,
-  "workspace":"PLATFORM",
-  "records":[
-    {"work_id":"PLATFORM-001","virtual_path":"PLATFORM/FOUNDATION","name":"Platform Boundary","purpose":"Platform plane boundary and role.","category":"FOUNDATION","status":"DONE","resolution":"FOUND","source_refs":["current/PLANE_BOUNDARY_CONTRACT.json"],"dependencies":["CORE","ASSURANCE","EXPERIENCE"],"evidence_refs":[]},
-    {"work_id":"PLATFORM-002","virtual_path":"PLATFORM/INTEGRATION","name":"Platform Integration","purpose":"Compose capabilities and resolve dependencies across planes.","category":"INTEGRATION","status":"IN_PROGRESS","resolution":"FOUND","source_refs":["current/PLATFORM_INTEGRATION_CONTRACT.json"],"dependencies":["CORE","ASSURANCE","EXPERIENCE"],"evidence_refs":[],"source_pr":472},
-    {"work_id":"PLATFORM-003","virtual_path":"PLATFORM/EVOLUTION","name":"Controlled Evolution","purpose":"Proposal, simulation, validation, rollback and promotion.","category":"EVOLUTION","status":"PLANNED","resolution":"PARTIAL","source_refs":["docs/MASTER-PLAN-329-339-FORENSIC-INTEGRATION-MAP.md"],"dependencies":["CORE","ASSURANCE"],"evidence_refs":[],"master_plan":"#330"},
-    {"work_id":"PLATFORM-004","virtual_path":"PLATFORM/FEDERATION","name":"Federation","purpose":"Repository, service and domain federation.","category":"FEDERATION","status":"PLANNED","resolution":"UNKNOWN","source_refs":["docs/MASTER-PLAN-329-339-FORENSIC-INTEGRATION-MAP.md"],"dependencies":["CORE","ASSURANCE","PLATFORM"],"evidence_refs":[],"master_plan":"#331"},
-    {"work_id":"PLATFORM-005","virtual_path":"PLATFORM/RESOURCE","name":"Resource Governance","purpose":"Quota, provider, budget and capacity composition.","category":"RESOURCE","status":"IN_PROGRESS","resolution":"PARTIAL","source_refs":["current/PLATFORM_INTEGRATION_CONTRACT.json"],"dependencies":["CORE","ASSURANCE"],"evidence_refs":[]},
-    {"work_id":"PLATFORM-006","virtual_path":"PLATFORM/SECURITY","name":"Security and Supply Chain","purpose":"Identity, supply-chain, isolation and recovery integration.","category":"SECURITY","status":"PLANNED","resolution":"PARTIAL","source_refs":["docs/MASTER-PLAN-329-339-FORENSIC-INTEGRATION-MAP.md"],"dependencies":["CORE","ASSURANCE"],"evidence_refs":[],"master_plan":"#333"},
-    {"work_id":"PLATFORM-007","virtual_path":"PLATFORM/RELEASE","name":"Platform Release","purpose":"Evidence-bound release and certification integration.","category":"RELEASE","status":"PLANNED","resolution":"PARTIAL","source_refs":["current/PLATFORM_INTEGRATION_CONTRACT.json"],"dependencies":["ASSURANCE"],"evidence_refs":[],"master_plan":"#334"},
-    {"work_id":"PLATFORM-008","virtual_path":"PLATFORM/OPERATIONS","name":"Continuous Operations","purpose":"Monitoring, reconciliation, recovery and successor handoff.","category":"OPERATIONS","status":"PLANNED","resolution":"PARTIAL","source_refs":["docs/MASTER-PLAN-329-339-FORENSIC-INTEGRATION-MAP.md"],"dependencies":["CORE","ASSURANCE","EXPERIENCE"],"evidence_refs":[],"master_plan":"#337-#339"}
+  "registry_id": "research-os-platform-work-registry-v1",
+  "contract_ref": "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json",
+  "revision": 2,
+  "workspace": "PLATFORM",
+  "records": [
+    {
+      "work_id": "PLATFORM-001",
+      "virtual_path": "PLATFORM/FOUNDATION",
+      "name": "Platform Boundary",
+      "purpose": "Platform plane boundary and role.",
+      "category": "FOUNDATION",
+      "status": "DONE",
+      "resolution": "FOUND",
+      "source_refs": [
+        "current/PLANE_BOUNDARY_CONTRACT.json"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE",
+        "EXPERIENCE"
+      ],
+      "evidence_refs": []
+    },
+    {
+      "work_id": "PLATFORM-002",
+      "virtual_path": "PLATFORM/INTEGRATION",
+      "name": "Platform Integration",
+      "purpose": "Compose capabilities and resolve dependencies across planes.",
+      "category": "INTEGRATION",
+      "status": "IN_PROGRESS",
+      "resolution": "FOUND",
+      "source_refs": [
+        "current/PLATFORM_INTEGRATION_CONTRACT.json"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE",
+        "EXPERIENCE"
+      ],
+      "evidence_refs": [],
+      "source_pr": 472
+    },
+    {
+      "work_id": "PLATFORM-003",
+      "virtual_path": "PLATFORM/EVOLUTION",
+      "name": "Controlled Evolution",
+      "purpose": "Proposal, simulation, validation, rollback and promotion.",
+      "category": "EVOLUTION",
+      "status": "PLANNED",
+      "resolution": "PARTIAL",
+      "source_refs": [
+        "docs/MASTER-PLAN-329-339-FORENSIC-INTEGRATION-MAP.md"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE"
+      ],
+      "evidence_refs": [],
+      "master_plan": "#330"
+    },
+    {
+      "work_id": "PLATFORM-004",
+      "virtual_path": "PLATFORM/FEDERATION",
+      "name": "Federation",
+      "purpose": "Repository, service and domain federation.",
+      "category": "FEDERATION",
+      "status": "PLANNED",
+      "resolution": "UNKNOWN",
+      "source_refs": [
+        "docs/MASTER-PLAN-329-339-FORENSIC-INTEGRATION-MAP.md"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE",
+        "PLATFORM"
+      ],
+      "evidence_refs": [],
+      "master_plan": "#331"
+    },
+    {
+      "work_id": "PLATFORM-005",
+      "virtual_path": "PLATFORM/RESOURCE",
+      "name": "Resource Governance",
+      "purpose": "Quota, provider, budget and capacity composition.",
+      "category": "RESOURCE",
+      "status": "IN_PROGRESS",
+      "resolution": "PARTIAL",
+      "source_refs": [
+        "current/PLATFORM_INTEGRATION_CONTRACT.json"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE"
+      ],
+      "evidence_refs": []
+    },
+    {
+      "work_id": "PLATFORM-006",
+      "virtual_path": "PLATFORM/SECURITY",
+      "name": "Security and Supply Chain",
+      "purpose": "Identity, supply-chain, isolation and recovery integration.",
+      "category": "SECURITY",
+      "status": "PLANNED",
+      "resolution": "PARTIAL",
+      "source_refs": [
+        "docs/MASTER-PLAN-329-339-FORENSIC-INTEGRATION-MAP.md"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE"
+      ],
+      "evidence_refs": [],
+      "master_plan": "#333"
+    },
+    {
+      "work_id": "PLATFORM-007",
+      "virtual_path": "PLATFORM/RELEASE",
+      "name": "Platform Release",
+      "purpose": "Evidence-bound release and certification integration.",
+      "category": "RELEASE",
+      "status": "PLANNED",
+      "resolution": "PARTIAL",
+      "source_refs": [
+        "current/PLATFORM_INTEGRATION_CONTRACT.json"
+      ],
+      "dependencies": [
+        "ASSURANCE"
+      ],
+      "evidence_refs": [],
+      "master_plan": "#334"
+    },
+    {
+      "work_id": "PLATFORM-008",
+      "virtual_path": "PLATFORM/OPERATIONS",
+      "name": "Continuous Operations",
+      "purpose": "Monitoring, reconciliation, recovery and successor handoff.",
+      "category": "OPERATIONS",
+      "status": "PLANNED",
+      "resolution": "PARTIAL",
+      "source_refs": [
+        "docs/MASTER-PLAN-329-339-FORENSIC-INTEGRATION-MAP.md"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE",
+        "EXPERIENCE"
+      ],
+      "evidence_refs": [],
+      "master_plan": "#337-#339"
+    },
+    {
+      "work_id": "PLATFORM-009",
+      "virtual_path": "PLATFORM/CONTROL/DEFECT",
+      "name": "Defect Control",
+      "purpose": "Track defect lifecycle, remediation and verification across platform and projects using existing evidence and execution boundaries.",
+      "category": "CONTROL",
+      "status": "IN_PROGRESS",
+      "resolution": "FOUND",
+      "source_refs": [
+        "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE",
+        "EXPERIENCE"
+      ],
+      "evidence_refs": []
+    },
+    {
+      "work_id": "PLATFORM-010",
+      "virtual_path": "PLATFORM/CONTROL/SCHEDULE",
+      "name": "Schedule Control",
+      "purpose": "Coordinate planned work, dependencies and blockers without creating a second scheduler or execution runtime.",
+      "category": "CONTROL",
+      "status": "IN_PROGRESS",
+      "resolution": "FOUND",
+      "source_refs": [
+        "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE",
+        "EXPERIENCE"
+      ],
+      "evidence_refs": []
+    },
+    {
+      "work_id": "PLATFORM-011",
+      "virtual_path": "PLATFORM/CONTROL/RISK",
+      "name": "Risk Control",
+      "purpose": "Track risk, exceptions and mitigation using existing governance and evidence boundaries.",
+      "category": "CONTROL",
+      "status": "IN_PROGRESS",
+      "resolution": "FOUND",
+      "source_refs": [
+        "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE"
+      ],
+      "evidence_refs": []
+    },
+    {
+      "work_id": "PLATFORM-012",
+      "virtual_path": "PLATFORM/CONTROL/CHANGE-IMPACT",
+      "name": "Change Impact Control",
+      "purpose": "Trace governed changes to affected components, contracts, projects and required gates using the existing platform graph and governance.",
+      "category": "CONTROL",
+      "status": "IN_PROGRESS",
+      "resolution": "FOUND",
+      "source_refs": [
+        "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json"
+      ],
+      "dependencies": [
+        "CORE",
+        "ASSURANCE",
+        "EXPERIENCE"
+      ],
+      "evidence_refs": []
+    }
   ]
 }
