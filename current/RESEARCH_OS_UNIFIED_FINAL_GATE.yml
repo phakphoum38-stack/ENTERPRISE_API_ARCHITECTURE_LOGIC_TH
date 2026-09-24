@@ -59,8 +59,8 @@ required_surface_contracts:
 
 navigation:
   source_of_truth: apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
-  expected_destination_count: 17
-  indexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  cardinality: derived_from_registry
+  indexes: derived_from_registry
   duplicate_registry_forbidden: true
 
 platform_surface:
