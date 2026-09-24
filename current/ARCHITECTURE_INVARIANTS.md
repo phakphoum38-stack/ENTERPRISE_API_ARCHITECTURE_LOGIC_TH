@@ -39,6 +39,14 @@ This document defines architectural rules that must remain true across Friend Se
 - **INV-019 — Stacked dependency order:** Stacked PRs must merge in dependency order: `#250 → #251 → #252 → #253 → #254 → #255` unless the dependency graph is explicitly changed and revalidated.
 - **INV-020 — Failure isolation:** Infrastructure/validator fixes should remain independently reviewable when they are not part of the feature boundary they protect.
 
+## Platform Governance
+
+- **INV-021 — One canonical registry per domain:** Governance may reference canonical registries, but must not create competing registries or authorities.
+- **INV-022 — No hard-coded surface cardinality:** Cross-platform surface validation derives identity and cardinality from canonical sources.
+- **INV-023 — Change impact is explicit:** Governed changes identify affected components, contracts, risk, blast radius, and required gates.
+- **INV-024 — Evidence coverage is attributable:** Completeness requires implementation, test, contract, evidence, provenance, and applicable gate coverage.
+- **INV-025 — Governance is non-authoritative:** Governance validators may fail closed and report evidence, but cannot execute, authorize, approve, merge, or release.
+
 ## Enforcement Principle
 
 Each invariant should be enforced by the narrowest appropriate mechanism:
