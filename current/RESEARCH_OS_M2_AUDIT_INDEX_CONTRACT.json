@@ -10,6 +10,6 @@
   "graph_relations":["REFERENCES","VERIFIED_BY","DISPATCHES_OR_REFERENCES","PARTICIPATES_IN","BINDS_TO","ENFORCES_OR_REFERENCES"],
   "gap_states":["MISSING","INCOMPLETE","BROKEN","DRIFT","DUPLICATE","UNKNOWN","DEFERRED"],
   "rules":{"unknown_is_not_pass":true,"skipped_is_not_pass":true,"deferred_is_not_done":true,"exact_source_sha_required":true,"release_authority_remains_final_gate":true,"existing_authorities_must_be_reused":true,"index_is_descriptive_only":true},
-  "integrity_checks":["exact_git_sha","inventory_completeness","duplicate_path_detection","unique_node_ids","no_dangling_edges","contract_test_linkage","workflow_inventory","contract_inventory","invariant_inventory","final_gate_node"],
+  "integrity_checks":["exact_git_sha","inventory_completeness","duplicate_path_detection","unique_node_ids","no_dangling_edges","contract_test_linkage","contract_implementation_linkage","workflow_inventory","contract_inventory","invariant_inventory","final_gate_node"],
   "release_binding":{"required_final_gate_job":"m2_audit","failure_on_index_integrity_error":true,"gap_findings_are_evidence_not_automatic_release_success":true}
 }
