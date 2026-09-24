@@ -40,7 +40,7 @@ class FakeWorkflowApiClient extends ResearchOSApiClient {
 void main() {
   testWidgets('Workflow Experience observes existing orchestration and timeline', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: WorkflowExperiencePage(apiClient: FakeWorkflowApiClient())),
+      MaterialApp(home: Scaffold(body: WorkflowExperiencePage(apiClient: FakeWorkflowApiClient()))),
     );
     await tester.pumpAndSettle();
 
