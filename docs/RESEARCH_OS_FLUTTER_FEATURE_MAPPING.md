@@ -63,22 +63,23 @@
 
 ## Current decision
 
-`owner_special/flutter_app` is the **current shell host**, not because the other applications are obsolete, but because it already contains the integrated Control Center, Mission Control, Friend, Launch Desk, Native Core, and Owner runtime boundary.
+`apps/research_os_flutter` is the canonical Research OS product UI surface across Windows, Web and iOS. The shared enterprise navigation registry remains the only canonical navigation registry.
 
-`apps/research_os_flutter` contributes the broad cross-platform Research OS feature set and platform integrations.
+`owner_special/flutter_app` remains an existing runtime compatibility boundary for Owner Special, Friend, Native integration, Windows identity, ServiceHost and installer lifecycle. It is not a second product UI authority and does not define a competing navigation registry.
 
-`v3/flutter_app` contributes V3-specific behavior and release contracts.
+`v3/flutter_app` remains a compatibility source until its feature and release contracts are migrated with evidence.
 
-Therefore the migration direction is:
+The convergence direction is:
 
 ```text
-apps/research_os_flutter  ─┐
-                           ├──> contracts/adapters ──> Owner Control Center shell
-v3/flutter_app            ─┘
-                                      │
-                                      ├── Windows / iOS / other platform adapters
-                                      ├── Friend / API / Runtime
-                                      └── Evidence / Identity / Governance
+apps/research_os_flutter  ──> canonical product UI / shared navigation / cross-platform adapters
+            │
+            ├── Owner Workspace
+            ├── Windows / Web / iOS
+            └── Evidence / Identity / Governance
+
+owner_special/flutter_app ──> runtime boundary / Friend runtime / native / Windows installer
+v3/flutter_app             ──> compatibility contracts until proven migrated
 ```
 
 ## Retirement condition
