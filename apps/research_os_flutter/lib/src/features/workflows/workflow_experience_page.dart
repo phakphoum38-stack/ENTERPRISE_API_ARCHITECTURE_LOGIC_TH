@@ -37,7 +37,8 @@ class _WorkflowExperiencePageState extends State<WorkflowExperiencePage> {
         _loading = false;
         if (_selectedRun != null) {
           final id = _selectedRun!['run_id']?.toString() ?? '';
-          _selectedRun = runs.where((run) => (run['run_id']?.toString() ?? '') == id).firstOrNull;
+          final matches = runs.where((run) => (run['run_id']?.toString() ?? '') == id);
+          _selectedRun = matches.isEmpty ? null : matches.first;
         }
       });
     } catch (error) {
