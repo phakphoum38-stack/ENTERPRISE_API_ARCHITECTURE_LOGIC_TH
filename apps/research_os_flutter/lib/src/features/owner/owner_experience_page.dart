@@ -218,6 +218,7 @@ class _OwnerExperiencePageState extends State<OwnerExperiencePage> {
                         subtitle: Text('Observations remain attributable to the existing evidence/audit plane.'),
                       ),
                       const ListTile(
+                        key: Key('owner-release-authority'),
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(Icons.verified_outlined),
                         title: Text('Release'),
