@@ -22,7 +22,7 @@
         "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json"
       ],
       "tests": [
-        "tools/test_platform_graph.py"
+        "owner_special/tests/test_platform_virtual_workspace.py"
       ],
       "evidence": [
         "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json"
@@ -43,7 +43,7 @@
         "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json"
       ],
       "tests": [
-        "tools/test_platform_graph.py"
+        "owner_special/tests/test_platform_virtual_workspace.py"
       ],
       "evidence": [
         "tools/platform_graph.py"
@@ -155,7 +155,7 @@
         "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json"
       ],
       "tests": [
-        "apps/research_os_flutter/test/native_control_center_page_test.dart"
+        "apps/research_os_flutter/test/features/control_center/native_control_center_page_test.dart"
       ],
       "evidence": [
         "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
