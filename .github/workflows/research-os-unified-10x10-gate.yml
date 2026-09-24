@@ -83,7 +83,16 @@ jobs:
           from v3.scripts.run_service import main
           raise SystemExit(main())
           '@ | Set-Content $launcher -Encoding utf8
-          $p=Start-Process $python -ArgumentList @('-u','v3/scripts/run_service.py') -WorkingDirectory $PWD -Environment @{PYTHONPATH="$PWD\v3";RESEARCH_OS_DATA_DIR=$data;RESEARCH_OS_V3_HOST='127.0.0.1';RESEARCH_OS_V3_PORT='8788'} -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          # Preserve the hosted runner environment. Supplying a partial -Environment map can
+          # replace the child environment and cause Windows DLL initialization failure (0xC0000142).
+          $childEnv=@{}
+          Get-ChildItem Env: | ForEach-Object { $childEnv[$_.Name]=$_.Value }
+          $childEnv['PYTHONPATH']="$PWD\v3"
+          $childEnv['RESEARCH_OS_DATA_DIR']=$data
+          $childEnv['RESEARCH_OS_V3_HOST']='127.0.0.1'
+          $childEnv['RESEARCH_OS_V3_PORT']='8788'
+          $childEnv['PYTHON_EXE']=$python
+          $p=Start-Process $python -ArgumentList @('-u','v3/scripts/run_service.py') -WorkingDirectory $PWD -Environment $childEnv -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
           $p.Id | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
           $ready=$false
           for($i=0;$i-lt 40;$i++){
