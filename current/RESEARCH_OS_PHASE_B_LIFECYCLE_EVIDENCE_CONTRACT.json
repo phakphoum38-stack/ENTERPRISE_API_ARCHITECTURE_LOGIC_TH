@@ -1,0 +1,42 @@
+{
+  "contract_id": "research-os-phase-b-lifecycle-evidence-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Bind command lifecycle, existing executor observation, immutable evidence, state, and explicit recovery without creating execution authority.",
+  "canonical_routing_contract": "current/NATIVE_COMMAND_ROUTING_CONTRACT.json",
+  "required_evidence_fields": [
+    "event_id",
+    "correlation_id",
+    "source_sha",
+    "target_sha",
+    "workflow_run_id",
+    "contract_version",
+    "fingerprint"
+  ],
+  "lifecycle": [
+    "INTENT",
+    "VALIDATE",
+    "PREPARE",
+    "AUTHORIZE",
+    "EXECUTE",
+    "OBSERVE",
+    "EVIDENCE",
+    "COMPLETE",
+    "RECOVER"
+  ],
+  "rules": [
+    "existing_executor_remains_authoritative",
+    "evidence_is_append_only",
+    "source_sha_must_match",
+    "correlation_id_must_match",
+    "unknown_state_stops",
+    "recovery_requires_explicit_reason",
+    "terminal_state_must_be_complete_or_recover",
+    "assurance_does_not_execute"
+  ],
+  "authority": {
+    "authorization": "external_human_or_canonical_authorization_boundary",
+    "execution": "existing_capability_executor",
+    "release": "final_gate"
+  }
+}
