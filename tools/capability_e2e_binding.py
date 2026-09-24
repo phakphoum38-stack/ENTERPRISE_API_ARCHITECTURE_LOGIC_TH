@@ -40,7 +40,6 @@ class CapabilityE2EBinding:
         source_sha: str,
         target_sha: str,
         workflow_run_id: str,
-        project_id: str = "",
         contract_version: str = "research-os-phase-c-capability-e2e/v1",
     ) -> None:
         self.ledger = ledger
