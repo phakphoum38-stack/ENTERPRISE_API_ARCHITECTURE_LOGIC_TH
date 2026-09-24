@@ -40,6 +40,7 @@ class CapabilityE2EBinding:
         source_sha: str,
         target_sha: str,
         workflow_run_id: str,
+        project_id: str = "",
         contract_version: str = "research-os-phase-c-capability-e2e/v1",
     ) -> None:
         self.ledger = ledger
@@ -47,6 +48,7 @@ class CapabilityE2EBinding:
         self.source_sha = source_sha
         self.target_sha = target_sha
         self.workflow_run_id = workflow_run_id
+        self.project_id = project_id
         self.contract_version = contract_version
 
     def invoke(
@@ -147,6 +149,7 @@ class CapabilityE2EBinding:
                 contract_version=self.contract_version,
                 recovery_required=recovery_required,
                 recovery_reason=recovery_reason,
+                project_id=self.project_id,
             )
         )
 
