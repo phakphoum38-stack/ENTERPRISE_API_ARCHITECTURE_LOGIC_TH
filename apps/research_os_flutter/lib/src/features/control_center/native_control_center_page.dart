@@ -690,15 +690,21 @@ class _FailureView extends StatelessWidget {
         ),
       );
     }
+    final items = failures is List
+        ? failures
+        : failedRuns.map((run) => <String, dynamic>{
+            'id': run['run_id'] ?? run['id'] ?? 'failed-run',
+            'status': run['status'] ?? 'failed',
+          }).toList();
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: failures.length,
+      itemCount: items.length,
       itemBuilder: (_, index) => ListTile(
         leading: const Icon(Icons.warning_amber_outlined),
         title: Text(
-          failures[index] is Map
-              ? (failures[index] as Map)['id']?.toString() ?? 'Failure'
-              : failures[index].toString(),
+          items[index] is Map
+              ? (items[index] as Map)['id']?.toString() ?? 'Failure'
+              : items[index].toString(),
         ),
       ),
     );
