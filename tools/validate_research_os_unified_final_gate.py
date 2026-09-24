@@ -71,9 +71,12 @@ def main() -> None:
         / "enterprise_navigation.dart"
     ).read_text(encoding="utf-8")
 
-    registry = navigation.split("const researchNavigationItems", 1)[1].split("];", 1)[0]
+    marker = "const researchNavigationItems"
+    if marker not in navigation:
+        fail("navigation registry declaration is missing")
+    registry = navigation.split(marker, 1)[1].split("];", 1)[0]
     entries = re.findall(
-        r"ResearchNavItem\\((.*?)\\),\\s*(?=ResearchNavItem|$)",
+        r"ResearchNavItem\((.*?)\),\s*(?=ResearchNavItem|$)",
         registry,
         flags=re.DOTALL,
     )
