@@ -4,7 +4,7 @@ from pathlib import Path
 
 from tools.lifecycle_evidence import LifecycleEvidenceLedger
 from tools.project_execution import ProjectExecutionProof
-from tools.project_registry import PROJECT_001, ProjectRegistry
+from tools.project_registry import PROJECT_001, ProjectDefinition, ProjectRegistry
 from tools.runtime_evidence import capture_runtime_evidence
 
 SHA = "a" * 40
@@ -21,9 +21,13 @@ class FailingAgentExecutor:
 
 
 class ProjectExecutionTests(unittest.TestCase):
-    def make_proof(self, directory: Path) -> ProjectExecutionProof:
+    def make_proof(
+        self,
+        directory: Path,
+        registry: ProjectRegistry | None = None,
+    ) -> ProjectExecutionProof:
         return ProjectExecutionProof(
-            registry=ProjectRegistry((PROJECT_001,)),
+            registry=registry or ProjectRegistry((PROJECT_001,)),
             ledger=LifecycleEvidenceLedger(directory / "evidence.jsonl"),
             owner_id="owner-001",
             source_sha=SHA,
@@ -113,17 +117,26 @@ class ProjectExecutionTests(unittest.TestCase):
 
     def test_cross_project_capability_boundary_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            registry = ProjectRegistry((PROJECT_001,))
-            with self.assertRaises(KeyError):
-                registry.get("project-002")
-            proof = self.make_proof(Path(directory))
+            project_002 = ProjectDefinition(
+                project_id="project-002",
+                display_name="Project 002",
+                version="1.0.0",
+                capabilities=("agent",),
+                authorization_policy="EXISTING_AUTHORIZATION_BOUNDARY",
+                workflow_profile="SHARED_WORKFLOW",
+                evidence_namespace="PROJECT:project-002",
+                resource_policy="REJECT_ON_CONFLICT",
+            )
+            registry = ProjectRegistry((PROJECT_001, project_002))
+            proof = self.make_proof(Path(directory), registry=registry)
+
             with self.assertRaises(ValueError):
                 proof.invoke(
-                    project_id="project-001",
+                    project_id="project-002",
                     capability_id="assurance",
                     action="record evidence",
                     executor=object(),
-                    correlation_id="project-001-corr-005",
+                    correlation_id="project-002-corr-005",
                     authorized=True,
                 )
 
