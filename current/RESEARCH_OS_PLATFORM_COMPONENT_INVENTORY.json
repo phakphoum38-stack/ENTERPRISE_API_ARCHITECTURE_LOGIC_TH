@@ -1,6 +1,6 @@
 {
   "registry_id": "research-os-platform-component-inventory-v1",
-  "version": 1,
+  "version": 2,
   "status": "ACTIVE",
   "purpose": "Derived governance inventory over existing canonical platform components; descriptive only and never an authority.",
   "source_of_truths": [
@@ -229,6 +229,98 @@
       ],
       "gates": [
         "flutter_surface",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "defect_control",
+      "canonical": "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+      "kind": "CONTROL_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "evidence"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_operating_control.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "schedule_control",
+      "canonical": "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+      "kind": "PLANNING_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "workflow"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_operating_control.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json"
+      ],
+      "gates": [
+        "project_scale",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "risk_control",
+      "canonical": "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+      "kind": "GOVERNANCE_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "evidence",
+        "platform_graph"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_operating_control.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "change_impact_control",
+      "canonical": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+      "kind": "ANALYSIS_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_graph",
+        "project_identity"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_operating_control.py",
+        "tools/test_platform_change_impact.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json"
+      ],
+      "gates": [
         "unified_final_gate"
       ]
     }
