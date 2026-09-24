@@ -16,6 +16,18 @@ class PhaseEUnifiedWindowsDistributionTests(unittest.TestCase):
         self.assertIn("Installer install run uninstall E2E", workflow)
         self.assertIn("WINDOWS_INSTALL_E2E_EVIDENCE.json", workflow)
 
+    def test_installer_e2e_requires_uninstall(self) -> None:
+        original = validator.json.loads(
+            validator.CONTRACT.read_text(encoding="utf-8")
+        )
+        original["install_e2e"]["uninstall_required"] = False
+        with patch.object(validator, "json") as mocked_json:
+            mocked_json.loads.return_value = original
+            self.assertIn(
+                "installer E2E invariant missing: uninstall_required",
+                validator.validate(),
+            )
+
     def test_distribution_cannot_replace_release_authority(self) -> None:
         original = validator.json.loads(
             validator.CONTRACT.read_text(encoding="utf-8")
