@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from tools.platform_graph import PlatformGraph
+
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "current" / "RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json"
 
@@ -49,6 +51,14 @@ def validate() -> list[str]:
         failures.append("release_domain_not_unique")
 
     workspace = _load("current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json")
+    try:
+        graph = PlatformGraph.from_paths(
+            "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json",
+            "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+        )
+        failures.extend(f"platform_graph:{item}" for item in graph.validate())
+    except Exception as exc:
+        failures.append(f"platform_graph:error:{exc}")
     records = workspace.get("records", [])
     work_ids = [r.get("work_id") for r in records]
     paths = [r.get("virtual_path") for r in records]
