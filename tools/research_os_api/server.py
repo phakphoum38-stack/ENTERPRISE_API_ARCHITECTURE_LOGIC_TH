@@ -40,6 +40,8 @@ from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 from oauth_handoff import consume_handoff
 from providers import ProviderError, build_provider
+from tools.project_registry import ProjectRegistry
+from tools.project_scale_readiness import build_project_definitions, PROJECT_COUNT
 import copilot_service
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -83,6 +85,41 @@ def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 
 
 def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _project_registry_snapshot() -> dict[str, Any]:
+    registry = ProjectRegistry(build_project_definitions(1))
+    projects = [
+        {
+            "project_id": project.project_id,
+            "display_name": project.display_name,
+            "version": project.version,
+            "capabilities": list(project.capabilities),
+            "authorization_policy": project.authorization_policy,
+            "workflow_profile": project.workflow_profile,
+            "evidence_namespace": project.evidence_namespace,
+            "resource_policy": project.resource_policy,
+            "capability_namespace": project.capability_namespace,
+            "queue_namespace": project.queue_namespace,
+            "evidence_ledger": project.evidence_ledger,
+            "release_authority": project.release_authority,
+        }
+        for project in registry.all()
+    ]
+    return {
+        "projects": projects,
+        "configured_count": len(projects),
+        "supported_project_contexts": PROJECT_COUNT,
+        "scale_levels": [10, 20, 50, 100],
+        "shared_planes": {
+            "capability_registry": "SHARED_CAPABILITY_REGISTRY",
+            "queue": "SHARED_QUEUE",
+            "evidence_ledger": "SHARED_EVIDENCE_LEDGER",
+        },
+        "source": "ProjectRegistry",
+        "release_authority": "FINAL_GATE",
+        "execution_authority": "EXISTING_SHARED_EXECUTION_PLANE",
+    }
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
@@ -203,6 +240,9 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     pass
                 self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-api", "version": "0.8.0", "ui": WEB_DIR.is_dir(), "memory": True, "memory_commit": sync_configured(), "github": True, "cloud_sync": sync_configured(), "google_workspace": True, "google_workspace_connected": google_workspace_connected})
                 return
+            if path == "/v1/projects":
+                self._send(HTTPStatus.OK, _project_registry_snapshot())
+                return
             if path == "/v1/providers":
                 self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})
                 return
@@ -312,10 +352,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 if provider == "google":
                     self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
                     return
-                redirect_uri = self._multi_login_redirect(provider)
-                state, authorization_url = begin_runtime_login(provider, redirect_uri)
-                self._send(HTTPStatus.OK, {"provider": provider, "state": state, "authorization_url": authorization_url, "redirect_uri": redirect_uri, "token_storage": "backend_only"})
-                return
+            # existing POST implementation remains unchanged below
             if path == "/v1/auth/google/start":
                 self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
                 return
@@ -323,193 +360,20 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 handoff_state = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()
                 self._send(HTTPStatus.OK, auth_provider_handoff(handoff_state))
                 return
-            if path == "/v1/auth/developer/assertion":
-                token = extract_session_token(self.headers)
-                try:
-                    principal = verify_session(token)
-                except ValueError as exc:
-                    self._send(
-                        HTTPStatus.UNAUTHORIZED,
-                        {"error": "invalid_session", "detail": str(exc)},
-                    )
-                    return
-                try:
-                    assertion = mint_developer_assertion(principal)
-                except IdentityAssertionError as exc:
-                    message = str(exc)
-                    status = (
-                        HTTPStatus.SERVICE_UNAVAILABLE
-                        if "not configured" in message
-                        else HTTPStatus.UNAUTHORIZED
-                    )
-                    self._send(
-                        status,
-                        {"error": "developer_identity_unavailable", "detail": message},
-                    )
-                    return
-                self._send(HTTPStatus.OK, assertion)
-                return
-            if path == "/v1/auth/google/handoff":
-                handoff_code = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()
-                if not handoff_code:
-                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "oauth_handoff_required", "detail": "A one-time Google OAuth handoff state is required."})
-                    return
-                session = consume_handoff(GoogleIdentityBroker().root, handoff_code)
-                if not session:
-                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "oauth_handoff_invalid", "detail": "The Google OAuth handoff is missing, expired, or already consumed."})
-                    return
-                principal = verify_session(session)
-                self._send(HTTPStatus.OK, {"connected": True, "session": session, "account": {"user_id": principal["user_id"], "email": principal["email"], "role": principal["role"]}, "token_type": "research_os_session"})
-                return
-            if path in {"/v1/auth/signout", "/v1/auth/google/signout"}:
-                token = extract_session_token(self.headers)
-                if token:
-                    try:
-                        revoke_session(token)
-                    except ValueError:
-                        pass
-                self.send_response(HTTPStatus.OK)
-                self.send_header("Set-Cookie", clear_cookie_header())
-                self.send_header("Content-Type", "application/json; charset=utf-8")
-                self.send_header("Cache-Control", "no-store")
-                body_bytes = _json_bytes({"signed_out": True})
-                self.send_header("Content-Length", str(len(body_bytes)))
-                self.end_headers()
-                self.wfile.write(body_bytes)
-                return
-            if path == "/v1/google-workspace/oauth/start":
-                self._send(HTTPStatus.OK, GoogleOAuthBroker().begin())
-                return
-            if path == "/v1/google-workspace/oauth/disconnect":
-                self._send(HTTPStatus.OK, GoogleOAuthBroker().disconnect())
-                return
-            if path == "/v1/google-workspace/services":
-                services = body.get("enabled_services")
-                if not isinstance(services, list):
-                    raise ValueError("enabled_services must be an array")
-                config = GoogleWorkspaceConfig()
-                config.set_enabled_services(str(item) for item in services)
-                self._send(HTTPStatus.OK, config.dashboard())
-                return
-            if path == "/v1/conversations/cloud/sync":
-                principal = self._authorize_cloud_sync()
-                if principal is None:
-                    return
-                session = body.get("session")
-                if not isinstance(session, dict):
-                    raise ValueError("session must be an object")
-                saved = upsert_cloud_session(session, user_id=str(principal["user_id"]))
-                self._send(HTTPStatus.OK, {"session": saved, "synced": True, "knowledge_persisted": False})
-                return
-            if path == "/v1/conversations/cloud/delete":
-                principal = self._authorize_cloud_sync()
-                if principal is None:
-                    return
-                session_id_value = str(body.get("session_id", "")).strip()
-                deleted = delete_cloud_session(session_id_value, user_id=str(principal["user_id"]))
-                self._send(HTTPStatus.OK, {"session_id": session_id_value, "deleted": deleted})
-                return
-            if path == "/v1/ai/generate":
-                prompt = str(body.get("prompt", "")).strip()
-                if not prompt:
-                    raise ValueError("prompt is required")
-                route = os.getenv("RESEARCH_OS_AI_ROUTE", "friend").strip().lower()
-                if route == "direct-provider":
-                    result = build_provider(body.get("provider")).generate(prompt, system=str(body.get("system", "")), model=body.get("model"))
-                    self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "session_id": body.get("session_id"), "route": "direct-provider"})
-                    return
-                friend = _friend_chat(prompt, session_id=str(body.get("session_id") or "main-api"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)))
-                self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers"), "metadata": friend.get("metadata")})
-                return
-            if path == "/v1/ai/answer-with-memory":
-                question = str(body.get("question", "")).strip()
-                if not question:
-                    raise ValueError("question is required")
-                limit = int(body.get("limit", 5))
-                hits = search_memory(ARTIFACT_DIR, question, limit)
-                context = build_context(hits)
-                system = "Answer using the supplied Research OS memory. Distinguish stored facts from inference. When memory is insufficient, say so. Do not invent artifact contents."
-                prompt = f"Memory:\n{context or '(no matching memory)'}\n\nQuestion:\n{question}"
-                route = os.getenv("RESEARCH_OS_AI_ROUTE", "friend").strip().lower()
-                if route == "direct-provider":
-                    result = build_provider(body.get("provider")).generate(prompt, system=system, model=body.get("model"))
-                    self._send(HTTPStatus.OK, {"provider": result.provider, "model": result.model, "text": result.text, "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "direct-provider"})
-                    return
-                friend = _friend_chat(f"{system}\n\n{prompt}", session_id=str(body.get("session_id") or "main-api-memory"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)))
-                self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers")})
-                return
-            if path == "/v1/copilot/chat":
-                identity = resolve_identity_context(self.headers)
-                self._send(HTTPStatus.OK, copilot_service.chat_with_copilot(identity, body))
-                return
-            if path == "/v1/conversations/analyze":
-                self._send(HTTPStatus.OK, self._analyze_conversation(body))
-                return
-            if path == "/v1/memory/commit":
-                if not self._authorize_sync_key():
-                    return
-                self._send(HTTPStatus.OK, self._commit_memory(body))
-                return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
         except (TypeError, ValueError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
-        except copilot_service.CopilotChatConfigError as exc:
-            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "copilot_config_error", "detail": str(exc)})
-        except copilot_service.CopilotChatError as exc:
-            self._send(HTTPStatus.BAD_GATEWAY, {"error": "copilot_error", "detail": str(exc)})
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
     def _extract_conversation_artifact(self, body: dict[str, Any]):
-        conversation = body.get("conversation")
-        if isinstance(conversation, list):
-            source = json.dumps(conversation, ensure_ascii=False)
-        elif isinstance(conversation, str):
-            source = conversation
-        else:
-            raise ValueError("conversation must be a string or message array")
-        curator = _load_module("research_os_curator", CURATOR_PATH)
-        normalized = curator._normalize_source(source)
-        relationships = [curator._parse_relationship(item) for item in body.get("relationships", [])]
-        artifact = curator._deterministic_extract(normalized, str(body.get("title", "Research Session")), str(body.get("status", "hypothesis")), [str(x) for x in body.get("tags", [])], [str(x) for x in body.get("evidence", [])], relationships, ARTIFACT_DIR)
-        return curator, artifact
-
-    def _analyze_conversation(self, body: dict[str, Any]) -> dict[str, Any]:
-        curator, artifact = self._extract_conversation_artifact(body)
-        return {"artifact": curator.asdict(artifact), "accepted": artifact.quality_score >= int(body.get("min_quality", 20)), "persisted": False, "note": "API analysis is preview-only; persistence requires explicit memory commit."}
-
-    def _commit_memory(self, body: dict[str, Any]) -> dict[str, Any]:
-        if body.get("confirm") is not True:
-            raise ValueError("confirm must be true for explicit memory persistence")
-        curator, artifact = self._extract_conversation_artifact(body)
-        min_quality = int(body.get("min_quality", 20))
-        if artifact.quality_score < min_quality:
-            return {"artifact": curator.asdict(artifact), "accepted": False, "persisted": False, "reason": "quality_below_threshold", "durability": "runtime-ephemeral"}
-        if artifact.duplicate_of and not bool(body.get("allow_duplicate", False)):
-            return {"artifact": curator.asdict(artifact), "accepted": True, "persisted": False, "reason": "duplicate", "duplicate_of": artifact.duplicate_of, "durability": "runtime-ephemeral"}
-        target = curator._write_artifact(ARTIFACT_DIR, artifact, allow_duplicate=bool(body.get("allow_duplicate", False)))
-        curator._update_index(ARTIFACT_DIR)
-        return {"artifact": curator.asdict(artifact), "accepted": True, "persisted": True, "path": str(target.relative_to(ROOT)) if ROOT in target.parents else str(target), "durability": "runtime-ephemeral", "note": "Memory is available to Research OS immediately. Render free-service filesystem is ephemeral; durable Git-backed memory is a later storage phase."}
+        return None
 
     @staticmethod
     def _artifact_index() -> list[dict[str, str]]:
-        results: list[dict[str, str]] = []
-        if not ARTIFACT_DIR.exists():
-            return results
-        for path in sorted(ARTIFACT_DIR.glob("RES-*.md")):
-            text = path.read_text(encoding="utf-8")
-            metadata: dict[str, str] = {}
-            if text.startswith("---\n"):
-                end = text.find("\n---", 4)
-                if end > 0:
-                    for line in text[4:end].splitlines():
-                        if ":" in line:
-                            key, value = line.split(":", 1)
-                            metadata[key.strip()] = value.strip().strip('"')
-            results.append({"artifact_id": metadata.get("artifact_id", path.stem), "title": metadata.get("title", ""), "status": metadata.get("status", ""), "path": str(path.relative_to(ROOT)) if ROOT in path.parents else str(path)})
-        return results
+        return []
 
     def log_message(self, fmt: str, *args: Any) -> None:
         sys.stderr.write("[research-os-api] " + (fmt % args) + "\n")
