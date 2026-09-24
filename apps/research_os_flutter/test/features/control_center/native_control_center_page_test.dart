@@ -116,7 +116,7 @@ void main() {
       (tester) async {
     const snapshot = NativeControlAuditSnapshot(
       auditId: 'audit-test',
-      observedAt: null,
+      observedAt: DateTime.utc(2026, 1, 1),
       status: 'DEFERRED',
       checks: <Map<String, String>>[
         <String, String>{
