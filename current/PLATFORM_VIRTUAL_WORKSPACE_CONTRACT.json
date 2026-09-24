@@ -12,7 +12,8 @@
     "RESOURCE",
     "SECURITY",
     "RELEASE",
-    "OPERATIONS"
+    "OPERATIONS",
+    "CONTROL"
   ],
   "statuses": [
     "PLANNED",
