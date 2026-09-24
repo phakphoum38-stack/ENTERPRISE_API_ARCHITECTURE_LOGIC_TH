@@ -1,104 +1,41 @@
-name: Owner Special iOS IPA
+name: Owner Special iOS Reconciliation Guard
 
-# Temporarily disabled. Run manually from Actions when iOS IPA work resumes.
+# Owner Special has no separate iOS product surface.
+# The canonical iOS product is apps/research_os_flutter and is validated by
+# .github/workflows/research-os-ios-ipa.yml.
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'owner_special/**'
+      - 'apps/research_os_flutter/**'
+      - '.github/workflows/owner-special-ios-ipa.yml'
 
 permissions:
   contents: read
 
 jobs:
-  build-ios-unsigned-ipa:
-    runs-on: macos-latest
-    timeout-minutes: 45
+  reconcile-owner-special-ios:
+    name: Reconcile Owner Special iOS boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Canonical iOS source gate
-        working-directory: owner_special/flutter_app
+      - name: Validate single canonical iOS surface
         shell: bash
         run: |
           set -euo pipefail
-          required=(
-            ios/Runner.xcodeproj/project.pbxproj
-            ios/Runner/Info.plist
-          )
-          for path in "${required[@]}"; do
-            test -f "$path" || { echo "Canonical Owner iOS source missing: $path"; exit 1; }
-          done
-          echo "CANONICAL_OWNER_IOS_SOURCE_GATE=PASS"
-
-      - name: Set Research OS iOS identity
-        working-directory: owner_special/flutter_app
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          project = Path('ios/Runner.xcodeproj/project.pbxproj')
-          text = project.read_text(encoding='utf-8')
-          out = []
-          for line in text.splitlines():
-              if 'PRODUCT_BUNDLE_IDENTIFIER =' in line:
-                  indent = line[:len(line) - len(line.lstrip())]
-                  current = line.split('=', 1)[1].strip().rstrip(';')
-                  if 'RunnerTests' in current:
-                      line = f'{indent}PRODUCT_BUNDLE_IDENTIFIER = com.phakphoum38.researchos.RunnerTests;'
-                  else:
-                      line = f'{indent}PRODUCT_BUNDLE_IDENTIFIER = com.phakphoum38.researchos;'
-              out.append(line)
-          project.write_text('\n'.join(out) + '\n', encoding='utf-8')
-          PY
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Research OS" ios/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleName Research OS" ios/Runner/Info.plist || true
-
-      - name: Flutter analyze and test
-        working-directory: owner_special/flutter_app
-        run: |
-          flutter pub get
-          flutter analyze
-          flutter test
-
-      - name: Build unsigned iOS app
-        working-directory: owner_special/flutter_app
-        run: flutter build ios --release --no-codesign
-
-      - name: Verify app identity
-        working-directory: owner_special/flutter_app
-        shell: bash
-        run: |
-          APP="build/ios/iphoneos/Runner.app"
-          test -d "$APP"
-          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
-          DISPLAY_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist")
-          test "$BUNDLE_ID" = "com.phakphoum38.researchos"
-          test "$DISPLAY_NAME" = "Research OS"
-
-      - name: Package unsigned IPA
-        working-directory: owner_special/flutter_app
-        shell: bash
-        run: |
-          rm -rf build/unsigned_ipa
-          mkdir -p build/unsigned_ipa/Payload
-          cp -R build/ios/iphoneos/Runner.app build/unsigned_ipa/Payload/ResearchOS.app
-          cd build/unsigned_ipa
-          zip -qry ../Research-OS-iOS-unsigned.ipa Payload
-          cd ..
-          shasum -a 256 Research-OS-iOS-unsigned.ipa | tee Research-OS-iOS-unsigned.ipa.sha256
-          test -s Research-OS-iOS-unsigned.ipa
-
-      - name: Upload unsigned IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Research-OS-iOS-unsigned-${{ github.sha }}
-          path: |
-            owner_special/flutter_app/build/Research-OS-iOS-unsigned.ipa
-            owner_special/flutter_app/build/Research-OS-iOS-unsigned.ipa.sha256
-          if-no-files-found: error
-          retention-days: 30
+          test -d apps/research_os_flutter
+          test -f .github/workflows/research-os-ios-ipa.yml
+          if [ -d owner_special/flutter_app/ios ]; then
+            echo "Owner Special iOS source must not exist; canonical source is apps/research_os_flutter/ios."
+            exit 1
+          fi
+          if grep -R -n --exclude='owner-special-ios-ipa.yml'             -e 'owner_special/flutter_app/ios'             -e 'working-directory: owner_special/flutter_app'             -e 'flutter build ios'             .github/workflows/owner-special-ios-ipa.yml; then
+            echo "Stale Owner Special iOS build authority detected."
+            exit 1
+          fi
+          grep -q 'apps/research_os_flutter' .github/workflows/research-os-ios-ipa.yml
+          echo "OWNER_SPECIAL_IOS_RECONCILIATION=PASS"
