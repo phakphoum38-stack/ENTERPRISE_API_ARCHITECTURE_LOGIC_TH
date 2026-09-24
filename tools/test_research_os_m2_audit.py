@@ -26,6 +26,10 @@ class M2AuditIndexTests(unittest.TestCase):
   implementation_edges=[e for e in g["edges"] if e["from"].startswith("IMPLEMENTATION:") and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:")]
   self.assertTrue(implementation_edges)
   self.assertTrue(g["integrity"]["contract_test_linkage"])
+  self.assertTrue(g["integrity"]["required_contract_inventory"])
+  self.assertTrue(g["integrity"]["required_workflow_inventory"])
+  self.assertGreater(g["inventory"]["required_contracts"],0)
+  self.assertGreater(g["inventory"]["required_workflows"],0)
   test_edges=[e for e in g["edges"] if e["from"].startswith("CONTRACT:") and e["relation"]=="VERIFIED_BY" and e["to"].startswith("TEST:")]
   self.assertTrue(test_edges)
 
