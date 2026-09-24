@@ -11,6 +11,8 @@ class PlatformCoreCompletionTests(unittest.TestCase):
         contexts = project_scale_readiness.build_project_contexts()
         self.assertEqual(100, len(contexts))
         self.assertEqual((), project_scale_readiness.validate_project_contexts(contexts))
+        self.assertEqual((), project_scale_readiness.validate_registry_scale())
+        self.assertEqual((), project_scale_readiness.validate_scale_levels())
     def test_project_isolation(self) -> None:
         contexts = project_scale_readiness.build_project_contexts()
         self.assertEqual((), project_scale_readiness.validate_isolation(project_a=contexts[0], project_b=contexts[1]))

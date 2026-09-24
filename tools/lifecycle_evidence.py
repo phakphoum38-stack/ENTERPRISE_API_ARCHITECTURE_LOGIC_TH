@@ -46,6 +46,7 @@ class LifecycleEvidence:
     evidence_sha256: str
     recovery_required: bool = False
     recovery_reason: str | None = None
+    project_id: str = ""
 
     @classmethod
     def create(
@@ -62,6 +63,7 @@ class LifecycleEvidence:
         contract_version: str = "research-os-canonical-platform/v1",
         recovery_required: bool = False,
         recovery_reason: str | None = None,
+        project_id: str = "",
     ) -> "LifecycleEvidence":
         if state not in LIFECYCLE:
             raise ValueError(f"unknown lifecycle state: {state}")
@@ -71,6 +73,8 @@ class LifecycleEvidence:
             raise ValueError("workflow_run_id is required")
         if recovery_required and not recovery_reason:
             raise ValueError("recovery_required requires recovery_reason")
+        if project_id and not project_id.strip():
+            raise ValueError("project_id cannot be blank")
         if state == "RECOVER" and not recovery_required:
             raise ValueError("RECOVER state requires recovery_required=true")
         core = {
@@ -85,6 +89,7 @@ class LifecycleEvidence:
             "contract_version": contract_version,
             "recovery_required": recovery_required,
             "recovery_reason": recovery_reason,
+            "project_id": project_id,
         }
         fingerprint = _sha256(core)
         evidence_id = f"ev-{uuid.uuid4().hex}"
@@ -106,6 +111,7 @@ class LifecycleEvidence:
             evidence_sha256=evidence_sha256,
             recovery_required=recovery_required,
             recovery_reason=recovery_reason,
+            project_id=project_id,
         )
 
 
@@ -135,7 +141,13 @@ class LifecycleEvidenceLedger:
             records.append(LifecycleEvidence(**payload))
         return tuple(records)
 
-    def validate_chain(self, *, correlation_id: str, expected_source_sha: str) -> tuple[str, ...]:
+    def validate_chain(
+        self,
+        *,
+        correlation_id: str,
+        expected_source_sha: str,
+        expected_project_id: str | None = None,
+    ) -> tuple[str, ...]:
         records = self.read()
         errors: list[str] = []
         if not records:
@@ -145,6 +157,8 @@ class LifecycleEvidenceLedger:
                 errors.append("correlation mismatch")
             if record.source_sha != expected_source_sha:
                 errors.append("source SHA mismatch")
+            if expected_project_id is not None and record.project_id != expected_project_id:
+                errors.append("project identity mismatch")
             if record.state not in LIFECYCLE:
                 errors.append("unknown lifecycle state")
             if record.recovery_required and not record.recovery_reason:
@@ -154,6 +168,8 @@ class LifecycleEvidenceLedger:
             errors.append("lifecycle has no terminal recovery/complete state")
         if states[-1] == "COMPLETE" and any(record.recovery_required for record in records):
             errors.append("completed lifecycle cannot retain unresolved recovery")
+        if any(state in TERMINAL for state in states[:-1]):
+            errors.append("terminal lifecycle state cannot be followed")
         return tuple(errors)
 
 

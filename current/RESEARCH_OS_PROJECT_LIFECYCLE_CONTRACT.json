@@ -1,0 +1,45 @@
+{
+  "contract_id": "research-os-project-lifecycle-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Prove one project can traverse the canonical lifecycle through an existing capability executor while preserving project identity, authorization, exact source SHA, evidence, and terminal recovery.",
+  "depends_on": [
+    "current/RESEARCH_OS_PROJECT_TEMPLATE_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_B_LIFECYCLE_EVIDENCE_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_C_CAPABILITY_E2E_BINDING_CONTRACT.json",
+    "current/RESEARCH_OS_100_PROJECT_READINESS_CONTRACT.json"
+  ],
+  "required_flow": [
+    "CREATE",
+    "VALIDATE",
+    "AUTHORIZE",
+    "EXECUTE",
+    "OBSERVE",
+    "EVIDENCE",
+    "COMPLETE_OR_RECOVER"
+  ],
+  "rules": [
+    "project_identity_is_required",
+    "capability_must_belong_to_project",
+    "authorization_remains_external",
+    "existing_executor_remains_authoritative",
+    "source_sha_is_exact_identity",
+    "project_identity_is_present_in_evidence",
+    "evidence_is_append_only",
+    "terminal_state_is_complete_or_recover",
+    "recovery_requires_explicit_reason",
+    "duplicate_delivery_is_idempotent",
+    "resource_conflict_is_reject",
+    "same_version_overwrite_is_rejected",
+    "single_final_gate",
+    "no_project_runtime",
+    "no_project_queue",
+    "no_project_evidence_ledger"
+  ],
+  "runtime_evidence": {
+    "model": "projection_over_existing_shared_evidence_plane",
+    "new_ledger_forbidden": true,
+    "local_black_box_must_not_create_second_evidence_authority": true
+  },
+  "release_authority": "FINAL_GATE"
+}

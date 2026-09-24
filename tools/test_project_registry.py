@@ -125,6 +125,28 @@ class ProjectRegistryTests(unittest.TestCase):
         self.assertTrue(first.startswith("project-001|"))
         self.assertTrue(second.startswith("project-002|"))
 
+    def test_real_project_definitions_scale_at_10_20_50_100(self) -> None:
+        for count in (10, 20, 50, 100):
+            registry = ProjectRegistry()
+            for index in range(1, count + 1):
+                registry.register(
+                    ProjectDefinition(
+                        project_id=f"project-{index:03d}",
+                        display_name=f"Project {index:03d}",
+                        version="1.0.0",
+                        capabilities=("agent",),
+                        authorization_policy="EXISTING_AUTHORIZATION_BOUNDARY",
+                        workflow_profile="SHARED_WORKFLOW",
+                        evidence_namespace=f"PROJECT:project-{index:03d}",
+                        resource_policy="REJECT_ON_CONFLICT",
+                    )
+                )
+            self.assertEqual(count, len(registry.all()))
+            self.assertEqual(
+                len(registry.all()),
+                len({item.project_id for item in registry.all()}),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
