@@ -1,0 +1,74 @@
+version: 1
+name: Research OS Unified Final Gate
+
+purpose: >
+  One release-gate contract that evaluates the existing Research OS
+  application surface and platform/release invariants without creating a
+  second executor, authorization system, navigation registry, or release
+  authority.
+
+authority:
+  release_authority: final_gate
+  merge_authority: external
+  external_tools_are_security_authority: false
+
+spine:
+  - identity
+  - capability
+  - authorization
+  - navigation
+  - page_feature
+  - workflow
+  - event_queue
+  - stateless_runner
+  - evidence_provenance
+  - aeos_recheck
+  - final_gate
+  - release
+
+required_contracts:
+  - current/CANONICAL_PLATFORM_CONTRACT.yml
+  - current/GOLDEN_RELEASE_CONTRACT.yml
+  - current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml
+
+required_workflows:
+  - .github/workflows/research-os-gate.yml
+  - .github/workflows/research-os-final-gate.yml
+  - .github/workflows/research-os-platform-surface-matrix.yml
+  - .github/workflows/research-os-release-spine-gate.yml
+
+required_surface_contracts:
+  - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
+  - apps/research_os_flutter/test/platform_surface_parity_test.dart
+  - apps/research_os_flutter/test/desktop_shell_test.dart
+
+navigation:
+  source_of_truth: apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
+  expected_destination_count: 15
+  indexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+  duplicate_registry_forbidden: true
+
+platform_surface:
+  required:
+    - windows
+    - web
+    - ios
+  shared_navigation_registry: required
+  platform_specific_navigation_registry: forbidden
+
+deferred:
+  explicit_state_required: true
+  deferred_is_not_pass: true
+  deferred_is_not_fail: true
+  deferred_must_not_be_silently_promoted: true
+  release_blocked_by_unresolved_deferred: true
+
+fail_closed:
+  missing_contract: STOP
+  missing_workflow: STOP
+  navigation_drift: STOP
+  unknown_gate_state: STOP
+  sha_mismatch: STOP
+  evidence_mismatch: STOP
+  provenance_mismatch: STOP
+  unauthorized_release: STOP

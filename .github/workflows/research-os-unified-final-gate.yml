@@ -1,0 +1,140 @@
+name: Research OS Unified Final Gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Exact commit SHA to validate"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-unified-final-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+env:
+  TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha || github.sha }}
+
+jobs:
+  contract:
+    name: Unified contract and navigation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+
+      - name: Verify checked-out SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$actual"
+
+      - name: Validate unified final gate contract
+        run: python tools/validate_research_os_unified_final_gate.py
+
+      - name: Validate canonical platform contract
+        run: python tools/validate_canonical_platform_contract.py
+
+      - name: Validate exact source identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          echo "SOURCE_IDENTITY=PASS"
+
+  flutter_surface:
+    name: Shared Flutter application surface
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Shared dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Shared analysis
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Navigation surface parity
+        working-directory: apps/research_os_flutter
+        run: flutter test test/platform_surface_parity_test.dart
+
+      - name: Page mapping contract
+        working-directory: apps/research_os_flutter
+        run: flutter test test/desktop_shell_test.dart
+
+  python_surface:
+    name: Research OS Python surface
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Compile source
+        run: python -m compileall -q v3/research_os_v3 v3/tests
+
+      - name: Unified validator test
+        run: python -m unittest tools.test_validate_research_os_unified_final_gate -v
+
+      - name: Research OS tests
+        env:
+          PYTHONPATH: v3
+        run: python -m unittest discover -s v3/tests -p 'test_*.py' -v
+
+  decision:
+    name: Unified release decision
+    needs: [contract, flutter_surface, python_surface]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate required results
+        env:
+          CONTRACT: ${{ needs.contract.result }}
+          FLUTTER_SURFACE: ${{ needs.flutter_surface.result }}
+          PYTHON_SURFACE: ${{ needs.python_surface.result }}
+        run: |
+          set -euo pipefail
+          printf 'contract=%s\n' "$CONTRACT"
+          printf 'flutter_surface=%s\n' "$FLUTTER_SURFACE"
+          printf 'python_surface=%s\n' "$PYTHON_SURFACE"
+          test "$CONTRACT" = success
+          test "$FLUTTER_SURFACE" = success
+          test "$PYTHON_SURFACE" = success
+          echo "RESEARCH_OS_UNIFIED_FINAL_GATE=PASS"
+          echo "RELEASE_AUTHORITY=FINAL_GATE"
