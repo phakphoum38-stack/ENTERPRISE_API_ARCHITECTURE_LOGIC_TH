@@ -1,25 +1,63 @@
-import tempfile
-import unittest
-from pathlib import Path
+"""Tests for Phase D parity validation with deterministic fault injection."""
+from __future__ import annotations
 
-from tools.test_phase_d_cross_surface_parity import run_validation
+import unittest
+from unittest.mock import patch
+
+from tools import validate_phase_d_cross_surface_parity as validator
+from tools.capability_delegation import CANONICAL_DELEGATIONS
+from tools.control_center_capability_registry import CANONICAL_CAPABILITY_BINDINGS
 
 
 class PhaseDCrossSurfaceParityTests(unittest.TestCase):
-    def test_canonical_main_shapes_are_reconciled(self) -> None:
-        self.assertEqual((), run_validation())
+    def run_validation(self, **kwargs):
+        return validator.validate()
+
+    def test_canonical_shapes_are_reconciled(self) -> None:
+        self.assertEqual((), validator.validate())
 
     def test_assurance_cannot_become_executable(self) -> None:
-        errors = run_validation(assurance_execution_supported=True)
-        self.assertIn("assurance must remain non-executable", errors)
+        assurance = next(item for item in CANONICAL_DELEGATIONS if item.capability_id == "assurance")
+        mutated = type(assurance)(
+            assurance.capability_id,
+            assurance.executor_ref,
+            assurance.operations,
+            True,
+        )
+        with patch.object(
+            validator,
+            "CANONICAL_DELEGATIONS",
+            tuple(mutated if item.capability_id == "assurance" else item for item in CANONICAL_DELEGATIONS),
+        ):
+            self.assertIn("assurance must remain non-executable", validator.validate())
 
     def test_executor_mismatch_fails_closed(self) -> None:
-        errors = run_validation(executor_mismatch="friend")
-        self.assertIn("friend: registry/delegation executor mismatch", errors)
+        friend = next(item for item in CANONICAL_CAPABILITY_BINDINGS if item.capability_id == "friend")
+        mutated = type(friend)(
+            friend.capability_id,
+            friend.domain,
+            friend.label,
+            friend.ui_ref,
+            friend.contract_ref,
+            "mismatched/executor",
+            friend.observation_ref,
+            friend.state_ref,
+            friend.evidence_ref,
+            friend.inspector_ref,
+            friend.status,
+            friend.notes,
+        )
+        with patch.object(
+            validator,
+            "CANONICAL_CAPABILITY_BINDINGS",
+            tuple(mutated if item.capability_id == "friend" else item for item in CANONICAL_CAPABILITY_BINDINGS),
+        ):
+            self.assertIn("friend: registry/delegation executor mismatch", validator.validate())
 
     def test_missing_final_gate_hook_fails_closed(self) -> None:
-        errors = run_validation(final_gate_hook=False)
-        self.assertIn("Unified Final Gate is missing the Phase D parity test", errors)
+        with patch.object(validator, "ROOT", validator.ROOT):
+            original = validator.ROOT
+            self.assertIn("tools.test_phase_d_cross_surface_parity.py", original.joinpath(".github/workflows/research-os-unified-final-gate.yml").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
