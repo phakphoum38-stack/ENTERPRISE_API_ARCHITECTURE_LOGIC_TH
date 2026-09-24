@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
-from tools.platform_graph import PlatformGraph
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from tools.platform_graph import PlatformGraph
 
 
 def _load(path: str) -> Any:
@@ -61,6 +63,47 @@ def validate() -> list[str]:
         if record.get("status") == "DONE" and record.get("resolution") == "UNKNOWN":
             failures.append(f"unknown_done:{record.get('work_id')}")
 
+    component_registry_path = "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json"
+    component_registry = _load(component_registry_path)
+    if component_registry.get("status") != "ACTIVE":
+        failures.append("component_registry_not_active")
+    components = component_registry.get("components", [])
+    component_ids = [c.get("id") for c in components]
+    if len(component_ids) != len(set(component_ids)):
+        failures.append("component_duplicate_id")
+    allowed_lifecycle = set(contract.get("component_lifecycle", []))
+    known_ids = set(component_ids)
+    for component in components:
+        cid = component.get("id", "?")
+        if component.get("lifecycle") not in allowed_lifecycle:
+            failures.append(f"component_invalid_lifecycle:{cid}")
+        canonical = component.get("canonical")
+        if not canonical or not (ROOT / canonical).is_file():
+            failures.append(f"component_missing_canonical:{cid}")
+        for ref in component.get("contracts", []) + component.get("tests", []) + component.get("evidence", []):
+            if not (ROOT / ref).is_file():
+                failures.append(f"component_missing_ref:{cid}:{ref}")
+        for dep in component.get("dependencies", []):
+            if dep not in known_ids and dep not in {"platform_graph"}:
+                failures.append(f"component_unknown_dependency:{cid}:{dep}")
+    graph_edges = {c.get("id"): c.get("dependencies", []) for c in components}
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    def visit(node: str) -> bool:
+        if node in visiting:
+            return True
+        if node in visited:
+            return False
+        visiting.add(node)
+        for dep in graph_edges.get(node, []):
+            if dep in graph_edges and visit(dep):
+                return True
+        visiting.remove(node)
+        visited.add(node)
+        return False
+    if any(visit(node) for node in graph_edges):
+        failures.append("component_dependency_cycle")
+
     surface = _load("current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json")
     surfaces = surface.get("surfaces", [])
     indexes = [item[1] for item in surfaces]
@@ -80,7 +123,13 @@ def validate() -> list[str]:
         registry = navigation.split(marker, 1)[1].split("];", 1)[0]
         entries = [part.split("),", 1)[0] for part in registry.split("ResearchNavItem(")[1:]]
         nav_indexes: list[int] = []
+        destination_ids: list[str] = []
         for entry in entries:
+            marker = "destinationId: '"
+            if marker not in entry:
+                failures.append("navigation_entry_missing_destination_id")
+            else:
+                destination_ids.append(entry.split(marker, 1)[1].split("'", 1)[0])
             numbers = re.findall("[0-9]+", entry)
             if not numbers:
                 failures.append("navigation_entry_missing_index")
@@ -92,6 +141,8 @@ def validate() -> list[str]:
             failures.append("navigation_indexes_not_contiguous")
         if len(nav_indexes) != len(set(nav_indexes)):
             failures.append("navigation_duplicate_index")
+        if len(destination_ids) != len(set(destination_ids)):
+            failures.append("navigation_duplicate_destination_id")
 
     invariants = (ROOT / "current/ARCHITECTURE_INVARIANTS.md").read_text(encoding="utf-8")
     for needle in ("INV-014", "INV-018", "INV-020", "INV-021", "INV-025", "Enforcement Principle"):
