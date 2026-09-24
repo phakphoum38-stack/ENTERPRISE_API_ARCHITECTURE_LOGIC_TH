@@ -42,3 +42,32 @@ def test_unknown_capability_fails_closed() -> None:
         assert "unsupported capability" in str(exc)
     else:
         raise AssertionError("unknown capability must fail closed")
+
+
+def test_operation_class_cannot_be_relabelled() -> None:
+    router = NativeCommandRouter()
+    try:
+        router.prepare(
+            capability_id="factory_v3",
+            action="execute factory plan",
+            mode="LIVE",
+            action_class="READ_ONLY",
+        )
+    except ValueError as exc:
+        assert "action class mismatch" in str(exc)
+    else:
+        raise AssertionError("mutation must not be relabelled as read-only")
+
+
+def test_assurance_has_no_execution_operation() -> None:
+    router = NativeCommandRouter()
+    try:
+        router.prepare(
+            capability_id="assurance",
+            action="inspect evidence",
+            mode="LIVE",
+        )
+    except ValueError as exc:
+        assert "unsupported action" in str(exc)
+    else:
+        raise AssertionError("assurance evidence authority must not become an executor")
