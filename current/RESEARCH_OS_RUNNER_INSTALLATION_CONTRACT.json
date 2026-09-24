@@ -13,9 +13,25 @@
     "no_new_queue": true,
     "no_new_evidence_ledger": true
   },
-  "source_modes": ["LOCAL_PACKAGE", "CLOUD_DRIVE_PACKAGE", "PORTABLE_PACKAGE"],
+  "source_modes": [
+    "LOCAL_PACKAGE",
+    "CLOUD_DRIVE_PACKAGE",
+    "PORTABLE_PACKAGE"
+  ],
   "cloud_drive_rule": "Cloud Drive is a distribution source only; execution should use a verified local installation or portable copy.",
-  "installation_lifecycle": ["DISCOVER", "DOWNLOAD", "VERIFY", "STAGE", "INSTALL", "REGISTER", "DISCOVER_CAPABILITIES", "HEALTH_CHECK", "READY", "FAILED", "ROLLBACK"],
+  "installation_lifecycle": [
+    "DISCOVER",
+    "DOWNLOAD",
+    "VERIFY",
+    "STAGE",
+    "INSTALL",
+    "REGISTER",
+    "DISCOVER_CAPABILITIES",
+    "HEALTH_CHECK",
+    "READY",
+    "FAILED",
+    "ROLLBACK"
+  ],
   "package_identity": {
     "package_id_required": true,
     "version_required": true,
@@ -24,7 +40,9 @@
     "source_sha_required": true,
     "manifest_required": true,
     "manifest_sha256_required": true,
-    "artifact_sha256_required": true
+    "artifact_sha256_required": true,
+    "canonical_manifest": "PACKAGE_MANIFEST.json",
+    "distribution_manifest_compatibility": "current/RESEARCH_OS_PHASE_E_UNIFIED_WINDOWS_DISTRIBUTION_CONTRACT.json"
   },
   "verification": {
     "algorithm": "SHA256",
@@ -47,16 +65,34 @@
     "reconnect_reconciliation_is_external_to_installer": true
   },
   "profiles": {
-    "windows_x64": {"platform": "windows", "architecture": "x86_64", "installer": "installer/research-os-unified.iss", "bootstrap_supported": true},
-    "linux_x64": {"platform": "linux", "architecture": "x86_64", "bootstrap_supported": true},
-    "macos_arm64": {"platform": "macos", "architecture": "arm64", "bootstrap_supported": true},
-    "portable": {"platform": "portable", "architecture": "host", "bootstrap_supported": true}
+    "windows_x64": {
+      "platform": "windows",
+      "architecture": "x86_64",
+      "installer": "installer/research-os-unified.iss",
+      "bootstrap_supported": true
+    },
+    "linux_x64": {
+      "platform": "linux",
+      "architecture": "x86_64",
+      "bootstrap_supported": true
+    },
+    "macos_arm64": {
+      "platform": "macos",
+      "architecture": "arm64",
+      "bootstrap_supported": true
+    },
+    "portable": {
+      "platform": "portable",
+      "architecture": "host",
+      "bootstrap_supported": true
+    }
   },
   "registration": {
     "runner_contract": "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
     "registration_does_not_grant_entitlement": true,
     "capability_discovery_required_before_ready": true,
-    "stale_capability_evidence_cannot_certify_ready": true
+    "stale_capability_evidence_cannot_certify_ready": true,
+    "bootstrap_entrypoint": "scripts/bootstrap-research-os.py"
   },
   "recovery": {
     "failed_verification_must_not_install": true,
