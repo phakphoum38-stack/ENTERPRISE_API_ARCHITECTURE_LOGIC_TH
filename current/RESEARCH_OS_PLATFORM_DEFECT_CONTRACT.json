@@ -1,0 +1,31 @@
+{
+  "contract_id": "research-os-platform-defect-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical metadata contract for tracking platform and project defects without creating a second issue tracker, executor, evidence plane, or release authority.",
+  "authority": {
+    "descriptive_only": true,
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "lifecycle": ["OPEN","TRIAGED","IN_REMEDIATION","VERIFICATION","VERIFIED","DEFERRED","CLOSED","REJECTED"],
+  "required_fields": ["defect_id","title","scope","severity","status","detected_by","affected_components","evidence_refs","verification_refs","created_at"],
+  "severity": ["BLOCKER","CRITICAL","MAJOR","MINOR"],
+  "rules": [
+    "defect_is_not_done_without_verification",
+    "deferred_is_not_fixed",
+    "missing_evidence_is_not_pass",
+    "root_cause_may_be_unknown_until_verified",
+    "final_gate_remains_single_release_authority",
+    "reuse_existing_execution_and_evidence_planes"
+  ],
+  "integration": {
+    "evidence": "existing canonical evidence plane",
+    "execution": "existing event_queue_stateless_runner",
+    "release": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+  }
+}
