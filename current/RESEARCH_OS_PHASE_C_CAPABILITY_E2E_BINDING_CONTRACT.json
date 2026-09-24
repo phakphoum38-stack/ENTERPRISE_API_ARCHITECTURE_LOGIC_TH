@@ -1,0 +1,30 @@
+{
+  "contract_id": "research-os-phase-c-capability-e2e-binding-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Bind canonical capability operations to their existing authoritative executors and project observations into the Phase B lifecycle/evidence boundary.",
+  "depends_on": [
+    "current/NATIVE_COMMAND_ROUTING_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_B_LIFECYCLE_EVIDENCE_CONTRACT.json"
+  ],
+  "capabilities": ["friend", "agent", "github", "factory_v3", "assurance"],
+  "rules": [
+    "authorization_is_external",
+    "router_is_not_execution_authority",
+    "existing_executor_remains_authoritative",
+    "unknown_capability_fails_closed",
+    "unknown_action_fails_closed",
+    "unknown_executor_method_fails_closed",
+    "mutation_never_bypasses_authorization",
+    "assurance_never_executes",
+    "evidence_is_append_only",
+    "source_sha_must_match",
+    "correlation_id_must_match",
+    "terminal_state_is_complete_or_recover",
+    "final_gate_remains_release_authority"
+  ],
+  "required_flow": [
+    "INTENT", "VALIDATE", "PREPARE", "AUTHORIZE",
+    "EXECUTE", "OBSERVE", "EVIDENCE", "COMPLETE_OR_RECOVER"
+  ]
+}
