@@ -52,6 +52,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json
   - current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json
+  - current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml

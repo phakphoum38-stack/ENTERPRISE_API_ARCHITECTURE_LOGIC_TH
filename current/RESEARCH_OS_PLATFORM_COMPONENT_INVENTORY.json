@@ -361,6 +361,32 @@
         "assurance",
         "unified_final_gate"
       ]
+    },
+    {
+      "id": "universal_runner",
+      "canonical": "tools/research_os_api/universal_runner.py",
+      "kind": "RUNNER_CAPABILITY_AND_LIFECYCLE_ADAPTER",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "workflow",
+        "memory_fabric"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
+        "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json"
+      ],
+      "tests": [
+        "v3/tests/test_universal_runner.py"
+      ],
+      "evidence": [
+        "tools/research_os_api/universal_runner.py",
+        "docs/RESEARCH_OS_UNIVERSAL_RUNNER.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
     }
   ],
   "rules": [
@@ -370,6 +396,7 @@
     "missing_evidence_is_not_pass",
     "final_gate_is_single_release_authority",
     "nvme_is_storage_backed_memory_not_dram",
-    "unknown_hardware_capability_is_not_available"
+    "unknown_hardware_capability_is_not_available",
+    "unknown_runner_capability_is_not_available"
   ]
 }
