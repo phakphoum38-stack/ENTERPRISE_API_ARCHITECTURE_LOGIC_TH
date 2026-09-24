@@ -3,7 +3,7 @@ import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 
 void main() {
   test('navigation registry remains the single destination source of truth', () {
-    expect(researchNavigationItems, hasLength(17));
+    expect(researchNavigationItems, hasLength(18));
     expect(
       researchNavigationItems.map((item) => item.index).toSet(),
       equals({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
