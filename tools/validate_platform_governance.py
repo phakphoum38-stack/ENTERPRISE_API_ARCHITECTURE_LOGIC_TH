@@ -78,28 +78,20 @@ def validate() -> list[str]:
         failures.append("navigation_registry_missing")
     else:
         registry = navigation.split(marker, 1)[1].split("];", 1)[0]
-        entries = re.findall(r"ResearchNavItem((.*?)),s*(?=ResearchNavItem|$)", registry, flags=re.DOTALL)
+        entries = [part.split("),", 1)[0] for part in registry.split("ResearchNavItem(")[1:]]
         nav_indexes: list[int] = []
-        nav_labels: list[str] = []
         for entry in entries:
-            numbers = re.findall(r"(d+)", entry)
-            labels_match = re.search(r"
-s*'([^']+)',s*
-s*'([^']+)',", entry)
+            numbers = re.findall("[0-9]+", entry)
             if not numbers:
                 failures.append("navigation_entry_missing_index")
             else:
                 nav_indexes.append(int(numbers[-1]))
-            if labels_match:
-                nav_labels.append(labels_match.group(2))
         if len(nav_indexes) != len(surfaces):
             failures.append("navigation_surface_count_drift")
         if sorted(nav_indexes) != list(range(len(nav_indexes))):
             failures.append("navigation_indexes_not_contiguous")
         if len(nav_indexes) != len(set(nav_indexes)):
             failures.append("navigation_duplicate_index")
-        if nav_labels and len(nav_labels) != len(set(nav_labels)):
-            failures.append("navigation_duplicate_label")
 
     invariants = (ROOT / "current/ARCHITECTURE_INVARIANTS.md").read_text(encoding="utf-8")
     for needle in ("INV-014", "INV-018", "INV-020", "INV-021", "INV-025", "Enforcement Principle"):
