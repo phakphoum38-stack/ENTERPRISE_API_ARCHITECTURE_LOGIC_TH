@@ -160,8 +160,14 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    var selectedIndex = -1;
     await tester.pumpWidget(
-      MaterialApp(home: HomePage(apiClient: FakeResearchOSApiClient())),
+      MaterialApp(
+        home: HomePage(
+          apiClient: FakeResearchOSApiClient(),
+          onNavigate: (index) => selectedIndex = index,
+        ),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -172,6 +178,9 @@ void main() {
     expect(find.text('Online'), findsOneWidget);
     expect(find.text('gemini'), findsOneWidget);
     expect(find.text('Ready'), findsOneWidget);
+    expect(find.text('AI & Agents'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('home-workspace-ai-agents-')));
+    expect(selectedIndex, 1);
     expect(tester.takeException(), isNull);
   });
 
