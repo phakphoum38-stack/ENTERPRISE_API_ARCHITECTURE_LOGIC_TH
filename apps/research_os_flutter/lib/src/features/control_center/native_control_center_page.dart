@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/research_os_api_client.dart';
+import 'native_control_audit_view.dart';
 
 class NativeControlCenterPage extends StatefulWidget {
   const NativeControlCenterPage({
@@ -21,6 +22,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   late final TabController _tabs;
   final _command = TextEditingController();
   final _inspector = TextEditingController();
+  final List<NativeControlAuditSnapshot> _auditSnapshots = <NativeControlAuditSnapshot>[];
   bool _loading = false;
   bool _simulation = false;
   int _livePulse = 0;
@@ -42,6 +44,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     'Open Friend',
     'Open Runtime',
     'Open Evidence',
+    'Open Audit',
     'Inspect object',
     'Simulation mode',
     'Refresh runtime',
@@ -50,7 +53,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 9, vsync: this);
+    _tabs = TabController(length: 10, vsync: this);
     _load();
   }
 
@@ -130,10 +133,55 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
 
     if (command == 'Open Evidence') {
       _tabs.animateTo(4);
-    } else if (command == 'Inspect object') {
+    } else if (command == 'Open Audit') {
       _tabs.animateTo(5);
+    } else if (command == 'Inspect object') {
+      _tabs.animateTo(6);
     }
   }
+
+  void _runAudit() {
+    final checks = <Map<String, String>>[
+      _auditCheck('Runtime', _health?['status']?.toString() == 'ok'),
+      _auditCheck('Brain capacity', _brain != null && _brain!.isNotEmpty),
+      _auditCheck('Brain skills', _skills != null && _skills!.isNotEmpty),
+      _auditCheck('Providers', _providers != null && _providers!.isNotEmpty),
+      _auditCheck('Agents', _agents != null && _agents!.isNotEmpty),
+      _auditCheck('Agent readiness', (_agentReadiness?['status'] ?? _agentReadiness?['readiness']) != null),
+      _auditCheck('Workflow observation', _orchestrationItems(_orchestrations).isNotEmpty),
+      _auditDeferred('Offline package audit'),
+      _auditDeferred('Installed baseline'),
+      _auditDeferred('Release authority decision'),
+    ];
+    final hasFail = checks.any((item) => item['state'] == 'FAIL');
+    final hasDeferred = checks.any((item) => item['state'] == 'DEFERRED');
+    final now = DateTime.now().toUtc();
+    final snapshot = NativeControlAuditSnapshot(
+      auditId: 'audit-\${now.millisecondsSinceEpoch}',
+      observedAt: now,
+      status: hasFail ? 'FAIL' : (hasDeferred ? 'DEFERRED' : 'PASS'),
+      checks: checks,
+      source: 'Native Control Center existing observation surfaces',
+    );
+    setState(() {
+      _auditSnapshots.insert(0, snapshot);
+      if (_auditSnapshots.length > 20) _auditSnapshots.removeLast();
+      _events.insert(0, 'Main Final Audit captured: \${snapshot.status}');
+    });
+    _tabs.animateTo(5);
+  }
+
+  Map<String, String> _auditCheck(String name, bool pass) => <String, String>{
+        'check': name,
+        'state': pass ? 'PASS' : 'FAIL',
+        'detail': pass ? 'Observed' : 'Required observation unavailable',
+      };
+
+  Map<String, String> _auditDeferred(String name) => <String, String>{
+        'check': name,
+        'state': 'DEFERRED',
+        'detail': 'Not exposed by the current read-only API surface',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -201,6 +249,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
               Tab(text: 'State', icon: Icon(Icons.account_tree_outlined)),
               Tab(text: 'System Map', icon: Icon(Icons.hub_outlined)),
               Tab(text: 'Evidence', icon: Icon(Icons.fact_check_outlined)),
+              Tab(text: 'Audit', icon: Icon(Icons.rule_folder_outlined)),
               Tab(text: 'Inspector', icon: Icon(Icons.manage_search_outlined)),
               Tab(text: 'Failures', icon: Icon(Icons.warning_amber_outlined)),
               Tab(text: 'History', icon: Icon(Icons.history_outlined)),
@@ -230,6 +279,17 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
                   agents: _agents,
                 ),
                 _EvidenceView(health: _health),
+                NativeControlAuditView(
+                  health: _health,
+                  brain: _brain,
+                  skills: _skills,
+                  providers: _providers,
+                  agents: _agents,
+                  agentReadiness: _agentReadiness,
+                  orchestrations: _orchestrations,
+                  snapshots: _auditSnapshots,
+                  onRun: _runAudit,
+                ),
                 _Inspector(
                   controller: _inspector,
                   selectedObject: _selectedObject,
