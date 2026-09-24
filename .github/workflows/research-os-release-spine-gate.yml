@@ -98,6 +98,7 @@ jobs:
           actual_manifest=hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest()
           evidence=json.load(open(sys.argv[3], encoding="utf-8-sig"))
           install_e2e=json.load(open(sys.argv[4], encoding="utf-8-sig"))
+          install_e2e_sha=hashlib.sha256(open(sys.argv[4],"rb").read()).hexdigest()
           archive_sha=hashlib.sha256(open(sys.argv[5],"rb").read()).hexdigest()
           target="${{ inputs.target_sha }}"
           assert manifest["source_sha"] == target
@@ -127,7 +128,9 @@ jobs:
           python3 - <<'PY'
           import hashlib, json, os
           from pathlib import Path
-          evidence={'schema':'research-os.release-spine.v1','immutable':True,'commit':os.environ['TARGET_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'gates':{'SOURCE':True,'QUALITY':True,'BUILD':True,'IDENTITY':True,'PACKAGE':True,'INSTALL_E2E':True,'PROVENANCE':True,'LINEAGE':True,'CANDIDATE':True,'CERTIFICATION':True,'RELEASE':False},'protected_gates':{'TARGET_SHA':True,'SHA256':True,'CANONICAL_LINEAGE':True,'RELEASE_CERTIFICATION':True},'run_refs':{'candidate':os.environ['CANDIDATE_RUN_ID'],'research_gate':os.environ['RESEARCH_GATE_RUN_ID'],'provenance':os.environ['PROVENANCE_RUN_ID'],'lineage':os.environ['LINEAGE_RUN_ID']}}
+          install_e2e_path=next(Path('release-input').rglob('WINDOWS_INSTALL_E2E_EVIDENCE.json'))
+          install_e2e_sha=hashlib.sha256(install_e2e_path.read_bytes()).hexdigest()
+          evidence={'schema':'research-os.release-spine.v1','immutable':True,'commit':os.environ['TARGET_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'install_e2e_evidence_sha256':install_e2e_sha,'gates':{'SOURCE':True,'QUALITY':True,'BUILD':True,'IDENTITY':True,'PACKAGE':True,'INSTALL_E2E':True,'PROVENANCE':True,'LINEAGE':True,'CANDIDATE':True,'CERTIFICATION':True,'RELEASE':False},'protected_gates':{'TARGET_SHA':True,'SHA256':True,'CANONICAL_LINEAGE':True,'RELEASE_CERTIFICATION':True},'run_refs':{'candidate':os.environ['CANDIDATE_RUN_ID'],'research_gate':os.environ['RESEARCH_GATE_RUN_ID'],'provenance':os.environ['PROVENANCE_RUN_ID'],'lineage':os.environ['LINEAGE_RUN_ID']}}
           evidence['manifest_sha256']=hashlib.sha256(json.dumps(evidence,sort_keys=True,separators=(',',':')).encode()).hexdigest()
           Path('release-spine/RELEASE_SPINE_CERTIFICATION.json').write_text(json.dumps(evidence,indent=2,sort_keys=True)+'\n',encoding='utf-8')
           print('RELEASE_SPINE_CERTIFICATION=PASS')
