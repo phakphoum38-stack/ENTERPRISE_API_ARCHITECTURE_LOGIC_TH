@@ -8,9 +8,9 @@
     "product_ui_root": "apps/research_os_flutter",
     "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
     "owner_surface": "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
-    "ios_source": "apps/research_os_flutter/ios",
-    "windows_source": "apps/research_os_flutter/windows",
-    "web_source": "apps/research_os_flutter/web"
+    "ios_source": "apps/research_os_flutter",
+    "windows_source": "apps/research_os_flutter",
+    "web_source": "apps/research_os_flutter"
   },
   "owner": {
     "identity_source": "/v1/auth/status",
@@ -45,7 +45,8 @@
     "ios": true,
     "same_product_surface_contract": true,
     "platform_adapters_may_differ": true,
-    "platform_navigation_may_not_diverge": true
+    "platform_navigation_may_not_diverge": true,
+    "platform_runners_generated_or_adapter_bound": true
   },
   "ios_reconciliation": {
     "canonical_source": "apps/research_os_flutter/ios",
@@ -87,6 +88,7 @@
     "surface_parity_test": "apps/research_os_flutter/test/platform_surface_parity_test.dart",
     "owner_special_manifest": "owner_special/OWNER_MANIFEST.json",
     "ios_workflow": ".github/workflows/research-os-ios-ipa.yml",
-    "ios_reconciliation_workflow": ".github/workflows/owner-special-ios-ipa.yml"
+    "ios_reconciliation_workflow": ".github/workflows/owner-special-ios-ipa.yml",
+    "platform_surface_matrix": ".github/workflows/research-os-platform-surface-matrix.yml"
   }
 }
