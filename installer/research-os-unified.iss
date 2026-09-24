@@ -24,7 +24,7 @@ CloseApplications=yes
 RestartApplications=no
 
 [Files]
-Source: "package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\phase-e\package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{commonappdata}\ResearchOS"
