@@ -119,19 +119,19 @@ def prove_evidence_provenance() -> tuple[str, ...]:
         _record_lifecycle(path, project_id="project-001", source_sha=source_sha,
                           state="COMPLETE", correlation_id="c-001")
         ledger = LifecycleEvidenceLedger(path)
-        if not ledger.validate_chain(correlation_id="c-001", expected_source_sha=source_sha,
-                                     expected_project_id="project-001"):
-            failures.append("valid project evidence did not validate")
-        if ledger.validate_chain(correlation_id="c-001", expected_source_sha="b" * 40,
-                                     expected_project_id="project-001"):
-            failures.append("stale source SHA was accepted")
         if ledger.validate_chain(correlation_id="c-001", expected_source_sha=source_sha,
-                                 expected_project_id="project-002"):
+                                   expected_project_id="project-001"):
+            failures.append("valid project evidence did not validate")
+        if not ledger.validate_chain(correlation_id="c-001", expected_source_sha="b" * 40,
+                                         expected_project_id="project-001"):
+            failures.append("stale source SHA was accepted")
+        if not ledger.validate_chain(correlation_id="c-001", expected_source_sha=source_sha,
+                                      expected_project_id="project-002"):
             failures.append("cross-project evidence was accepted")
         _record_lifecycle(path, project_id="project-002", source_sha=source_sha,
                           state="COMPLETE", correlation_id="c-002")
-        if ledger.validate_chain(correlation_id="c-002", expected_source_sha=source_sha,
-                                 expected_project_id="project-001"):
+        if not ledger.validate_chain(correlation_id="c-002", expected_source_sha=source_sha,
+                                      expected_project_id="project-001"):
             failures.append("cross-project lineage was accepted")
     return tuple(failures)
 
