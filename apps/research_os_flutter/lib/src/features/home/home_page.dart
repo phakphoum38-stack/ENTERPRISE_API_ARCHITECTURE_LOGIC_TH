@@ -71,8 +71,8 @@ class _HomePageState extends State<HomePage> {
         onRefresh: _refresh,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 18, 24, 32),
-          children: <Widget>[
-            Container(
+            children: <Widget>[
+              Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -334,7 +334,38 @@ class _WorkspaceCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Card(
       child: InkWell(
-        key: Key('home-workspace-${title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-') }'),
+        key: Key('home-workspace-${title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-,
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+          children: <Widget>[
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(13)),
+              child: Icon(icon, color: scheme.primary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+), '')}'),
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
