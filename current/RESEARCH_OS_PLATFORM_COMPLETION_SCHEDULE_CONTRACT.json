@@ -1,0 +1,43 @@
+{
+  "contract_id": "research-os-platform-completion-schedule-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Reconcile the existing Schedule planning/generation surface with the Research OS platform contract, evidence, Control Center projection, and Unified Final Gate without introducing a second scheduler, queue, runtime, or release authority.",
+  "canonical_schedule_contract": "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+  "canonical_schedule_implementation": "owner_special/research_os_friend/schedule_generation",
+  "canonical_schedule_service_boundary": "owner_special/research_os_friend/service.py",
+  "canonical_control_projection": "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
+  "execution_boundary": "existing event_queue_stateless_runner",
+  "release_authority": "FINAL_GATE",
+  "required_proof": [
+    "schedule_contract_active",
+    "schedule_generation_tests",
+    "schedule_preview_boundary",
+    "control_center_projection",
+    "final_gate_binding",
+    "no_duplicate_scheduler_authority"
+  ],
+  "lifecycle": [
+    "PLANNED",
+    "READY",
+    "BLOCKED",
+    "IN_PROGRESS",
+    "WAITING_VERIFICATION",
+    "DONE",
+    "DEFERRED",
+    "CANCELLED"
+  ],
+  "rules": [
+    "schedule_is_planning_and_generation_boundary_only",
+    "schedule_does_not_execute",
+    "schedule_does_not_authorize",
+    "schedule_does_not_release",
+    "existing_queue_and_stateless_runner_remain_execution_path",
+    "preview_is_not_execution",
+    "confirmation_is_not_release_authority",
+    "unmet_requirements_are_not_success",
+    "deferred_is_not_done",
+    "unknown_is_not_pass",
+    "final_gate_remains_single_release_authority"
+  ]
+}
