@@ -33,7 +33,7 @@ class PlatformOperatingControlTests(unittest.TestCase):
             cwd=ROOT, text=True, capture_output=True, check=True,
         )
         payload = json.loads(result.stdout)
-        self.assertIn("platform_governance", payload["affected_components"])
+        self.assertIn("change_impact_control", payload["affected_components"])
         self.assertIn("unified_final_gate", payload["required_gates"])
 
 if __name__ == "__main__":
