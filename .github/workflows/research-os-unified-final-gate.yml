@@ -154,6 +154,12 @@ jobs:
           PYTHONPATH: .
         run: |
           python -m unittest tools.test_platform_production_hardening -v
+      - name: Platform production completion
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/platform_production_completion.py
+          python -m unittest tools.test_platform_production_completion -v
 
   decision:
     name: Unified release decision
