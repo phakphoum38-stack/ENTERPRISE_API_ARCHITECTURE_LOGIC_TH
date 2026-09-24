@@ -1,0 +1,132 @@
+{
+  "contract_id": "research-os-product-surface-inventory-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Machine-readable inventory of the canonical Research OS cross-platform product surfaces, anchored to existing implementation and test targets without creating a second navigation registry or authority.",
+  "canonical_ui_root": "apps/research_os_flutter",
+  "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+  "source_of_truth": "Architecture Source of Truth: ENTERPRISE_API_ARCHITECTURE_LOGIC_TH",
+  "rules": [
+    "reuse_existing_navigation_registry",
+    "reuse_existing_api_client",
+    "reuse_existing_capability_authorization",
+    "unknown_is_not_done",
+    "missing_backend_binding_is_not_fabricated",
+    "flutter_external_tool_remains_external",
+    "owner_remains_unbounded_highest_privilege",
+    "final_gate_remains_single_release_authority"
+  ],
+  "surfaces": [
+    [
+      "Home",
+      0,
+      "apps/research_os_flutter/lib/src/features/home/home_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "AI Chat",
+      1,
+      "apps/research_os_flutter/lib/src/features/chat/voice_conversation_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Agent Center",
+      2,
+      "apps/research_os_flutter/lib/src/features/agents/agent_center_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Library",
+      3,
+      "apps/research_os_flutter/lib/src/features/library/library_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Knowledge Graph",
+      4,
+      "apps/research_os_flutter/lib/src/features/graph/knowledge_graph_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "GitHub",
+      5,
+      "apps/research_os_flutter/lib/src/features/github/github_dashboard_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Google Workspace",
+      6,
+      "apps/research_os_flutter/lib/src/features/google_workspace/google_workspace_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Local API & Service",
+      7,
+      "apps/research_os_flutter/lib/src/features/local_api/local_api_control_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "System Monitor",
+      8,
+      "apps/research_os_flutter/lib/src/features/monitor/system_monitor_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Settings",
+      9,
+      "apps/research_os_flutter/lib/src/features/settings/settings_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Developer Access",
+      10,
+      "apps/research_os_flutter/lib/src/features/developer_access/developer_access_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Brain Skills",
+      11,
+      "apps/research_os_flutter/lib/src/features/brain_skills/brain_skills_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Google Sign-In",
+      12,
+      "apps/research_os_flutter/lib/src/features/auth/google_login_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Friend Connect",
+      13,
+      "apps/research_os_flutter/lib/src/features/friend/friend_connect_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Control Center",
+      14,
+      "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ]
+  ],
+  "non_surface_bindings": {
+    "control_center_audit": "apps/research_os_flutter/lib/src/features/control_center/native_control_audit_view.dart",
+    "capability_navigation_contract": "docs/RESEARCH_OS_CAPABILITY_NAVIGATION_BINDING.md",
+    "external_flutter_tool": "phakphoum38-stack/flutter",
+    "owner_special": "owner_special/flutter_app",
+    "v3": "v3/flutter_app"
+  },
+  "next_product_gaps": [
+    "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint is exposed by ResearchOSApiClient yet; do not fabricate project telemetry.",
+    "WORKFLOW_EXPERIENCE: orchestration lifecycle is exposed through existing API client, but a dedicated product workspace mapping remains to be completed.",
+    "OWNER_EXPERIENCE: Owner Special remains a separate runtime/UI lineage and requires explicit adapter parity work before consolidation."
+  ],
+  "authority": {
+    "descriptive_only": true,
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_release": false,
+    "may_merge": false,
+    "release_authority": "FINAL_GATE"
+  }
+}
