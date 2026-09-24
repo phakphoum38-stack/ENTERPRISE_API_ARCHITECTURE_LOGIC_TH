@@ -47,7 +47,7 @@ def main() -> None:
     assert payload["authority"]["release_authority"] == "FINAL_GATE"
     assert "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint is exposed by ResearchOSApiClient yet; do not fabricate project telemetry." not in payload["next_product_gaps"]
     print("PRODUCT_SURFACE_INVENTORY=PASS")
-    print("CANONICAL_DESTINATIONS=17")
+    print("CANONICAL_DESTINATIONS=18")
     print("AUTHORITY=DESCRIPTIVE_ONLY")
     print("PROJECT_EXPERIENCE=COMPLETE")
     assert "WORKFLOW_EXPERIENCE: orchestration lifecycle is exposed through existing API client, but a dedicated product workspace mapping remains to be completed." not in payload["next_product_gaps"]
