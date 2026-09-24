@@ -66,13 +66,13 @@ class ProjectExecutionProof:
                 f"capability {capability_id!r} is not registered for project {project_id!r}"
             )
 
-        self._binding.project_id = project_id
         result: BindingResult = self._binding.invoke(
             capability_id=capability_id,
             action=action,
             executor=executor,
             correlation_id=correlation_id,
             authorized=authorized,
+            project_id=project_id,
             args=args,
             kwargs=kwargs,
         )
