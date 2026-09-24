@@ -71,11 +71,17 @@ def main() -> None:
         / "enterprise_navigation.dart"
     ).read_text(encoding="utf-8")
 
-    matches = re.findall(
-        r"ResearchNavItem\([^\n]*,\s*(\d+)\),",
+    entries = re.findall(
+        r"ResearchNavItem\((.*?)\)",
         navigation,
+        flags=re.DOTALL,
     )
-    indexes = [int(value) for value in matches]
+    indexes: list[int] = []
+    for entry in entries:
+        numbers = re.findall(r"\\b(\\d+)\\b", entry)
+        if not numbers:
+            fail("navigation entry is missing a stable index")
+        indexes.append(int(numbers[-1]))
     if len(indexes) != 15:
         fail(f"navigation registry contains {len(indexes)} entries; expected 15")
     if sorted(indexes) != list(range(15)):
