@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from research_os_api.memory_fabric import MemoryFabricError, NvmeMemoryRegion, detect_host_capabilities
+from tools.research_os_api.memory_fabric import MemoryFabricError, NvmeMemoryRegion, detect_host_capabilities
 
 class MemoryFabricTests(unittest.TestCase):
     def test_mmap_backed_region_round_trip(self):
@@ -30,9 +30,10 @@ class MemoryFabricTests(unittest.TestCase):
 
     def test_capability_detection_is_conservative(self):
         caps = detect_host_capabilities()
-        self.assertTrue(caps["nvme_backend"])
-        self.assertFalse(caps["pcie5_detected"])
-        self.assertFalse(caps["cxl_detected"])
+        self.assertTrue(caps["storage_backed_region_supported"])
+        self.assertIsNone(caps["nvme_detected"])
+        self.assertIsNone(caps["pcie5_detected"])
+        self.assertIsNone(caps["cxl_detected"])
 
 if __name__ == "__main__":
     unittest.main()
