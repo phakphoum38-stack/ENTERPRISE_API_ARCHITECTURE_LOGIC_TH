@@ -64,13 +64,6 @@ void main() {
     expect(find.text('Workflow runs'), findsOneWidget);
     expect(find.text('Running'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
-    expect(find.byKey(const ValueKey('platform-controls-card')), findsOneWidget);
-    expect(find.text('Platform Controls'), findsOneWidget);
-    expect(find.text('Defect Control'), findsOneWidget);
-    expect(find.text('Schedule Control'), findsOneWidget);
-    expect(find.text('Risk Control'), findsOneWidget);
-    expect(find.text('Change Impact Control'), findsOneWidget);
-    expect(find.text('CANONICAL'), findsNWidgets(4));
 
     final overview = find.byKey(
       const ValueKey('control-center-overview-scroll'),
@@ -88,6 +81,21 @@ void main() {
         )
         .first;
     expect(overviewScrollable, findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('platform-controls-card')),
+      500,
+      scrollable: overviewScrollable,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('platform-controls-card')), findsOneWidget);
+    expect(find.text('Platform Controls'), findsOneWidget);
+    expect(find.text('Defect Control'), findsOneWidget);
+    expect(find.text('Schedule Control'), findsOneWidget);
+    expect(find.text('Risk Control'), findsOneWidget);
+    expect(find.text('Change Impact Control'), findsOneWidget);
+    expect(find.text('CANONICAL'), findsNWidgets(4));
 
     await tester.scrollUntilVisible(
       find.text('Workflow control surface'),
