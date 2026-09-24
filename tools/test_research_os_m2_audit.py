@@ -16,6 +16,7 @@ class M2AuditIndexTests(unittest.TestCase):
  def test_relationship_graph_is_explicit(self):
   g=build_index()
   self.assertTrue(any(e["relation"]=="VERIFIED_BY" and e["from"].startswith("CONTRACT:") and e["to"].startswith("TEST:") for e in g["edges"]))
+  self.assertTrue(g["integrity"]["final_gate_node"])
   self.assertIn("FINAL_GATE:UNIFIED",{n["id"] for n in g["nodes"]})
   self.assertTrue(any(e["relation"]=="BINDS_TO" and e["to"]=="FINAL_GATE:UNIFIED" for e in g["edges"]))
  def test_contract_implementation_integrity_is_explicit(self):

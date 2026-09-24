@@ -85,7 +85,10 @@ def build_index():
   for name,target in workflow_names.items():
    if target!=w and name in txt:
     edges.append({"from":nid("WORKFLOW",w),"relation":"DISPATCHES_OR_REFERENCES","to":nid("WORKFLOW",target)})
- add_node("FINAL_GATE:UNIFIED","AUTHORITY","current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml","VERIFIED")
+ final_gate_path="current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+ final_gate_exists=final_gate_path in by_path
+ if final_gate_exists:
+  add_node("FINAL_GATE:UNIFIED","AUTHORITY",final_gate_path,"VERIFIED")
  for r in rows:
   if r["has_final_gate_reference"] and r["kind"]!="workflow":
    edges.append({"from":nid(r["kind"],r["path"]),"relation":"BINDS_TO","to":"FINAL_GATE:UNIFIED"})
@@ -110,7 +113,7 @@ def build_index():
   "workflow_inventory":bool(workflows),
   "contract_inventory":bool(contracts),
   "invariant_inventory":any(r["invariant_refs"] for r in rows),
-  "final_gate_node":"FINAL_GATE:UNIFIED" in targets,
+  "final_gate_node":final_gate_exists and "FINAL_GATE:UNIFIED" in targets,
  }
  return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V2","source_sha":source,"root":str(ROOT),
   "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
