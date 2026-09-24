@@ -1,0 +1,122 @@
+name: Research OS Release Spine Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact immutable source SHA
+        required: true
+        type: string
+      candidate_run_id:
+        description: Successful Research OS Candidate run ID
+        required: true
+        type: string
+      research_gate_run_id:
+        description: Successful Research OS Gate run ID
+        required: true
+        type: string
+      provenance_run_id:
+        description: Successful Provenance Evidence Gate run ID
+        required: true
+        type: string
+      lineage_run_id:
+        description: Successful Canonical Source Lineage Gate run ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: research-os-release-spine-${{ inputs.target_sha }}
+  cancel-in-progress: false
+
+env:
+  TARGET_SHA: ${{ inputs.target_sha }}
+
+jobs:
+  certify:
+    name: Verify release spine and certify exact target
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 1
+      - name: Verify exact checkout SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+      - name: Validate constituent workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          RESEARCH_GATE_RUN_ID: ${{ inputs.research_gate_run_id }}
+          PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
+          LINEAGE_RUN_ID: ${{ inputs.lineage_run_id }}
+        run: |
+          set -euo pipefail
+          validate_run() {
+            local run_id="$1" expected_workflow="$2"
+            test -n "$run_id"
+            local workflow status conclusion head_sha
+            workflow="$(gh run view "$run_id" --repo "${{ github.repository }}" --json workflowName --jq '.workflowName')"
+            status="$(gh run view "$run_id" --repo "${{ github.repository }}" --json status --jq '.status')"
+            conclusion="$(gh run view "$run_id" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')"
+            head_sha="$(gh run view "$run_id" --repo "${{ github.repository }}" --json headSha --jq '.headSha')"
+            test "$workflow" = "$expected_workflow"
+            test "$status" = completed
+            test "$conclusion" = success
+            test "$head_sha" = "$TARGET_SHA"
+          }
+          validate_run "$CANDIDATE_RUN_ID" "Research OS Candidate"
+          validate_run "$RESEARCH_GATE_RUN_ID" "Research OS Gate"
+          validate_run "$PROVENANCE_RUN_ID" "Provenance Evidence Gate"
+          validate_run "$LINEAGE_RUN_ID" "Canonical Source Lineage Gate"
+      - name: Verify candidate installer SHA evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf release-input && mkdir -p release-input
+          gh run download "${{ inputs.candidate_run_id }}" --repo "${{ github.repository }}" --name "research-os-v3-verified-candidate-$TARGET_SHA" --dir release-input
+          manifest="$(find release-input -type f -name 'candidate-manifest.json' -print -quit)"
+          setup="$(find release-input -type f -name 'Research-OS-V3-Setup-*-x64.exe' -print -quit)"
+          test -n "$manifest" && test -n "$setup"
+          python3 - "$manifest" "$setup" <<'PY'
+          import hashlib, json, sys
+          manifest=json.load(open(sys.argv[1], encoding='utf-8-sig'))
+          actual=hashlib.sha256(open(sys.argv[2],'rb').read()).hexdigest()
+          assert manifest['target_sha'] == '${{ inputs.target_sha }}'
+          assert manifest['validation'] == 'passed'
+          assert actual == manifest['installer']['sha256']
+          print('CANDIDATE_INSTALLER_SHA256=PASS')
+          PY
+      - name: Build immutable release spine evidence
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          RESEARCH_GATE_RUN_ID: ${{ inputs.research_gate_run_id }}
+          PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
+          LINEAGE_RUN_ID: ${{ inputs.lineage_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-spine
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          evidence={'schema':'research-os.release-spine.v1','immutable':True,'commit':os.environ['TARGET_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'gates':{'SOURCE':True,'QUALITY':True,'BUILD':True,'IDENTITY':True,'PACKAGE':True,'INSTALL_E2E':True,'PROVENANCE':True,'LINEAGE':True,'CANDIDATE':True,'CERTIFICATION':True,'RELEASE':False},'protected_gates':{'TARGET_SHA':True,'SHA256':True,'CANONICAL_LINEAGE':True,'RELEASE_CERTIFICATION':True},'run_refs':{'candidate':os.environ['CANDIDATE_RUN_ID'],'research_gate':os.environ['RESEARCH_GATE_RUN_ID'],'provenance':os.environ['PROVENANCE_RUN_ID'],'lineage':os.environ['LINEAGE_RUN_ID']}}
+          evidence['manifest_sha256']=hashlib.sha256(json.dumps(evidence,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+          Path('release-spine/RELEASE_SPINE_CERTIFICATION.json').write_text(json.dumps(evidence,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print('RELEASE_SPINE_CERTIFICATION=PASS')
+          PY
+      - name: Upload immutable release spine evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-os-release-spine-${{ inputs.target_sha }}
+          path: release-spine/RELEASE_SPINE_CERTIFICATION.json
+          if-no-files-found: error
+          retention-days: 30
