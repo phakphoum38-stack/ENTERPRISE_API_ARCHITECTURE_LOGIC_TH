@@ -11,6 +11,11 @@ class PhaseEUnifiedWindowsDistributionTests(unittest.TestCase):
     def test_contract_reconciles(self) -> None:
         self.assertEqual((), validator.validate())
 
+    def test_installer_e2e_is_bound(self) -> None:
+        workflow = validator._read_phase_e_workflow(validator.ROOT)
+        self.assertIn("Installer install run uninstall E2E", workflow)
+        self.assertIn("WINDOWS_INSTALL_E2E_EVIDENCE.json", workflow)
+
     def test_distribution_cannot_replace_release_authority(self) -> None:
         original = validator.json.loads(
             validator.CONTRACT.read_text(encoding="utf-8")
