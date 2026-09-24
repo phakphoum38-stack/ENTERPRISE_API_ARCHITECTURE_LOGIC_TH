@@ -6,6 +6,7 @@ from tools.project_registry import ProjectRegistry
 from tools.project_scale_execution import (
     SCALE_LEVELS,
     execute_scale,
+    execute_scale_concurrently,
     exercise_resource_conflict,
 )
 from tools.project_scale_readiness import build_project_definitions
@@ -31,6 +32,23 @@ class ProjectScaleExecutionTests(unittest.TestCase):
                 self.assertEqual(summary.completed, count)
                 self.assertEqual(summary.recovered, 0)
                 self.assertEqual(summary.evidence_records, count * 8)
+
+    def test_100_projects_execute_concurrently_on_shared_evidence_plane(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            registry = ProjectRegistry(build_project_definitions(100))
+            summary = execute_scale_concurrently(
+                registry=registry,
+                ledger_path=Path(directory) / "shared-concurrent-evidence.jsonl",
+                owner_id="owner-001",
+                source_sha=SHA,
+                target_sha=SHA,
+                workflow_run_id="workflow-concurrent-100",
+                max_workers=16,
+            )
+            self.assertEqual(summary.project_count, 100)
+            self.assertEqual(summary.completed, 100)
+            self.assertEqual(summary.recovered, 0)
+            self.assertEqual(summary.evidence_records, 800)
 
     def test_shared_evidence_plane_keeps_project_correlations_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
