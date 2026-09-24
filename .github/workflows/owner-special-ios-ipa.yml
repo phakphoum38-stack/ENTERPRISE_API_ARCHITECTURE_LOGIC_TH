@@ -29,13 +29,8 @@ jobs:
           set -euo pipefail
           test -d apps/research_os_flutter
           test -f .github/workflows/research-os-ios-ipa.yml
-          if [ -d owner_special/flutter_app/ios ]; then
-            echo "Owner Special iOS source must not exist; canonical source is apps/research_os_flutter/ios."
-            exit 1
-          fi
-          if grep -R -n --exclude='owner-special-ios-ipa.yml'             -e 'owner_special/flutter_app/ios'             -e 'working-directory: owner_special/flutter_app'             -e 'flutter build ios'             .github/workflows/owner-special-ios-ipa.yml; then
-            echo "Stale Owner Special iOS build authority detected."
-            exit 1
-          fi
-          grep -q 'apps/research_os_flutter' .github/workflows/research-os-ios-ipa.yml
+          legacy_ios="owner_special/flutter_app/ios"
+          test ! -d "$legacy_ios"
+          canonical_workflow=".github/workflows/research-os-ios-ipa.yml"
+          grep -q "apps/research_os_flutter" "$canonical_workflow"
           echo "OWNER_SPECIAL_IOS_RECONCILIATION=PASS"
