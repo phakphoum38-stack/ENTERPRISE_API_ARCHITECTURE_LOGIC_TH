@@ -171,6 +171,7 @@ class _OwnerExperiencePageState extends State<OwnerExperiencePage> {
                         ),
                       ),
                       const ListTile(
+                        key: Key('owner-authority-boundary'),
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(Icons.lock_outline),
                         title: Text('Server authority boundary'),
