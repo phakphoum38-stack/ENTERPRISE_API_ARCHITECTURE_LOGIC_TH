@@ -11,6 +11,7 @@ M.2 is the descriptive repository-wide audit/index layer. This update keeps the 
 - FILE/WORKFLOW -> existing Unified Final Gate binding
 - FILE -> architecture invariant references
 - source SHA, node identity and dangling-edge integrity
+- non-vacuous contract-to-test and contract-to-implementation linkage checks; integrity cannot pass merely because the candidate relationship set is empty
 
 The graph reuses existing repository authorities; it does not create a second Platform Graph, runtime, scheduler, authorization service, evidence authority, or release authority.
 
