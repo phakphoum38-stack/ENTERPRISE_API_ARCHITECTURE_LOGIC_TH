@@ -36,7 +36,19 @@ REQUIRED_PACKAGE_PATHS = {
 }
 
 
-def _read_phase_e_workflow(root: Path) -> str:\n    return (root / ".github/workflows/research-os-phase-e-unified-windows-distribution.yml").read_text(encoding="utf-8")\n\n\ndef _read_unified_final_gate(root: Path) -> str:\n    return (root / ".github/workflows/research-os-unified-final-gate.yml").read_text(encoding="utf-8")\n\n\ndef validate(root: Path = ROOT) -> tuple[str, ...]:
+def _read_phase_e_workflow(root: Path) -> str:
+    return (
+        root / ".github/workflows/research-os-phase-e-unified-windows-distribution.yml"
+    ).read_text(encoding="utf-8")
+
+
+def _read_unified_final_gate(root: Path) -> str:
+    return (
+        root / ".github/workflows/research-os-unified-final-gate.yml"
+    ).read_text(encoding="utf-8")
+
+
+def validate(root: Path = ROOT) -> tuple[str, ...]:
     errors: list[str] = []
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
 
@@ -76,9 +88,7 @@ def _read_phase_e_workflow(root: Path) -> str:\n    return (root / ".github/work
         if authority.get(key) is not True:
             errors.append(f"authority invariant missing: {key}")
 
-    workflow = (root / ".github/workflows/research-os-phase-e-unified-windows-distribution.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = _read_phase_e_workflow(root)
     for marker in (
         "TARGET_SHA",
         "Research-OS-Unified-Windows-x64",
@@ -90,9 +100,7 @@ def _read_phase_e_workflow(root: Path) -> str:\n    return (root / ".github/work
         if marker not in workflow:
             errors.append(f"Phase E workflow missing required marker: {marker}")
 
-    gate = (root / ".github/workflows/research-os-unified-final-gate.yml").read_text(
-        encoding="utf-8"
-    )
+    gate = _read_unified_final_gate(root)
     if "tools.test_phase_e_unified_windows_distribution" not in gate:
         errors.append("Unified Final Gate is missing the Phase E distribution test")
 
