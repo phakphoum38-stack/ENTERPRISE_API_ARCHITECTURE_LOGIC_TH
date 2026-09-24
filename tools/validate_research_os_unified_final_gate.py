@@ -20,8 +20,12 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PROJECT_001.json",
     "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json",
     "current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json",
+    "current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json",
     "current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json",
     "apps/research_os_flutter/lib/src/features/control_center/native_control_audit_view.dart",
+    "apps/research_os_flutter/lib/src/features/projects/project_experience_page.dart",
+    "tools/research_os_api/test_project_routes.py",
+    "apps/research_os_flutter/test/project_experience_page_test.dart",
     "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
     "tools/project_scale_execution.py",
     "tools/test_project_scale_execution.py",
@@ -74,6 +78,7 @@ def main() -> None:
         "current/RESEARCH_OS_PROJECT_001.json",
         "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json",
         "current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json",
+        "current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json",
         "current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
@@ -90,9 +95,9 @@ def main() -> None:
         if not numbers:
             fail("navigation entry is missing a stable index")
         indexes.append(int(numbers[-1]))
-    if len(indexes) != 15:
-        fail(f"navigation registry contains {len(indexes)} entries; expected 15")
-    if sorted(indexes) != list(range(15)):
+    if len(indexes) != 16:
+        fail(f"navigation registry contains {len(indexes)} entries; expected 16")
+    if sorted(indexes) != list(range(16)):
         fail(f"navigation indexes drifted: {indexes}")
     missing_spine = [item for item in EXPECTED_SPINE if f"  - {item}" not in text]
     if missing_spine:
@@ -100,7 +105,7 @@ def main() -> None:
     print("UNIFIED_FINAL_GATE_CONTRACT=PASS")
     print("PLATFORM_CORE_COMPLETION=BOUND")
     print("100_PROJECT_READINESS=BOUND")
-    print("NAVIGATION_REGISTRY=15_DESTINATIONS")
+    print("NAVIGATION_REGISTRY=16_DESTINATIONS")
     print("RELEASE_AUTHORITY=FINAL_GATE")
     print("DEFERRED_POLICY=EXPLICIT_AND_FAIL_CLOSED")
 

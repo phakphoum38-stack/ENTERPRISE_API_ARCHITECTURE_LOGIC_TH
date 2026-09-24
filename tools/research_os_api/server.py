@@ -40,6 +40,13 @@ from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 from oauth_handoff import consume_handoff
 from providers import ProviderError, build_provider
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+from tools.project_registry import ProjectRegistry
+from tools.project_scale_readiness import PROJECT_COUNT, build_project_definitions
 import copilot_service
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -83,6 +90,41 @@ def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 
 
 def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _project_registry_snapshot() -> dict[str, Any]:
+    registry = ProjectRegistry(build_project_definitions(1))
+    projects = [
+        {
+            "project_id": project.project_id,
+            "display_name": project.display_name,
+            "version": project.version,
+            "capabilities": list(project.capabilities),
+            "authorization_policy": project.authorization_policy,
+            "workflow_profile": project.workflow_profile,
+            "evidence_namespace": project.evidence_namespace,
+            "resource_policy": project.resource_policy,
+            "capability_namespace": project.capability_namespace,
+            "queue_namespace": project.queue_namespace,
+            "evidence_ledger": project.evidence_ledger,
+            "release_authority": project.release_authority,
+        }
+        for project in registry.all()
+    ]
+    return {
+        "projects": projects,
+        "configured_count": len(projects),
+        "supported_project_contexts": PROJECT_COUNT,
+        "scale_levels": [10, 20, 50, 100],
+        "shared_planes": {
+            "capability_registry": "SHARED_CAPABILITY_REGISTRY",
+            "queue": "SHARED_QUEUE",
+            "evidence_ledger": "SHARED_EVIDENCE_LEDGER",
+        },
+        "source": "ProjectRegistry",
+        "release_authority": "FINAL_GATE",
+        "execution_authority": "EXISTING_SHARED_EXECUTION_PLANE",
+    }
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
@@ -202,6 +244,9 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
                 self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-api", "version": "0.8.0", "ui": WEB_DIR.is_dir(), "memory": True, "memory_commit": sync_configured(), "github": True, "cloud_sync": sync_configured(), "google_workspace": True, "google_workspace_connected": google_workspace_connected})
+                return
+            if path == "/v1/projects":
+                self._send(HTTPStatus.OK, _project_registry_snapshot())
                 return
             if path == "/v1/providers":
                 self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})

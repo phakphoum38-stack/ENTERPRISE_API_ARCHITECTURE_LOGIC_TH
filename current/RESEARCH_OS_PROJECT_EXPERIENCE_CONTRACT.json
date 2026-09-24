@@ -1,0 +1,70 @@
+{
+  "contract_id": "research-os-project-experience-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Expose the existing ProjectRegistry through the canonical Research OS API and product UI without creating project-local execution, queue, evidence, authorization, or release authorities.",
+  "sources": [
+    "tools/project_registry.py",
+    "tools/project_scale_readiness.py",
+    "current/RESEARCH_OS_PROJECT_TEMPLATE_CONTRACT.json",
+    "current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json"
+  ],
+  "api": {
+    "method": "GET",
+    "path": "/v1/projects",
+    "implementation": "tools/research_os_api/server.py",
+    "source_of_truth": "ProjectRegistry",
+    "response_requires": [
+      "configured_count",
+      "supported_project_contexts",
+      "scale_levels",
+      "projects",
+      "shared_planes",
+      "release_authority",
+      "execution_authority"
+    ]
+  },
+  "ui": {
+    "implementation": "apps/research_os_flutter/lib/src/features/projects/project_experience_page.dart",
+    "navigation_index": 14,
+    "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+    "app_shell": "apps/research_os_flutter/lib/src/app_shell.dart",
+    "api_client": "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
+  },
+  "invariants": [
+    "project_identity_is_visible",
+    "project_configuration_is_read_only",
+    "execution_uses_existing_shared_execution_plane",
+    "authorization_remains_external",
+    "queue_remains_shared",
+    "evidence_ledger_remains_shared",
+    "project_evidence_is_namespace_scoped",
+    "resource_conflict_is_reject",
+    "same_version_overwrite_is_rejected",
+    "single_final_gate",
+    "no_project_runtime",
+    "no_project_queue",
+    "no_project_evidence_ledger",
+    "no_project_authorization_authority",
+    "no_project_navigation_registry",
+    "no_project_release_authority"
+  ],
+  "proof": {
+    "api_test": "tools/research_os_api/test_project_routes.py",
+    "flutter_test": "apps/research_os_flutter/test/project_experience_page_test.dart",
+    "scale_proof": "current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json"
+  },
+  "boundaries": {
+    "supported_project_contexts": 100,
+    "configured_projects": 1,
+    "scale_levels": [
+      10,
+      20,
+      50,
+      100
+    ],
+    "external_flutter_tool": "phakphoum38-stack/flutter",
+    "owner_special": "owner_special/flutter_app",
+    "release_authority": "FINAL_GATE"
+  }
+}

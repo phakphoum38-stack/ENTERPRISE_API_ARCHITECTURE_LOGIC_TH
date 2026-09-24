@@ -12,9 +12,9 @@ CONTRACT = ROOT / "current" / "RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.js
 def main() -> None:
     payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
     surfaces = payload["surfaces"]
-    assert len(surfaces) == 15, "product surface inventory must cover the 15 canonical destinations"
+    assert len(surfaces) == 16, "product surface inventory must cover the 15 canonical destinations"
     indexes = [item[1] for item in surfaces]
-    assert indexes == list(range(15)), f"navigation indexes drifted: {indexes}"
+    assert indexes == list(range(16)), f"navigation indexes drifted: {indexes}"
     labels = [item[0] for item in surfaces]
     assert len(labels) == len(set(labels)), "surface labels must be unique"
 
@@ -45,7 +45,7 @@ def main() -> None:
     assert payload["authority"]["release_authority"] == "FINAL_GATE"
     assert "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint is exposed by ResearchOSApiClient yet; do not fabricate project telemetry." in payload["next_product_gaps"]
     print("PRODUCT_SURFACE_INVENTORY=PASS")
-    print("CANONICAL_DESTINATIONS=15")
+    print("CANONICAL_DESTINATIONS=16")
     print("AUTHORITY=DESCRIPTIVE_ONLY")
     print("PROJECT_EXPERIENCE=EXPLICIT_GAP")
 
