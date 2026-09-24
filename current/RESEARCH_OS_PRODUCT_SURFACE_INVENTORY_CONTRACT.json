@@ -118,6 +118,12 @@
       16,
       "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
       "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Owner",
+      17,
+      "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
     ]
   ],
   "non_surface_bindings": {
@@ -127,9 +133,7 @@
     "owner_special": "owner_special/flutter_app",
     "v3": "v3/flutter_app"
   },
-  "next_product_gaps": [
-    "OWNER_EXPERIENCE: Owner Special remains a separate runtime/UI lineage and requires explicit adapter parity work before consolidation."
-  ],
+  "next_product_gaps": [],
   "authority": {
     "descriptive_only": true,
     "may_execute": false,

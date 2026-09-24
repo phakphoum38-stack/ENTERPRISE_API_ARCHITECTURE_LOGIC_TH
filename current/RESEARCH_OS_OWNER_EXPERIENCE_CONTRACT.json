@@ -1,0 +1,72 @@
+{
+  "contract_id": "research-os-owner-experience-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Expose the existing system Owner authority and platform-wide observations through the canonical Research OS product surface without creating a second runtime, authorization authority, navigation registry, evidence ledger, or release authority.",
+  "identity": {
+    "source": "/v1/auth/status",
+    "must_be_server_derived": true,
+    "role": "OWNER"
+  },
+  "authority": {
+    "owner_is_highest_privilege": true,
+    "resource_or_scope_bound": false,
+    "client_must_not_grant_authority": true,
+    "workflow_control_remains_server_authorized": true,
+    "release_authority": "FINAL_GATE"
+  },
+  "observations": {
+    "health": "/health",
+    "projects": "/v1/projects",
+    "workflows": "/v1/agents/orchestrations",
+    "agents": "/v1/agents",
+    "providers": "/v1/providers"
+  },
+  "experience": {
+    "interaction": "OBSERVE",
+    "mutation": false,
+    "execution": false,
+    "authorization": false,
+    "approval": false,
+    "release": false,
+    "uses_existing_control_center": true
+  },
+  "owner_special": {
+    "runtime": "owner_special",
+    "desktop_surface": "owner_special/flutter_app",
+    "friend_service": "127.0.0.1:8790",
+    "integration_mode": "existing_boundary_observation_only"
+  },
+  "lifecycle": [
+    "INTENT",
+    "VALIDATE",
+    "OBSERVE",
+    "EVIDENCE",
+    "COMPLETE",
+    "RECOVER"
+  ],
+  "cross_platform": {
+    "canonical_product_surface": "apps/research_os_flutter",
+    "windows": true,
+    "web": true,
+    "ios": true,
+    "external_flutter_tool_remains_external": true
+  },
+  "invariants": [
+    "verified_session_is_the_identity_source",
+    "owner_is_unbounded_by_resource_or_scope",
+    "observation_is_not_authorization",
+    "command_is_not_execution",
+    "evidence_is_not_authority",
+    "final_gate_is_the_single_release_authority",
+    "owner_special_remains_an_existing_runtime_boundary",
+    "unknown_is_not_known"
+  ],
+  "proof": {
+    "flutter_test": "apps/research_os_flutter/test/owner_experience_page_test.dart",
+    "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+    "api_client": "apps/research_os_flutter/lib/src/api/research_os_api_client.dart",
+    "authorization_reference": "docs/RESEARCH_OS_OWNER_AUTHORIZATION.md",
+    "owner_special_manifest": "owner_special/OWNER_MANIFEST.json"
+  }
+}

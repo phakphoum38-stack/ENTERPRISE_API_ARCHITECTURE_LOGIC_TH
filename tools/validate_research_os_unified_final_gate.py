@@ -23,6 +23,9 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json",
     "current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json",
     "current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json",
+    "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json",
+    "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
+    "apps/research_os_flutter/test/owner_experience_page_test.dart",
     "apps/research_os_flutter/lib/src/features/control_center/native_control_audit_view.dart",
     "apps/research_os_flutter/lib/src/features/projects/project_experience_page.dart",
     "apps/research_os_flutter/lib/src/features/workflows/workflow_experience_page.dart",
@@ -84,6 +87,7 @@ def main() -> None:
         "current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json",
         "current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json",
         "current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json",
+        "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
             fail(f"required completion contract is not bound: {contract_ref}")
@@ -99,9 +103,9 @@ def main() -> None:
         if not numbers:
             fail("navigation entry is missing a stable index")
         indexes.append(int(numbers[-1]))
-    if len(indexes) != 17:
-        fail(f"navigation registry contains {len(indexes)} entries; expected 17")
-    if sorted(indexes) != list(range(17)):
+    if len(indexes) != 18:
+        fail(f"navigation registry contains {len(indexes)} entries; expected 18")
+    if sorted(indexes) != list(range(18)):
         fail(f"navigation indexes drifted: {indexes}")
     missing_spine = [item for item in EXPECTED_SPINE if f"  - {item}" not in text]
     if missing_spine:
@@ -109,7 +113,7 @@ def main() -> None:
     print("UNIFIED_FINAL_GATE_CONTRACT=PASS")
     print("PLATFORM_CORE_COMPLETION=BOUND")
     print("100_PROJECT_READINESS=BOUND")
-    print("NAVIGATION_REGISTRY=17_DESTINATIONS")
+    print("NAVIGATION_REGISTRY=18_DESTINATIONS")
     print("RELEASE_AUTHORITY=FINAL_GATE")
     print("DEFERRED_POLICY=EXPLICIT_AND_FAIL_CLOSED")
 

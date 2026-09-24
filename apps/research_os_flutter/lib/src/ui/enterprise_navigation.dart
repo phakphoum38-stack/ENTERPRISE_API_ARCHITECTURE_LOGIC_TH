@@ -45,6 +45,13 @@ const researchNavigationItems = <ResearchNavItem>[
     16,
     capabilityId: 'control_center',
   ),
+  ResearchNavItem(
+    'System',
+    'Owner',
+    Icons.shield_outlined,
+    17,
+    capabilityId: 'owner',
+  ),
 ];
 
 class ResearchSidebar extends StatelessWidget {

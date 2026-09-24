@@ -12,9 +12,9 @@ CONTRACT = ROOT / "current" / "RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.js
 def main() -> None:
     payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
     surfaces = payload["surfaces"]
-    assert len(surfaces) == 17, "product surface inventory must cover the 17 canonical destinations"
+    assert len(surfaces) == 18, "product surface inventory must cover the 18 canonical destinations"
     indexes = [item[1] for item in surfaces]
-    assert indexes == list(range(17)), f"navigation indexes drifted: {indexes}"
+    assert indexes == list(range(18)), f"navigation indexes drifted: {indexes}"
     labels = [item[0] for item in surfaces]
     assert len(labels) == len(set(labels)), "surface labels must be unique"
 
@@ -34,6 +34,8 @@ def main() -> None:
     assert "const researchNavigationItems" in navigation_text
     assert "Control Center" in navigation_text
     assert "capabilityId: 'control_center'" in navigation_text
+    assert "Owner" in navigation_text
+    assert "capabilityId: 'owner'" in navigation_text
 
     for path in (
         payload["non_surface_bindings"]["control_center_audit"],
@@ -45,7 +47,7 @@ def main() -> None:
     assert payload["authority"]["release_authority"] == "FINAL_GATE"
     assert "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint is exposed by ResearchOSApiClient yet; do not fabricate project telemetry." not in payload["next_product_gaps"]
     print("PRODUCT_SURFACE_INVENTORY=PASS")
-    print("CANONICAL_DESTINATIONS=17")
+    print("CANONICAL_DESTINATIONS=18")
     print("AUTHORITY=DESCRIPTIVE_ONLY")
     print("PROJECT_EXPERIENCE=COMPLETE")
     assert "WORKFLOW_EXPERIENCE: orchestration lifecycle is exposed through existing API client, but a dedicated product workspace mapping remains to be completed." not in payload["next_product_gaps"]

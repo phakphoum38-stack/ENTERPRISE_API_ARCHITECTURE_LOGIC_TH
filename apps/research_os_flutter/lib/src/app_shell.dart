@@ -15,6 +15,7 @@ import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
 import 'features/local_api/local_api_control_page.dart';
 import 'features/monitor/system_monitor_page.dart';
+import 'features/owner/owner_experience_page.dart';
 import 'features/workflows/workflow_experience_page.dart';
 import 'features/projects/project_experience_page.dart';
 import 'features/settings/settings_page.dart';
@@ -70,6 +71,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
           apiClient: widget.apiClient,
           onNavigate: _select,
         ),
+        OwnerExperiencePage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
