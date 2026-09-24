@@ -1,0 +1,32 @@
+{
+  "contract_id": "research-os-platform-production-completion-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Reconcile existing Research OS production-readiness authorities into one fail-closed completion proof without creating new execution or release authority.",
+  "scope": ["CONTRACT_WORKFLOW_VALIDATOR_CONSISTENCY", "REPRODUCIBILITY", "DEPENDENCY_INTEGRITY", "OBSERVABILITY", "MIGRATION_ROLLBACK", "SECURITY_BOUNDARY", "FINAL_GATE_AGGREGATION"],
+  "required_proofs": {
+    "contract_workflow_validator_consistency": true,
+    "exact_sha_reproducibility": true,
+    "dependency_graph_integrity": true,
+    "observability_identity": true,
+    "migration_rollback_contract": true,
+    "security_boundary": true,
+    "unknown_and_deferred_fail_closed": true,
+    "single_release_authority": true
+  },
+  "invariants": ["existing_authorities_only", "final_gate_remains_single_release_authority", "evidence_is_not_authority", "observation_is_not_authorization", "unknown_is_not_pass", "deferred_is_not_pass", "stale_evidence_is_not_pass", "exact_sha_identity", "dependency_cycles_are_blocked", "rollback_requires_explicit_compatibility_and_postflight"],
+  "authority": {
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE",
+    "creates_new_runtime": false,
+    "creates_new_scheduler": false,
+    "creates_new_queue": false,
+    "creates_new_authorization_authority": false,
+    "creates_new_evidence_ledger": false,
+    "creates_new_release_authority": false
+  }
+}
