@@ -169,7 +169,7 @@ class LifecycleEvidenceLedger:
         if states[-1] == "COMPLETE" and any(record.recovery_required for record in records):
             errors.append("completed lifecycle cannot retain unresolved recovery")
         if any(state in TERMINAL for state in states[:-1]):
-            errors.append("terminal lifecycle state cannot be followed by another state")
+            errors.append("terminal lifecycle state cannot be followed")
         return tuple(errors)
 
 
