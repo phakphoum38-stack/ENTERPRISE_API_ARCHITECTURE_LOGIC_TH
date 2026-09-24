@@ -1,0 +1,56 @@
+{
+  "contract_id": "research-os-100-project-readiness-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Prove that up to 100 project contexts can share the existing Research OS platform core without duplicating runtime, queue, evidence, navigation, authorization, or release authority.",
+  "project_count": 100,
+  "shared_components": [
+    "capability_registry",
+    "authorization_boundary",
+    "workflow_model",
+    "event_queue_model",
+    "stateless_runner_model",
+    "evidence_model",
+    "unified_final_gate",
+    "release_authority"
+  ],
+  "required_invariants": [
+    "unique_project_identity",
+    "project_isolation",
+    "capability_identity_is_project_scoped",
+    "authorization_does_not_cross_project_boundary",
+    "idempotency_key_includes_project_identity",
+    "resource_conflict_is_reject",
+    "no_same_version_overwrite",
+    "evidence_contains_project_identity",
+    "correlation_is_project_traceable",
+    "recovery_preserves_project_identity",
+    "shared_execution_plane",
+    "shared_evidence_plane",
+    "shared_final_gate",
+    "no_per_project_runtime",
+    "no_per_project_queue",
+    "no_per_project_evidence_ledger",
+    "no_per_project_navigation_registry"
+  ],
+  "scale_test": {
+    "contexts": 100,
+    "concurrency_model": "shared_core",
+    "isolation_model": "project_id_boundary",
+    "duplicate_delivery": "idempotent",
+    "conflict_policy": "REJECT",
+    "release_authority": "FINAL_GATE"
+  },
+  "fail_closed": [
+    "duplicate_project_id",
+    "cross_project_access",
+    "missing_project_identity",
+    "duplicate_idempotency",
+    "same_version_overwrite",
+    "missing_project_evidence",
+    "per_project_runtime",
+    "per_project_queue",
+    "per_project_evidence_ledger",
+    "second_final_gate"
+  ]
+}
