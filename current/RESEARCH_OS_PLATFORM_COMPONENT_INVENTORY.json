@@ -1,0 +1,222 @@
+{
+  "registry_id": "research-os-platform-component-inventory-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Derived governance inventory over existing canonical platform components; descriptive only and never an authority.",
+  "source_of_truths": [
+    "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+    "tools/platform_graph.py",
+    "current/ARCHITECTURE_INVARIANTS.md"
+  ],
+  "components": [
+    {
+      "id": "platform_workspace",
+      "canonical": "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+      "kind": "REGISTRY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_graph"
+      ],
+      "contracts": [
+        "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_graph.py"
+      ],
+      "evidence": [
+        "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json"
+      ],
+      "gates": [
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "platform_graph",
+      "canonical": "tools/platform_graph.py",
+      "kind": "ENGINE_READ_ONLY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace"
+      ],
+      "contracts": [
+        "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_graph.py"
+      ],
+      "evidence": [
+        "tools/platform_graph.py"
+      ],
+      "gates": [
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "navigation",
+      "canonical": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+      "kind": "CANONICAL_REGISTRY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "product_surface"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/platform_surface_parity_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "project_identity",
+      "canonical": "tools/project_registry.py",
+      "kind": "CANONICAL_REGISTRY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_project_registry.py"
+      ],
+      "evidence": [
+        "tools/project_registry.py"
+      ],
+      "gates": [
+        "project_scale",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "workflow",
+      "canonical": "current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json",
+      "kind": "EXPERIENCE_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/workflow_experience_page_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/features/workflows/workflow_experience_page.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "evidence",
+      "canonical": "tools/lifecycle_evidence.py",
+      "kind": "EVIDENCE_PLANE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "workflow"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_runtime_evidence.py"
+      ],
+      "evidence": [
+        "tools/lifecycle_evidence.py"
+      ],
+      "gates": [
+        "evidence_lineage",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "control_center",
+      "canonical": "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
+      "kind": "EXPERIENCE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "navigation",
+        "evidence"
+      ],
+      "contracts": [
+        "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/native_control_center_page_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "release",
+      "canonical": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+      "kind": "RELEASE_AUTHORITY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "evidence",
+        "navigation"
+      ],
+      "contracts": [
+        "current/GOLDEN_RELEASE_CONTRACT.yml"
+      ],
+      "tests": [
+        "tools/validate_research_os_unified_final_gate.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "release_spine"
+      ]
+    },
+    {
+      "id": "owner",
+      "canonical": "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json",
+      "kind": "EXPERIENCE_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "control_center",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/owner_experience_page_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "unified_final_gate"
+      ]
+    }
+  ],
+  "rules": [
+    "metadata_only",
+    "canonical_sources_remain_authoritative",
+    "unknown_is_not_done",
+    "missing_evidence_is_not_pass",
+    "final_gate_is_single_release_authority"
+  ]
+}
