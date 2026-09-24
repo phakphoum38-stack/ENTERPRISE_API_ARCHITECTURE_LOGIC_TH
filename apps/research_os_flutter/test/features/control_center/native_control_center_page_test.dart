@@ -114,7 +114,7 @@ void main() {
 
   testWidgets('Main Final Audit renders snapshots and preserves deferred state',
       (tester) async {
-    const snapshot = NativeControlAuditSnapshot(
+    final snapshot = NativeControlAuditSnapshot(
       auditId: 'audit-test',
       observedAt: DateTime.utc(2026, 1, 1),
       status: 'DEFERRED',
