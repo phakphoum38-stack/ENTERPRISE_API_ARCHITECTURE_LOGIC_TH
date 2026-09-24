@@ -53,8 +53,10 @@ jobs:
 
       - name: Exact SHA
         shell: pwsh
+        env:
+          TARGET_SHA: ${{ github.sha }}
         run: |
-          if ((git rev-parse HEAD).Trim() -ne $env:GITHUB_SHA) { throw 'Source SHA mismatch.' }
+          if ((git rev-parse HEAD).Trim() -ne $env:TARGET_SHA) { throw 'Source SHA mismatch.' }
 
       - name: Python compile
         shell: pwsh
