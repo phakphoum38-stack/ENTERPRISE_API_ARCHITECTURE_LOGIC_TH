@@ -339,7 +339,7 @@ class _WorkspaceCard extends StatelessWidget {
         .replaceAll(RegExp(r'^-|-\$'), '');
     return Card(
       child: InkWell(
-        key: Key('home-workspace-\$slug'),
+        key: Key('home-workspace-$slug'),
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
