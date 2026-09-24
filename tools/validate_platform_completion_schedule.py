@@ -17,6 +17,7 @@ REQUIRED = {
  "control_center":"apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
  "final_gate":"current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
  "final_gate_validator":"tools/validate_research_os_unified_final_gate.py",
+ "final_gate_workflow":".github/workflows/research-os-unified-final-gate.yml",
 }
 def fail(message:str)->None:
  print(f"PLATFORM_SCHEDULE_COMPLETION=FAIL: {message}"); raise SystemExit(1)
@@ -39,12 +40,13 @@ def main()->None:
  service=(ROOT/REQUIRED["service"]).read_text(encoding="utf-8")
  control=(ROOT/REQUIRED["control_center"]).read_text(encoding="utf-8")
  gate=(ROOT/REQUIRED["final_gate"]).read_text(encoding="utf-8")
+ workflow=(ROOT/REQUIRED["final_gate_workflow"]).read_text(encoding="utf-8")
  if "class ScheduleGenerateTool" not in adapter or 'name = "schedule.generate"' not in adapter: fail("deterministic schedule generation boundary missing")
  if "/owner/schedule/previews/" not in service or "/confirm" not in service: fail("schedule preview/confirmation boundary missing")
  if "schedule_control" not in control or "RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT" not in control: fail("Control Center schedule projection missing")
  if "current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json" not in gate: fail("completion contract is not bound to Unified Final Gate")
- if "tools/validate_platform_completion_schedule.py" not in gate: fail("schedule completion validator is not bound to Unified Final Gate")
- if "tools/test_platform_completion_schedule.py" not in gate: fail("schedule completion test is not bound to Unified Final Gate")
+ if "tools/validate_platform_completion_schedule.py" not in workflow: fail("schedule completion validator is not bound to Unified Final Gate workflow")
+ if "tools/test_platform_completion_schedule.py" not in workflow: fail("schedule completion test is not bound to Unified Final Gate workflow")
  for marker in ('"release_authority": "SCHEDULE"','"authorization_authority": "SCHEDULE"','"execution_authority": "SCHEDULE"',"ScheduleScheduler"):
   if marker in adapter or marker in service: fail(f"duplicate scheduler authority marker found: {marker}")
  print("PLATFORM_SCHEDULE_COMPLETION=PASS")
