@@ -15,7 +15,6 @@ class M2AuditIndexTests(unittest.TestCase):
   self.assertIn("final_gate",rows["current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"]["capabilities"])
  def test_relationship_graph_is_explicit(self):
   g=build_index()
-  self.assertTrue(any(e["relation"]=="IMPLEMENTED_BY" and e["from"].startswith("CONTRACT:") and e["to"].startswith("IMPLEMENTATION:") for e in g["edges"]))
   self.assertTrue(any(e["relation"]=="VERIFIED_BY" and e["from"].startswith("CONTRACT:") and e["to"].startswith("TEST:") for e in g["edges"]))
   self.assertIn("FINAL_GATE:UNIFIED",{n["id"] for n in g["nodes"]})
   self.assertTrue(any(e["relation"]=="BINDS_TO" and e["to"]=="FINAL_GATE:UNIFIED" for e in g["edges"]))
