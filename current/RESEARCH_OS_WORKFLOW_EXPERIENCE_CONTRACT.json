@@ -1,0 +1,21 @@
+{
+  "contract_id": "research-os-workflow-experience-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Provide one canonical product workspace for observing the existing Workflow Engine orchestration lifecycle without creating a second runtime, queue, scheduler, or authority.",
+  "canonical_api": {
+    "list": "/v1/agents/orchestrations",
+    "detail": "/v1/agents/orchestrations/{run_id}",
+    "timeline": "/v1/agents/orchestrations/{run_id}/timeline"
+  },
+  "lifecycle": ["INTENT","VALIDATE","PREPARE","AUTHORIZE","EXECUTE","OBSERVE","EVIDENCE","COMPLETE","RECOVER"],
+  "supported_observations": ["run_id","objective","status","steps","attempt_count","timeline_events"],
+  "interaction_modes": ["OBSERVE","SIMULATION"],
+  "authority": {"descriptive_only": true, "may_execute": false, "may_authorize": false, "may_approve": false, "may_release": false, "may_merge": false, "release_authority": "FINAL_GATE"},
+  "invariants": ["existing_workflow_engine_remains_authoritative","existing_queue_remains_shared","existing_stateless_runner_remains_authoritative","workflow_observation_is_not_authorization","timeline_is_observation_not_history_rewrite","unknown_is_preserved","no_project_specific_runtime","no_duplicate_scheduler","no_duplicate_queue","no_duplicate_evidence_ledger"],
+  "project_binding": {"source": "ProjectRegistry", "rule": "The UI must not infer or fabricate a project association when the existing orchestration API does not return one."},
+  "bounds": {"max_runs_requested": 100, "max_timeline_events_displayed": 256},
+  "required_surfaces": ["apps/research_os_flutter/lib/src/features/workflows/workflow_experience_page.dart","apps/research_os_flutter/lib/src/api/research_os_api_client.dart","apps/research_os_flutter/lib/src/app_shell.dart","apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart"],
+  "required_tests": ["apps/research_os_flutter/test/workflow_experience_page_test.dart"],
+  "final_gate": "FINAL_GATE"
+}
