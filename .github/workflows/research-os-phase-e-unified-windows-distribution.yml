@@ -1,0 +1,211 @@
+name: Research OS Phase E Unified Windows Distribution
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/research-os-phase-e-unified-windows-distribution
+    paths:
+      - ".github/workflows/research-os-phase-e-unified-windows-distribution.yml"
+      - "apps/research_os_flutter/**"
+      - "apps/research_os_web/**"
+      - "owner_special/**"
+      - "tools/**"
+      - "v3/**"
+      - "current/**"
+      - "installer/research-os-unified.iss"
+      - "scripts/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - run: python tools/validate_phase_e_unified_windows_distribution.py
+      - env:
+          PYTHONPATH: .
+        run: python -m unittest tools.test_phase_e_unified_windows_distribution -v
+
+  build:
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Exact SHA
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD).Trim() -ne $env:GITHUB_SHA) { throw 'Source SHA mismatch.' }
+
+      - name: Python compile
+        shell: pwsh
+        run: |
+          python -m compileall -q tools owner_special v3
+          if ($LASTEXITCODE -ne 0) { throw 'Python compile failed.' }
+
+      - name: Build Research OS Flutter
+        shell: pwsh
+        run: |
+          $src = "$env:GITHUB_WORKSPACE\apps\research_os_flutter"
+          $w = "$env:RUNNER_TEMP\research-os-phase-e-flutter"
+          if (Test-Path $w) { Remove-Item $w -Recurse -Force }
+          New-Item -ItemType Directory -Force $w | Out-Null
+          Copy-Item "$src\*" $w -Recurse -Force
+          Set-Location $w
+          flutter config --enable-windows-desktop
+          flutter create --platforms=windows --project-name=research_os_flutter .
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows build failed.' }
+          $exe = "$w\build\windows\x64\runner\Release\research_os_flutter.exe"
+          if (-not (Test-Path $exe)) { throw 'Research OS executable missing.' }
+          $v = (Get-Item $exe).VersionInfo
+          if ($v.ProductName -ne 'Research OS') { throw 'Research OS ProductName mismatch.' }
+          if ($v.CompanyName -ne 'Research OS Team') { throw 'Research OS CompanyName mismatch.' }
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\phase-e\package\app" | Out-Null
+          Copy-Item "$w\build\windows\x64\runner\Release\*" "$env:GITHUB_WORKSPACE\phase-e\package\app" -Recurse -Force
+
+      - name: Build Owner Special
+        shell: pwsh
+        working-directory: owner_special/flutter_app
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Special Windows build failed.' }
+          if (-not (Test-Path 'build\windows\x64\runner\Release\research_os_owner_special.exe')) { throw 'Owner Special executable missing.' }
+
+      - name: Build services
+        shell: pwsh
+        run: |
+          dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o phase-e/service
+          dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o phase-e/owner-service
+          if ($LASTEXITCODE -ne 0) { throw 'Service publish failed.' }
+
+      - name: Stage unified package
+        shell: pwsh
+        run: |
+          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
+          New-Item -ItemType Directory -Force "$p\owner_special\app","$p\owner_special\research_os_friend","$p\owner_special\scripts","$p\tools","$p\v3","$p\current","$p\workflow","$p\platform\research_os_web","$p\assurance\aeos","$p\runtime\python","$p\service_host","$p\scripts" | Out-Null
+          Copy-Item "owner_special\flutter_app\build\windows\x64\runner\Release\*" "$p\owner_special\app" -Recurse -Force
+          Copy-Item "owner_special\research_os_friend\*" "$p\owner_special\research_os_friend" -Recurse -Force
+          Copy-Item "owner_special\scripts\*" "$p\owner_special\scripts" -Recurse -Force
+          Copy-Item "owner_special\OWNER_MANIFEST.json" "$p\owner_special\OWNER_MANIFEST.json" -Force
+          $env:GITHUB_SHA = (git rev-parse HEAD).Trim()
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath "$p\owner_special\app\research_os_owner_special.exe" -ExpectedManifestPath "$p\owner_special\OWNER_MANIFEST.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner identity gate failed.' }
+          Copy-Item "tools\*" "$p\tools" -Recurse -Force
+          Copy-Item "v3\*" "$p\v3" -Recurse -Force
+          Copy-Item "current\*" "$p\current" -Recurse -Force
+          Copy-Item "current\GENERATE_WORKFLOW_REGISTRY.yml","tools\validate_generate_orchestrator.py","tools\validate_v35_contract.py",".github\workflows\research-os-unified-final-gate.yml" "$p\workflow" -Force
+          Copy-Item "apps\research_os_web\*" "$p\platform\research_os_web" -Recurse -Force
+          Copy-Item "current\RESEARCH_OS_UNIFIED_FINAL_GATE.yml",".github\workflows\research-os-platform-surface-matrix.yml" "$p\platform" -Force
+          Copy-Item "tools\aeos\*" "$p\assurance\aeos" -Recurse -Force
+          Copy-Item "tools\lifecycle_evidence.py","tools\capability_e2e_binding.py" "$p\assurance" -Force
+          Copy-Item "scripts\research-os-service.ps1","scripts\start-research-os-local.ps1" "$p\scripts" -Force
+          Copy-Item "phase-e\service\*" "$p\service_host" -Recurse -Force
+          Copy-Item "phase-e\owner-service\*" "$p\service_host" -Recurse -Force
+          $py = (python -c "import sys; print(sys.base_prefix)").Trim()
+          Copy-Item "$py\*" "$p\runtime\python" -Recurse -Force
+          if (-not (Test-Path "$p\runtime\python\python.exe")) { throw 'Bundled Python missing.' }
+
+      - name: Manifest and package validation
+        shell: pwsh
+        run: |
+          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
+          $required = @(
+            "$p\app\research_os_flutter.exe",
+            "$p\owner_special\app\research_os_owner_special.exe",
+            "$p\owner_special\OWNER_MANIFEST.json",
+            "$p\owner_special\research_os_friend",
+            "$p\owner_special\scripts",
+            "$p\tools",
+            "$p\v3",
+            "$p\current",
+            "$p\workflow",
+            "$p\platform\research_os_web",
+            "$p\assurance\aeos",
+            "$p\runtime\python\python.exe",
+            "$p\service_host\ResearchOS.ServiceHost.exe",
+            "$p\service_host\ResearchOS.Owner.ServiceHost.exe",
+            "$p\scripts\research-os-service.ps1"
+          )
+          foreach ($x in $required) { if (-not (Test-Path $x)) { throw "Missing distribution component: $x" } }
+          $entries = foreach ($f in Get-ChildItem $p -Recurse -File | Sort-Object FullName) {
+            [ordered]@{
+              path = $f.FullName.Substring($p.Length + 1).Replace('\','/')
+              sha256 = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              bytes = $f.Length
+            }
+          }
+          [ordered]@{
+            schema_version = 1
+            distribution = 'Research OS Unified Windows'
+            source_sha = (git rev-parse HEAD).Trim()
+            product_name = 'Research OS'
+            company_name = 'Research OS Team'
+            main_executable = 'app/research_os_flutter.exe'
+            owner_executable = 'owner_special/app/research_os_owner_special.exe'
+            file_count = @($entries).Count
+            files = @($entries)
+          } | ConvertTo-Json -Depth 8 | Set-Content "$p\DISTRIBUTION_MANIFEST.json" -Encoding utf8
+          $mh = (Get-FileHash "$p\DISTRIBUTION_MANIFEST.json" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$mh  DISTRIBUTION_MANIFEST.json" | Set-Content "$p\DISTRIBUTION_MANIFEST.sha256" -Encoding ascii
+          Write-Host 'RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION=PASS'
+
+      - name: Build unified installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          & $iscc "$env:GITHUB_WORKSPACE\installer\research-os-unified.iss"
+          if ($LASTEXITCODE -ne 0) { throw 'Unified installer build failed.' }
+
+      - name: Package and hash distribution
+        shell: pwsh
+        run: |
+          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\installer\output\Research-OS-Unified-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw 'Unified installer missing.' }
+          $sha = (git rev-parse HEAD).Trim()
+          $zip = "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Unified-Windows-x64-$sha.zip"
+          Compress-Archive -Path "$p\*","$($setup.FullName)" -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
+          [ordered]@{source_sha=$sha; artifact=(Split-Path $zip -Leaf); artifact_sha256=$hash; release_authority='FINAL_GATE'} | ConvertTo-Json | Set-Content "$env:GITHUB_WORKSPACE\phase-e\RELEASE_EVIDENCE.json" -Encoding utf8
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Research-OS-Unified-Windows-x64
+          path: |
+            phase-e/Research-OS-Unified-Windows-x64-*.zip
+            phase-e/Research-OS-Unified-Windows-x64-*.zip.sha256
+            phase-e/RELEASE_EVIDENCE.json
+            phase-e/package/DISTRIBUTION_MANIFEST.json
+            phase-e/package/DISTRIBUTION_MANIFEST.sha256
+            installer/output/Research-OS-Unified-Setup-*-x64.exe
+          if-no-files-found: error
+          retention-days: 30
