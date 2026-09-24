@@ -57,6 +57,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_PRODUCTION_HARDENING_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_PRODUCTION_COMPLETION_CONTRACT.json
   - current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
