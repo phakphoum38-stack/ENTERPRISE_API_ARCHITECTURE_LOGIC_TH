@@ -412,6 +412,35 @@
         "assurance",
         "unified_final_gate"
       ]
+    },
+    {
+      "id": "owner_experience_platform",
+      "canonical": "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json",
+      "kind": "EXPERIENCE_PLATFORM",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "navigation",
+        "control_center",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json",
+        "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_owner_experience_platform.py",
+        "apps/research_os_flutter/test/owner_experience_page_test.dart",
+        "apps/research_os_flutter/test/platform_surface_parity_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
+        "owner_special/OWNER_MANIFEST.json"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ]
     }
   ],
   "rules": [
