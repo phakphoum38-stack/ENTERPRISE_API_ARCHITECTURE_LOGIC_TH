@@ -10,7 +10,12 @@
     "current/RESEARCH_OS_100_PROJECT_READINESS_CONTRACT.json",
     "current/CANONICAL_PLATFORM_CONTRACT.yml"
   ],
-  "scale_levels": [10, 20, 50, 100],
+  "scale_levels": [
+    10,
+    20,
+    50,
+    100
+  ],
   "required_invariants": [
     "real_project_registry_definitions",
     "shared_execution_plane",
@@ -27,7 +32,9 @@
     "same_version_overwrite_is_rejected",
     "alternate_version_branching_is_preserved",
     "terminal_execution_is_complete_or_recover",
-    "single_final_gate"
+    "single_final_gate",
+    "concurrent_shared_execution",
+    "concurrent_project_evidence_isolated"
   ],
   "proof": {
     "implementation": "tools/project_scale_execution.py",
@@ -37,7 +44,17 @@
     "new_queue_forbidden": true,
     "new_evidence_ledger_forbidden": true,
     "new_authorization_authority_forbidden": true,
-    "new_release_authority_forbidden": true
+    "new_release_authority_forbidden": true,
+    "concurrency": "bounded_thread_pool_over_existing_shared_execution_and_evidence_planes"
   },
-  "release_authority": "FINAL_GATE"
+  "release_authority": "FINAL_GATE",
+  "scale_test": {
+    "concurrency_model": "bounded_shared_core",
+    "concurrency_levels": [
+      10,
+      20,
+      50,
+      100
+    ]
+  }
 }
