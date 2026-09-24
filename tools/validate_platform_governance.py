@@ -109,8 +109,7 @@ def main() -> int:
     failures = validate()
     if failures:
         print("RESEARCH_OS_PLATFORM_GOVERNANCE=FAIL")
-        print("
-".join(failures))
+        print(*failures, sep="\\n")
         return 1
     print("RESEARCH_OS_PLATFORM_GOVERNANCE=PASS")
     print("AUTHORITY_MODEL=DESCRIPTIVE_VALIDATING")
