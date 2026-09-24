@@ -60,6 +60,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json
   - current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_COMPLETE_1_12_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
