@@ -127,6 +127,9 @@ jobs:
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Phase C capability E2E binding
+        run: python -m unittest tools.test_capability_delegation tools.test_lifecycle_evidence tools.test_capability_e2e_binding -v
+
       - name: Evaluate required results
         env:
           CONTRACT: ${{ needs.contract.result }}
