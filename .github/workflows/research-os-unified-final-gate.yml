@@ -135,11 +135,15 @@ jobs:
         run: |
           python tools/platform_core_completion.py
           python -m unittest tools.test_platform_core_completion -v
-      - name: Project template and Project 001
+      - name: Project lifecycle and runtime evidence
         env:
           PYTHONPATH: .
         run: |
-          python -m unittest tools.test_project_registry -v
+          python -m unittest \
+            tools.test_project_registry \
+            tools.test_project_execution \
+            tools.test_runtime_evidence \
+            -v
 
   decision:
     name: Unified release decision
