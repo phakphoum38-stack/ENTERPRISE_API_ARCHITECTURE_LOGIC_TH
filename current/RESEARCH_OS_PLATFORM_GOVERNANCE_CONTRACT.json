@@ -17,7 +17,8 @@
     "risk_control": "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
     "change_impact_control": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
     "control_center_contract": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
-    "universal_runner": "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json"
+    "universal_runner": "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
+    "runner_installation": "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json"
   },
   "authority": {
     "governance_mode": "DESCRIPTIVE_AND_VALIDATING",
@@ -64,6 +65,11 @@
       "domain": "universal_runner",
       "canonical": "tools/research_os_api/universal_runner.py",
       "role": "CAPABILITY_AND_LIFECYCLE_COMPATIBILITY_ADAPTER"
+    },
+    {
+      "domain": "runner_installation",
+      "canonical": "tools/research_os_api/runner_installer.py",
+      "role": "VERIFIED_INSTALLATION_AND_BOOTSTRAP_ADAPTER"
     }
   ],
   "component_lifecycle": [
@@ -288,6 +294,17 @@
       "components": [
         "universal_runner",
         "memory_fabric"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/research_os_api/runner_installer.py",
+      "components": [
+        "runner_installation",
+        "universal_runner"
       ],
       "gates": [
         "assurance",

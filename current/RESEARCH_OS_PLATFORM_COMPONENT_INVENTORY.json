@@ -387,6 +387,31 @@
         "assurance",
         "unified_final_gate"
       ]
+    },
+    {
+      "id": "runner_installation",
+      "canonical": "tools/research_os_api/runner_installer.py",
+      "kind": "INSTALLATION_AND_BOOTSTRAP_ADAPTER",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "universal_runner",
+        "memory_fabric"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
+        "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_runner_installer.py"
+      ],
+      "evidence": [
+        "tools/research_os_api/runner_installer.py",
+        "docs/RESEARCH_OS_RUNNER_INSTALLATION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
     }
   ],
   "rules": [
@@ -397,6 +422,8 @@
     "final_gate_is_single_release_authority",
     "nvme_is_storage_backed_memory_not_dram",
     "unknown_hardware_capability_is_not_available",
-    "unknown_runner_capability_is_not_available"
+    "unknown_runner_capability_is_not_available",
+    "cloud_drive_is_distribution_not_runtime",
+    "verified_package_required_before_install"
   ]
 }
