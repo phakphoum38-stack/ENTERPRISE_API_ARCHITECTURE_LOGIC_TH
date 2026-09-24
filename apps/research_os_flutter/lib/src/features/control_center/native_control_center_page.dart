@@ -157,7 +157,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     final hasDeferred = checks.any((item) => item['state'] == 'DEFERRED');
     final now = DateTime.now().toUtc();
     final snapshot = NativeControlAuditSnapshot(
-      auditId: 'audit-\${now.millisecondsSinceEpoch}',
+      auditId: 'audit-${now.millisecondsSinceEpoch}',
       observedAt: now,
       status: hasFail ? 'FAIL' : (hasDeferred ? 'DEFERRED' : 'PASS'),
       checks: checks,
@@ -166,7 +166,7 @@ class _NativeControlCenterPageState extends State<NativeControlCenterPage>
     setState(() {
       _auditSnapshots.insert(0, snapshot);
       if (_auditSnapshots.length > 20) _auditSnapshots.removeLast();
-      _events.insert(0, 'Main Final Audit captured: \${snapshot.status}');
+      _events.insert(0, 'Main Final Audit captured: ${snapshot.status}');
     });
     _tabs.animateTo(5);
   }
