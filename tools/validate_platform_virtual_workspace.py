@@ -2,7 +2,7 @@
 """Fail-closed validator for the metadata-only Platform Virtual Workspace."""
 import argparse,hashlib,json,sys
 from pathlib import Path
-C={"FOUNDATION","INTEGRATION","EVOLUTION","FEDERATION","RESOURCE","SECURITY","RELEASE","OPERATIONS"}
+C={"FOUNDATION","INTEGRATION","EVOLUTION","FEDERATION","RESOURCE","SECURITY","RELEASE","OPERATIONS","CONTROL"}
 S={"PLANNED","IN_PROGRESS","BLOCKED","HOLD","UNKNOWN","DONE","SUPERSEDED"}
 R={"FOUND","PARTIAL","GAP","UNKNOWN"}
 def validate(contract,registry):
