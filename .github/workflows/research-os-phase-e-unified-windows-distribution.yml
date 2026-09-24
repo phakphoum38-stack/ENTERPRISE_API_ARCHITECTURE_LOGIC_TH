@@ -65,14 +65,14 @@ jobs:
       - name: Build Research OS Flutter
         shell: pwsh
         run: |
-          $src = "$env:GITHUB_WORKSPACE\apps\research_os_flutter"
-          $w = "$env:RUNNER_TEMP\research-os-phase-e-flutter"
-          if (Test-Path $w) { Remove-Item $w -Recurse -Force }
-          New-Item -ItemType Directory -Force $w | Out-Null
-          Copy-Item "$src\*" $w -Recurse -Force
+          $repoWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-phase-e-windows'
+          & "$env:GITHUB_WORKSPACE\tools\ci\prepare_flutter_isolated_workspace.ps1" -RepositoryRoot $env:GITHUB_WORKSPACE -AppRelativePath 'apps/research_os_flutter' -WorkspaceRoot $repoWorkspace
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter workspace preparation failed.' }
+          $w = Join-Path $repoWorkspace 'apps\research_os_flutter'
           Set-Location $w
           flutter config --enable-windows-desktop
           flutter create --platforms=windows --project-name=research_os_flutter .
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows bootstrap failed.' }
           flutter pub get
           flutter analyze
           flutter test
