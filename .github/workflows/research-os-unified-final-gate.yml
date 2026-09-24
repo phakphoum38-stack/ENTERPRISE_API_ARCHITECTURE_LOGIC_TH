@@ -144,6 +144,11 @@ jobs:
             tools.test_project_execution \
             tools.test_runtime_evidence \
             -v
+      - name: Project scale execution and conflict proof
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest tools.test_project_scale_execution -v
 
   decision:
     name: Unified release decision

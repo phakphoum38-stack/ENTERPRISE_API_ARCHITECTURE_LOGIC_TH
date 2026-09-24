@@ -19,6 +19,9 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PROJECT_TEMPLATE_CONTRACT.json",
     "current/RESEARCH_OS_PROJECT_001.json",
     "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json",
+    "current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json",
+    "tools/project_scale_execution.py",
+    "tools/test_project_scale_execution.py",
     "tools/project_execution.py",
     "tools/test_project_execution.py",
     "tools/runtime_evidence.py",
@@ -66,6 +69,7 @@ def main() -> None:
         "current/RESEARCH_OS_PROJECT_TEMPLATE_CONTRACT.json",
         "current/RESEARCH_OS_PROJECT_001.json",
         "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json",
+        "current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
             fail(f"required completion contract is not bound: {contract_ref}")
