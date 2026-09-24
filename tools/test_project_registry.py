@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 
 from tools.project_registry import (
     FINAL_GATE,
@@ -17,6 +19,25 @@ from tools.project_registry import (
 class ProjectRegistryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.registry = ProjectRegistry((PROJECT_001,))
+
+    def test_project_template_contract_and_reference_match_registry(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        contract = json.loads(
+            (root / "current/RESEARCH_OS_PROJECT_TEMPLATE_CONTRACT.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        reference = json.loads(
+            (root / "current/RESEARCH_OS_PROJECT_001.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(contract["status"], "ACTIVE")
+        self.assertEqual(
+            contract["reference_project"],
+            "current/RESEARCH_OS_PROJECT_001.json",
+        )
+        self.assertEqual(reference["project_id"], PROJECT_001.project_id)
+        self.assertEqual(reference["version"], PROJECT_001.version)
+        self.assertEqual(tuple(reference["capabilities"]), PROJECT_001.capabilities)
 
     def test_project_001_is_reference_configuration(self) -> None:
         project = self.registry.get("project-001")
