@@ -118,8 +118,18 @@ jobs:
 
       - name: Research OS tests
         env:
-          PYTHONPATH: v3
+          PYTHONPATH: .:v3
         run: python -m unittest discover -s v3/tests -p 'test_*.py' -v
+
+      - name: Phase C capability E2E binding
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest \
+            tools.test_capability_delegation \
+            tools.test_lifecycle_evidence \
+            tools.test_capability_e2e_binding \
+            -v
 
   decision:
     name: Unified release decision
@@ -127,9 +137,6 @@ jobs:
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Phase C capability E2E binding
-        run: PYTHONPATH=. python -m unittest tools.test_capability_delegation tools.test_lifecycle_evidence tools.test_capability_e2e_binding -v
-
       - name: Evaluate required results
         env:
           CONTRACT: ${{ needs.contract.result }}
