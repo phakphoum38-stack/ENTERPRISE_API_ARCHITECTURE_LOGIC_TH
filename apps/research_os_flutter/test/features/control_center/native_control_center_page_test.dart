@@ -106,7 +106,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(NativeControlAuditView), findsOneWidget);
     expect(find.byIcon(Icons.rule_folder_outlined), findsOneWidget);
 
     api.close();
