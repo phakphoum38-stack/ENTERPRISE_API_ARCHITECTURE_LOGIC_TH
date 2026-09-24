@@ -22,12 +22,18 @@ def main() -> None:
     navigation = ROOT / "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart"
     assert shell.is_file(), "canonical app shell is missing"
     assert navigation.is_file(), "canonical navigation registry is missing"
+    shell_text = shell.read_text(encoding="utf-8")
+    navigation_text = navigation.read_text(encoding="utf-8")
 
     for label, index, implementation, shell_ref in surfaces:
         implementation_path = ROOT / implementation
         assert implementation_path.is_file(), f"{label}: missing implementation {implementation}"
         assert shell_ref == "apps/research_os_flutter/lib/src/app_shell.dart"
-        assert f"index: {index}" not in shell.read_text(encoding="utf-8") or True
+        assert implementation_path.stem in shell_text, f"{label}: implementation is not wired in app shell"
+
+    assert "const researchNavigationItems" in navigation_text
+    assert "Control Center" in navigation_text
+    assert "capabilityId: 'control_center'" in navigation_text
 
     for path in (
         payload["non_surface_bindings"]["control_center_audit"],
@@ -37,7 +43,7 @@ def main() -> None:
 
     assert payload["authority"]["descriptive_only"] is True
     assert payload["authority"]["release_authority"] == "FINAL_GATE"
-    assert "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint" in payload["next_product_gaps"]
+    assert "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint is exposed by ResearchOSApiClient yet; do not fabricate project telemetry." in payload["next_product_gaps"]
     print("PRODUCT_SURFACE_INVENTORY=PASS")
     print("CANONICAL_DESTINATIONS=15")
     print("AUTHORITY=DESCRIPTIVE_ONLY")
