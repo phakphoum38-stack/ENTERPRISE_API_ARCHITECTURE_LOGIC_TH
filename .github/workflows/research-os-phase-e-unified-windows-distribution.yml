@@ -78,6 +78,28 @@ jobs:
           flutter config --enable-windows-desktop
           flutter create --platforms=windows --project-name=research_os_flutter .
           if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows bootstrap failed.' }
+
+          # flutter create regenerates Windows runner metadata, so apply the
+          # canonical Research OS identity before the release build.
+          $mainCpp = 'windows\runner\main.cpp'
+          $mainText = Get-Content $mainCpp -Raw
+          $mainText = $mainText -replace 'Create\(L"research_os_flutter"', 'Create(L"Research OS"'
+          Set-Content -Path $mainCpp -Value $mainText -Encoding utf8
+
+          $runnerRc = 'windows\runner\Runner.rc'
+          $rc = Get-Content $runnerRc -Raw
+          $rc = $rc -replace 'VALUE "CompanyName", ".*?"', 'VALUE "CompanyName", "Research OS Team"'
+          $rc = $rc -replace 'VALUE "FileDescription", ".*?"', 'VALUE "FileDescription", "Research OS"'
+          $rc = $rc -replace 'VALUE "InternalName", ".*?"', 'VALUE "InternalName", "ResearchOS"'
+          $rc = $rc -replace 'VALUE "OriginalFilename", ".*?"', 'VALUE "OriginalFilename", "research_os_flutter.exe"'
+          $rc = $rc -replace 'VALUE "ProductName", ".*?"', 'VALUE "ProductName", "Research OS"'
+          Set-Content -Path $runnerRc -Value $rc -Encoding utf8
+
+          $verifyRc = Get-Content $runnerRc -Raw
+          if ($verifyRc -notmatch 'VALUE "ProductName", "Research OS"') { throw 'Research OS ProductName branding was not applied.' }
+          if ($verifyRc -notmatch 'VALUE "CompanyName", "Research OS Team"') { throw 'Research OS CompanyName branding was not applied.' }
+          if ($verifyRc -match 'research_os_owner_special') { throw 'Owner Special identity leaked into Research OS Runner.rc.' }
+
           flutter pub get
           flutter analyze
           flutter test
