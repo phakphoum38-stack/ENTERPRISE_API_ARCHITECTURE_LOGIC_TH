@@ -53,6 +53,49 @@ jobs:
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           echo "SOURCE_IDENTITY=PASS"
 
+  aeos_recheck:
+    name: AEOS assurance recheck for exact target
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Verify exact target SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "AEOS_TARGET_SHA=$actual"
+      - name: Execute existing AEOS Master Assurance
+        env:
+          AEOS_EXPECTED_SHA: ${{ env.TARGET_SHA }}
+          AEOS_ASSURANCE_RUN_ID: unified-final-gate-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          python tools/aeos_master_assurance.py --output aeos_master_assurance_manifest.json
+      - name: Bind existing AEOS evidence to Unified Final Gate
+        if: always()
+        run: |
+          set -euo pipefail
+          python tools/validate_aeos_final_gate_binding.py \
+            --manifest aeos_master_assurance_manifest.json \
+            --expected-sha "$TARGET_SHA"
+      - name: Upload AEOS recheck evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: research-os-unified-final-gate-aeos-${{ env.TARGET_SHA }}
+          path: aeos_master_assurance_manifest.json
+          if-no-files-found: error
+          retention-days: 30
   flutter_surface:
     name: Shared Flutter application surface
     needs: contract
@@ -177,7 +220,7 @@ jobs:
 
   decision:
     name: Unified release decision
-    needs: [contract, flutter_surface, python_surface]
+    needs: [contract, aeos_recheck, flutter_surface, python_surface]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -186,13 +229,16 @@ jobs:
           CONTRACT: ${{ needs.contract.result }}
           FLUTTER_SURFACE: ${{ needs.flutter_surface.result }}
           PYTHON_SURFACE: ${{ needs.python_surface.result }}
+          AEOS_RECHECK: ${{ needs.aeos_recheck.result }}
         run: |
           set -euo pipefail
           printf 'contract=%s\n' "$CONTRACT"
           printf 'flutter_surface=%s\n' "$FLUTTER_SURFACE"
           printf 'python_surface=%s\n' "$PYTHON_SURFACE"
+          printf 'aeos_recheck=%s\n' "$AEOS_RECHECK"
           test "$CONTRACT" = success
           test "$FLUTTER_SURFACE" = success
           test "$PYTHON_SURFACE" = success
+          test "$AEOS_RECHECK" = success
           echo "RESEARCH_OS_UNIFIED_FINAL_GATE=PASS"
           echo "RELEASE_AUTHORITY=FINAL_GATE"
