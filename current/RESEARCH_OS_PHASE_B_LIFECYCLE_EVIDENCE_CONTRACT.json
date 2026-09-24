@@ -11,6 +11,7 @@
     "target_sha",
     "workflow_run_id",
     "contract_version",
+    "project_id",
     "fingerprint"
   ],
   "lifecycle": [
@@ -29,6 +30,7 @@
     "evidence_is_append_only",
     "source_sha_must_match",
     "correlation_id_must_match",
+    "project_id_must_match_when_project_scoped",
     "unknown_state_stops",
     "recovery_requires_explicit_reason",
     "terminal_state_must_be_complete_or_recover",
