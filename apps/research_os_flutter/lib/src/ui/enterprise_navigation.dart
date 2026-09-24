@@ -6,6 +6,7 @@ class ResearchNavItem {
     this.label,
     this.icon,
     this.index, {
+    this.destinationId,
     this.capabilityId,
   });
 
@@ -13,6 +14,7 @@ class ResearchNavItem {
   final String label;
   final IconData icon;
   final int index;
+  final String destinationId;
 
   /// Canonical cross-layer capability identity when this destination is
   /// already bound to an existing capability contract. Null means the
@@ -22,28 +24,29 @@ class ResearchNavItem {
 }
 
 const researchNavigationItems = <ResearchNavItem>[
-  ResearchNavItem('Workspace', 'Home', Icons.dashboard_outlined, 0),
-  ResearchNavItem('Workspace', 'AI Chat', Icons.chat_bubble_outline, 1),
-  ResearchNavItem('Workspace', 'Agent Center', Icons.smart_toy_outlined, 2),
-  ResearchNavItem('AI', 'Brain Skills', Icons.psychology_alt_outlined, 11),
-  ResearchNavItem('Knowledge', 'Library', Icons.local_library_outlined, 3),
-  ResearchNavItem('Knowledge', 'Knowledge Graph', Icons.hub_outlined, 4),
-  ResearchNavItem('Connections', 'GitHub', Icons.account_tree_outlined, 5),
-  ResearchNavItem('Connections', 'Google Workspace', Icons.apps_outlined, 6),
-  ResearchNavItem('Connections', 'Friend Connect', Icons.support_agent_outlined, 13),
-  ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7),
-  ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8),
-  ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
-  ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
-  ResearchNavItem('Account', 'Google Sign-In', Icons.account_circle_outlined, 12),
-  ResearchNavItem('Workspace', 'Projects', Icons.workspaces_outlined, 14),
-  ResearchNavItem('Workspace', 'Workflows', Icons.account_tree_outlined, 15),
+  ResearchNavItem('Workspace', 'Home', Icons.dashboard_outlined, 0, destinationId: 'home'),
+  ResearchNavItem('Workspace', 'AI Chat', Icons.chat_bubble_outline, 1, destinationId: 'ai_chat'),
+  ResearchNavItem('Workspace', 'Agent Center', Icons.smart_toy_outlined, 2, destinationId: 'agent_center'),
+  ResearchNavItem('AI', 'Brain Skills', Icons.psychology_alt_outlined, 11, destinationId: 'brain_skills'),
+  ResearchNavItem('Knowledge', 'Library', Icons.local_library_outlined, 3, destinationId: 'library'),
+  ResearchNavItem('Knowledge', 'Knowledge Graph', Icons.hub_outlined, 4, destinationId: 'knowledge_graph'),
+  ResearchNavItem('Connections', 'GitHub', Icons.account_tree_outlined, 5, destinationId: 'github'),
+  ResearchNavItem('Connections', 'Google Workspace', Icons.apps_outlined, 6, destinationId: 'google_workspace'),
+  ResearchNavItem('Connections', 'Friend Connect', Icons.support_agent_outlined, 13, destinationId: 'friend_connect'),
+  ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7, destinationId: 'local_api_service'),
+  ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8, destinationId: 'system_monitor'),
+  ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9, destinationId: 'settings'),
+  ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10, destinationId: 'developer_access'),
+  ResearchNavItem('Account', 'Google Sign-In', Icons.account_circle_outlined, 12, destinationId: 'google_sign_in'),
+  ResearchNavItem('Workspace', 'Projects', Icons.workspaces_outlined, 14, destinationId: 'projects'),
+  ResearchNavItem('Workspace', 'Workflows', Icons.account_tree_outlined, 15, destinationId: 'workflows'),
   ResearchNavItem(
     'Control',
     'Control Center',
     Icons.tune_outlined,
     16,
     capabilityId: 'control_center',
+    destinationId: 'control_center',
   ),
   ResearchNavItem(
     'System',
@@ -51,6 +54,7 @@ const researchNavigationItems = <ResearchNavItem>[
     Icons.shield_outlined,
     17,
     capabilityId: 'owner',
+    destinationId: 'owner',
   ),
 ];
 
