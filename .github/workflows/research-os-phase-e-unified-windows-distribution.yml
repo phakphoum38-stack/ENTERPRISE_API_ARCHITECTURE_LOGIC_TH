@@ -19,6 +19,9 @@ on:
 permissions:
   contents: read
 
+env:
+  TARGET_SHA: ${{ github.sha }}
+
 jobs:
   validate:
     runs-on: ubuntu-latest
