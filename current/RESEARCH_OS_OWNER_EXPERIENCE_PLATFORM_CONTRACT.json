@@ -1,0 +1,92 @@
+{
+  "contract_id": "research-os-owner-experience-platform-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "plane": "EXPERIENCE",
+  "purpose": "Converge Owner UI, Owner Special runtime boundaries, navigation, and cross-platform surface identity into one platform contract without creating duplicate runtime, authorization, navigation, evidence, or release authorities.",
+  "canonical": {
+    "product_ui_root": "apps/research_os_flutter",
+    "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+    "owner_surface": "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
+    "ios_source": "apps/research_os_flutter/ios",
+    "windows_source": "apps/research_os_flutter/windows",
+    "web_source": "apps/research_os_flutter/web"
+  },
+  "owner": {
+    "identity_source": "/v1/auth/status",
+    "role": "OWNER",
+    "highest_privilege": true,
+    "resource_or_scope_bound": false,
+    "client_may_grant_authority": false,
+    "ui_may_authorize": false,
+    "ui_may_execute": false,
+    "ui_may_approve": false,
+    "ui_may_release": false
+  },
+  "owner_special": {
+    "runtime_root": "owner_special",
+    "runtime_boundary": "owner_special/flutter_app",
+    "canonical_product_ui": false,
+    "purpose": "existing runtime, Friend service, native integration, Windows identity and installer boundary",
+    "compatibility_surface": true,
+    "separate_navigation_authority": false,
+    "separate_release_authority": false
+  },
+  "navigation": {
+    "single_source_of_truth": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+    "desktop_and_mobile_share_registry": true,
+    "platform_specific_registry_forbidden": true,
+    "semantic_v5_routes_are_projection_only": true,
+    "integer_indexes_are_compatibility_only": true
+  },
+  "cross_platform": {
+    "windows": true,
+    "web": true,
+    "ios": true,
+    "same_product_surface_contract": true,
+    "platform_adapters_may_differ": true,
+    "platform_navigation_may_not_diverge": true
+  },
+  "ios_reconciliation": {
+    "canonical_source": "apps/research_os_flutter/ios",
+    "owner_special_ios_source": null,
+    "owner_special_ios_workflow": "reconciliation_guard_only",
+    "legacy_owner_special_ios_build_forbidden": true,
+    "missing_owner_special_ios_source_is_not_an_error": true
+  },
+  "ui_states": [
+    "LOADING",
+    "OBSERVED",
+    "UNKNOWN",
+    "ERROR",
+    "EMPTY",
+    "DEFERRED"
+  ],
+  "fail_closed": {
+    "unknown_is_not_pass": true,
+    "deferred_is_not_pass": true,
+    "missing_canonical_ui_is_stop": true,
+    "navigation_drift_is_stop": true,
+    "stale_owner_special_ios_reference_is_stop": true
+  },
+  "authority": {
+    "final_gate_is_single_release_authority": true,
+    "evidence_is_not_authority": true,
+    "observation_is_not_authorization": true,
+    "owner_special_remains_runtime_boundary": true,
+    "no_new_runtime": true,
+    "no_new_authorization_authority": true,
+    "no_new_navigation_registry": true,
+    "no_new_evidence_ledger": true,
+    "no_new_release_authority": true
+  },
+  "proof": {
+    "validator": "tools/validate_owner_experience_platform.py",
+    "test": "tools/test_owner_experience_platform.py",
+    "owner_flutter_test": "apps/research_os_flutter/test/owner_experience_page_test.dart",
+    "surface_parity_test": "apps/research_os_flutter/test/platform_surface_parity_test.dart",
+    "owner_special_manifest": "owner_special/OWNER_MANIFEST.json",
+    "ios_workflow": ".github/workflows/research-os-ios-ipa.yml",
+    "ios_reconciliation_workflow": ".github/workflows/owner-special-ios-ipa.yml"
+  }
+}
