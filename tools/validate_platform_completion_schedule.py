@@ -46,7 +46,7 @@ def main()->None:
  if "schedule_control" not in control or "RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT" not in control: fail("Control Center schedule projection missing")
  if "current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json" not in gate: fail("completion contract is not bound to Unified Final Gate")
  if "tools/validate_platform_completion_schedule.py" not in workflow: fail("schedule completion validator is not bound to Unified Final Gate workflow")
- if "tools/test_platform_completion_schedule.py" not in workflow: fail("schedule completion test is not bound to Unified Final Gate workflow")
+ if "tools.test_platform_completion_schedule" not in workflow: fail("schedule completion test is not bound to Unified Final Gate workflow")
  for marker in ('"release_authority": "SCHEDULE"','"authorization_authority": "SCHEDULE"','"execution_authority": "SCHEDULE"',"ScheduleScheduler"):
   if marker in adapter or marker in service: fail(f"duplicate scheduler authority marker found: {marker}")
  print("PLATFORM_SCHEDULE_COMPLETION=PASS")
