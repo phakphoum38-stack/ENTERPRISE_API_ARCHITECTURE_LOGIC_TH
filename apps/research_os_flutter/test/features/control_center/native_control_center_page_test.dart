@@ -92,4 +92,34 @@ void main() {
 
     api.close();
   });
+
+  testWidgets('Main Final Audit is available inside the existing Control Center',
+      (tester) async {
+    final api = ResearchOSApiClient(
+      baseUrl: 'http://127.0.0.1:8787',
+      client: _FakeClient(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: NativeControlCenterPage(apiClient: api)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Audit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Main Final Audit'), findsOneWidget);
+    expect(find.text('Run Audit'), findsOneWidget);
+
+    await tester.tap(find.text('Run Audit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Latest: DEFERRED'), findsOneWidget);
+    expect(find.text('Offline package audit'), findsOneWidget);
+    expect(find.text('Installed baseline'), findsOneWidget);
+    expect(find.text('Release authority decision'), findsOneWidget);
+    expect(find.text('Export Audit JSON'), findsOneWidget);
+
+    api.close();
+  });
 }
