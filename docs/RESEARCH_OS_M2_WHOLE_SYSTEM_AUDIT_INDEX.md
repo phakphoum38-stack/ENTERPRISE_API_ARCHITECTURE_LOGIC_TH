@@ -13,6 +13,7 @@ M.2 is the descriptive repository-wide audit/index layer. This update keeps the 
 - source SHA, node identity and dangling-edge integrity
 - non-vacuous contract-to-test and contract-to-implementation linkage checks; integrity cannot pass merely because the candidate relationship set is empty
 - final-gate authority node existence is validated against the canonical contract file, rather than synthesized unconditionally
+- required contract and workflow inventory is reconciled against the canonical Unified Final Gate `required_contracts` and `required_workflows` lists; missing anchors fail M.2 integrity
 
 The graph reuses existing repository authorities; it does not create a second Platform Graph, runtime, scheduler, authorization service, evidence authority, or release authority.
 
