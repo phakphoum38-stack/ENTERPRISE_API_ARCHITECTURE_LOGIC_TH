@@ -36,7 +36,7 @@ REQUIRED_PACKAGE_PATHS = {
 }
 
 
-def validate(root: Path = ROOT) -> tuple[str, ...]:
+def _read_phase_e_workflow(root: Path) -> str:\n    return (root / ".github/workflows/research-os-phase-e-unified-windows-distribution.yml").read_text(encoding="utf-8")\n\n\ndef _read_unified_final_gate(root: Path) -> str:\n    return (root / ".github/workflows/research-os-unified-final-gate.yml").read_text(encoding="utf-8")\n\n\ndef validate(root: Path = ROOT) -> tuple[str, ...]:
     errors: list[str] = []
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
 
@@ -82,7 +82,7 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
     for marker in (
         "TARGET_SHA",
         "Research-OS-Unified-Windows-x64",
-        "SHA256SUMS.txt",
+        "DISTRIBUTION_MANIFEST.sha256",
         "RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION",
         "research_os_owner_special.exe",
         "runtime\\python\\python.exe",
