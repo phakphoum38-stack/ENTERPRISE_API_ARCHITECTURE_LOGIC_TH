@@ -30,6 +30,7 @@ from github_status import GitHubStatusError, dashboard as github_dashboard
 from google_identity import GoogleIdentityBroker
 from google_oauth import GoogleOAuthBroker, GoogleOAuthError
 from google_workspace import GoogleWorkspaceConfig, get_google_workspace_dashboard
+from server_auth_routes import auth_provider_handoff
 from identity_providers import provider_catalog
 from identity_context import resolve_identity_context
 from memory import build_context, search_memory
@@ -310,11 +311,15 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
                     return
                 redirect_uri = self._multi_login_redirect(provider)
-                _, authorization_url = begin_runtime_login(provider, redirect_uri)
-                self._send(HTTPStatus.OK, {"provider": provider, "authorization_url": authorization_url, "redirect_uri": redirect_uri, "token_storage": "backend_only"})
+                state, authorization_url = begin_runtime_login(provider, redirect_uri)
+                self._send(HTTPStatus.OK, {"provider": provider, "state": state, "authorization_url": authorization_url, "redirect_uri": redirect_uri, "token_storage": "backend_only"})
                 return
             if path == "/v1/auth/google/start":
                 self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
+                return
+            if path == "/v1/auth/providers/handoff":
+                handoff_state = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()
+                self._send(HTTPStatus.OK, auth_provider_handoff(handoff_state))
                 return
             if path == "/v1/auth/google/handoff":
                 handoff_code = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()

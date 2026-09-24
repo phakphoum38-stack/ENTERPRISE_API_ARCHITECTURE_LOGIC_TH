@@ -75,6 +75,7 @@ class GoogleOAuthBroker:
         return {
             "authorization_url": f"{AUTH_ENDPOINT}?{urlencode(params)}",
             "redirect_uri": self.redirect_uri(),
+            "state": state,
             "state_created": True,
             "token_storage": "backend_only",
         }

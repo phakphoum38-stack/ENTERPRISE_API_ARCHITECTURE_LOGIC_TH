@@ -25,9 +25,7 @@ concurrency:
 
 jobs:
   build-ios-unsigned-ipa:
-    # iOS is intentionally excluded from PR #177 validation.
-    # Keep push/manual execution available for the dedicated iOS workstream.
-    if: github.event_name != 'pull_request'
+    # iOS validates the same shared Research OS Flutter application surface.
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -75,12 +73,13 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Research OS" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleName Research OS" ios/Runner/Info.plist || true
 
-      - name: Flutter analyze and full test
+      - name: Flutter analyze, full test, and shared surface parity
         working-directory: apps/research_os_flutter
         run: |
           flutter pub get
           flutter analyze
           flutter test
+          flutter test test/platform_surface_parity_test.dart --reporter expanded
 
       - name: Prove Check-in iPhone flow
         working-directory: apps/research_os_flutter

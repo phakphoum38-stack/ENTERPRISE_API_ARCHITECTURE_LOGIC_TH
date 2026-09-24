@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Futuristic ChatGPT-style navigation for the Research OS desktop shell.
-/// Existing feature indices remain stable; staged items are visibly disabled
-/// until their real workspace is implemented.
+import 'enterprise_navigation.dart';
+
+/// Shared desktop navigation for the Research OS application surface.
+/// All destinations are sourced from the same registry used by the mobile drawer.
 class ResearchOSSidebarV2 extends StatelessWidget {
   const ResearchOSSidebarV2({
     required this.expanded,
@@ -19,63 +20,6 @@ class ResearchOSSidebarV2 extends StatelessWidget {
 
   static const compactWidth = 76.0;
   static const expandedWidth = 264.0;
-
-  void _tap(BuildContext context, _Entry entry) {
-    if (!entry.available) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${entry.label} อยู่ในแผนงานถัดไป'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    onSelected(entry.index);
-  }
-
-  Widget _destination(BuildContext context, _Entry entry) {
-    final scheme = Theme.of(context).colorScheme;
-    final selected = entry.available && selectedIndex == entry.index;
-    final foreground = entry.available
-        ? (selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant)
-        : scheme.onSurface.withValues(alpha: .38);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: expanded ? 10 : 8, vertical: 2),
-      child: Material(
-        color: selected ? scheme.secondaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(13),
-        child: InkWell(
-          key: Key('v2-nav-${entry.keyName}'),
-          borderRadius: BorderRadius.circular(13),
-          onTap: () => _tap(context, entry),
-          child: SizedBox(
-            height: 43,
-            child: Row(
-              children: <Widget>[
-                SizedBox(
-                  width: expanded ? 44 : 58,
-                  child: Icon(entry.icon, color: foreground, size: 21),
-                ),
-                if (expanded)
-                  Expanded(
-                    child: Text(
-                      entry.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: foreground,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _section(BuildContext context, String title) {
     if (!expanded) return const SizedBox(height: 8);
@@ -197,27 +141,68 @@ class ResearchOSSidebarV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const workspace = <_Entry>[
-      _Entry('search', 'Search', Icons.search_outlined, 0),
-      _Entry('new-chat', 'New chat', Icons.add_comment_outlined, 1),
-      _Entry('conversation', 'สนทนา AI', Icons.chat_bubble_outline, 1),
-      _Entry('friend-connect', 'Friend Connect', Icons.support_agent_outlined, 13),
-      _Entry('images', 'Images', Icons.image_outlined, 1, available: false),
-      _Entry('library', 'Library', Icons.local_library_outlined, 3),
-      _Entry('scheduled', 'Scheduled', Icons.schedule_outlined, 1,
-          available: false),
-      _Entry('plugins', 'Plugins', Icons.extension_outlined, 1,
-          available: false),
-      _Entry('projects', 'Projects', Icons.folder_outlined, 1,
-          available: false),
-    ];
-    const account = <_Entry>[
-      _Entry('pinned', 'Pinned', Icons.push_pin_outlined, 1,
-          available: false),
-      _Entry('recents', 'Recents', Icons.history_outlined, 1),
-      _Entry('account', 'Google Identity', Icons.account_circle_outlined, 12),
-      _Entry('settings', 'Settings', Icons.settings_outlined, 9),
-    ];
+
+    List<Widget> entries() {
+      final widgets = <Widget>[];
+      String? section;
+      for (final item in researchNavigationItems) {
+        if (expanded && section != item.section) {
+          section = item.section;
+          widgets.add(_section(context, item.section));
+        }
+        widgets.add(
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: expanded ? 10 : 8,
+              vertical: 2,
+            ),
+            child: Material(
+              color: selectedIndex == item.index
+                  ? scheme.secondaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(13),
+              child: InkWell(
+                key: Key('v2-nav-${item.index}'),
+                borderRadius: BorderRadius.circular(13),
+                onTap: () => onSelected(item.index),
+                child: SizedBox(
+                  height: 43,
+                  child: Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: expanded ? 44 : 58,
+                        child: Icon(
+                          item.icon,
+                          color: selectedIndex == item.index
+                              ? scheme.onSecondaryContainer
+                              : scheme.onSurfaceVariant,
+                          size: 21,
+                        ),
+                      ),
+                      if (expanded)
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            key: Key('desktop-nav-label-${item.index}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: selectedIndex == item.index
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      return widgets;
+    }
 
     return AnimatedContainer(
       key: const Key('research-os-sidebar-v2'),
@@ -234,23 +219,9 @@ class ResearchOSSidebarV2 extends StatelessWidget {
           const Divider(height: 1),
           Expanded(
             child: ListView(
+              key: const Key('desktop-navigation-list-v2'),
               padding: const EdgeInsets.symmetric(vertical: 6),
-              children: <Widget>[
-                _section(context, 'Workspace'),
-                for (final entry in workspace) _destination(context, entry),
-                _section(context, 'More'),
-                _destination(
-                  context,
-                  const _Entry(
-                    'more',
-                    'More',
-                    Icons.more_horiz_outlined,
-                    2,
-                  ),
-                ),
-                _section(context, 'Account'),
-                for (final entry in account) _destination(context, entry),
-              ],
+              children: entries(),
             ),
           ),
           _securityStatus(context),
@@ -258,17 +229,6 @@ class ResearchOSSidebarV2 extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Entry {
-  const _Entry(this.keyName, this.label, this.icon, this.index,
-      {this.available = true});
-
-  final String keyName;
-  final String label;
-  final IconData icon;
-  final int index;
-  final bool available;
 }
 
 class _ResearchMark extends StatelessWidget {

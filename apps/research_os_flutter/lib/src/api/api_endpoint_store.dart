@@ -5,12 +5,53 @@ class ApiEndpointStore {
 
   static const _storageKey = 'research_os_api_base_url_v1';
   static const localDefault = 'http://127.0.0.1:8787';
+  static const developerDefault = 'http://127.0.0.1:8790';
   static const renderDefault = 'https://research-os-api-phakphoum.onrender.com';
+
+  // Connection names are user-facing; endpoint values remain internal.
+  static const connectionResearchOs = 'research_os';
+  static const connectionDeveloperRuntime = 'developer_runtime';
+
+  static const developerBuildDefault = String.fromEnvironment(
+    'RESEARCH_OS_DEVELOPER_BASE_URL',
+    defaultValue: developerDefault,
+  );
 
   static const buildDefault = String.fromEnvironment(
     'RESEARCH_OS_API_BASE_URL',
     defaultValue: renderDefault,
   );
+
+  static String profileUrl(String profile) {
+    switch (profile) {
+      case connectionDeveloperRuntime:
+        return normalize(developerBuildDefault);
+      case connectionResearchOs:
+      default:
+        return normalize(buildDefault);
+    }
+  }
+
+  static String profileLabel(String profile) {
+    switch (profile) {
+      case connectionDeveloperRuntime:
+        return 'Developer Runtime';
+      case connectionResearchOs:
+      default:
+        return 'Research OS';
+    }
+  }
+
+  static String profileForUrl(String url) {
+    final normalized = normalize(url);
+    if (normalized == profileUrl(connectionDeveloperRuntime)) {
+      return connectionDeveloperRuntime;
+    }
+    if (normalized == profileUrl(connectionResearchOs)) {
+      return connectionResearchOs;
+    }
+    return 'custom';
+  }
 
   static Future<String> load() async {
     final prefs = await SharedPreferences.getInstance();

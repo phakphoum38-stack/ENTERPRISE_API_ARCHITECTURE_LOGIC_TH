@@ -275,6 +275,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
               runSpacing: 8,
               children: [
                 OutlinedButton.icon(
+                  key: const Key('flutter-code-tool-read'),
                   onPressed: _busy || _path == null ? null : _readSelected,
                   icon: const Icon(Icons.menu_book_outlined),
                   label: const Text('อ่าน Code'),
@@ -297,6 +298,7 @@ class _FlutterCodeToolPageState extends State<FlutterCodeToolPage> {
               const SizedBox(height: 4),
               SelectableText(
                 'Read SHA: $_sha',
+                key: const Key('flutter-code-tool-read-sha'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

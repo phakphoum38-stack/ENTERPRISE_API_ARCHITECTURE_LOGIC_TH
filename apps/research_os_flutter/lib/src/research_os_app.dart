@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
+import 'features/auth/login_page.dart';
 
 class ResearchOSApp extends StatefulWidget {
   const ResearchOSApp({super.key});
@@ -15,6 +16,7 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   ThemeMode _themeMode = ThemeMode.system;
   ResearchOSApiClient? _apiClient;
   String? _apiBaseUrl;
+  bool? _authenticated;
 
   @override
   void initState() {
@@ -25,9 +27,22 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   Future<void> _loadApiEndpoint() async {
     final url = await ApiEndpointStore.load();
     if (!mounted) return;
+    final client = ResearchOSApiClient(baseUrl: url);
+    bool authenticated = false;
+    try {
+      final status = await client.getAuthStatus();
+      authenticated = status['connected'] == true;
+    } on Object {
+      authenticated = false;
+    }
+    if (!mounted) {
+      client.close();
+      return;
+    }
     setState(() {
       _apiBaseUrl = url;
-      _apiClient = ResearchOSApiClient(baseUrl: url);
+      _apiClient = client;
+      _authenticated = authenticated;
     });
   }
 
@@ -36,9 +51,11 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
     await ApiEndpointStore.save(normalized);
     final previous = _apiClient;
     if (!mounted) return;
+    final client = ResearchOSApiClient(baseUrl: normalized);
     setState(() {
       _apiBaseUrl = normalized;
-      _apiClient = ResearchOSApiClient(baseUrl: normalized);
+      _apiClient = client;
+      _authenticated = false;
     });
     previous?.close();
   }
@@ -144,11 +161,12 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
       themeMode: _themeMode,
-      home: apiClient == null || _apiBaseUrl == null
+      home: apiClient == null || _apiBaseUrl == null || _authenticated == null
           ? const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             )
-          : ResearchOSAppShell(
+          : _authenticated!
+              ? ResearchOSAppShell(
               key: ValueKey(_apiBaseUrl),
               apiClient: apiClient,
               themeMode: _themeMode,
@@ -156,7 +174,16 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
                 setState(() => _themeMode = value);
               },
               onApiBaseUrlChanged: _changeApiEndpoint,
-            ),
+            )
+                      : LoginPage(
+                  key: ValueKey(_apiBaseUrl),
+                  apiClient: apiClient,
+                  connectionProfile: ApiEndpointStore.profileForUrl(_apiBaseUrl!),
+                  onConnectionChanged: _changeApiEndpoint,
+                  onAuthenticated: () {
+                    setState(() => _authenticated = true);
+                  },
+                ),
     );
   }
 }

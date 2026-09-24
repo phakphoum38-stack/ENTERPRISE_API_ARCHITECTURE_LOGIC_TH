@@ -23,7 +23,12 @@ void main() {
           'items': [{'path': 'lib/main.dart', 'bytes': 20}],
         }), 200);
       }
-      if (request.url.path == '/v2/developer/code/file/lib/main.dart') {
+      if (request.url.pathSegments.length == 5 &&
+          request.url.pathSegments[0] == 'v2' &&
+          request.url.pathSegments[1] == 'developer' &&
+          request.url.pathSegments[2] == 'code' &&
+          request.url.pathSegments[3] == 'file' &&
+          request.url.pathSegments[4] == 'lib/main.dart') {
         return http.Response(jsonEncode({
           'api_version': 'v2',
           'project': 'research_os_flutter',
@@ -74,15 +79,37 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.textContaining('Read SHA: old-sha'), findsOneWidget);
-    await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
-    await tester.ensureVisible(find.text('Preview Diff'));
-    await tester.tap(find.text('Preview Diff'));
+    final readButton = find.byKey(const Key('flutter-code-tool-read'));
+    expect(readButton, findsOneWidget);
+    await tester.ensureVisible(readButton);
+    await tester.tap(readButton);
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('flutter-code-tool-status')), findsOneWidget);
+    final readSha = find.byKey(const Key('flutter-code-tool-read-sha'));
+    expect(readSha, findsOneWidget);
+    await tester.scrollUntilVisible(
+      readSha,
+      300,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('flutter-code-tool-scroll')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    expect(readSha, findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'void main() { print(1); }\\n');
+
+    final previewButton = find.widgetWithText(FilledButton, 'Preview Diff');
+    expect(previewButton, findsOneWidget);
+    await tester.ensureVisible(previewButton);
+    await tester.tap(previewButton);
+    await tester.pumpAndSettle();
+
     expect(find.textContaining('Preview Diff'), findsWidgets);
 
-    await tester.ensureVisible(find.text('Apply Change'));
-    await tester.tap(find.text('Apply Change'));
+    final applyButton = find.widgetWithText(FilledButton, 'Apply Change');
+    expect(applyButton, findsOneWidget);
+    await tester.ensureVisible(applyButton);
+    await tester.tap(applyButton);
     await tester.pumpAndSettle();
     expect(applied, isTrue);
   });

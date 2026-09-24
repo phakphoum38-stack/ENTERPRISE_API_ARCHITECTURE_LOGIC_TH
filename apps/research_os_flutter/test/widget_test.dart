@@ -5,7 +5,12 @@ import 'package:research_os_flutter/src/app_shell.dart';
 import 'package:research_os_flutter/src/features/github/github_dashboard_page.dart';
 import 'package:research_os_flutter/src/features/graph/knowledge_graph_page.dart';
 import 'package:research_os_flutter/src/features/home/home_page.dart';
+import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+String researchNavigationItemsLabel(int index) {
+  return researchNavigationItems.singleWhere((item) => item.index == index).label;
+}
 
 class FakeResearchOSApiClient extends ResearchOSApiClient {
   FakeResearchOSApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
@@ -126,11 +131,21 @@ Future<void> pumpShell(WidgetTester tester) async {
 
 Future<void> openSidebarDestination(
   WidgetTester tester,
-  String keyName,
+  int index,
 ) async {
-  final finder = find.byKey(Key('v2-nav-$keyName'));
+  final finder = find.byKey(
+    Key('v2-nav-$index'),
+    skipOffstage: false,
+  );
+  await tester.scrollUntilVisible(
+    finder,
+    300,
+    scrollable: find.descendant(
+      of: find.byKey(const Key('desktop-navigation-list-v2')),
+      matching: find.byType(Scrollable),
+    ),
+  );
   expect(finder, findsOneWidget);
-  await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
@@ -165,7 +180,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpShell(tester);
-    await openSidebarDestination(tester, 'conversation');
+    await openSidebarDestination(tester, 1);
 
     expect(find.text('สนทนา AI'), findsOneWidget);
     expect(find.text('Friend AI • Text + Voice • Local-first'), findsOneWidget);
@@ -182,7 +197,23 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpShell(tester);
 
-    expect(find.byKey(const Key('v2-nav-account')), findsOneWidget);
+    final googleNav = find.byKey(
+      const Key('v2-nav-12'),
+      skipOffstage: false,
+    );
+    await tester.scrollUntilVisible(
+      googleNav,
+      300,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('desktop-navigation-list-v2')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(googleNav, findsOneWidget);
+    expect(
+      researchNavigationItemsLabel(12),
+      'Google Sign-In',
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -191,7 +222,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpShell(tester);
-    await openSidebarDestination(tester, 'library');
+    await openSidebarDestination(tester, 3);
 
     expect(find.text('Conversation to Knowledge'), findsOneWidget);
     expect(find.textContaining('active'), findsWidgets);
@@ -253,7 +284,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
-    await openSidebarDestination(tester, 'settings');
+    await openSidebarDestination(tester, 9);
 
     expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsWidgets);

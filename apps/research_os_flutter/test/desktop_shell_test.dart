@@ -88,23 +88,23 @@ void main() {
 
       // Sidebar navigation.
       expect(
-        find.byKey(const Key('v2-nav-search')),
+        find.byKey(const Key('v2-nav-0')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('v2-nav-conversation')),
+        find.byKey(const Key('v2-nav-1')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('v2-nav-friend-connect')),
+        find.byKey(const Key('v2-nav-13')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('v2-nav-settings')),
+        find.byKey(const Key('v2-nav-9')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('v2-nav-account')),
+        find.byKey(const Key('v2-nav-12')),
         findsOneWidget,
       );
 
@@ -137,8 +137,8 @@ void main() {
       // Expanded sidebar labels.
       expect(find.text('WORKSPACE'), findsOneWidget);
       expect(find.text('ACCOUNT'), findsOneWidget);
-      expect(find.text('Search'), findsOneWidget);
-      expect(find.text('New chat'), findsOneWidget);
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('AI Chat'), findsOneWidget);
       expect(find.text('Settings'), findsOneWidget);
       expect(find.text('AI Operating Workspace'), findsOneWidget);
       expect(find.text('Friend Connect'), findsAtLeastNWidgets(1));
@@ -146,7 +146,7 @@ void main() {
       // Friend Connect workspace.
       await tester.tap(
         find.byKey(
-          const Key('v2-nav-friend-connect'),
+          const Key('v2-nav-13'),
         ),
       );
 
@@ -173,7 +173,7 @@ void main() {
       // Open Conversation.
       await tester.tap(
         find.byKey(
-          const Key('v2-nav-conversation'),
+          const Key('v2-nav-1'),
         ),
       );
 

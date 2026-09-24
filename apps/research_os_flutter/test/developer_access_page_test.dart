@@ -82,12 +82,29 @@ void main() {
 
     expect(find.byKey(const Key('developer-access-page')), findsOneWidget);
     expect(find.text('user:owner'), findsOneWidget);
-    await tester.ensureVisible(find.textContaining('คำขอที่รออนุมัติ (1)'));
-    expect(find.textContaining('คำขอที่รออนุมัติ (1)'), findsOneWidget);
+    final outerScroll = find.byKey(const Key('developer-access-scroll'));
+    final pendingHeading = find.textContaining('คำขอที่รออนุมัติ (1)');
+    await tester.scrollUntilVisible(
+      pendingHeading,
+      500,
+      scrollable: find.descendant(
+        of: outerScroll,
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    expect(pendingHeading, findsOneWidget);
     expect(find.text('Owner file.md'), findsOneWidget);
 
-    await tester.ensureVisible(find.textContaining('สิทธิ์ที่กำลังใช้งาน (1)'));
-    expect(find.textContaining('สิทธิ์ที่กำลังใช้งาน (1)'), findsOneWidget);
+    final activeHeading = find.textContaining('สิทธิ์ที่กำลังใช้งาน (1)');
+    await tester.scrollUntilVisible(
+      activeHeading,
+      500,
+      scrollable: find.descendant(
+        of: outerScroll,
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    expect(activeHeading, findsOneWidget);
     expect(find.text('Approved file.md'), findsOneWidget);
     expect(find.text('Revoke'), findsOneWidget);
   });
