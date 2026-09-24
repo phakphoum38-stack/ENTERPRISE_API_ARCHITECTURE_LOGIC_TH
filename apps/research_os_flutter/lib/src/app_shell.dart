@@ -15,6 +15,7 @@ import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
 import 'features/local_api/local_api_control_page.dart';
 import 'features/monitor/system_monitor_page.dart';
+import 'features/projects/project_experience_page.dart';
 import 'features/settings/settings_page.dart';
 import 'ui/enterprise_navigation.dart';
 import 'ui/research_os_sidebar_v2.dart';
@@ -62,6 +63,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         BrainSkillsPage(apiClient: widget.apiClient),
         GoogleLoginPage(apiClient: widget.apiClient),
         FriendConnectPage(apiClient: widget.apiClient),
+        ProjectExperiencePage(apiClient: widget.apiClient),
         NativeControlCenterPage(
           apiClient: widget.apiClient,
           onNavigate: _select,
