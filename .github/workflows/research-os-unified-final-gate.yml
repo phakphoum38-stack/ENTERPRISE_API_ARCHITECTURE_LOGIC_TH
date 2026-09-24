@@ -131,6 +131,13 @@ jobs:
             tools.test_capability_e2e_binding \
             -v
 
+      - name: Phase D cross-surface parity
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_phase_d_cross_surface_parity.py
+          python -m unittest tools.test_phase_d_cross_surface_parity -v
+
   decision:
     name: Unified release decision
     needs: [contract, flutter_surface, python_surface]
