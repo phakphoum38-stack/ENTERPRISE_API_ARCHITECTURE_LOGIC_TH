@@ -1,13 +1,15 @@
 {
-  "contract_id":"research-os-m2-whole-system-audit-index-v1",
-  "version":1,"status":"ACTIVE",
-  "purpose":"Create a searchable, source-SHA-pinned whole-repository audit index connecting files, capabilities, contracts, tests, workflows, evidence, invariants and the Unified Final Gate without becoming runtime or release authority.",
+  "contract_id":"research-os-m2-whole-system-audit-index-v2",
+  "version":2,
+  "status":"ACTIVE",
+  "purpose":"Create a searchable, source-SHA-pinned whole-system inventory and explicit relationship graph using existing repository authorities.",
   "source_of_truth":"GitHub repository source at exact checked-out SHA",
   "virtual_workspace":{"role":"audit_snapshot_and_index_only","must_not_become_source_of_truth":true,"must_not_create_runtime_authority":true,"must_not_create_release_authority":true},
   "required_outputs":["m2_audit_index.json","m2_audit_index_summary.txt"],
-  "index_dimensions":["file","capability","authority","contract","implementation","test","workflow","evidence","invariant","dependency","surface","source_sha","gap"],
+  "graph_nodes":["FILE","CONTRACT","TEST","WORKFLOW","INVARIANT","AUTHORITY"],
+  "graph_relations":["REFERENCES","VERIFIED_BY","DISPATCHES_OR_REFERENCES","PARTICIPATES_IN","BINDS_TO","ENFORCES_OR_REFERENCES"],
   "gap_states":["MISSING","INCOMPLETE","BROKEN","DRIFT","DUPLICATE","UNKNOWN","DEFERRED"],
   "rules":{"unknown_is_not_pass":true,"skipped_is_not_pass":true,"deferred_is_not_done":true,"exact_source_sha_required":true,"release_authority_remains_final_gate":true,"existing_authorities_must_be_reused":true,"index_is_descriptive_only":true},
-  "integrity_checks":["exact_git_sha","inventory_completeness","duplicate_path_detection","contract_test_linkage","workflow_inventory","invariant_inventory"],
+  "integrity_checks":["exact_git_sha","inventory_completeness","duplicate_path_detection","unique_node_ids","no_dangling_edges","contract_test_linkage","workflow_inventory","contract_inventory","invariant_inventory","final_gate_node"],
   "release_binding":{"required_final_gate_job":"m2_audit","failure_on_index_integrity_error":true,"gap_findings_are_evidence_not_automatic_release_success":true}
 }
