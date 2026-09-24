@@ -68,8 +68,8 @@ def validate_isolation(*, project_a: ProjectContext, project_b: ProjectContext) 
 
 
 def build_project_definitions(count: int = PROJECT_COUNT) -> tuple[ProjectDefinition, ...]:
-    if count != PROJECT_COUNT:
-        raise ValueError("readiness harness is defined for exactly 100 projects")
+    if not 1 <= count <= PROJECT_COUNT:
+        raise ValueError("project count must be between 1 and 100")
     capabilities = (
         "control_center",
         "friend",
@@ -97,6 +97,8 @@ def build_project_definitions(count: int = PROJECT_COUNT) -> tuple[ProjectDefini
     )
 
 
+SCALE_LEVELS = (10, 20, 50, 100)
+
 def validate_registry_scale(count: int = PROJECT_COUNT) -> tuple[str, ...]:
     registry = ProjectRegistry(build_project_definitions(count))
     projects = registry.all()
@@ -109,4 +111,13 @@ def validate_registry_scale(count: int = PROJECT_COUNT) -> tuple[str, ...]:
     for project in projects:
         if project.evidence_namespace != f"PROJECT:{project.project_id}":
             errors.append(f"{project.project_id}: evidence namespace mismatch")
+    return tuple(errors)
+
+
+def validate_scale_levels() -> tuple[str, ...]:
+    errors: list[str] = []
+    for count in SCALE_LEVELS:
+        errors.extend(
+            f"{count}: {error}" for error in validate_registry_scale(count)
+        )
     return tuple(errors)
