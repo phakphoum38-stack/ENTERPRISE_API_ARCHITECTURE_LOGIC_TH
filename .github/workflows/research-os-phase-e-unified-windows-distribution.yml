@@ -210,7 +210,9 @@ jobs:
           choco install innosetup --no-progress -y
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
           $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-          & $iscc "$env:GITHUB_WORKSPACE\installer\research-os-unified.iss"
+          $stagingRoot = "$env:GITHUB_WORKSPACE\phase-e\package"
+          if (-not (Test-Path $stagingRoot)) { throw "Distribution staging root not found: $stagingRoot" }
+          & $iscc "/DPackageRoot=$stagingRoot" "$env:GITHUB_WORKSPACE\installer\research-os-unified.iss"
           if ($LASTEXITCODE -ne 0) { throw 'Unified installer build failed.' }
 
       - name: Package and hash distribution
