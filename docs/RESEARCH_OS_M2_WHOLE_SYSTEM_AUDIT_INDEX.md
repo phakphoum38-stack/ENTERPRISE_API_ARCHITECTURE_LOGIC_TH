@@ -1,11 +1,12 @@
 # Research OS M.2 Whole-System Audit Graph
 
-M.2 is the descriptive repository-wide audit/index layer. This update keeps the existing inventory API and adds an explicit relationship graph.
+M.2 is the descriptive repository-wide audit/index layer. This update keeps the existing inventory API and adds an explicit relationship graph, including contract-to-implementation integrity evidence.
 
 ## What it connects
 
 - FILE -> CONTRACT references
 - CONTRACT -> TEST verification relationships
+- IMPLEMENTATION -> CONTRACT reference relationships, validated when explicit contract references exist
 - WORKFLOW -> WORKFLOW dispatch/reference signals
 - FILE/WORKFLOW -> existing Unified Final Gate binding
 - FILE -> architecture invariant references
