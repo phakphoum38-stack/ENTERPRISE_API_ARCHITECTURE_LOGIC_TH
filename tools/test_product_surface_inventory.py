@@ -34,6 +34,8 @@ def main() -> None:
     assert "const researchNavigationItems" in navigation_text
     assert "Control Center" in navigation_text
     assert "capabilityId: 'control_center'" in navigation_text
+    assert "Owner" in navigation_text
+    assert "capabilityId: 'owner'" in navigation_text
 
     for path in (
         payload["non_surface_bindings"]["control_center_audit"],
