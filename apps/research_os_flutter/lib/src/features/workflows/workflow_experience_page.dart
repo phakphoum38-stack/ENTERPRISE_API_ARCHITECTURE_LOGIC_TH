@@ -99,7 +99,7 @@ class _WorkflowExperiencePageState extends State<WorkflowExperiencePage> {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text(_loading ? 'Loading workflow runs...' : _runs.length.toString() + ' run(s) observed', key: const Key('workflow-run-count'))),
+                  Expanded(child: Text(_loading ? 'Loading workflow runs...' : '${_runs.length} run(s) observed', key: const Key('workflow-run-count'))),
                   IconButton(
                     key: const Key('refresh-workflows'),
                     tooltip: 'Refresh workflow runs',
@@ -130,7 +130,7 @@ class _WorkflowExperiencePageState extends State<WorkflowExperiencePage> {
         const SizedBox(height: 18),
         EnterpriseSection(
           title: 'Selected run',
-          subtitle: selected == null ? 'Select a run to inspect its existing timeline.' : 'Read-only observation of ' + (selected['run_id']?.toString() ?? '') + '.',
+          subtitle: selected == null ? 'Select a run to inspect its existing timeline.' : 'Read-only observation of ${selected['run_id']?.toString() ?? ''}.',
           child: selected == null
               ? const ListTile(
                   key: Key('workflow-no-selection'),
@@ -144,7 +144,7 @@ class _WorkflowExperiencePageState extends State<WorkflowExperiencePage> {
                       key: const Key('workflow-selected-run'),
                       leading: const Icon(Icons.route_outlined),
                       title: Text(selected['objective']?.toString() ?? 'Untitled workflow'),
-                      subtitle: Text('Run ' + (selected['run_id']?.toString() ?? '-') + ' • status ' + (selected['status']?.toString() ?? 'UNKNOWN')),
+                      subtitle: Text('Run ${selected['run_id']?.toString() ?? '-'} • status ${selected['status']?.toString() ?? 'UNKNOWN'}'),
                     ),
                     if (selectedSteps.isNotEmpty) ...[
                       const Divider(),
@@ -172,7 +172,7 @@ class _WorkflowExperiencePageState extends State<WorkflowExperiencePage> {
                           dense: true,
                           leading: const Icon(Icons.circle_outlined, size: 16),
                           title: Text(event['event_type']?.toString() ?? 'event'),
-                          subtitle: Text('run status: ' + (event['run_status']?.toString() ?? 'UNKNOWN') + ' • step: ' + (event['step_id']?.toString() ?? '-')),
+                          subtitle: Text('run status: ${event['run_status']?.toString() ?? 'UNKNOWN'} • step: ${event['step_id']?.toString() ?? '-'}'),
                         )),
                   ],
                 ),
@@ -185,13 +185,13 @@ class _WorkflowExperiencePageState extends State<WorkflowExperiencePage> {
     final id = run['run_id']?.toString() ?? '';
     final selected = _selectedRun?['run_id'] == run['run_id'];
     return Card(
-      key: Key('workflow-run-' + id),
+      key: Key('workflow-run-$id'),
       margin: const EdgeInsets.only(top: 8),
       child: ListTile(
         selected: selected,
         leading: const Icon(Icons.account_tree_outlined),
         title: Text(run['objective']?.toString() ?? 'Untitled workflow'),
-        subtitle: Text('Run ' + id + ' • ' + (run['status']?.toString() ?? 'UNKNOWN')),
+        subtitle: Text('Run $id • ${run['status']?.toString() ?? 'UNKNOWN'}'),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => _selectRun(run),
       ),
@@ -207,5 +207,5 @@ class _LifecycleChip extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Chip(key: Key('workflow-lifecycle-' + label), label: Text(label));
+  Widget build(BuildContext context) => Chip(key: Key('workflow-lifecycle-$label'), label: Text(label));
 }
