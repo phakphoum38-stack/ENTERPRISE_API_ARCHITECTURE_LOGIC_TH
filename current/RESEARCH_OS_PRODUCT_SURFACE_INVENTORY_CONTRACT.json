@@ -102,8 +102,14 @@
       "apps/research_os_flutter/lib/src/app_shell.dart"
     ],
     [
-      "Control Center",
+      "Projects",
       14,
+      "apps/research_os_flutter/lib/src/features/projects/project_experience_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Control Center",
+      15,
       "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
       "apps/research_os_flutter/lib/src/app_shell.dart"
     ]
