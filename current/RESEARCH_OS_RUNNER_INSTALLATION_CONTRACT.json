@@ -1,0 +1,67 @@
+{
+  "contract_id": "research-os-runner-installation-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical installation and bootstrap contract for distributing the existing Universal Runner and Research OS runtime from local or cloud-synchronized package sources.",
+  "authority": {
+    "installation_is_not_execution_authority": true,
+    "distribution_is_not_release_authority": true,
+    "final_gate_remains_release_authority": true,
+    "authorization_remains_existing_control_plane": true,
+    "no_new_runtime": true,
+    "no_new_scheduler": true,
+    "no_new_queue": true,
+    "no_new_evidence_ledger": true
+  },
+  "source_modes": ["LOCAL_PACKAGE", "CLOUD_DRIVE_PACKAGE", "PORTABLE_PACKAGE"],
+  "cloud_drive_rule": "Cloud Drive is a distribution source only; execution should use a verified local installation or portable copy.",
+  "installation_lifecycle": ["DISCOVER", "DOWNLOAD", "VERIFY", "STAGE", "INSTALL", "REGISTER", "DISCOVER_CAPABILITIES", "HEALTH_CHECK", "READY", "FAILED", "ROLLBACK"],
+  "package_identity": {
+    "package_id_required": true,
+    "version_required": true,
+    "platform_required": true,
+    "architecture_required": true,
+    "source_sha_required": true,
+    "manifest_required": true,
+    "manifest_sha256_required": true,
+    "artifact_sha256_required": true
+  },
+  "verification": {
+    "algorithm": "SHA256",
+    "source_sha_must_match_manifest": true,
+    "manifest_digest_must_match": true,
+    "artifact_digest_must_match": true,
+    "unknown_package_is_rejected": true,
+    "platform_mismatch_is_rejected": true,
+    "architecture_mismatch_is_rejected": true,
+    "path_traversal_is_rejected": true
+  },
+  "target": {
+    "installation_is_local": true,
+    "cloud_sync_directory_is_not_required_as_runtime": true,
+    "atomic_staging_required": true,
+    "existing_user_data_must_not_be_deleted_by_install": true
+  },
+  "offline": {
+    "installed_runtime_can_operate_without_cloud": true,
+    "reconnect_reconciliation_is_external_to_installer": true
+  },
+  "profiles": {
+    "windows_x64": {"platform": "windows", "architecture": "x86_64", "installer": "installer/research-os-unified.iss", "bootstrap_supported": true},
+    "linux_x64": {"platform": "linux", "architecture": "x86_64", "bootstrap_supported": true},
+    "macos_arm64": {"platform": "macos", "architecture": "arm64", "bootstrap_supported": true},
+    "portable": {"platform": "portable", "architecture": "host", "bootstrap_supported": true}
+  },
+  "registration": {
+    "runner_contract": "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
+    "registration_does_not_grant_entitlement": true,
+    "capability_discovery_required_before_ready": true,
+    "stale_capability_evidence_cannot_certify_ready": true
+  },
+  "recovery": {
+    "failed_verification_must_not_install": true,
+    "failed_install_must_not_advertise_ready": true,
+    "staging_must_be_disposable": true,
+    "rollback_must_preserve_user_data": true
+  }
+}
