@@ -64,32 +64,28 @@ void main() {
     expect(find.text('Workflow runs'), findsOneWidget);
     expect(find.text('Running'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
-
     final overview = find.byKey(
       const ValueKey('control-center-overview-scroll'),
     );
     expect(overview, findsOneWidget);
 
-    // ListView is the keyed owner of the overview scroll region. Its actual
-    // Scrollable is a child created by ListView, not an ancestor of ListView.
-    // Resolve that child so scrollUntilVisible can operate on the correct
-    // scroll position without depending on other Scrollables in the page.
-    final overviewScrollable = find
-        .descendant(
-          of: overview,
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    expect(overviewScrollable, findsOneWidget);
-
-    await tester.scrollUntilVisible(
-      find.text('Workflow control surface'),
-      500,
-      scrollable: overviewScrollable,
+    // Platform Controls is inside a ListView and may not exist in the widget
+    // tree until the lazy list has been scrolled far enough to build it.
+    // Drag the keyed ListView directly so the test does not require the target
+    // widget to exist before scrolling.
+    await tester.drag(
+      overview,
+      const Offset(0, -900),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Workflow control surface'), findsOneWidget);
+    expect(find.byKey(const ValueKey('platform-controls-card')), findsOneWidget);
+    expect(find.text('Platform Controls'), findsOneWidget);
+    expect(find.text('Defect Control'), findsOneWidget);
+    expect(find.text('Schedule Control'), findsOneWidget);
+    expect(find.text('Risk Control'), findsOneWidget);
+    expect(find.text('Change Impact Control'), findsOneWidget);
+    expect(find.text('CANONICAL'), findsNWidgets(4));
 
     api.close();
   });

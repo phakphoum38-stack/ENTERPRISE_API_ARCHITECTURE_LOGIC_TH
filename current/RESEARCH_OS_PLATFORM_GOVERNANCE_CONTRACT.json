@@ -15,7 +15,8 @@
     "defect_control": "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
     "schedule_control": "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
     "risk_control": "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
-    "change_impact_control": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json"
+    "change_impact_control": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+    "control_center_contract": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json"
   },
   "authority": {
     "governance_mode": "DESCRIPTIVE_AND_VALIDATING",
@@ -52,6 +53,11 @@
       "domain": "release",
       "canonical": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
       "role": "SINGLE_RELEASE_AUTHORITY"
+    },
+    {
+      "domain": "control_center",
+      "canonical": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+      "role": "DESCRIPTIVE_READ_ONLY_PROJECTION"
     }
   ],
   "component_lifecycle": [
@@ -258,6 +264,17 @@
       ],
       "gates": [
         "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+      "components": [
+        "control_center",
+        "platform_controls"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "flutter_surface"
       ]
     }
   ]

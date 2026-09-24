@@ -170,10 +170,15 @@
       "lifecycle": "ACTIVE",
       "dependencies": [
         "navigation",
-        "evidence"
+        "evidence",
+        "defect_control",
+        "schedule_control",
+        "risk_control",
+        "change_impact_control"
       ],
       "contracts": [
-        "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json"
+        "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json"
       ],
       "tests": [
         "apps/research_os_flutter/test/features/control_center/native_control_center_page_test.dart"
@@ -248,11 +253,13 @@
         "tools/test_platform_operating_control.py"
       ],
       "evidence": [
-        "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json"
+        "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
       ],
       "gates": [
         "assurance",
-        "unified_final_gate"
+        "unified_final_gate",
+        "flutter_surface"
       ]
     },
     {
@@ -271,11 +278,13 @@
         "tools/test_platform_operating_control.py"
       ],
       "evidence": [
-        "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json"
+        "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
       ],
       "gates": [
         "project_scale",
-        "unified_final_gate"
+        "unified_final_gate",
+        "flutter_surface"
       ]
     },
     {
@@ -294,11 +303,13 @@
         "tools/test_platform_operating_control.py"
       ],
       "evidence": [
-        "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json"
+        "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
       ],
       "gates": [
         "assurance",
-        "unified_final_gate"
+        "unified_final_gate",
+        "flutter_surface"
       ]
     },
     {
@@ -318,10 +329,12 @@
         "tools/test_platform_change_impact.py"
       ],
       "evidence": [
-        "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json"
+        "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
       ],
       "gates": [
-        "unified_final_gate"
+        "unified_final_gate",
+        "flutter_surface"
       ]
     }
   ],

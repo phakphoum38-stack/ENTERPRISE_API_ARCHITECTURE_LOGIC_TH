@@ -35,7 +35,8 @@
     "EVIDENCE_EXPLORER",
     "FAILURE_CENTER",
     "RESOURCE_VIEWER",
-    "HUMAN_CONTROL_BOUNDARY"
+    "HUMAN_CONTROL_BOUNDARY",
+    "PLATFORM_CONTROL_VIEWER"
   ],
   "authority": {
     "descriptive_only": true,
@@ -76,5 +77,46 @@
     "platform_ref": "current/PLATFORM_INTEGRATION_CONTRACT.json",
     "experience_ref": "current/EXPERIENCE_GUI_UX_UI_CONTRACT.json",
     "learning_ref": "current/UNIVERSAL_LEARNING_CONTRACT.json"
+  },
+  "platform_controls": {
+    "mode": "READ_ONLY_PROJECTION",
+    "canonical_sources": [
+      "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+      "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+      "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+      "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json"
+    ],
+    "controls": [
+      {
+        "id": "defect_control",
+        "label": "Defect Control",
+        "lifecycle": "OPEN → TRIAGED → IN_REMEDIATION → VERIFICATION → VERIFIED / DEFERRED / CLOSED / REJECTED"
+      },
+      {
+        "id": "schedule_control",
+        "label": "Schedule Control",
+        "lifecycle": "PLANNED → READY → IN_PROGRESS → WAITING_VERIFICATION → DONE / DEFERRED / CANCELLED"
+      },
+      {
+        "id": "risk_control",
+        "label": "Risk Control",
+        "lifecycle": "IDENTIFIED → ASSESSED → MITIGATING → MONITORED → ACCEPTED / ESCALATED / CLOSED / DEFERRED"
+      },
+      {
+        "id": "change_impact_control",
+        "label": "Change Impact Control",
+        "lifecycle": "ANALYZE → CLASSIFY → MAP_DEPENDENCIES → REQUIRE_GATES → VERIFY"
+      }
+    ],
+    "authority": "DESCRIPTIVE_ONLY",
+    "rules": [
+      "projection_does_not_execute",
+      "projection_does_not_authorize",
+      "projection_does_not_approve",
+      "projection_does_not_release",
+      "final_gate_remains_single_release_authority",
+      "unknown_is_not_pass",
+      "deferred_is_not_done"
+    ]
   }
 }

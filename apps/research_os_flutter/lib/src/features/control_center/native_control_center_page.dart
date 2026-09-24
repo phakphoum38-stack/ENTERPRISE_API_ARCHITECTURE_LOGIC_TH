@@ -477,6 +477,8 @@ class _Overview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        const _PlatformControlsCard(),
+        const SizedBox(height: 12),
         const _BoundaryCard(),
       ],
     );
@@ -740,6 +742,69 @@ class _Simulation extends StatelessWidget {
             ),
           ),
         ],
+      );
+}
+
+class _PlatformControlsCard extends StatelessWidget {
+  const _PlatformControlsCard();
+
+  static const controls = <Map<String, String>>[
+    <String, String>{
+      'id': 'defect_control',
+      'label': 'Defect Control',
+      'source': 'RESEARCH_OS_PLATFORM_DEFECT_CONTRACT',
+    },
+    <String, String>{
+      'id': 'schedule_control',
+      'label': 'Schedule Control',
+      'source': 'RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT',
+    },
+    <String, String>{
+      'id': 'risk_control',
+      'label': 'Risk Control',
+      'source': 'RESEARCH_OS_PLATFORM_RISK_CONTRACT',
+    },
+    <String, String>{
+      'id': 'change_impact_control',
+      'label': 'Change Impact Control',
+      'source': 'RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT',
+    },
+  ];
+
+  @override
+  Widget build(BuildContext context) => Card(
+        key: const ValueKey('platform-controls-card'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Platform Controls',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Read-only projection of the canonical operating controls. '
+                'It does not execute, authorize, approve, or release.',
+              ),
+              const SizedBox(height: 10),
+              ...controls.map(
+                (control) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.rule_outlined),
+                  title: Text(control['label']!),
+                  subtitle: Text(control['source']!),
+                  trailing: const Text('CANONICAL'),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
 }
 
