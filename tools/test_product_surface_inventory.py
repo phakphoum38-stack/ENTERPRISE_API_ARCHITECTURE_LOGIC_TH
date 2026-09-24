@@ -14,7 +14,7 @@ def main() -> None:
     surfaces = payload["surfaces"]
     assert len(surfaces) == 18, "product surface inventory must cover the 18 canonical destinations"
     indexes = [item[1] for item in surfaces]
-    assert indexes == list(range(17)), f"navigation indexes drifted: {indexes}"
+    assert indexes == list(range(18)), f"navigation indexes drifted: {indexes}"
     labels = [item[0] for item in surfaces]
     assert len(labels) == len(set(labels)), "surface labels must be unique"
 
