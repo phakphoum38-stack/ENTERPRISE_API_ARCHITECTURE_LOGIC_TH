@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "current" / "RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
@@ -13,35 +12,31 @@ CONTRACT = ROOT / "current" / "RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
 REQUIRED_FILES = (
     "current/CANONICAL_PLATFORM_CONTRACT.yml",
     "current/GOLDEN_RELEASE_CONTRACT.yml",
+    "current/RESEARCH_OS_PHASE_B_LIFECYCLE_EVIDENCE_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_C_CAPABILITY_E2E_BINDING_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_D_CROSS_SURFACE_PARITY_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_E_UNIFIED_WINDOWS_DISTRIBUTION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_CORE_COMPLETION_CONTRACT.json",
+    "current/RESEARCH_OS_100_PROJECT_READINESS_CONTRACT.json",
     ".github/workflows/research-os-gate.yml",
     ".github/workflows/research-os-final-gate.yml",
     ".github/workflows/research-os-platform-surface-matrix.yml",
     ".github/workflows/research-os-release-spine-gate.yml",
+    ".github/workflows/research-os-unified-final-gate.yml",
     "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
     "apps/research_os_flutter/test/platform_surface_parity_test.dart",
     "apps/research_os_flutter/test/desktop_shell_test.dart",
 )
 
 EXPECTED_SPINE = (
-    "identity",
-    "capability",
-    "authorization",
-    "navigation",
-    "page_feature",
-    "workflow",
-    "event_queue",
-    "stateless_runner",
-    "evidence_provenance",
-    "aeos_recheck",
-    "final_gate",
-    "release",
+    "identity", "capability", "authorization", "navigation", "page_feature",
+    "workflow", "event_queue", "stateless_runner", "evidence_provenance",
+    "aeos_recheck", "final_gate", "release",
 )
-
 
 def fail(message: str) -> "NoReturn":
     print(f"UNIFIED_FINAL_GATE=FAIL: {message}")
     raise SystemExit(1)
-
 
 def main() -> None:
     if not CONTRACT.is_file():
@@ -61,25 +56,19 @@ def main() -> None:
     if missing:
         fail("missing required anchors: " + ", ".join(missing))
 
-    navigation = (
-        ROOT
-        / "apps"
-        / "research_os_flutter"
-        / "lib"
-        / "src"
-        / "ui"
-        / "enterprise_navigation.dart"
-    ).read_text(encoding="utf-8")
+    for contract_ref in (
+        "current/RESEARCH_OS_PLATFORM_CORE_COMPLETION_CONTRACT.json",
+        "current/RESEARCH_OS_100_PROJECT_READINESS_CONTRACT.json",
+    ):
+        if f"  - {contract_ref}" not in text:
+            fail(f"required completion contract is not bound: {contract_ref}")
 
+    navigation = (ROOT / "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart").read_text(encoding="utf-8")
     marker = "const researchNavigationItems"
     if marker not in navigation:
         fail("navigation registry declaration is missing")
     registry = navigation.split(marker, 1)[1].split("];", 1)[0]
-    entries = re.findall(
-        r"ResearchNavItem\((.*?)\),\s*(?=ResearchNavItem|$)",
-        registry,
-        flags=re.DOTALL,
-    )
+    entries = re.findall(r"ResearchNavItem\((.*?)\),\s*(?=ResearchNavItem|$)", registry, flags=re.DOTALL)
     indexes: list[int] = []
     for entry in entries:
         numbers = re.findall(r"\b(\d+)\b", entry)
@@ -96,10 +85,11 @@ def main() -> None:
         fail("unified spine is incomplete: " + ", ".join(missing_spine))
 
     print("UNIFIED_FINAL_GATE_CONTRACT=PASS")
+    print("PLATFORM_CORE_COMPLETION=BOUND")
+    print("100_PROJECT_READINESS=BOUND")
     print("NAVIGATION_REGISTRY=15_DESTINATIONS")
     print("RELEASE_AUTHORITY=FINAL_GATE")
     print("DEFERRED_POLICY=EXPLICIT_AND_FAIL_CLOSED")
-
 
 if __name__ == "__main__":
     main()
