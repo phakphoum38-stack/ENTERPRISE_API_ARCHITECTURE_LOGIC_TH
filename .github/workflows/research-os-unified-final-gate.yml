@@ -49,6 +49,8 @@ jobs:
         run: python tools/platform_core_completion.py
       - name: Validate complete platform architecture
         run: python tools/validate_research_os_platform_architecture.py
+      - name: Validate platform phases 1-12 completion
+        run: python tools/validate_research_os_platform_complete_1_12.py
       - name: Validate exact source identity
         run: |
           set -euo pipefail
@@ -259,6 +261,8 @@ jobs:
         run: |
           python tools/validate_research_os_platform_architecture.py
           python -m unittest tools.test_validate_research_os_platform_architecture -v
+          python tools/validate_research_os_platform_complete_1_12.py
+          python -m unittest tools.test_validate_research_os_platform_complete_1_12 -v
 
   decision:
     name: Unified release decision
