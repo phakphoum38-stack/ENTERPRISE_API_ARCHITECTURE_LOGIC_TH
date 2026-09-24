@@ -148,7 +148,7 @@ class LifecycleEvidenceLedger:
         expected_source_sha: str,
         expected_project_id: str | None = None,
     ) -> tuple[str, ...]:
-        records = self.read()
+        records = tuple(record for record in self.read() if record.correlation_id == correlation_id)
         errors: list[str] = []
         if not records:
             return ("missing lifecycle evidence",)
