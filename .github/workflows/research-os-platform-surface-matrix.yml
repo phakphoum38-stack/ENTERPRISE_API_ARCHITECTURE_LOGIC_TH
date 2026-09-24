@@ -1,0 +1,99 @@
+name: Research OS Platform Surface Matrix
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/research_os_flutter/**"
+      - "packages/research_os_contracts/**"
+      - ".github/workflows/research-os-platform-surface-matrix.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/research_os_flutter/**"
+      - "packages/research_os_contracts/**"
+      - ".github/workflows/research-os-platform-surface-matrix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-platform-surface-matrix-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  platform-surface:
+    name: "${{ matrix.platform }} platform surface"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            build_command: flutter build windows --release
+            artifact_path: build/windows
+          - platform: web
+            os: ubuntu-latest
+            build_command: flutter build web --release
+            artifact_path: build/web
+          - platform: ios
+            os: macos-latest
+            build_command: flutter build ios --release --no-codesign
+            artifact_path: build/ios/iphoneos/Runner.app
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate shared Research OS source
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test test/platform_surface_parity_test.dart
+          flutter test test/desktop_shell_test.dart
+
+      - name: Bootstrap target platform in isolated workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_app="$GITHUB_WORKSPACE/apps/research_os_flutter"
+          work="$RUNNER_TEMP/research-os-platform-${{ matrix.platform }}"
+          rm -rf "$work"
+          mkdir -p "$work"
+          cp -R "$source_app/." "$work/"
+          cd "$work"
+          flutter create --platforms=${{ matrix.platform }} --project-name=research_os_flutter .
+          test -d "${{ matrix.artifact_path }}" || true
+          echo "RESEARCH_OS_PLATFORM_WORKSPACE=$work" >> "$GITHUB_ENV"
+
+      - name: Build target platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RESEARCH_OS_PLATFORM_WORKSPACE"
+          flutter pub get
+          ${{ matrix.build_command }}
+          echo "RESEARCH_OS_PLATFORM_BUILD=PASS"
+          test -e "${{ matrix.artifact_path }}"
+
+      - name: Verify shared contract remains present
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RESEARCH_OS_PLATFORM_WORKSPACE"
+          test -f pubspec.yaml
+          test -d lib
+          test -d test
+          echo "RESEARCH_OS_SHARED_SOURCE_CONTRACT=PASS"
