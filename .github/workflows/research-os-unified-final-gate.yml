@@ -35,20 +35,18 @@ jobs:
         with:
           ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
-
       - name: Verify checked-out SHA
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$TARGET_SHA"
           echo "CHECKED_OUT_SHA=$actual"
-
       - name: Validate unified final gate contract
         run: python tools/validate_research_os_unified_final_gate.py
-
       - name: Validate canonical platform contract
         run: python tools/validate_canonical_platform_contract.py
-
+      - name: Validate platform core completion
+        run: python tools/platform_core_completion.py
       - name: Validate exact source identity
         run: |
           set -euo pipefail
@@ -66,29 +64,23 @@ jobs:
         with:
           ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
       - name: Shared dependencies
         working-directory: apps/research_os_flutter
         run: flutter pub get
-
       - name: Shared analysis
         working-directory: apps/research_os_flutter
         run: flutter analyze
-
       - name: Navigation surface parity
         working-directory: apps/research_os_flutter
         run: flutter test test/platform_surface_parity_test.dart
-
       - name: Capability to navigation binding
         working-directory: apps/research_os_flutter
         run: flutter test test/navigation_capability_binding_test.dart
-
       - name: Page mapping contract
         working-directory: apps/research_os_flutter
         run: flutter test test/desktop_shell_test.dart
@@ -104,23 +96,18 @@ jobs:
         with:
           ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
-
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-
       - name: Compile source
         run: python -m compileall -q v3/research_os_v3 v3/tests
-
       - name: Unified validator test
         run: python -m unittest tools.test_validate_research_os_unified_final_gate -v
-
       - name: Research OS tests
         env:
           PYTHONPATH: .:v3
         run: python -m unittest discover -s v3/tests -p 'test_*.py' -v
-
       - name: Phase C capability E2E binding
         env:
           PYTHONPATH: .
@@ -130,20 +117,24 @@ jobs:
             tools.test_lifecycle_evidence \
             tools.test_capability_e2e_binding \
             -v
-
       - name: Phase D cross-surface parity
         env:
           PYTHONPATH: .
         run: |
           python tools/validate_phase_d_cross_surface_parity.py
           python -m unittest tools.test_phase_d_cross_surface_parity -v
-
       - name: Phase E unified Windows distribution contract
         env:
           PYTHONPATH: .
         run: |
           python tools/validate_phase_e_unified_windows_distribution.py
           python -m unittest tools.test_phase_e_unified_windows_distribution -v
+      - name: Platform core and 100-project readiness
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/platform_core_completion.py
+          python -m unittest tools.test_platform_core_completion -v
 
   decision:
     name: Unified release decision
