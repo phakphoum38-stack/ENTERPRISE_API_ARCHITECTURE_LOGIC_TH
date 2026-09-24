@@ -110,5 +110,15 @@ class LifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(hasattr(LifecycleEvidenceLedger, "authorize"))
 
 
+    def test_terminal_state_cannot_be_followed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = LifecycleEvidenceLedger(Path(directory) / "evidence.jsonl")
+            ledger.append(make("COMPLETE"))
+            ledger.append(make("RECOVER", recovery_required=True, recovery_reason="late-event"))
+            self.assertIn(
+                "terminal lifecycle state cannot be followed",
+                ledger.validate_chain(correlation_id="corr-001", expected_source_sha=SHA),
+            )
+
 if __name__ == "__main__":
     unittest.main()
