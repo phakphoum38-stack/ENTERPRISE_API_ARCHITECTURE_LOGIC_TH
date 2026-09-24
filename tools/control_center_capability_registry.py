@@ -61,10 +61,9 @@ class CapabilityBinding:
             raise ValueError(f"unsupported status: {self.status}")
 
 
-# Evidence basis: paths/classes below are present on the canonical main
-# snapshot 410c05fac73744495c55a17ba822156b3b68a09b. "PARTIAL" is intentional:
-# it means the component exists, but the full central lifecycle is not yet
-# proven as one executable binding on that snapshot.
+# Evidence basis: Phase C established the canonical Control Center delegation
+# and lifecycle/evidence binding. Phase D keeps this registry synchronized with
+# that binding; Assurance remains intentionally non-executable.
 CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
     CapabilityBinding(
         "control_center",
@@ -93,8 +92,8 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "owner_special/research_os_friend/runtime.py:EvidenceRecorder",
         "owner_special/research_os_friend/runtime.py:FriendRuntime",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
-        "PARTIAL",
-        "Canonical Friend runtime is real and owner-bound; central Command→Friend binding is not yet canonical on main.",
+        "CANONICAL_WIRED",
+        "Friend runtime is owner-bound and now reconciled through the canonical delegation/lifecycle boundary.",
     ),
     CapabilityBinding(
         "agent",
@@ -108,8 +107,8 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "owner_special/research_os_friend/agent_trace_store.py:PersistentAgentTraceStore",
         "owner_special/research_os_friend/agent_runtime.py:AgentRun",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
-        "PARTIAL",
-        "Agent lifecycle and trace persistence exist; central resolver/executor binding is not yet canonical on main.",
+        "CANONICAL_WIRED",
+        "Agent lifecycle and trace persistence are reconciled through the canonical delegation/lifecycle boundary.",
     ),
     CapabilityBinding(
         "github",
@@ -123,8 +122,8 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "tools/research_os_api/github_status.py",
         "tools/research_os_api/github_status.py",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
-        "PARTIAL",
-        "GitHub inspection is present; canonical command→workflow execution is a separate binding gap.",
+        "CANONICAL_WIRED",
+        "GitHub is intentionally read-only in the current delegation contract and is reconciled through the canonical inspection binding.",
     ),
     CapabilityBinding(
         "factory_v3",
@@ -138,8 +137,8 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "v3/research_os_v3/execution.py",
         "v3/research_os_v3/execution.py",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
-        "PARTIAL",
-        "V3 execution is canonical for V3; Control Center must delegate rather than duplicate it.",
+        "CANONICAL_WIRED",
+        "V3 execution remains authoritative and is reached through the canonical delegation boundary.",
     ),
     CapabilityBinding(
         "assurance",
@@ -153,8 +152,8 @@ CANONICAL_CAPABILITY_BINDINGS: tuple[CapabilityBinding, ...] = (
         "owner_special/research_os_friend/evidence.py:EvidenceRecorder",
         "current/NATIVE_CONTROL_SURFACE_CONTRACT.json",
         "owner_special/flutter_app/lib/src/native_core_workspace_page.dart:_Inspector",
-        "PARTIAL",
-        "Evidence exists in canonical runtimes, but a universal cross-engine evidence binding is not yet established.",
+        "WIRED_NOT_EXECUTABLE",
+        "Assurance is bound to the evidence boundary but intentionally exposes no executable operations.",
     ),
 )
 

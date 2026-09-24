@@ -1,0 +1,35 @@
+{
+  "contract_id": "research-os-phase-d-cross-surface-parity-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Reconcile the canonical capability registry, delegation bindings, lifecycle evidence boundary, and shared Windows/Web/iOS application surface without creating duplicate authority or execution systems.",
+  "depends_on": [
+    "current/ARCHITECTURE_COMPLETENESS_CONTRACT.json",
+    "current/NATIVE_COMMAND_ROUTING_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_B_LIFECYCLE_EVIDENCE_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_C_CAPABILITY_E2E_BINDING_CONTRACT.json"
+  ],
+  "capabilities": ["control_center", "friend", "agent", "github", "factory_v3", "assurance"],
+  "rules": [
+    "one_canonical_capability_registry",
+    "one_delegation_binding_per_capability",
+    "existing_executor_remains_authoritative",
+    "read_only_and_mutation_action_classes_must_match",
+    "assurance_never_executes",
+    "evidence_uses_phase_b_boundary",
+    "platforms_share_one_application_surface",
+    "platforms_do_not_create_capability_or_navigation_registries",
+    "unresolved_parity_is_not_pass",
+    "final_gate_remains_release_authority"
+  ],
+  "required_evidence_fields": [
+    "event_id",
+    "correlation_id",
+    "source_sha",
+    "target_sha",
+    "workflow_run_id",
+    "contract_version",
+    "fingerprint"
+  ],
+  "required_platforms": ["windows", "web", "ios"]
+}
