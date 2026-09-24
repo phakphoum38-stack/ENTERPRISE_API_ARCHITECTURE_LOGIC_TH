@@ -48,7 +48,6 @@ class CapabilityE2EBinding:
         self.source_sha = source_sha
         self.target_sha = target_sha
         self.workflow_run_id = workflow_run_id
-        self.project_id = project_id
         self.contract_version = contract_version
 
     def invoke(
@@ -61,6 +60,7 @@ class CapabilityE2EBinding:
         kwargs: Mapping[str, Any] | None = None,
         correlation_id: str,
         authorized: bool,
+        project_id: str | None = None,
     ) -> BindingResult:
         """Invoke an existing executor and project its observation into evidence.
 
@@ -68,25 +68,27 @@ class CapabilityE2EBinding:
         class never grants authorization. A false value fails before execution.
         """
         kwargs = dict(kwargs or {})
-        self._record(correlation_id, capability_id, action, "INTENT")
+        if project_id is not None and not project_id.strip():
+            raise ValueError("project_id cannot be blank")
+        self._record(correlation_id, capability_id, action, "INTENT", project_id=project_id or "")
 
         try:
             operation = get_operation(capability_id, action)
-            self._record(correlation_id, capability_id, action, "VALIDATE")
+            self._record(correlation_id, capability_id, action, "VALIDATE", project_id=project_id or "")
             self._validate_sha()
             method = self._resolve_executor(executor, operation)
 
-            self._record(correlation_id, capability_id, action, "PREPARE")
+            self._record(correlation_id, capability_id, action, "PREPARE", project_id=project_id or "")
             if not authorized:
                 raise CapabilityBindingError("external authorization is required")
-            self._record(correlation_id, capability_id, action, "AUTHORIZE")
+            self._record(correlation_id, capability_id, action, "AUTHORIZE", project_id=project_id or "")
 
             observation = method(*args, **kwargs)
 
-            self._record(correlation_id, capability_id, action, "EXECUTE")
-            self._record(correlation_id, capability_id, action, "OBSERVE")
-            self._record(correlation_id, capability_id, action, "EVIDENCE")
-            self._record(correlation_id, capability_id, action, "COMPLETE")
+            self._record(correlation_id, capability_id, action, "EXECUTE", project_id=project_id or "")
+            self._record(correlation_id, capability_id, action, "OBSERVE", project_id=project_id or "")
+            self._record(correlation_id, capability_id, action, "EVIDENCE", project_id=project_id or "")
+            self._record(correlation_id, capability_id, action, "COMPLETE", project_id=project_id or "")
 
             return BindingResult(
                 capability_id=capability_id,
@@ -104,6 +106,7 @@ class CapabilityE2EBinding:
                 "RECOVER",
                 recovery_required=True,
                 recovery_reason=reason,
+                project_id=project_id or "",
             )
             return BindingResult(
                 capability_id=capability_id,
@@ -133,6 +136,7 @@ class CapabilityE2EBinding:
         action: str,
         state: str,
         *,
+        project_id: str = "",
         recovery_required: bool = False,
         recovery_reason: str | None = None,
     ) -> None:
@@ -149,7 +153,7 @@ class CapabilityE2EBinding:
                 contract_version=self.contract_version,
                 recovery_required=recovery_required,
                 recovery_reason=recovery_reason,
-                project_id=self.project_id,
+                project_id=project_id,
             )
         )
 
