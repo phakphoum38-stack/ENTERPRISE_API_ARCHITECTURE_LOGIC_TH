@@ -29,6 +29,7 @@
     "target_sha",
     "workflow_run_id",
     "contract_version",
+    "project_id",
     "fingerprint"
   ],
   "required_platforms": ["windows", "web", "ios"]
