@@ -149,6 +149,11 @@ jobs:
           PYTHONPATH: .
         run: |
           python -m unittest tools.test_project_scale_execution -v
+      - name: Platform production hardening
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest tools.test_platform_production_hardening -v
 
   decision:
     name: Unified release decision

@@ -34,6 +34,9 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json",
     "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
     "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_PRODUCTION_HARDENING_CONTRACT.json",
+    "tools/platform_production_hardening.py",
+    "tools/test_platform_production_hardening.py",
     "tools/test_runner_installer.py",
     "tools/research_os_api/runner_installer.py",
     "scripts/bootstrap-research-os.py",
@@ -113,6 +116,7 @@ def main() -> None:
         "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json",
         "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
         "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_PRODUCTION_HARDENING_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
             fail(f"required completion contract is not bound: {contract_ref}")

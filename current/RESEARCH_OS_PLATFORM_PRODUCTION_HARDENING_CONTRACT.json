@@ -1,0 +1,103 @@
+{
+  "contract_id": "research-os-platform-production-hardening-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Prove that the existing Research OS Platform remains isolated, recoverable, traceable, distributable, and release-gated when exercised at 100-project scale.",
+  "scope": [
+    "100_PROJECT_SCALE",
+    "FAILURE_RECOVERY",
+    "EVIDENCE_PROVENANCE",
+    "UNIFIED_DISTRIBUTION",
+    "PRODUCTION_READINESS"
+  ],
+  "scale": {
+    "project_count": 100,
+    "concurrency_levels": [10, 20, 50, 100],
+    "shared_platform_required": true,
+    "project_isolation_required": true,
+    "cross_project_resource_mutation_forbidden": true,
+    "cross_project_evidence_forbidden": true
+  },
+  "failure_recovery": {
+    "required_scenarios": [
+      "runner_failure",
+      "worker_failure",
+      "lease_expiry",
+      "stale_ack",
+      "retry_exhaustion",
+      "timeout",
+      "cancellation",
+      "resource_conflict"
+    ],
+    "terminal_states": ["COMPLETE", "RECOVER", "FAILED", "CANCELLED"],
+    "retry_requires_attempt_identity": true,
+    "timeout_is_explicit": true,
+    "cancellation_is_explicit": true,
+    "stale_delivery_must_fail_closed": true,
+    "recovery_must_preserve_project_identity": true
+  },
+  "evidence_provenance": {
+    "required_fields": [
+      "project_id",
+      "correlation_id",
+      "workflow_run_id",
+      "source_sha",
+      "target_sha",
+      "contract_version",
+      "attempt_id",
+      "check_id",
+      "result",
+      "timestamp"
+    ],
+    "freshness_requires_exact_source_sha": true,
+    "artifact_sha256_required": true,
+    "unknown_is_not_pass": true,
+    "skipped_is_not_pass": true,
+    "deferred_is_not_pass": true,
+    "cross_project_lineage_forbidden": true
+  },
+  "distribution": {
+    "windows_unified_package_required": true,
+    "existing_phase_e_contract_remains_authoritative": true,
+    "required_components": [
+      "research_os_flutter",
+      "research_os_python",
+      "tools",
+      "platform",
+      "assurance",
+      "owner_special",
+      "workflow_tooling",
+      "runtime_python",
+      "universal_runner",
+      "runner_installer"
+    ],
+    "package_is_not_execution_authority": true,
+    "final_gate_is_release_authority": true
+  },
+  "production_readiness": {
+    "required": [
+      "contract_workflow_validator_consistency",
+      "reproducible_target_sha",
+      "resource_isolation",
+      "failure_recovery",
+      "evidence_lineage",
+      "artifact_integrity",
+      "distribution_integrity",
+      "rollback_plan",
+      "observability",
+      "final_gate_aggregation"
+    ],
+    "unknown_blocks_release": true,
+    "deferred_blocks_release": true,
+    "duplicate_release_authority_forbidden": true
+  },
+  "authority": {
+    "no_new_runtime": true,
+    "no_new_scheduler": true,
+    "no_new_queue": true,
+    "no_new_authorization_authority": true,
+    "no_new_evidence_ledger": true,
+    "no_new_release_authority": true,
+    "final_gate_remains_single_release_authority": true
+  }
+}
