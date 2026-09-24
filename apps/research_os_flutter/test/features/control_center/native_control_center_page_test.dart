@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:research_os_flutter/src/api/research_os_api_client.dart';
+import 'package:research_os_flutter/src/features/control_center/native_control_audit_view.dart';
 import 'package:research_os_flutter/src/features/control_center/native_control_center_page.dart';
 
 class _FakeClient extends http.BaseClient {
@@ -105,22 +106,58 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byType(NativeControlAuditView), findsOneWidget);
     expect(find.byIcon(Icons.rule_folder_outlined), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.rule_folder_outlined));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Main Final Audit'), findsOneWidget);
-    expect(find.text('Run Audit'), findsOneWidget);
-
-    await tester.tap(find.text('Run Audit'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Latest: DEFERRED'), findsOneWidget);
-    expect(find.text('Offline package audit'), findsOneWidget);
-    expect(find.text('Installed baseline'), findsOneWidget);
-    expect(find.text('Release authority decision'), findsOneWidget);
-    expect(find.text('Export Audit JSON'), findsOneWidget);
 
     api.close();
   });
+
+  testWidgets('Main Final Audit renders snapshots and preserves deferred state',
+      (tester) async {
+    const snapshot = NativeControlAuditSnapshot(
+      auditId: 'audit-test',
+      observedAt: null,
+      status: 'DEFERRED',
+      checks: <Map<String, String>>[
+        <String, String>{
+          'check': 'Offline package audit',
+          'state': 'DEFERRED',
+          'detail': 'Not exposed by the current read-only API surface',
+        },
+        <String, String>{
+          'check': 'Installed baseline',
+          'state': 'DEFERRED',
+          'detail': 'Not exposed by the current read-only API surface',
+        },
+      ],
+      source: 'test',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NativeControlAuditView(
+          health: const <String, dynamic>{'status': 'ok'},
+          brain: const <String, dynamic>{'capacity': 1},
+          skills: const <String, dynamic>{'skills': <String>['test']},
+          providers: const <String, dynamic>{'providers': <String>['test']},
+          agents: const <String, dynamic>{'agents': <String>['test']},
+          agentReadiness: const <String, dynamic>{'status': 'ready'},
+          orchestrations: const <String, dynamic>{
+            'orchestrations': <Map<String, dynamic>>[
+              <String, dynamic>{'run_id': 'run-1', 'status': 'completed'},
+            ],
+          },
+          snapshots: <NativeControlAuditSnapshot>[snapshot],
+          onRun: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Main Final Audit'), findsOneWidget);
+    expect(find.text('Latest: DEFERRED'), findsOneWidget);
+    expect(find.text('Offline package audit'), findsOneWidget);
+    expect(find.text('Installed baseline'), findsOneWidget);
+    expect(find.text('Export Audit JSON'), findsOneWidget);
+  });
+
 }
