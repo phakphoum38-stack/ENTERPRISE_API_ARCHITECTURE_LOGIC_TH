@@ -336,6 +336,31 @@
         "unified_final_gate",
         "flutter_surface"
       ]
+    },
+    {
+      "id": "memory_fabric",
+      "canonical": "tools/research_os_api/memory_fabric.py",
+      "kind": "STORAGE_BACKED_MEMORY_ABSTRACTION",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "workflow",
+        "evidence"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_memory_fabric.py"
+      ],
+      "evidence": [
+        "tools/research_os_api/memory_fabric.py",
+        "docs/RESEARCH_OS_MEMORY_FABRIC_ARCHITECTURE.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
     }
   ],
   "rules": [
@@ -343,6 +368,8 @@
     "canonical_sources_remain_authoritative",
     "unknown_is_not_done",
     "missing_evidence_is_not_pass",
-    "final_gate_is_single_release_authority"
+    "final_gate_is_single_release_authority",
+    "nvme_is_storage_backed_memory_not_dram",
+    "unknown_hardware_capability_is_not_available"
   ]
 }

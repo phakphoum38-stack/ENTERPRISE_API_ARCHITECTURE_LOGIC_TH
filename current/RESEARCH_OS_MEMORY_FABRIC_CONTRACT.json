@@ -1,0 +1,16 @@
+{
+  "contract_id": "research-os-memory-fabric-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical descriptive contract for tiered memory used by Research OS workloads. NVMe is a storage-backed memory tier, never DRAM or a new authority.",
+  "authority": {"type": "DESCRIPTIVE_ONLY", "creates_runtime_authority": false, "creates_release_authority": false, "unified_final_gate_remains_release_authority": true},
+  "tiers": [{"id":"T0","name":"CPU_CACHE","persistent":false},{"id":"T1","name":"DRAM","persistent":false},{"id":"T2","name":"NVME","persistent":true},{"id":"T3","name":"PERSISTENT_STORAGE","persistent":true}],
+  "nvme": {"role":"STORAGE_BACKED_MEMORY_TIER","pcie_generation_optional":true,"pcie5_is_acceleration_capability_not_requirement":true,"direct_hardware_control_from_python":false,"recommended_access":["mmap","buffered_io","native_adapter_when_required"]},
+  "operations": ["allocate","read","write","promote","demote","evict","pin"],
+  "placement_policy": {"HOT":"DRAM","WARM":"NVME","COLD":"NVME_OR_PERSISTENT_STORAGE","PERSIST":"PERSISTENT_STORAGE"},
+  "future_backends": ["GPU_VRAM","NUMA","CXL_MEMORY","REMOTE_MEMORY"],
+  "isolation": {"project_scoped":true,"owner_session_scoped":true,"cross_project_cache_forbidden":true,"cross_project_evidence_forbidden":true},
+  "workload_support": ["dataset_processing","checkpoint","artifact_workspace","cache","prefetch"],
+  "safety": {"nvme_must_not_be_described_as_dram":true,"unknown_capability_must_not_be_promoted_to_available":true,"capacity_exhaustion_is_explicit":true,"eviction_must_not_cross_isolation_boundary":true},
+  "observability": ["tier","capacity","usage","io_latency","queue_depth","pressure","capability"]
+}
