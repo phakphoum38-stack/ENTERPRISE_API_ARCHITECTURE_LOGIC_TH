@@ -30,7 +30,7 @@ MARKERS = (
     ("tools/capability_e2e_binding.py", "class CapabilityE2EBinding"),
     ("tools/lifecycle_evidence.py", "class LifecycleEvidence"),
     ("tools/control_center_capability_registry.py", "CANONICAL_CAPABILITY_BINDINGS"),
-    ("tools/native_command_router.py", "simulation"),
+    ("tools/native_command_router.py", "MODES = frozenset"),
 )
 
 def validate(root: Path = ROOT) -> tuple[str, ...]:
