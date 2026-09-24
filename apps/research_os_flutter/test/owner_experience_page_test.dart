@@ -40,7 +40,7 @@ void main() {
     expect(find.text('OWNER session verified'), findsOneWidget);
     expect(find.text('Projects configured'), findsOneWidget);
     expect(find.text('1'), findsWidgets);
-    expect(find.byKey(const Key('owner-release-authority')), findsOneWidget);
+    expect(find.byKey(const Key('owner-authority-boundary')), findsOneWidget);
     expect(find.textContaining('unrestricted by resource or scope'), findsOneWidget);
   });
 }
