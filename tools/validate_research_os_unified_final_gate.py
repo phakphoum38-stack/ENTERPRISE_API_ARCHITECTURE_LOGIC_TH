@@ -38,6 +38,9 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PLATFORM_PRODUCTION_COMPLETION_CONTRACT.json",
     "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json",
+    "current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json",
+    "tools/research_os_m2_audit.py",
+    "tools/test_research_os_m2_audit.py",
     "tools/validate_platform_completion_schedule.py",
     "tools/test_platform_completion_schedule.py",
     "tools/validate_owner_experience_platform.py",
@@ -165,6 +168,8 @@ def main() -> None:
     governance = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_platform_governance.py")], cwd=ROOT, text=True, capture_output=True)
     if governance.returncode != 0:
         fail("platform governance validation failed: " + (governance.stdout or governance.stderr).strip())
+    if "m2_audit:" not in text or "m2_audit_integrity_failure: STOP" not in text:
+        fail("M.2 audit binding is incomplete")
     missing_spine = [item for item in EXPECTED_SPINE if f"  - {item}" not in text]
     if missing_spine:
         fail("unified spine is incomplete: " + ", ".join(missing_spine))
@@ -176,6 +181,7 @@ def main() -> None:
     print("DEFERRED_POLICY=EXPLICIT_AND_FAIL_CLOSED")
     print("AEOS_RECHECK=BOUND_TO_FINAL_GATE")
     print("AEOS_RELEASE_AUTHORITY=FINAL_GATE")
+    print("M2_AUDIT=BOUND_TO_FINAL_GATE")
 
 if __name__ == "__main__":
     main()
