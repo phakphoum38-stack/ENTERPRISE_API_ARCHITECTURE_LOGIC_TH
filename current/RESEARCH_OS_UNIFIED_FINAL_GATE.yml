@@ -58,6 +58,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_PRODUCTION_COMPLETION_CONTRACT.json
   - current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json
+  - current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -96,6 +97,14 @@ assurance_recheck:
     - EXPIRED
   release_authority_remains: final_gate
 
+m2_audit:
+  contract: current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json
+  implementation: tools/research_os_m2_audit.py
+  test: tools/test_research_os_m2_audit.py
+  exact_source_sha: required
+  integrity_failure: STOP
+  release_authority_remains: final_gate
+
 navigation:
   source_of_truth: apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
   cardinality: derived_from_registry
@@ -126,5 +135,6 @@ fail_closed:
   evidence_mismatch: STOP
   provenance_mismatch: STOP
   unauthorized_release: STOP
+  m2_audit_integrity_failure: STOP
   missing_aeos_recheck: STOP
   aeos_non_pass: STOP
