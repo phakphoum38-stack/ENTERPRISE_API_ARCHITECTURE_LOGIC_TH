@@ -3,6 +3,8 @@
 from __future__ import annotations
 from pathlib import Path
 import re
+import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "current" / "RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
@@ -41,6 +43,9 @@ REQUIRED_FILES = (
     "tools/runtime_evidence.py",
     "tools/test_runtime_evidence.py",
     "tools/project_registry.py",
+    "tools/validate_platform_governance.py",
+    "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json",
+    "tools/platform_governance_report.py",
     "tools/test_project_registry.py",
     ".github/workflows/research-os-gate.yml",
     ".github/workflows/research-os-final-gate.yml",
@@ -109,6 +114,9 @@ def main() -> None:
         fail("navigation registry is empty")
     if sorted(indexes) != list(range(len(indexes))):
         fail(f"navigation indexes drifted: {indexes}")
+    governance = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_platform_governance.py")], cwd=ROOT, text=True, capture_output=True)
+    if governance.returncode != 0:
+        fail("platform governance validation failed: " + (governance.stdout or governance.stderr).strip())
     missing_spine = [item for item in EXPECTED_SPINE if f"  - {item}" not in text]
     if missing_spine:
         fail("unified spine is incomplete: " + ", ".join(missing_spine))
