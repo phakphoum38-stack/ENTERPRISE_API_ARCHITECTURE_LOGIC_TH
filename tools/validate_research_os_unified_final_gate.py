@@ -35,6 +35,8 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
     "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
     "tools/test_runner_installer.py",
+    "tools/research_os_api/runner_installer.py",
+    "scripts/bootstrap-research-os.py",
     "tools/test_platform_operating_control.py",
     "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
     "apps/research_os_flutter/test/owner_experience_page_test.dart",
