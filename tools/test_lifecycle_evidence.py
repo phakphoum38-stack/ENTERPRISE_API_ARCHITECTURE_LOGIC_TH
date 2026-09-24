@@ -1,3 +1,5 @@
+import tempfile
+import unittest
 from pathlib import Path
 
 from tools.lifecycle_evidence import LifecycleEvidence, LifecycleEvidenceLedger
@@ -20,56 +22,78 @@ def make(state: str, **kwargs: object) -> LifecycleEvidence:
     )
 
 
-def test_required_evidence_fields_and_fingerprint() -> None:
-    record = make("INTENT")
-    assert record.event_id.startswith("ev-")
-    assert record.correlation_id == "corr-001"
-    assert record.source_sha == SHA
-    assert record.target_sha == SHA
-    assert record.workflow_run_id == "workflow-001"
-    assert len(record.fingerprint) == 64
-    assert len(record.evidence_sha256) == 64
+class LifecycleEvidenceTests(unittest.TestCase):
+    def test_required_evidence_fields_and_fingerprint(self) -> None:
+        record = make("INTENT")
+        self.assertTrue(record.event_id.startswith("ev-"))
+        self.assertEqual(record.correlation_id, "corr-001")
+        self.assertEqual(record.source_sha, SHA)
+        self.assertEqual(record.target_sha, SHA)
+        self.assertEqual(record.workflow_run_id, "workflow-001")
+        self.assertEqual(len(record.fingerprint), 64)
+        self.assertEqual(len(record.evidence_sha256), 64)
+
+    def test_complete_lifecycle_validates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = LifecycleEvidenceLedger(Path(directory) / "evidence.jsonl")
+            for state in (
+                "INTENT", "VALIDATE", "PREPARE", "AUTHORIZE",
+                "EXECUTE", "OBSERVE", "EVIDENCE", "COMPLETE",
+            ):
+                ledger.append(make(state))
+            self.assertEqual(
+                ledger.validate_chain(
+                    correlation_id="corr-001", expected_source_sha=SHA
+                ),
+                (),
+            )
+
+    def test_failed_lifecycle_requires_explicit_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = LifecycleEvidenceLedger(Path(directory) / "evidence.jsonl")
+            ledger.append(make("INTENT"))
+            ledger.append(make("OBSERVE"))
+            ledger.append(
+                make(
+                    "RECOVER",
+                    recovery_required=True,
+                    recovery_reason="executor-failed",
+                )
+            )
+            self.assertEqual(
+                ledger.validate_chain(
+                    correlation_id="corr-001", expected_source_sha=SHA
+                ),
+                (),
+            )
+
+    def test_source_sha_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = LifecycleEvidenceLedger(Path(directory) / "evidence.jsonl")
+            ledger.append(make("INTENT"))
+            ledger.append(
+                make(
+                    "RECOVER",
+                    recovery_required=True,
+                    recovery_reason="source-changed",
+                )
+            )
+            self.assertIn(
+                "source SHA mismatch",
+                ledger.validate_chain(
+                    correlation_id="corr-001", expected_source_sha="b" * 40
+                ),
+            )
+
+    def test_recovery_without_reason_is_rejected(self) -> None:
+        with self.assertRaises(ValueError) as raised:
+            make("RECOVER", recovery_required=True)
+        self.assertIn("recovery_reason", str(raised.exception))
+
+    def test_module_does_not_execute_an_executor(self) -> None:
+        self.assertFalse(hasattr(LifecycleEvidenceLedger, "execute"))
+        self.assertFalse(hasattr(LifecycleEvidenceLedger, "authorize"))
 
 
-def test_complete_lifecycle_validates(tmp_path: Path) -> None:
-    ledger = LifecycleEvidenceLedger(tmp_path / "evidence.jsonl")
-    for state in ("INTENT", "VALIDATE", "PREPARE", "AUTHORIZE", "EXECUTE", "OBSERVE", "EVIDENCE", "COMPLETE"):
-        ledger.append(make(state))
-    assert ledger.validate_chain(correlation_id="corr-001", expected_source_sha=SHA) == ()
-
-
-def test_failed_lifecycle_requires_explicit_recovery(tmp_path: Path) -> None:
-    ledger = LifecycleEvidenceLedger(tmp_path / "evidence.jsonl")
-    ledger.append(make("INTENT"))
-    ledger.append(make("OBSERVE"))
-    ledger.append(
-        make(
-            "RECOVER",
-            recovery_required=True,
-            recovery_reason="executor-failed",
-        )
-    )
-    assert ledger.validate_chain(correlation_id="corr-001", expected_source_sha=SHA) == ()
-
-
-def test_source_sha_mismatch_fails_closed(tmp_path: Path) -> None:
-    ledger = LifecycleEvidenceLedger(tmp_path / "evidence.jsonl")
-    ledger.append(make("INTENT"))
-    ledger.append(make("RECOVER", recovery_required=True, recovery_reason="source-changed"))
-    assert "source SHA mismatch" in ledger.validate_chain(
-        correlation_id="corr-001", expected_source_sha="b" * 40
-    )
-
-
-def test_recovery_without_reason_is_rejected() -> None:
-    try:
-        make("RECOVER", recovery_required=True)
-    except ValueError as exc:
-        assert "recovery_reason" in str(exc)
-    else:
-        raise AssertionError("recovery must carry an explicit reason")
-
-
-def test_module_does_not_execute_an_executor() -> None:
-    assert not hasattr(LifecycleEvidenceLedger, "execute")
-    assert not hasattr(LifecycleEvidenceLedger, "authorize")
+if __name__ == "__main__":
+    unittest.main()

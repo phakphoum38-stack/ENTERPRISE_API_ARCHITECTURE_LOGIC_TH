@@ -69,6 +69,10 @@ class LifecycleEvidence:
             raise ValueError("identity, owner, source_sha and target_sha are required")
         if not workflow_run_id:
             raise ValueError("workflow_run_id is required")
+        if recovery_required and not recovery_reason:
+            raise ValueError("recovery_required requires recovery_reason")
+        if state == "RECOVER" and not recovery_required:
+            raise ValueError("RECOVER state requires recovery_required=true")
         core = {
             "correlation_id": correlation_id,
             "capability_id": capability_id,
