@@ -1,0 +1,65 @@
+{
+  "contract_id": "research-os-phase-e-unified-windows-distribution-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Assemble one SHA-bound Windows Research OS distribution from existing authoritative components without creating a second runtime, scheduler, authorization system, evidence plane, or release authority.",
+  "depends_on": [
+    "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+    "current/RESEARCH_OS_PHASE_D_CROSS_SURFACE_PARITY_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_C_CAPABILITY_E2E_BINDING_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_B_LIFECYCLE_EVIDENCE_CONTRACT.json"
+  ],
+  "required_components": [
+    "research_os_flutter",
+    "research_os_python",
+    "tools",
+    "platform",
+    "assurance",
+    "owner_special",
+    "workflow_tooling",
+    "runtime_python"
+  ],
+  "required_package_paths": [
+    "app/research_os_flutter.exe",
+    "owner_special/app/research_os_owner_special.exe",
+    "owner_special/OWNER_MANIFEST.json",
+    "owner_special/research_os_friend",
+    "owner_special/scripts",
+    "tools",
+    "v3",
+    "current",
+    "workflow",
+    "runtime/python/python.exe",
+    "service_host/ResearchOS.ServiceHost.exe",
+    "service_host/ResearchOS.Owner.ServiceHost.exe",
+    "scripts/research-os-service.ps1"
+  ],
+  "identity": {
+    "product_name": "Research OS",
+    "company_name": "Research OS Team",
+    "main_executable": "research_os_flutter.exe",
+    "owner_executable": "research_os_owner_special.exe"
+  },
+  "provenance": {
+    "source_sha_required": true,
+    "manifest_required": true,
+    "sha256_required": true,
+    "source_sha_must_match_manifest": true,
+    "artifact_sha256_required": true
+  },
+  "authority": {
+    "final_gate_remains_release_authority": true,
+    "owner_authorization_remains_authoritative": true,
+    "external_tools_are_not_authority": true,
+    "distribution_is_not_execution_authority": true
+  },
+  "forbidden": [
+    "second_runtime",
+    "second_scheduler",
+    "second_queue",
+    "second_authorization_system",
+    "second_evidence_ledger",
+    "platform_specific_navigation_registry",
+    "automatic_release"
+  ]
+}
