@@ -40,6 +40,11 @@ from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 from oauth_handoff import consume_handoff
 from providers import ProviderError, build_provider
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 from tools.project_registry import ProjectRegistry
 from tools.project_scale_readiness import PROJECT_COUNT, build_project_definitions
 import copilot_service
