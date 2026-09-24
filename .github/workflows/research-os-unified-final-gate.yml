@@ -161,6 +161,13 @@ jobs:
           python tools/validate_owner_experience_platform.py
           python -m unittest tools.test_owner_experience_platform -v
 
+      - name: Schedule completion reconciliation
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_platform_completion_schedule.py
+          python -m unittest tools.test_platform_completion_schedule tools.test_platform_operating_control -v
+
       - name: Platform production completion
         env:
           PYTHONPATH: .
