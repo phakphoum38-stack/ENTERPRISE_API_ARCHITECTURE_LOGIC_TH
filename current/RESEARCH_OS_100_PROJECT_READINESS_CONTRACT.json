@@ -35,12 +35,18 @@
   ],
   "scale_test": {
     "contexts": 100,
-    "validation_levels": [10, 20, 50, 100],
+    "validation_levels": [
+      10,
+      20,
+      50,
+      100
+    ],
     "concurrency_model": "shared_core",
     "isolation_model": "project_id_boundary",
     "duplicate_delivery": "idempotent",
     "conflict_policy": "REJECT",
-    "release_authority": "FINAL_GATE"
+    "release_authority": "FINAL_GATE",
+    "proof": "real ProjectRegistry definitions, not synthetic ProjectContext-only validation"
   },
   "fail_closed": [
     "duplicate_project_id",
