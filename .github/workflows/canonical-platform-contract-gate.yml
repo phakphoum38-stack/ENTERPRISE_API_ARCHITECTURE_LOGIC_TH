@@ -1,0 +1,56 @@
+name: Canonical Platform Contract Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "current/CANONICAL_PLATFORM_CONTRACT.yml"
+      - "current/GOLDEN_RELEASE_CONTRACT.yml"
+      - "tools/validate_canonical_platform_contract.py"
+      - ".github/workflows/canonical-platform-contract-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canonical-platform-contract-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate canonical platform contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Assert exact source SHA
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SHA"
+          echo "CANONICAL_PLATFORM_SOURCE_SHA=$actual"
+
+      - name: Validate canonical platform contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/validate_canonical_platform_contract.py
+
+      - name: Validate golden contract binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -qF 'canonical_platform_contract:' current/GOLDEN_RELEASE_CONTRACT.yml
+          grep -qF 'path: current/CANONICAL_PLATFORM_CONTRACT.yml' current/GOLDEN_RELEASE_CONTRACT.yml
+          grep -qF 'validator: tools/validate_canonical_platform_contract.py' current/GOLDEN_RELEASE_CONTRACT.yml
+          echo 'GOLDEN_CONTRACT_CANONICAL_PLATFORM_BINDING=PASS'
