@@ -82,12 +82,12 @@ def prove_failure_recovery() -> tuple[str, ...]:
         else:
             failures.append("stale ACK was accepted")
 
-        pool = BoundedWorkerPool(max_workers=1, max_queue=1)
+        pool = BoundedWorkerPool(max_workers=1, max_queue=2)
         blocker = Event()
         future = pool.submit("timeout-task", lambda _: blocker.wait())
         try:
-            pool.run_with_timeout("timeout-task-2", lambda _: "unexpected", timeout=0.01)
-        except (QueueSaturatedError, TaskTimeoutError):
+            pool.run_with_timeout("timeout-task-2", lambda _: blocker.wait(), timeout=0.01)
+        except TaskTimeoutError:
             pass
         finally:
             blocker.set()
