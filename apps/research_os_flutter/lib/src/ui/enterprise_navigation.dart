@@ -6,7 +6,7 @@ class ResearchNavItem {
     this.label,
     this.icon,
     this.index, {
-    this.destinationId,
+    required this.destinationId,
     this.capabilityId,
   });
 
