@@ -68,15 +68,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source_app="$GITHUB_WORKSPACE/apps/research_os_flutter"
+          source_repo="$GITHUB_WORKSPACE"
           work="$RUNNER_TEMP/research-os-platform-${{ matrix.platform }}"
           rm -rf "$work"
           mkdir -p "$work"
-          cp -R "$source_app/." "$work/"
-          cd "$work"
+          cp -R "$source_repo/." "$work/"
+          cd "$work/apps/research_os_flutter"
           flutter create --platforms=${{ matrix.platform }} --project-name=research_os_flutter .
-          test -d "${{ matrix.artifact_path }}" || true
-          echo "RESEARCH_OS_PLATFORM_WORKSPACE=$work" >> "$GITHUB_ENV"
+          echo "RESEARCH_OS_PLATFORM_WORKSPACE=$work/apps/research_os_flutter" >> "$GITHUB_ENV"
 
       - name: Build target platform
         shell: bash
