@@ -77,13 +77,14 @@ class NvmeMemoryRegion:
             raise ValueError("read exceeds region bounds")
         return bytes(self._require_open()[offset : offset + length])
 
-def detect_host_capabilities() -> dict[str, str | bool]:
+def detect_host_capabilities() -> dict[str, str | bool | None]:
     """Return conservative host facts without guessing PCIe/NVMe details."""
     return {
         "os": platform.system(),
         "architecture": platform.machine(),
         "python": platform.python_version(),
-        "nvme_backend": True,
-        "pcie5_detected": False,
-        "cxl_detected": False,
+        "storage_backed_region_supported": True,
+        "nvme_detected": None,
+        "pcie5_detected": None,
+        "cxl_detected": None,
     }
