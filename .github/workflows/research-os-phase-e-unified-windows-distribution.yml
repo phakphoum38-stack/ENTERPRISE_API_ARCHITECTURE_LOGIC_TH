@@ -320,11 +320,6 @@ jobs:
           Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
           Wait-Process -Id $app.Id -Timeout 10 -ErrorAction SilentlyContinue
 
-          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $installRoot 'scripts\research-os-service.ps1') -Action stop -DataDir $dataRoot
-          if ($LASTEXITCODE -ne 0) { throw 'Research OS service stop failed during uninstall preparation.' }
-          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $installRoot 'owner_special\scripts\install-owner-service.ps1') -Action uninstall -Root $installRoot -DataDir $ownerDataRoot -ServiceName 'ResearchOSOwnerFriendService' -OwnerId 'owner' -Port 8790
-          if ($LASTEXITCODE -ne 0) { throw 'Owner Friend service uninstall failed during E2E.' }
-
           $uninstaller = Join-Path $installRoot 'unins000.exe'
           if (-not (Test-Path $uninstaller)) { throw 'Inno Setup uninstaller missing.' }
           $uninstall = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
