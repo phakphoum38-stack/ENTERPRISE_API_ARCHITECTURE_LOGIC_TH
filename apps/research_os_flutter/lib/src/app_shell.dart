@@ -45,7 +45,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
   bool _sidebarExpanded = false;
 
   List<Widget> get _pages => <Widget>[
-        HomePage(apiClient: widget.apiClient),
+        HomePage(apiClient: widget.apiClient, onNavigate: _select),
         VoiceConversationPage(apiClient: widget.apiClient),
         AgentCenterPage(apiClient: widget.apiClient),
         LibraryPage(apiClient: widget.apiClient),
