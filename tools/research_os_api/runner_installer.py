@@ -21,7 +21,7 @@ class PackageManifest:
     platform: str
     architecture: str
     source_sha: str
-    artifact_sha256: str
+    artifact_sha256: str | None
     files: Mapping[str, str]
 
     @classmethod
@@ -30,17 +30,19 @@ class PackageManifest:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise InstallationError(f"invalid package manifest: {path}") from exc
-        required = ("package_id", "version", "platform", "architecture", "source_sha", "artifact_sha256", "files")
+        required = ("package_id", "version", "platform", "architecture", "source_sha", "files")
         missing = [key for key in required if not data.get(key)]
         if missing:
             raise InstallationError(f"manifest missing required fields: {', '.join(missing)}")
         files = data["files"]
+        if isinstance(files, list):
+            files = {str(item["path"]): str(item["sha256"]) for item in files if isinstance(item, dict) and item.get("path") and item.get("sha256")}
         if not isinstance(files, dict) or not files:
             raise InstallationError("manifest files must be a non-empty object")
         return cls(
             str(data["package_id"]), str(data["version"]), str(data["platform"]),
             str(data["architecture"]), str(data["source_sha"]),
-            str(data["artifact_sha256"]), {str(k): str(v) for k, v in files.items()},
+            str(data.get("artifact_sha256")) if data.get("artifact_sha256") else None, {str(k): str(v) for k, v in files.items()},
         )
 
 
