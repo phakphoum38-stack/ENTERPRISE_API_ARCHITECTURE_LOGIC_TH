@@ -1,0 +1,57 @@
+{
+  "contract_id": "research-os-platform-core-completion-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Finite definition of done for the shared Research OS platform core. Existing canonical contracts and executors remain authoritative; this contract closes verification gaps without creating a second runtime.",
+  "required_contracts": [
+    "current/CANONICAL_PLATFORM_CONTRACT.yml",
+    "current/GOLDEN_RELEASE_CONTRACT.yml",
+    "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+    "current/RESEARCH_OS_PHASE_B_LIFECYCLE_EVIDENCE_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_C_CAPABILITY_E2E_BINDING_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_D_CROSS_SURFACE_PARITY_CONTRACT.json",
+    "current/RESEARCH_OS_PHASE_E_UNIFIED_WINDOWS_DISTRIBUTION_CONTRACT.json"
+  ],
+  "required_existing_components": [
+    "tools/capability_delegation.py",
+    "tools/capability_e2e_binding.py",
+    "tools/lifecycle_evidence.py",
+    "tools/control_center_capability_registry.py",
+    "tools/native_command_router.py",
+    "tools/validate_canonical_platform_contract.py",
+    "tools/validate_research_os_unified_final_gate.py",
+    "tools/validate_phase_e_unified_windows_distribution.py"
+  ],
+  "invariants": {
+    "shared_execution_plane": true,
+    "shared_evidence_plane": true,
+    "single_final_gate": true,
+    "owner_is_unbounded_privilege_boundary": true,
+    "external_tools_are_not_authority": true,
+    "assurance_is_not_executable": true,
+    "platform_specific_navigation_is_forbidden": true,
+    "source_sha_is_exact_identity": true,
+    "resource_conflict_is_reject_and_release": true,
+    "duplicate_delivery_is_idempotent": true,
+    "unknown_state_fails_closed": true
+  },
+  "definition_of_done": {
+    "phase_e_distribution": "PASS",
+    "canonical_contracts": "PASS",
+    "capability_delegation": "PASS",
+    "lifecycle_evidence": "PASS",
+    "cross_surface_parity": "PASS",
+    "unified_final_gate_binding": "PASS",
+    "one_hundred_project_readiness": "PASS"
+  },
+  "forbidden": [
+    "new_runtime",
+    "new_scheduler",
+    "new_queue",
+    "new_evidence_ledger",
+    "new_authorization_authority",
+    "new_navigation_registry",
+    "new_release_authority",
+    "per_project_runtime_duplication"
+  ]
+}
