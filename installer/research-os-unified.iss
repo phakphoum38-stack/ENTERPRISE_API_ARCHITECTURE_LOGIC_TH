@@ -2,6 +2,9 @@
 #define MyAppVersion "3.0.0"
 #define MyAppPublisher "Research OS Team"
 #define MyAppExeName "research_os_flutter.exe"
+#ifndef PackageRoot
+#define PackageRoot "..\phase-e\package"
+#endif
 
 [Setup]
 AppId={{C6E8D8B0-2D6A-4B3D-8A7A-8A0F6B8A3E11}
@@ -24,7 +27,7 @@ CloseApplications=yes
 RestartApplications=no
 
 [Files]
-Source: "..\phase-e\package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{commonappdata}\ResearchOS"
