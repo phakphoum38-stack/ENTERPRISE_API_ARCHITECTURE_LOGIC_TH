@@ -24,17 +24,64 @@
     "must_not_create_duplicate_authority": true
   },
   "authority_domains": [
-    {"domain":"navigation","canonical":"apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart","role":"CANONICAL_REGISTRY"},
-    {"domain":"project_identity","canonical":"tools/project_registry.py","role":"CANONICAL_REGISTRY"},
-    {"domain":"workflow","canonical":"current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json","role":"EXPERIENCE_CONTRACT_OVER_EXISTING_ENGINE"},
-    {"domain":"evidence","canonical":"tools/lifecycle_evidence.py","role":"CANONICAL_EVIDENCE_PLANE"},
-    {"domain":"release","canonical":"current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml","role":"SINGLE_RELEASE_AUTHORITY"}
+    {
+      "domain": "navigation",
+      "canonical": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+      "role": "CANONICAL_REGISTRY"
+    },
+    {
+      "domain": "project_identity",
+      "canonical": "tools/project_registry.py",
+      "role": "CANONICAL_REGISTRY"
+    },
+    {
+      "domain": "workflow",
+      "canonical": "current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json",
+      "role": "EXPERIENCE_CONTRACT_OVER_EXISTING_ENGINE"
+    },
+    {
+      "domain": "evidence",
+      "canonical": "tools/lifecycle_evidence.py",
+      "role": "CANONICAL_EVIDENCE_PLANE"
+    },
+    {
+      "domain": "release",
+      "canonical": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+      "role": "SINGLE_RELEASE_AUTHORITY"
+    }
   ],
-  "component_lifecycle": ["PLANNED","IN_PROGRESS","BLOCKED","HOLD","UNKNOWN","ACTIVE","DEPRECATED","RETIRED"],
-  "resolutions": ["FOUND","PARTIAL","GAP","UNKNOWN","DRIFT"],
-  "risk_classes": ["LOW","MEDIUM","HIGH","CRITICAL"],
+  "component_lifecycle": [
+    "PLANNED",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "HOLD",
+    "UNKNOWN",
+    "ACTIVE",
+    "DEPRECATED",
+    "RETIRED"
+  ],
+  "resolutions": [
+    "FOUND",
+    "PARTIAL",
+    "GAP",
+    "UNKNOWN",
+    "DRIFT"
+  ],
+  "risk_classes": [
+    "LOW",
+    "MEDIUM",
+    "HIGH",
+    "CRITICAL"
+  ],
   "change_control": {
-    "required_fields": ["change_id","target_components","affected_contracts","risk_class","blast_radius","required_gates"],
+    "required_fields": [
+      "change_id",
+      "target_components",
+      "affected_contracts",
+      "risk_class",
+      "blast_radius",
+      "required_gates"
+    ],
     "hard_stop": [
       "authority_escalation",
       "duplicate_authority",
@@ -49,7 +96,16 @@
     "merge_rule": "Governance validation is evidence for review; FINAL_GATE remains the release authority."
   },
   "evidence_coverage": {
-    "required_dimensions": ["identity","contract","dependency","implementation","test","evidence","provenance","gate"],
+    "required_dimensions": [
+      "identity",
+      "contract",
+      "dependency",
+      "implementation",
+      "test",
+      "evidence",
+      "provenance",
+      "gate"
+    ],
     "unknown_is_not_pass": true,
     "missing_is_not_pass": true,
     "stale_is_not_pass": true
@@ -65,5 +121,91 @@
     "cross_project_isolation",
     "conflict_stop_release_reconcile",
     "history_is_immutable"
+  ],
+  "change_impact_rules": [
+    {
+      "match": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+      "components": [
+        "navigation",
+        "cross_platform_surface"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "apps/research_os_flutter/lib/src/features/",
+      "components": [
+        "product_surface"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix"
+      ]
+    },
+    {
+      "match": "tools/project_registry.py",
+      "components": [
+        "project_identity",
+        "project_scale",
+        "evidence"
+      ],
+      "gates": [
+        "project_scale",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/lifecycle_evidence.py",
+      "components": [
+        "evidence",
+        "provenance"
+      ],
+      "gates": [
+        "evidence_lineage",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/ARCHITECTURE_INVARIANTS.md",
+      "components": [
+        "architecture_governance"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+      "components": [
+        "release_governance"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "release_spine"
+      ]
+    },
+    {
+      "match": ".github/workflows/",
+      "components": [
+        "ci_governance"
+      ],
+      "gates": [
+        "workflow_integrity",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+      "components": [
+        "platform_governance"
+      ],
+      "gates": [
+        "unified_final_gate"
+      ]
+    }
   ]
 }
