@@ -1,30 +1,28 @@
-# Research OS M.2 Whole-System Audit Index
+# Research OS M.2 Whole-System Audit Graph
 
-The M.2 index is a descriptive audit/index layer. It is not a runtime, scheduler, authorization system, evidence authority, or release authority.
+M.2 is the descriptive repository-wide audit/index layer. This update keeps the existing inventory API and adds an explicit relationship graph.
 
-## Source identity
+## What it connects
 
-The index is generated from the exact checked-out Git SHA. GitHub Main remains the source of truth; the virtual workspace is only an audit snapshot.
+- FILE -> CONTRACT references
+- CONTRACT -> TEST verification relationships
+- WORKFLOW -> WORKFLOW dispatch/reference signals
+- FILE/WORKFLOW -> existing Unified Final Gate binding
+- FILE -> architecture invariant references
+- source SHA, node identity and dangling-edge integrity
 
-## Indexed dimensions
-
-- file and directory inventory
-- capability classification
-- authority signals
-- contract / implementation / test relationships
-- workflow inventory
-- evidence / provenance signals
-- architecture invariants
-- platform surfaces
-- source and artifact lineage signals
-- explicit GAP states: MISSING, INCOMPLETE, BROKEN, DRIFT, DUPLICATE, UNKNOWN, DEFERRED
+The graph reuses existing repository authorities; it does not create a second Platform Graph, runtime, scheduler, authorization service, evidence authority, or release authority.
 
 ## Search
 
-Use `python tools/research_os_m2_audit.py --query runner` or `--query final_gate` for focused search.
+Use `python tools/research_os_m2_audit.py --query runner` or `--query final_gate`.
 
-Use `python tools/research_os_m2_audit.py --output m2_audit_index.json` for the complete machine-readable index.
+The query returns matching graph nodes and edges. Full output is written to `m2_audit_index.json` with the exact checked-out SHA.
 
 ## Gate semantics
 
-`M2_AUDIT_INDEX=PASS` means the index itself is internally valid and source identity is pinned. It does not mean every indexed capability is complete. Findings remain explicit for subsequent repair and audit.
+`M2_AUDIT_INDEX=PASS` and `M2_AUDIT_GRAPH=PASS` mean only that the index/graph itself is source-pinned and internally consistent. They do not mean every capability is complete.
+
+UNKNOWN, SKIPPED and DEFERRED remain non-success states. Findings remain explicit for subsequent repair/audit.
+
+M.2 is read-only and descriptive.
