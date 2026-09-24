@@ -61,6 +61,47 @@ def validate() -> list[str]:
         if record.get("status") == "DONE" and record.get("resolution") == "UNKNOWN":
             failures.append(f"unknown_done:{record.get('work_id')}")
 
+    component_registry_path = "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json"
+    component_registry = _load(component_registry_path)
+    if component_registry.get("status") != "ACTIVE":
+        failures.append("component_registry_not_active")
+    components = component_registry.get("components", [])
+    component_ids = [c.get("id") for c in components]
+    if len(component_ids) != len(set(component_ids)):
+        failures.append("component_duplicate_id")
+    allowed_lifecycle = set(contract.get("component_lifecycle", []))
+    known_ids = set(component_ids)
+    for component in components:
+        cid = component.get("id", "?")
+        if component.get("lifecycle") not in allowed_lifecycle:
+            failures.append(f"component_invalid_lifecycle:{cid}")
+        canonical = component.get("canonical")
+        if not canonical or not (ROOT / canonical).is_file():
+            failures.append(f"component_missing_canonical:{cid}")
+        for ref in component.get("contracts", []) + component.get("tests", []) + component.get("evidence", []):
+            if not (ROOT / ref).is_file():
+                failures.append(f"component_missing_ref:{cid}:{ref}")
+        for dep in component.get("dependencies", []):
+            if dep not in known_ids and dep not in {"platform_graph"}:
+                failures.append(f"component_unknown_dependency:{cid}:{dep}")
+    graph_edges = {c.get("id"): c.get("dependencies", []) for c in components}
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    def visit(node: str) -> bool:
+        if node in visiting:
+            return True
+        if node in visited:
+            return False
+        visiting.add(node)
+        for dep in graph_edges.get(node, []):
+            if dep in graph_edges and visit(dep):
+                return True
+        visiting.remove(node)
+        visited.add(node)
+        return False
+    if any(visit(node) for node in graph_edges):
+        failures.append("component_dependency_cycle")
+
     surface = _load("current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json")
     surfaces = surface.get("surfaces", [])
     indexes = [item[1] for item in surfaces]
