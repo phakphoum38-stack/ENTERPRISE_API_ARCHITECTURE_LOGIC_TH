@@ -40,6 +40,7 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json",
     "current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_COMPLETE_1_12_CONTRACT.json",
     "tools/research_os_m2_audit.py",
     "tools/test_research_os_m2_audit.py",
     "tools/validate_platform_completion_schedule.py",
