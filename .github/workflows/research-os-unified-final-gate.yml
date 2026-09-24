@@ -96,6 +96,40 @@ jobs:
           path: aeos_master_assurance_manifest.json
           if-no-files-found: error
           retention-days: 30
+  m2_audit:
+    name: M.2 whole-system audit index
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Verify exact target SHA
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+      - name: Build M.2 index
+        run: python tools/research_os_m2_audit.py --output m2_audit_index.json --summary m2_audit_index_summary.txt
+      - name: Test M.2 index
+        run: python -m unittest tools.test_research_os_m2_audit -v
+      - name: Verify M.2 source identity
+        run: |
+          set -euo pipefail
+          grep -F "SOURCE_SHA=$TARGET_SHA" m2_audit_index_summary.txt
+          grep -F "M2_AUDIT_INDEX=PASS" m2_audit_index_summary.txt
+      - name: Upload M.2 evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: research-os-m2-audit-${{ env.TARGET_SHA }}
+          path: |
+            m2_audit_index.json
+            m2_audit_index_summary.txt
+          if-no-files-found: error
+          retention-days: 30
   flutter_surface:
     name: Shared Flutter application surface
     needs: contract
@@ -220,7 +254,7 @@ jobs:
 
   decision:
     name: Unified release decision
-    needs: [contract, aeos_recheck, flutter_surface, python_surface]
+    needs: [contract, aeos_recheck, m2_audit, flutter_surface, python_surface]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -230,15 +264,18 @@ jobs:
           FLUTTER_SURFACE: ${{ needs.flutter_surface.result }}
           PYTHON_SURFACE: ${{ needs.python_surface.result }}
           AEOS_RECHECK: ${{ needs.aeos_recheck.result }}
+          M2_AUDIT: ${{ needs.m2_audit.result }}
         run: |
           set -euo pipefail
           printf 'contract=%s\n' "$CONTRACT"
           printf 'flutter_surface=%s\n' "$FLUTTER_SURFACE"
           printf 'python_surface=%s\n' "$PYTHON_SURFACE"
           printf 'aeos_recheck=%s\n' "$AEOS_RECHECK"
+          printf 'm2_audit=%s\n' "$M2_AUDIT"
           test "$CONTRACT" = success
           test "$FLUTTER_SURFACE" = success
           test "$PYTHON_SURFACE" = success
           test "$AEOS_RECHECK" = success
+          test "$M2_AUDIT" = success
           echo "RESEARCH_OS_UNIFIED_FINAL_GATE=PASS"
           echo "RELEASE_AUTHORITY=FINAL_GATE"
