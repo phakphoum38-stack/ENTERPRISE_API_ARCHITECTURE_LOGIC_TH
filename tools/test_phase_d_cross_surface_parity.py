@@ -39,7 +39,7 @@ class PhaseDCrossSurfaceParityTests(unittest.TestCase):
             friend.label,
             friend.ui_ref,
             friend.contract_ref,
-            friend.runtime_ref,
+            "mismatched/runtime",
             "mismatched/executor",
             friend.observation_ref,
             friend.evidence_ref,
@@ -56,9 +56,19 @@ class PhaseDCrossSurfaceParityTests(unittest.TestCase):
             self.assertIn("friend: registry executor family mismatch", validator.validate())
 
     def test_missing_final_gate_hook_fails_closed(self) -> None:
-        with patch.object(validator, "ROOT", validator.ROOT):
-            original = validator.ROOT
-            self.assertIn("tools.test_phase_d_cross_surface_parity.py", original.joinpath(".github/workflows/research-os-unified-final-gate.yml").read_text(encoding="utf-8"))
+        original_read_text = validator.Path.read_text
+
+        def read_text_without_phase_d_hook(path, *args, **kwargs):
+            text = original_read_text(path, *args, **kwargs)
+            if str(path).endswith(".github/workflows/research-os-unified-final-gate.yml"):
+                return text.replace("tools.test_phase_d_cross_surface_parity", "tools.test_phase_d_cross_surface_parity_REMOVED")
+            return text
+
+        with patch.object(validator.Path, "read_text", read_text_without_phase_d_hook):
+            self.assertIn(
+                "Unified Final Gate is missing the Phase D parity test",
+                validator.validate(),
+            )
 
 
 if __name__ == "__main__":
