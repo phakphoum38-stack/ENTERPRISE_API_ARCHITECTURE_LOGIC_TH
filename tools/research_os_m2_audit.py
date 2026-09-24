@@ -44,8 +44,19 @@ def capabilities(path,text):
  return found or ["general"]
 def nid(k,path): return k.upper()+":"+path
 
+def required_authority_paths(by_path):
+ gate_path="current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+ if gate_path not in by_path:
+  return [], []
+ text=read_text(by_path[gate_path])
+ def section(name):
+  match=re.search(rf"^{name}:\n((?:  - .+\n)+)",text,re.MULTILINE)
+  return [line[4:].strip() for line in match.group(1).splitlines()] if match else []
+ return section("required_contracts"), section("required_workflows")
+
 def build_index():
  source=git_sha(); ps=files(); by_path={rel(p):p for p in ps}; rows=[]
+ required_contracts,required_workflows=required_authority_paths(by_path)
  for p in ps:
   path=rel(p); txt=read_text(p)
   rows.append({"path":path,"kind":kind(path),"size":p.stat().st_size,
@@ -98,6 +109,12 @@ def build_index():
  edges=sorted({(e["from"],e["relation"],e["to"]):e for e in edges}.values(),key=lambda e:(e["from"],e["relation"],e["to"]))
  targets={n["id"] for n in nodes}; dangling=[e for e in edges if e["from"] not in targets or e["to"] not in targets]
  findings=[]
+ for required in required_contracts:
+  if required not in by_path or required not in contracts:
+   findings.append({"state":"MISSING","code":"REQUIRED_FINAL_GATE_CONTRACT_MISSING_FROM_M2","path":required})
+ for required in required_workflows:
+  if required not in by_path or required not in workflows:
+   findings.append({"state":"MISSING","code":"REQUIRED_FINAL_GATE_WORKFLOW_MISSING_FROM_M2","path":required})
  for c in contracts:
   stem=Path(c).stem.lower().replace("-contract","")
   if not any((c in read_text(by_path[t])) or (stem and stem in Path(t).stem.lower()) for t in tests):
@@ -112,11 +129,13 @@ def build_index():
   "contract_implementation_linkage":bool(implementations) and any(e["from"].startswith("IMPLEMENTATION:") and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) and all(any(e["from"]==nid("IMPLEMENTATION",i) and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) for i in implementations if any(c in read_text(by_path[i]) for c in contracts)),
   "workflow_inventory":bool(workflows),
   "contract_inventory":bool(contracts),
+  "required_contract_inventory":bool(required_contracts) and all(path in contracts for path in required_contracts),
+  "required_workflow_inventory":bool(required_workflows) and all(path in workflows for path in required_workflows),
   "invariant_inventory":any(r["invariant_refs"] for r in rows),
   "final_gate_node":final_gate_exists and "FINAL_GATE:UNIFIED" in targets,
  }
  return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V2","source_sha":source,"root":str(ROOT),
-  "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
+  "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"required_contracts":len(required_contracts),"required_workflows":len(required_workflows),"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
   "integrity":integrity,"findings":findings,"nodes":nodes,"edges":edges,"files":rows,"dangling_edges":dangling}
 def build_graph(): return build_index()
 def main():
