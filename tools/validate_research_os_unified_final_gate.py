@@ -65,6 +65,7 @@ def main() -> None:
         "current/RESEARCH_OS_100_PROJECT_READINESS_CONTRACT.json",
         "current/RESEARCH_OS_PROJECT_TEMPLATE_CONTRACT.json",
         "current/RESEARCH_OS_PROJECT_001.json",
+        "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
             fail(f"required completion contract is not bound: {contract_ref}")
