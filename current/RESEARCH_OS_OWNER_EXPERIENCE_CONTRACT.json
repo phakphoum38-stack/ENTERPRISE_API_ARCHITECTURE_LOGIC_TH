@@ -1,8 +1,8 @@
 {
-  "contract_id": "research-os-owner-experience-v1",
-  "version": 1,
+  "contract_id": "research-os-owner-experience-v2",
+  "version": 2,
   "status": "ACTIVE",
-  "purpose": "Expose the existing system Owner authority and platform-wide observations through the canonical Research OS product surface without creating a second runtime, authorization authority, navigation registry, evidence ledger, or release authority.",
+  "purpose": "Expose Owner authority and platform observations through the canonical Research OS product surface while keeping Owner Special as an existing runtime boundary and reconciling all platform UI surfaces to one contract.",
   "identity": {
     "source": "/v1/auth/status",
     "must_be_server_derived": true,
@@ -33,9 +33,11 @@
   },
   "owner_special": {
     "runtime": "owner_special",
-    "desktop_surface": "owner_special/flutter_app",
+    "desktop_surface": "runtime_boundary_only",
     "friend_service": "127.0.0.1:8790",
-    "integration_mode": "existing_boundary_observation_only"
+    "integration_mode": "existing_runtime_boundary_observation_only",
+    "canonical_product_ui": false,
+    "ios_source": null
   },
   "lifecycle": [
     "INTENT",
@@ -50,7 +52,9 @@
     "windows": true,
     "web": true,
     "ios": true,
-    "external_flutter_tool_remains_external": true
+    "external_flutter_tool_remains_external": true,
+    "shared_surface_contract": true,
+    "ios_source": "apps/research_os_flutter/ios"
   },
   "invariants": [
     "verified_session_is_the_identity_source",
@@ -67,6 +71,14 @@
     "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
     "api_client": "apps/research_os_flutter/lib/src/api/research_os_api_client.dart",
     "authorization_reference": "docs/RESEARCH_OS_OWNER_AUTHORIZATION.md",
-    "owner_special_manifest": "owner_special/OWNER_MANIFEST.json"
-  }
+    "owner_special_manifest": "owner_special/OWNER_MANIFEST.json",
+    "platform_validator": "tools/validate_owner_experience_platform.py"
+  },
+  "navigation": {
+    "single_source_of_truth": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+    "desktop_and_mobile_share_registry": true,
+    "platform_specific_registry_forbidden": true,
+    "semantic_v5_routes_are_projection_only": true
+  },
+  "reconciliation_contract": "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json"
 }
