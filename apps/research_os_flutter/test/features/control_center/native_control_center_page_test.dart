@@ -105,7 +105,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Audit'));
+    expect(find.byIcon(Icons.rule_folder_outlined), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.rule_folder_outlined));
     await tester.pumpAndSettle();
 
     expect(find.text('Main Final Audit'), findsOneWidget);
