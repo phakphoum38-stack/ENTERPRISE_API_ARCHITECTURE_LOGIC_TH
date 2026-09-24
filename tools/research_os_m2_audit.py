@@ -112,7 +112,7 @@ def build_index():
   "invariant_inventory":any(r["invariant_refs"] for r in rows),
   "final_gate_node":"FINAL_GATE:UNIFIED" in targets,
  }
- return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V3","source_sha":source,"root":str(ROOT),
+ return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V2","source_sha":source,"root":str(ROOT),
   "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
   "integrity":integrity,"findings":findings,"nodes":nodes,"edges":edges,"files":rows,"dangling_edges":dangling}
 def build_graph(): return build_index()
