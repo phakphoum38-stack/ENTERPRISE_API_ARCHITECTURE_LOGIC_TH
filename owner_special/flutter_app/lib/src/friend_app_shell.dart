@@ -15,15 +15,15 @@ class FriendAppShell extends StatelessWidget {
   final Widget? controlCenter;
 
   static const items = <({IconData icon, String label})>[
-    (icon: Icons.dashboard_outlined, label: 'Control Center'),
-    (icon: Icons.space_dashboard_outlined, label: 'Mission Control'),
-    (icon: Icons.chat_bubble_outline, label: 'Friend'),
-    (icon: Icons.rocket_launch_outlined, label: 'Launch Desk'),
-    (icon: Icons.auto_awesome_outlined, label: 'Capabilities'),
-    (icon: Icons.memory_outlined, label: 'Memory'),
-    (icon: Icons.tune_outlined, label: 'Provider'),
-    (icon: Icons.groups_outlined, label: 'Team'),
-    (icon: Icons.account_circle_outlined, label: 'Google Identity'),
+    (icon: Icons.dashboard_outlined, label: 'Runtime Control'),
+    (icon: Icons.space_dashboard_outlined, label: 'Mission Control (Observed)'),
+    (icon: Icons.chat_bubble_outline, label: 'Friend Runtime'),
+    (icon: Icons.rocket_launch_outlined, label: 'Launch Desk (Runtime)'),
+    (icon: Icons.auto_awesome_outlined, label: 'Capabilities (Runtime)'),
+    (icon: Icons.memory_outlined, label: 'Memory (Runtime)'),
+    (icon: Icons.tune_outlined, label: 'Provider Boundary'),
+    (icon: Icons.groups_outlined, label: 'Team Context'),
+    (icon: Icons.account_circle_outlined, label: 'Identity Boundary'),
   ];
 
   @override
@@ -164,7 +164,14 @@ class _Header extends StatelessWidget {
                   const SizedBox(width: 10),
                   Container(width: 4, height: 4, decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle)),
                   const SizedBox(width: 8),
-                  Text('Owner Special • AI workspace', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  Expanded(
+                    child: Text(
+                      'Owner Runtime Boundary • Research OS',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
                 ],
               ],
             ),

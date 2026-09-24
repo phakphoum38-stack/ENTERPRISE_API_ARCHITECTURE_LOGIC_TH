@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../ui/enterprise_navigation.dart';
 import 'v5_capability.dart';
 
 @immutable
@@ -7,108 +8,100 @@ class ResearchOSWorkspaceRoute {
   const ResearchOSWorkspaceRoute({
     required this.workspace,
     required this.route,
-    required this.label,
-    required this.icon,
+    required this.destinationId,
     required this.capability,
   });
 
   final ResearchOSWorkspace workspace;
   final String route;
-  final String label;
-  final IconData icon;
+  final String destinationId;
   final ResearchOSCapability capability;
+
+  ResearchNavItem get destination => researchNavigationItems.firstWhere(
+        (item) => item.destinationId == destinationId,
+      );
+
+  String get label => destination.label;
+  IconData get icon => destination.icon;
 }
 
 class ResearchOSWorkspaceRoutes {
   const ResearchOSWorkspaceRoutes();
 
-  static const all = <ResearchOSWorkspaceRoute>[
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.friend,
-      route: 'friend',
-      label: 'Friend',
-      icon: Icons.support_agent_outlined,
-      capability: ResearchOSCapability.friend,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.research,
-      route: 'research',
-      label: 'Research',
-      icon: Icons.search_outlined,
-      capability: ResearchOSCapability.research,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.developer,
-      route: 'developer',
-      label: 'Develop',
-      icon: Icons.code_outlined,
-      capability: ResearchOSCapability.github,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.brain,
-      route: 'brain',
-      label: 'Brain',
-      icon: Icons.psychology_alt_outlined,
-      capability: ResearchOSCapability.brainSkills,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.factory,
-      route: 'factory',
-      label: 'Factory',
-      icon: Icons.account_tree_outlined,
-      capability: ResearchOSCapability.factory,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.memory,
-      route: 'memory',
-      label: 'Memory',
-      icon: Icons.memory_outlined,
-      capability: ResearchOSCapability.memory,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.library,
-      route: 'library',
-      label: 'Library',
-      icon: Icons.local_library_outlined,
-      capability: ResearchOSCapability.library,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.evidence,
-      route: 'evidence',
-      label: 'Evidence',
-      icon: Icons.fact_check_outlined,
-      capability: ResearchOSCapability.evidence,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.identity,
-      route: 'identity',
-      label: 'Identity',
-      icon: Icons.admin_panel_settings_outlined,
-      capability: ResearchOSCapability.identity,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.owner,
-      route: 'owner',
-      label: 'Owner',
-      icon: Icons.shield_outlined,
-      capability: ResearchOSCapability.owner,
-    ),
-    ResearchOSWorkspaceRoute(
-      workspace: ResearchOSWorkspace.settings,
-      route: 'settings',
-      label: 'Settings',
-      icon: Icons.settings_outlined,
-      capability: ResearchOSCapability.settings,
-    ),
-  ];
+  static List<ResearchOSWorkspaceRoute> get all => <ResearchOSWorkspaceRoute>[
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.friend,
+          route: 'friend',
+          destinationId: 'friend_connect',
+          capability: ResearchOSCapability.friend,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.research,
+          route: 'research',
+          destinationId: 'home',
+          capability: ResearchOSCapability.research,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.developer,
+          route: 'developer',
+          destinationId: 'github',
+          capability: ResearchOSCapability.github,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.brain,
+          route: 'brain',
+          destinationId: 'brain_skills',
+          capability: ResearchOSCapability.brainSkills,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.factory,
+          route: 'factory',
+          destinationId: 'workflows',
+          capability: ResearchOSCapability.factory,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.memory,
+          route: 'memory',
+          destinationId: 'library',
+          capability: ResearchOSCapability.memory,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.library,
+          route: 'library',
+          destinationId: 'library',
+          capability: ResearchOSCapability.library,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.evidence,
+          route: 'evidence',
+          destinationId: 'control_center',
+          capability: ResearchOSCapability.evidence,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.identity,
+          route: 'identity',
+          destinationId: 'google_sign_in',
+          capability: ResearchOSCapability.identity,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.owner,
+          route: 'owner',
+          destinationId: 'owner',
+          capability: ResearchOSCapability.owner,
+        ),
+        const ResearchOSWorkspaceRoute(
+          workspace: ResearchOSWorkspace.settings,
+          route: 'settings',
+          destinationId: 'settings',
+          capability: ResearchOSCapability.settings,
+        ),
+      ];
 
-  ResearchOSWorkspaceRoute forWorkspace(ResearchOSWorkspace workspace) {
-    return all.firstWhere((item) => item.workspace == workspace);
-  }
+  ResearchOSWorkspaceRoute forWorkspace(ResearchOSWorkspace workspace) =>
+      all.firstWhere((item) => item.workspace == workspace);
 
-  ResearchOSWorkspaceRoute forRoute(String route) {
-    return all.firstWhere((item) => item.route == route);
-  }
+  ResearchOSWorkspaceRoute forRoute(String route) =>
+      all.firstWhere((item) => item.route == route);
 
   List<ResearchOSWorkspaceRoute> visibleFor(ResearchOSUserLevel level) {
     const registry = ResearchOSCapabilityRegistry();

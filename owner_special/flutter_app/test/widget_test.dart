@@ -72,7 +72,7 @@ void main() {
 
     // Control Center is the default surface; explicitly open Friend before
     // asserting Friend-specific controls.
-    await tester.tap(find.text('Friend').first);
+    await tester.tap(find.text('Friend Runtime').first);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('turbo-million')), findsOneWidget);

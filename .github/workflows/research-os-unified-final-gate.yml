@@ -154,6 +154,13 @@ jobs:
           PYTHONPATH: .
         run: |
           python -m unittest tools.test_platform_production_hardening -v
+      - name: Owner Experience Platform reconciliation
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_owner_experience_platform.py
+          python -m unittest tools.test_owner_experience_platform -v
+
       - name: Platform production completion
         env:
           PYTHONPATH: .
