@@ -31,6 +31,10 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+    "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json",
+    "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
+    "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
+    "tools/test_runner_installer.py",
     "tools/test_platform_operating_control.py",
     "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
     "apps/research_os_flutter/test/owner_experience_page_test.dart",
@@ -104,6 +108,9 @@ def main() -> None:
         "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+        "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json",
+        "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
+        "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
             fail(f"required completion contract is not bound: {contract_ref}")
