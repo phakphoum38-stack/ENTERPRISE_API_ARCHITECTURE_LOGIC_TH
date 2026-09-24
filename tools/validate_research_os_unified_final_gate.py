@@ -78,7 +78,7 @@ def main() -> None:
     )
     indexes: list[int] = []
     for entry in entries:
-        numbers = re.findall(r"\\b(\\d+)\\b", entry)
+        numbers = re.findall(r"\b(\d+)\b", entry)
         if not numbers:
             fail("navigation entry is missing a stable index")
         indexes.append(int(numbers[-1]))
