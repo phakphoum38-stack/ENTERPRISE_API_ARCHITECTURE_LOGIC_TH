@@ -91,7 +91,9 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
     workflow = _read_phase_e_workflow(root)
     for marker in (
         "TARGET_SHA",
-        "Research-OS-Unified-Windows-x64",
+        "inputs.target_sha",
+        "ref: ${{ env.TARGET_SHA }}",
+        "Research-OS-Unified-Windows-x64-${{ env.TARGET_SHA }}",
         "DISTRIBUTION_MANIFEST.sha256",
         "RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION",
         "research_os_owner_special.exe",

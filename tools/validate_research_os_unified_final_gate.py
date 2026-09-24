@@ -31,6 +31,7 @@ REQUIRED_FILES = (
     ".github/workflows/research-os-gate.yml",
     ".github/workflows/research-os-final-gate.yml",
     ".github/workflows/research-os-platform-surface-matrix.yml",
+    ".github/workflows/research-os-phase-e-unified-windows-distribution.yml",
     ".github/workflows/research-os-release-spine-gate.yml",
     ".github/workflows/research-os-unified-final-gate.yml",
     "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",

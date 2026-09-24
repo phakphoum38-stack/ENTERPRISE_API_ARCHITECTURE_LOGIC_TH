@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       candidate_run_id:
-        description: Successful Research OS Candidate run ID
+        description: Successful Research OS Unified Windows Distribution run ID
         required: true
         type: string
       research_gate_run_id:
@@ -73,7 +73,7 @@ jobs:
             test "$conclusion" = success
             test "$head_sha" = "$TARGET_SHA"
           }
-          validate_run "$CANDIDATE_RUN_ID" "Research OS Candidate"
+          validate_run "$CANDIDATE_RUN_ID" "Research OS Unified Windows Distribution"
           validate_run "$RESEARCH_GATE_RUN_ID" "Research OS Gate"
           validate_run "$PROVENANCE_RUN_ID" "Provenance Evidence Gate"
           validate_run "$LINEAGE_RUN_ID" "Canonical Source Lineage Gate"
@@ -83,18 +83,30 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf release-input && mkdir -p release-input
-          gh run download "${{ inputs.candidate_run_id }}" --repo "${{ github.repository }}" --name "research-os-v3-verified-candidate-$TARGET_SHA" --dir release-input
-          manifest="$(find release-input -type f -name 'candidate-manifest.json' -print -quit)"
-          setup="$(find release-input -type f -name 'Research-OS-V3-Setup-*-x64.exe' -print -quit)"
-          test -n "$manifest" && test -n "$setup"
-          python3 - "$manifest" "$setup" <<'PY'
-          import hashlib, json, sys
-          manifest=json.load(open(sys.argv[1], encoding='utf-8-sig'))
-          actual=hashlib.sha256(open(sys.argv[2],'rb').read()).hexdigest()
-          assert manifest['target_sha'] == '${{ inputs.target_sha }}'
-          assert manifest['validation'] == 'passed'
-          assert actual == manifest['installer']['sha256']
-          print('CANDIDATE_INSTALLER_SHA256=PASS')
+          gh run download "${{ inputs.candidate_run_id }}" --repo "${{ github.repository }}" --name "Research-OS-Unified-Windows-x64-$TARGET_SHA" --dir release-input
+          manifest="$(find release-input -type f -name 'DISTRIBUTION_MANIFEST.json' -print -quit)"
+          manifest_hash="$(find release-input -type f -name 'DISTRIBUTION_MANIFEST.sha256' -print -quit)"
+          release_evidence="$(find release-input -type f -name 'RELEASE_EVIDENCE.json' -print -quit)"
+          archive="$(find release-input -type f -name "Research-OS-Unified-Windows-x64-$TARGET_SHA.zip" -print -quit)"
+          setup="$(find release-input -type f -name 'Research-OS-Unified-Setup-*-x64.exe' -print -quit)"
+          test -n "$manifest" && test -n "$manifest_hash" && test -n "$release_evidence" && test -n "$archive" && test -n "$setup"
+          python3 - "$manifest" "$manifest_hash" "$release_evidence" "$archive" "$setup" <<'PY'
+          import hashlib, json, pathlib, sys
+          manifest=json.load(open(sys.argv[1], encoding="utf-8-sig"))
+          manifest_hash_line=pathlib.Path(sys.argv[2]).read_text(encoding="utf-8").strip().split()[0].lower()
+          actual_manifest=hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest()
+          evidence=json.load(open(sys.argv[3], encoding="utf-8-sig"))
+          archive_sha=hashlib.sha256(open(sys.argv[4],"rb").read()).hexdigest()
+          target="${{ inputs.target_sha }}"
+          assert manifest["source_sha"] == target
+          assert manifest["product_name"] == "Research OS"
+          assert manifest["company_name"] == "Research OS Team"
+          assert manifest_hash_line == actual_manifest
+          assert evidence["source_sha"] == target
+          assert evidence["artifact_sha256"] == archive_sha
+          assert evidence["release_authority"] == "FINAL_GATE"
+          print("UNIFIED_WINDOWS_DISTRIBUTION_SHA256=PASS")
+          print(f"UNIFIED_WINDOWS_ARCHIVE_SHA256={archive_sha}")
           PY
       - name: Build immutable release spine evidence
         env:

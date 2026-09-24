@@ -1,7 +1,12 @@
-name: Research OS Phase E Unified Windows Distribution
+name: Research OS Unified Windows Distribution
 
 on:
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact immutable source SHA to build and validate
+        required: true
+        type: string
   push:
     branches:
       - feat/research-os-phase-e-unified-windows-distribution
@@ -20,7 +25,7 @@ permissions:
   contents: read
 
 env:
-  TARGET_SHA: ${{ github.sha }}
+  TARGET_SHA: ${{ inputs.target_sha || github.sha }}
 
 jobs:
   validate:
@@ -28,8 +33,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
-      - run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Verify exact target SHA
+        env:
+          TARGET_SHA: ${{ env.TARGET_SHA }}
+        run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
       - run: python tools/validate_phase_e_unified_windows_distribution.py
       - env:
           PYTHONPATH: .
@@ -42,6 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
@@ -57,7 +67,7 @@ jobs:
       - name: Exact SHA
         shell: pwsh
         env:
-          TARGET_SHA: ${{ github.sha }}
+          TARGET_SHA: ${{ env.TARGET_SHA }}
         run: |
           if ((git rev-parse HEAD).Trim() -ne $env:TARGET_SHA) { throw 'Source SHA mismatch.' }
 
@@ -230,7 +240,7 @@ jobs:
 
       - uses: actions/upload-artifact@v6
         with:
-          name: Research-OS-Unified-Windows-x64
+          name: Research-OS-Unified-Windows-x64-${{ env.TARGET_SHA }}
           path: |
             phase-e/Research-OS-Unified-Windows-x64-*.zip
             phase-e/Research-OS-Unified-Windows-x64-*.zip.sha256
