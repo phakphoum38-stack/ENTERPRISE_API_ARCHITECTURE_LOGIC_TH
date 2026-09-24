@@ -146,8 +146,12 @@ class LifecycleEvidenceLedger:
     def read(self) -> tuple[LifecycleEvidence, ...]:
         if not self.path.exists():
             return ()
+        # Readers share the same per-path lock as appenders so validation never
+        # observes a partially written JSONL record.
+        with _append_lock(self.path):
+            content = self.path.read_text(encoding="utf-8")
         records = []
-        for line in self.path.read_text(encoding="utf-8").splitlines():
+        for line in content.splitlines():
             if not line.strip():
                 continue
             payload = json.loads(line)
