@@ -37,11 +37,12 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
   ResearchNavItem('Account', 'Google Sign-In', Icons.account_circle_outlined, 12),
   ResearchNavItem('Workspace', 'Projects', Icons.workspaces_outlined, 14),
+  ResearchNavItem('Workspace', 'Workflows', Icons.account_tree_outlined, 15),
   ResearchNavItem(
     'Control',
     'Control Center',
     Icons.tune_outlined,
-    15,
+    16,
     capabilityId: 'control_center',
   ),
 ];

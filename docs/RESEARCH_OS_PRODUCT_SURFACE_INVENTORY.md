@@ -6,8 +6,8 @@ apps/research_os_flutter product surface before any new UI is created.
 
 ## Verified existing surface
 
-The canonical navigation registry contains exactly 16 destinations, indexed
-0–15, and the app shell wires the corresponding existing feature pages.
+The canonical navigation registry contains exactly 17 destinations, indexed
+0–16, and the app shell wires the corresponding existing feature pages.
 
 The inventory does not create another navigation registry. The existing
 researchNavigationItems registry remains authoritative for presentation
@@ -25,26 +25,20 @@ navigation metadata.
 
 ## Findings
 
-The existing 15 product destinations are present and wired:
+The existing 17 product destinations are present and wired:
 
 Home, AI Chat, Agent Center, Library, Knowledge Graph, GitHub,
 Google Workspace, Local API & Service, System Monitor, Settings,
 Developer Access, Brain Skills, Google Sign-In, Friend Connect, and
-Control Center.
+Control Center, and Workflows.
 
 Control Center already contains the Main Final Audit surface.
 
-Projects now exposes the existing ProjectRegistry through the canonical API and a read-only product surface.
+Projects exposes the existing ProjectRegistry through the canonical API and a read-only product surface.
 
-### Next real product gaps
+Workflows now exposes the existing orchestration lifecycle through a read-only product workspace using the canonical API client. Project association is never inferred when the orchestration API does not return it.
 
-1. Project Experience — the existing ProjectRegistry is real platform
-   infrastructure, but ResearchOSApiClient does not yet expose a canonical
-   ProjectRegistry API endpoint. The UI must not fabricate project telemetry.
-2. Workflow Experience — orchestration APIs already exist; a dedicated
-   product workspace mapping is still required.
-3. Owner Experience — Owner Special remains a separate runtime/UI lineage;
-   explicit adapter/parity work is required before any consolidation.
+### Remaining real product gap
 
-These are recorded as gaps for the next vertical slices rather than being
-silently marked complete.
+1. Owner Experience — Owner Special remains a separate runtime/UI lineage; explicit adapter/parity work is required before any consolidation.
+

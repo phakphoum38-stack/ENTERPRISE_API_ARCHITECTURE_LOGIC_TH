@@ -108,8 +108,14 @@
       "apps/research_os_flutter/lib/src/app_shell.dart"
     ],
     [
-      "Control Center",
+      "Workflows",
       15,
+      "apps/research_os_flutter/lib/src/features/workflows/workflow_experience_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ],
+    [
+      "Control Center",
+      16,
       "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
       "apps/research_os_flutter/lib/src/app_shell.dart"
     ]
@@ -122,8 +128,6 @@
     "v3": "v3/flutter_app"
   },
   "next_product_gaps": [
-    "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint is exposed by ResearchOSApiClient yet; do not fabricate project telemetry.",
-    "WORKFLOW_EXPERIENCE: orchestration lifecycle is exposed through existing API client, but a dedicated product workspace mapping remains to be completed.",
     "OWNER_EXPERIENCE: Owner Special remains a separate runtime/UI lineage and requires explicit adapter parity work before consolidation."
   ],
   "authority": {

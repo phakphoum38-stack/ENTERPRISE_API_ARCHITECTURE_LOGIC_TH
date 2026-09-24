@@ -41,6 +41,7 @@ required_contracts:
   - current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json
   - current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json
   - current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json
+  - current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json
   - current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json
 
 required_workflows:
@@ -57,8 +58,8 @@ required_surface_contracts:
 
 navigation:
   source_of_truth: apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
-  expected_destination_count: 16
-  indexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+  expected_destination_count: 17
+  indexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   duplicate_registry_forbidden: true
 
 platform_surface:
