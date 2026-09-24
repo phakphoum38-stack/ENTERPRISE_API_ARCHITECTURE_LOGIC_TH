@@ -30,6 +30,7 @@ class LifecycleEvidenceTests(unittest.TestCase):
         self.assertEqual(record.source_sha, SHA)
         self.assertEqual(record.target_sha, SHA)
         self.assertEqual(record.workflow_run_id, "workflow-001")
+        self.assertEqual(record.project_id, "")
         self.assertEqual(len(record.fingerprint), 64)
         self.assertEqual(len(record.evidence_sha256), 64)
 
@@ -65,6 +66,20 @@ class LifecycleEvidenceTests(unittest.TestCase):
                     correlation_id="corr-001", expected_source_sha=SHA
                 ),
                 (),
+            )
+
+    def test_project_identity_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = LifecycleEvidenceLedger(Path(directory) / "evidence.jsonl")
+            ledger.append(make("INTENT", project_id="project-001"))
+            ledger.append(make("RECOVER", project_id="project-001", recovery_required=True, recovery_reason="test"))
+            self.assertIn(
+                "project identity mismatch",
+                ledger.validate_chain(
+                    correlation_id="corr-001",
+                    expected_source_sha=SHA,
+                    expected_project_id="project-002",
+                ),
             )
 
     def test_source_sha_mismatch_fails_closed(self) -> None:
