@@ -10,9 +10,6 @@ from tools.control_center_capability_registry import CANONICAL_CAPABILITY_BINDIN
 
 
 class PhaseDCrossSurfaceParityTests(unittest.TestCase):
-    def run_validation(self, **kwargs):
-        return validator.validate()
-
     def test_canonical_shapes_are_reconciled(self) -> None:
         self.assertEqual((), validator.validate())
 
@@ -56,15 +53,7 @@ class PhaseDCrossSurfaceParityTests(unittest.TestCase):
             self.assertIn("friend: registry executor family mismatch", validator.validate())
 
     def test_missing_final_gate_hook_fails_closed(self) -> None:
-        original = validator._read_unified_final_gate
-        with patch.object(
-            validator,
-            "_read_unified_final_gate",
-            lambda root: original(root).replace(
-                "tools.test_phase_d_cross_surface_parity",
-                "tools.test_phase_d_cross_surface_parity_REMOVED",
-            ),
-        ):
+        with patch.object(validator, "_read_unified_final_gate", lambda root: ""):
             self.assertIn(
                 "Unified Final Gate is missing the Phase D parity test",
                 validator.validate(),
