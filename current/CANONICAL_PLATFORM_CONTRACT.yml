@@ -1,0 +1,145 @@
+version: 1
+name: Canonical Platform Contract
+
+purpose: >
+  Single cross-workflow contract for identity, execution state, evidence,
+  provenance, retry, recovery, compatibility, and observability.
+  This contract coordinates existing capabilities; it does not create a
+  second executor, queue, scheduler, authority, or final gate.
+
+identity:
+  source_sha:
+    canonical: true
+    explicit_input_preferred: true
+    accepted:
+      - inputs.source_sha
+      - inputs.target_sha
+      - propagated_source_sha
+      - propagated_target_sha
+      - github.sha
+    release_binding: exact
+    head_must_match: true
+    mutation_invalidates_proof: true
+  event:
+    required: true
+    immutable: true
+    fields: [event_id, correlation_id]
+  idempotency:
+    required: true
+    key_fields: [event_id, source_sha, action]
+    duplicate_policy: reject_duplicate_or_reuse_existing_result
+
+versioning:
+  contract_version_required: true
+  policy_version_required: true
+  incompatible_change_requires_migration: true
+  current_and_versions_must_remain_traceable: true
+
+state_machine:
+  terminal_states: [SUCCEEDED, REJECTED, FAILED, RELEASED]
+  allowed:
+    CREATED: [QUEUED, REJECTED]
+    QUEUED: [RUNNING, REJECTED, FAILED]
+    RUNNING: [SUCCEEDED, REJECTED, FAILED, RELEASED]
+    SUCCEEDED: []
+    REJECTED: [RELEASED]
+    FAILED: [RELEASED]
+    RELEASED: []
+  unknown_transition: STOP
+  terminal_state_must_not_restart: true
+
+resource_conflict:
+  conflict_policy: REJECT
+  on_reject:
+    stop_execution: true
+    release_resources: true
+    ack_or_reconcile_delivery: true
+  same_version_overwrite: false
+  alternate_version_branching_allowed: true
+
+retry:
+  bounded: true
+  retry_must_preserve_failure_meaning: true
+  retry_must_rebind_evidence: true
+  retry_must_use_same_canonical_identity: true
+  retry_on_unknown: false
+  retry_on_security_boundary_violation: false
+
+reconciliation:
+  required_after_delivery_uncertainty: true
+  required_after_worker_loss: true
+  required_after_resource_conflict: true
+  unresolved_state: STOP
+  duplicate_delivery_must_be_idempotent: true
+
+evidence:
+  immutable: true
+  required_fields:
+    - event_id
+    - actor
+    - device_id
+    - service_id
+    - action
+    - policy_id
+    - policy_version
+    - policy_decision
+    - authorization_result
+    - timestamp
+    - correlation_id
+    - result
+    - source_sha
+    - target_sha
+    - workflow_run_id
+    - contract_version
+    - fingerprint
+  stale_when:
+    - source_sha_changes
+    - target_sha_changes
+    - contract_version_changes
+    - policy_version_changes
+  unknown_or_missing: STOP
+
+provenance:
+  exact_object_binding: true
+  exact_execution_context_binding: true
+  sha256_binding: true
+  verifier_must_be_independent: true
+  self_attestation_is_not_proof: true
+
+observability:
+  correlation_required_across:
+    - event
+    - queue
+    - worker
+    - execution
+    - evidence
+    - final_gate
+  minimum_trace_fields: [event_id, correlation_id, source_sha, workflow_run_id]
+  missing_trace: STOP
+
+compatibility:
+  additive_schema_changes: allowed_when_backward_compatible
+  breaking_schema_changes: migration_required
+  unknown_contract_version: STOP
+  producer_consumer_contract_must_be_explicit: true
+
+recovery:
+  every_certified_main_requires_recovery_point: true
+  rollback_requires_identity: true
+  rollback_requires_evidence: true
+  rollback_requires_post_verification: true
+
+fail_closed:
+  unknown: STOP
+  missing_evidence: STOP
+  sha_mismatch: STOP
+  contract_mismatch: STOP
+  provenance_mismatch: STOP
+  replay_divergence: STOP
+  dependency_cycle: STOP
+  authority_escalation: STOP
+
+authority:
+  final_gate_is_release_authority: true
+  contract_does_not_grant_merge_authority: true
+  external_tools_are_not_security_authority: true
