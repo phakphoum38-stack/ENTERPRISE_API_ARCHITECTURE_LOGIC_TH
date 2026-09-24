@@ -25,7 +25,7 @@ navigation metadata.
 
 ## Findings
 
-The existing 17 product destinations are present and wired:
+The existing 18 product destinations are present and wired:
 
 Home, AI Chat, Agent Center, Library, Knowledge Graph, GitHub,
 Google Workspace, Local API & Service, System Monitor, Settings,
