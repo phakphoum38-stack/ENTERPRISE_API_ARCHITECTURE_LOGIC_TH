@@ -103,9 +103,9 @@ def main() -> None:
         if not numbers:
             fail("navigation entry is missing a stable index")
         indexes.append(int(numbers[-1]))
-    if len(indexes) != 17:
-        fail(f"navigation registry contains {len(indexes)} entries; expected 17")
-    if sorted(indexes) != list(range(17)):
+    if len(indexes) != 18:
+        fail(f"navigation registry contains {len(indexes)} entries; expected 18")
+    if sorted(indexes) != list(range(18)):
         fail(f"navigation indexes drifted: {indexes}")
     missing_spine = [item for item in EXPECTED_SPINE if f"  - {item}" not in text]
     if missing_spine:
