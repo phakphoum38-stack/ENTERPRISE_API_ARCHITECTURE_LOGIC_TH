@@ -111,5 +111,21 @@ class ProjectExecutionTests(unittest.TestCase):
             )
 
 
+    def test_cross_project_capability_boundary_isolated(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            registry = ProjectRegistry((PROJECT_001,))
+            with self.assertRaises(KeyError):
+                registry.get("project-002")
+            proof = self.make_proof(Path(directory))
+            with self.assertRaises(ValueError):
+                proof.invoke(
+                    project_id="project-001",
+                    capability_id="assurance",
+                    action="record evidence",
+                    executor=object(),
+                    correlation_id="project-001-corr-005",
+                    authorized=True,
+                )
+
 if __name__ == "__main__":
     unittest.main()
