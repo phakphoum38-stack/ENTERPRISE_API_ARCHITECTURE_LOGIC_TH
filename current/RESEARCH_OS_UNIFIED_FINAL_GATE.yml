@@ -40,6 +40,7 @@ required_contracts:
   - current/RESEARCH_OS_PROJECT_001.json
   - current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json
   - current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json
+  - current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
