@@ -12,7 +12,7 @@ CONTRACT = ROOT / "current" / "RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.js
 def main() -> None:
     payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
     surfaces = payload["surfaces"]
-    assert len(surfaces) == 17, "product surface inventory must cover the 17 canonical destinations"
+    assert len(surfaces) == 18, "product surface inventory must cover the 18 canonical destinations"
     indexes = [item[1] for item in surfaces]
     assert indexes == list(range(17)), f"navigation indexes drifted: {indexes}"
     labels = [item[0] for item in surfaces]
