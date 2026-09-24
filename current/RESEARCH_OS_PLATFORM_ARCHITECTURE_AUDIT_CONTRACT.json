@@ -1,0 +1,19 @@
+{
+  "contract_id":"research-os-platform-architecture-audit-v1",
+  "version":1,
+  "status":"ACTIVE",
+  "purpose":"Single platform-level integrity contract reconciling existing Research OS Platform components, contracts, execution/evidence planes, product surfaces, governance, scale readiness, distribution and Unified Final Gate without duplicate authority.",
+  "scope":["PLATFORM_CORE","CONTROL_PLANE","EXECUTION_PLANE","EVIDENCE_AND_ASSURANCE","PRODUCT_SURFACES","GOVERNANCE","100_PROJECT_SCALE","UNIFIED_DISTRIBUTION"],
+  "required_component_ids":["platform_workspace","platform_graph","navigation","product_surface","project_identity","workflow","evidence","control_center","release","owner","defect_control","schedule_control","risk_control","change_impact_control","memory_fabric","universal_runner","runner_installation","owner_experience_platform"],
+  "required_invariants":{
+    "single_final_gate":true,"shared_execution_plane":true,"shared_evidence_plane":true,
+    "owner_is_unbounded_privilege_boundary":true,"resource_conflict_is_reject_and_release":true,
+    "same_version_overwrite_forbidden":true,"alternate_version_branching_preserved":true,
+    "platform_specific_navigation_forbidden":true,"external_tools_are_not_authority":true,
+    "m2_is_descriptive_only":true,"unknown_is_not_pass":true,"deferred_is_not_done":true,
+    "no_per_project_runtime":true,"no_per_project_queue":true,"no_per_project_evidence_ledger":true,
+    "final_gate_is_single_release_authority":true
+  },
+  "authority":{"audit_is_descriptive_and_validating":true,"may_execute":false,"may_authorize":false,"may_approve":false,"may_merge":false,"may_release":false,"release_authority":"FINAL_GATE"},
+  "failure_policy":{"missing_component":"STOP","missing_contract":"STOP","missing_test":"STOP","missing_evidence":"STOP","unknown_state":"STOP","duplicate_authority":"STOP","navigation_drift":"STOP","cross_project_lineage":"STOP"}
+}
