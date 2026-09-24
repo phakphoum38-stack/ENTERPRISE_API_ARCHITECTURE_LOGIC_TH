@@ -127,6 +127,8 @@ jobs:
           Copy-Item "scripts\research-os-service.ps1","scripts\start-research-os-local.ps1" "$p\scripts" -Force
           Copy-Item "phase-e\service\*" "$p\service_host" -Recurse -Force
           Copy-Item "phase-e\owner-service\*" "$p\service_host" -Recurse -Force
+          python -m pip install --disable-pip-version-check --quiet "openai-agents>=0.21.0,<1.0"
+          if ($LASTEXITCODE -ne 0) { throw 'OpenAI Agents SDK installation failed.' }
           $py = (python -c "import sys; print(sys.base_prefix)").Trim()
           Copy-Item "$py\*" "$p\runtime\python" -Recurse -Force
           if (-not (Test-Path "$p\runtime\python\python.exe")) { throw 'Bundled Python missing.' }
