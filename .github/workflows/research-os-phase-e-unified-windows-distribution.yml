@@ -225,6 +225,130 @@ jobs:
           & $iscc "/DPackageRoot=$stagingRoot" "$env:GITHUB_WORKSPACE\installer\research-os-unified.iss"
           if ($LASTEXITCODE -ne 0) { throw 'Unified installer build failed.' }
 
+      - name: Installer install run uninstall E2E
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = "$env:GITHUB_WORKSPACE\phase-e\package"
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\installer\output\Research-OS-Unified-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw 'Unified installer missing for E2E.' }
+
+          $targetSha = (git rev-parse HEAD).Trim()
+          $installRoot = Join-Path $env:ProgramFiles 'Research OS'
+          $dataRoot = Join-Path $env:ProgramData 'ResearchOS'
+          $ownerDataRoot = Join-Path $env:ProgramData 'ResearchOSOwnerSpecial'
+          $manifest = Join-Path $package 'DISTRIBUTION_MANIFEST.json'
+          $manifestHash = Join-Path $package 'DISTRIBUTION_MANIFEST.sha256'
+          $manifestHashValue = (Get-FileHash $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checks = [ordered]@{}
+
+          $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /TASKS="desktopicon"'
+          $process = Start-Process -FilePath $setup.FullName -ArgumentList $arguments -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer exited with code $($process.ExitCode)." }
+
+          foreach ($relative in @(
+            'app\research_os_flutter.exe',
+            'owner_special\app\research_os_owner_special.exe',
+            'owner_special\OWNER_MANIFEST.json',
+            'owner_special\research_os_friend',
+            'owner_special\scripts',
+            'tools',
+            'v3',
+            'current',
+            'workflow',
+            'platform\research_os_web',
+            'assurance\aeos',
+            'runtime\python\python.exe',
+            'service_host\ResearchOS.ServiceHost.exe',
+            'service_host\ResearchOS.Owner.ServiceHost.exe',
+            'scripts\research-os-service.ps1',
+            'DISTRIBUTION_MANIFEST.json',
+            'DISTRIBUTION_MANIFEST.sha256'
+          )) {
+            if (-not (Test-Path (Join-Path $installRoot $relative))) {
+              throw "Installed distribution component missing: $relative"
+            }
+          }
+          $checks['installed_components'] = $true
+
+          $installedManifest = Get-Content (Join-Path $installRoot 'DISTRIBUTION_MANIFEST.json') -Raw | ConvertFrom-Json
+          if ($installedManifest.source_sha -ne $targetSha) { throw 'Installed manifest source SHA mismatch.' }
+          if ($installedManifest.product_name -ne 'Research OS') { throw 'Installed manifest product identity mismatch.' }
+          if ($installedManifest.company_name -ne 'Research OS Team') { throw 'Installed manifest company identity mismatch.' }
+          $installedManifestHash = (Get-FileHash (Join-Path $installRoot 'DISTRIBUTION_MANIFEST.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($installedManifestHash -ne $manifestHashValue) { throw 'Installed manifest SHA256 mismatch.' }
+          $checks['manifest_provenance'] = $true
+
+          $mainService = Get-Service -Name 'ResearchOSService' -ErrorAction SilentlyContinue
+          $ownerService = Get-Service -Name 'ResearchOSOwnerFriendService' -ErrorAction SilentlyContinue
+          if (-not $mainService -or $mainService.Status -ne 'Running') { throw 'Research OS service is not running after install.' }
+          if (-not $ownerService -or $ownerService.Status -ne 'Running') { throw 'Owner Friend service is not running after install.' }
+          $checks['services_running'] = $true
+
+          $ownerReady = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $ownerHealth = Invoke-RestMethod -Uri 'http://127.0.0.1:8790/owner/health' -TimeoutSec 2
+              if ($ownerHealth.status -eq 'ok') { $ownerReady = $true; break }
+            } catch {}
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ownerReady) { throw 'Owner Friend HTTP health check failed.' }
+          $checks['owner_http_ready'] = $true
+
+          $apiReady = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $apiResponse = Invoke-WebRequest -Uri 'http://127.0.0.1:8787/' -TimeoutSec 2 -UseBasicParsing
+              if ($apiResponse.StatusCode -ge 200 -and $apiResponse.StatusCode -lt 500) { $apiReady = $true; break }
+            } catch {
+              if ($_.Exception.Response) { $apiReady = $true; break }
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $apiReady) { throw 'Research OS API HTTP readiness check failed.' }
+          $checks['research_os_api_ready'] = $true
+
+          $appPath = Join-Path $installRoot 'app\research_os_flutter.exe'
+          $app = Start-Process -FilePath $appPath -WorkingDirectory (Split-Path $appPath) -PassThru
+          Start-Sleep -Seconds 5
+          $app.Refresh()
+          if ($app.HasExited) { throw "Research OS desktop application exited during smoke test with code $($app.ExitCode)." }
+          $checks['desktop_app_launch'] = $true
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          Wait-Process -Id $app.Id -Timeout 10 -ErrorAction SilentlyContinue
+
+          $uninstaller = Join-Path $installRoot 'unins000.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'Inno Setup uninstaller missing.' }
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstall.ExitCode)." }
+
+          for ($i = 0; $i -lt 30; $i++) {
+            if (-not (Test-Path $installRoot)) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (Test-Path $installRoot) { throw 'Installation root remained after uninstall.' }
+          if (Get-Service -Name 'ResearchOSService' -ErrorAction SilentlyContinue) { throw 'Research OS service remained after uninstall.' }
+          if (Get-Service -Name 'ResearchOSOwnerFriendService' -ErrorAction SilentlyContinue) { throw 'Owner Friend service remained after uninstall.' }
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw 'Research OS API port remained bound after uninstall.' }
+          if (Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction SilentlyContinue) { throw 'Owner Friend port remained bound after uninstall.' }
+          $checks['uninstall_clean'] = $true
+
+          [ordered]@{
+            schema = 'research-os.windows-installer-e2e.v1'
+            source_sha = $targetSha
+            installer = $setup.Name
+            installer_sha256 = $setupHash
+            manifest_sha256 = $manifestHashValue
+            manifest_hash_file = (Get-Content $manifestHash -Raw).Trim()
+            install_root = $installRoot
+            checks = $checks
+            release_authority = 'FINAL_GATE'
+          } | ConvertTo-Json -Depth 8 | Set-Content "$env:GITHUB_WORKSPACE\phase-e\WINDOWS_INSTALL_E2E_EVIDENCE.json" -Encoding utf8
+          Write-Host 'WINDOWS_INSTALL_E2E=PASS'
+
       - name: Package and hash distribution
         shell: pwsh
         run: |
@@ -245,6 +369,7 @@ jobs:
             phase-e/Research-OS-Unified-Windows-x64-*.zip
             phase-e/Research-OS-Unified-Windows-x64-*.zip.sha256
             phase-e/RELEASE_EVIDENCE.json
+            phase-e/WINDOWS_INSTALL_E2E_EVIDENCE.json
             phase-e/package/DISTRIBUTION_MANIFEST.json
             phase-e/package/DISTRIBUTION_MANIFEST.sha256
             installer/output/Research-OS-Unified-Setup-*-x64.exe

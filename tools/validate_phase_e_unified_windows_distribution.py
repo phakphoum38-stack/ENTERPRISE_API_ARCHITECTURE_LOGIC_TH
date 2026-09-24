@@ -88,6 +88,32 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
         if authority.get(key) is not True:
             errors.append(f"authority invariant missing: {key}")
 
+    install_e2e = contract.get("install_e2e", {})
+    for key in (
+        "evidence_required",
+        "install_required",
+        "component_verification_required",
+        "manifest_source_sha_required",
+        "manifest_sha256_required",
+        "research_os_api_readiness_required",
+        "owner_friend_http_readiness_required",
+        "desktop_launch_smoke_required",
+        "uninstall_required",
+        "uninstall_root_must_be_absent",
+        "services_must_be_absent_after_uninstall",
+    ):
+        if install_e2e.get(key) is not True:
+            errors.append(f"installer E2E invariant missing: {key}")
+    if install_e2e.get("services_required") != [
+        "ResearchOSService",
+        "ResearchOSOwnerFriendService",
+    ]:
+        errors.append("installer E2E service set drifted")
+    if install_e2e.get("ports_must_be_released_after_uninstall") != [8787, 8790]:
+        errors.append("installer E2E port set drifted")
+    if install_e2e.get("release_authority") != "FINAL_GATE":
+        errors.append("installer E2E release authority drifted")
+
     workflow = _read_phase_e_workflow(root)
     for marker in (
         "TARGET_SHA",
@@ -98,6 +124,8 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
         "RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION",
         "research_os_owner_special.exe",
         "runtime\\python\\python.exe",
+        "Installer install run uninstall E2E",
+        "WINDOWS_INSTALL_E2E_EVIDENCE.json",
     ):
         if marker not in workflow:
             errors.append(f"Phase E workflow missing required marker: {marker}")

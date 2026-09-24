@@ -60,6 +60,29 @@
     "second_authorization_system",
     "second_evidence_ledger",
     "platform_specific_navigation_registry",
-    "automatic_release"
-  ]
+    "automatic_release",
+    "installer_source_layout_dependency"
+  ],
+  "install_e2e": {
+    "evidence_required": true,
+    "install_required": true,
+    "component_verification_required": true,
+    "manifest_source_sha_required": true,
+    "manifest_sha256_required": true,
+    "services_required": [
+      "ResearchOSService",
+      "ResearchOSOwnerFriendService"
+    ],
+    "research_os_api_readiness_required": true,
+    "owner_friend_http_readiness_required": true,
+    "desktop_launch_smoke_required": true,
+    "uninstall_required": true,
+    "uninstall_root_must_be_absent": true,
+    "services_must_be_absent_after_uninstall": true,
+    "ports_must_be_released_after_uninstall": [
+      8787,
+      8790
+    ],
+    "release_authority": "FINAL_GATE"
+  }
 }
