@@ -18,6 +18,10 @@ EXPECTED = {"control_center", "friend", "agent", "github", "factory_v3", "assura
 DELEGATED = {"friend", "agent", "github", "factory_v3", "assurance"}
 
 
+def _read_unified_final_gate(root: Path) -> str:
+    return (root / ".github/workflows/research-os-unified-final-gate.yml").read_text(encoding="utf-8")
+
+
 def validate(root: Path = ROOT) -> tuple[str, ...]:
     errors: list[str] = []
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
@@ -71,9 +75,7 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
     if set(contract["required_evidence_fields"]) != required:
         errors.append("phase D evidence field set differs from Phase B")
 
-    gate = (root / ".github/workflows/research-os-unified-final-gate.yml").read_text(
-        encoding="utf-8"
-    )
+    gate = _read_unified_final_gate(root)
     if "tools.test_phase_d_cross_surface_parity" not in gate:
         errors.append("Unified Final Gate is missing the Phase D parity test")
 
