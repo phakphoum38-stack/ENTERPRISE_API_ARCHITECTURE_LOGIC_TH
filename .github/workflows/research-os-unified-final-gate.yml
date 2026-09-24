@@ -85,6 +85,10 @@ jobs:
         working-directory: apps/research_os_flutter
         run: flutter test test/platform_surface_parity_test.dart
 
+      - name: Capability to navigation binding
+        working-directory: apps/research_os_flutter
+        run: flutter test test/navigation_capability_binding_test.dart
+
       - name: Page mapping contract
         working-directory: apps/research_os_flutter
         run: flutter test test/desktop_shell_test.dart
