@@ -2,6 +2,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_flutter/src/api/research_os_api_client.dart';
 import 'package:research_os_flutter/src/app_shell.dart';
+import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 
 class DesktopShellApiClient extends ResearchOSApiClient {
   DesktopShellApiClient()
@@ -202,6 +203,19 @@ void main() {
         findsOneWidget,
       );
 
+      // Every registry destination must resolve to a real page slot.
+      for (final item in researchNavigationItems) {
+        await tester.tap(
+          find.byKey(Key('v2-nav-${item.index}')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'Navigation index ${item.index} (${item.label}) must map to a page.',
+        );
+      }
       // No Flutter exception.
       expect(
         tester.takeException(),
