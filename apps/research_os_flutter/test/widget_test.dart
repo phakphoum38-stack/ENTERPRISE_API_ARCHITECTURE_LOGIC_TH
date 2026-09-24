@@ -179,7 +179,7 @@ void main() {
     expect(find.text('gemini'), findsOneWidget);
     expect(find.text('Ready'), findsOneWidget);
     expect(find.text('AI & Agents'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('home-workspace-ai-agents-')));
+    await tester.tap(find.byKey(const Key('home-workspace-ai-agents')));
     expect(selectedIndex, 1);
     expect(tester.takeException(), isNull);
   });
