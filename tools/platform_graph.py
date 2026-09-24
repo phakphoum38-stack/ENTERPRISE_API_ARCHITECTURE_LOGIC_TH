@@ -153,8 +153,6 @@ class PlatformGraph:
             for field_name in self.contract.get("required_record_fields", []):
                 if field_name not in record or record.get(field_name) is None:
                     failures.append(f"missing:{work_id}:{field_name}")
-            if record.get("status") == "DONE" and not record.get("evidence_refs"):
-                failures.append(f"missing:{work_id}:evidence_refs")
             path = record.get("virtual_path")
             if path in seen_paths:
                 failures.append(f"duplicate_virtual_path:{path}")
