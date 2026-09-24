@@ -24,11 +24,18 @@ class PhaseEUnifiedWindowsDistributionTests(unittest.TestCase):
             )
 
     def test_workflow_must_bind_owner_special(self) -> None:
-        with patch.object(
-            validator,
-            "Path",
-        ):
-            pass
+        with patch.object(validator, "_read_phase_e_workflow", return_value=""):
+            self.assertIn(
+                "Phase E workflow missing required marker: research_os_owner_special.exe",
+                validator.validate(),
+            )
+
+    def test_final_gate_hook_is_required(self) -> None:
+        with patch.object(validator, "_read_unified_final_gate", return_value=""):
+            self.assertIn(
+                "Unified Final Gate is missing the Phase E distribution test",
+                validator.validate(),
+            )
 
     def test_contract_requires_exact_sha(self) -> None:
         original = validator.json.loads(
