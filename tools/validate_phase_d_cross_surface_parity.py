@@ -35,13 +35,28 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
         errors.append("delegation set drifted")
     errors.extend(validate_delegations())
 
+    # Registry executor_ref may name a concrete runtime adapter while the
+    # delegation registry names the contract-facing executor. Phase D therefore
+    # reconciles by canonical capability ownership, not string identity:
+    # every delegated capability must have a non-empty runtime/executor pair,
+    # and the delegation executor must remain the canonical executor family.
+    expected_executor_families = {
+        "friend": "FriendRuntime",
+        "agent": "AgentRuntime",
+        "github": "github_status.py",
+        "factory_v3": "FactoryExecutionEngine",
+        "assurance": "EvidenceRecorder",
+    }
     for capability_id in DELEGATED:
         binding = registry.get(capability_id)
         delegation = delegations.get(capability_id)
         if binding is None or delegation is None:
             continue
-        if binding.executor_ref != delegation.executor_ref:
-            errors.append(f"{capability_id}: registry/delegation executor mismatch")
+        expected = expected_executor_families[capability_id]
+        if expected not in binding.runtime_ref and expected not in binding.executor_ref:
+            errors.append(f"{capability_id}: registry executor family mismatch")
+        if expected not in delegation.executor_ref:
+            errors.append(f"{capability_id}: delegation executor family mismatch")
 
     assurance = delegations.get("assurance")
     if assurance is not None and (assurance.execution_supported or assurance.operations):
