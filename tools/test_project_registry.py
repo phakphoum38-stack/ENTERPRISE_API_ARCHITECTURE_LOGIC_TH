@@ -125,11 +125,6 @@ class ProjectRegistryTests(unittest.TestCase):
         self.assertTrue(first.startswith("project-001|"))
         self.assertTrue(second.startswith("project-002|"))
 
-
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_real_project_definitions_scale_at_10_20_50_100(self) -> None:
         for count in (10, 20, 50, 100):
             registry = ProjectRegistry()
@@ -151,3 +146,7 @@ if __name__ == "__main__":
                 len(registry.all()),
                 len({item.project_id for item in registry.all()}),
             )
+
+
+if __name__ == "__main__":
+    unittest.main()
