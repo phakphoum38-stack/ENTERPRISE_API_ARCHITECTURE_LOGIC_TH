@@ -46,6 +46,25 @@ rules:
       - sha256
     tamper_detection: manifest_sha256
 
+  canonical_platform_contract:
+    required: true
+    path: current/CANONICAL_PLATFORM_CONTRACT.yml
+    validator: tools/validate_canonical_platform_contract.py
+    governs:
+      - identity
+      - idempotency
+      - versioning
+      - state_machine
+      - resource_conflict
+      - retry
+      - reconciliation
+      - evidence
+      - provenance
+      - observability
+      - compatibility
+      - recovery
+      - fail_closed
+
   intelligence:
     trusted_tooling_ref: main
     failed_source_is_data_only: true
