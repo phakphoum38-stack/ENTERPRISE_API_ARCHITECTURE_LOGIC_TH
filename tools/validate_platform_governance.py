@@ -20,6 +20,8 @@ def _load(path: str) -> Any:
 def validate() -> list[str]:
     failures: list[str] = []
     contract = _load("current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json")
+    if not contract.get("change_impact_rules"):
+        failures.append("change_impact_rules_missing")
 
     if contract.get("contract_id") != "research-os-platform-governance-v1":
         failures.append("contract_id")
