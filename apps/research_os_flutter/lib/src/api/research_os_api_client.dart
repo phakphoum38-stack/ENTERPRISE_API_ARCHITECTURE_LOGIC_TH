@@ -62,6 +62,7 @@ class ResearchOSApiClient {
       _postJson('/v1/auth/signout', const <String, Object?>{});
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
+  Future<Map<String, dynamic>> getProjects() => _getJson('/v1/projects');
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
