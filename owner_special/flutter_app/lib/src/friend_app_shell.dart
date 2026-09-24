@@ -164,7 +164,14 @@ class _Header extends StatelessWidget {
                   const SizedBox(width: 10),
                   Container(width: 4, height: 4, decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle)),
                   const SizedBox(width: 8),
-                  Text('Owner Runtime Boundary • Research OS', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  Expanded(
+                    child: Text(
+                      'Owner Runtime Boundary • Research OS',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
                 ],
               ],
             ),
