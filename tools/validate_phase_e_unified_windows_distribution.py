@@ -98,6 +98,8 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
         "RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION",
         "research_os_owner_special.exe",
         "runtime\\python\\python.exe",
+        "Installer install run uninstall E2E",
+        "WINDOWS_INSTALL_E2E_EVIDENCE.json",
     ):
         if marker not in workflow:
             errors.append(f"Phase E workflow missing required marker: {marker}")
