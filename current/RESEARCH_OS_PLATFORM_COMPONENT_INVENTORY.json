@@ -15,9 +15,7 @@
       "canonical": "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
       "kind": "REGISTRY",
       "lifecycle": "ACTIVE",
-      "dependencies": [
-        "platform_graph"
-      ],
+      "dependencies": [],
       "contracts": [
         "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json"
       ],
@@ -68,6 +66,29 @@
       ],
       "evidence": [
         "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "product_surface",
+      "canonical": "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json",
+      "kind": "SURFACE_INVENTORY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/platform_surface_parity_test.dart"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json"
       ],
       "gates": [
         "flutter_surface",
