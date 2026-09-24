@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 
 class ResearchNavItem {
-  const ResearchNavItem(this.section, this.label, this.icon, this.index);
+  const ResearchNavItem(
+    this.section,
+    this.label,
+    this.icon,
+    this.index, {
+    this.capabilityId,
+  });
 
   final String section;
   final String label;
   final IconData icon;
   final int index;
+
+  /// Canonical cross-layer capability identity when this destination is
+  /// already bound to an existing capability contract. Null means the
+  /// destination is currently shell-only or its capability binding is still
+  /// being migrated; it does not grant authority by itself.
+  final String? capabilityId;
 }
 
 const researchNavigationItems = <ResearchNavItem>[
@@ -24,7 +36,13 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9),
   ResearchNavItem('Access', 'Developer Access', Icons.admin_panel_settings_outlined, 10),
   ResearchNavItem('Account', 'Google Sign-In', Icons.account_circle_outlined, 12),
-  ResearchNavItem('Control', 'Control Center', Icons.tune_outlined, 14),
+  ResearchNavItem(
+    'Control',
+    'Control Center',
+    Icons.tune_outlined,
+    14,
+    capabilityId: 'control_center',
+  ),
 ];
 
 class ResearchSidebar extends StatelessWidget {
