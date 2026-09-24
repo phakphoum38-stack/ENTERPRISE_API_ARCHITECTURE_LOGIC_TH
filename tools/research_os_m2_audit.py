@@ -105,13 +105,14 @@ def build_index():
   "duplicate_path_detection":len({r["path"] for r in rows})==len(rows),
   "unique_node_ids":len(node_ids)==len(nodes),
   "no_dangling_edges":not dangling,
-  "contract_test_linkage":True,
+  "contract_test_linkage":all(any(e["from"]==nid("CONTRACT",c) and e["relation"]=="VERIFIED_BY" for e in edges) for c in contracts if any(c in read_text(by_path[t]) or Path(c).stem.lower().replace("-contract","") in Path(t).stem.lower() for t in tests)),
+  "contract_implementation_linkage":all(any(e["from"]==nid("IMPLEMENTATION",i) and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) for i in implementations if any(c in read_text(by_path[i]) for c in contracts)),
   "workflow_inventory":bool(workflows),
   "contract_inventory":bool(contracts),
   "invariant_inventory":any(r["invariant_refs"] for r in rows),
   "final_gate_node":"FINAL_GATE:UNIFIED" in targets,
  }
- return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V2","source_sha":source,"root":str(ROOT),
+ return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V3","source_sha":source,"root":str(ROOT),
   "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
   "integrity":integrity,"findings":findings,"nodes":nodes,"edges":edges,"files":rows,"dangling_edges":dangling}
 def build_graph(): return build_index()
