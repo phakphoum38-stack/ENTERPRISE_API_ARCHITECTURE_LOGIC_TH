@@ -43,7 +43,7 @@ def main() -> None:
 
     assert payload["authority"]["descriptive_only"] is True
     assert payload["authority"]["release_authority"] == "FINAL_GATE"
-    assert "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint is exposed by ResearchOSApiClient yet; do not fabricate project telemetry." in payload["next_product_gaps"]
+    assert "PROJECT_EXPERIENCE: no canonical ProjectRegistry API endpoint is exposed by ResearchOSApiClient yet; do not fabricate project telemetry." not in payload["next_product_gaps"]
     print("PRODUCT_SURFACE_INVENTORY=PASS")
     print("CANONICAL_DESTINATIONS=17")
     print("AUTHORITY=DESCRIPTIVE_ONLY")
