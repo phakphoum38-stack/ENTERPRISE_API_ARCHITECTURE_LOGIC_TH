@@ -31,7 +31,7 @@ class PhaseDCrossSurfaceParityTests(unittest.TestCase):
         ):
             self.assertIn("assurance must remain non-executable", validator.validate())
 
-    def test_executor_mismatch_fails_closed(self) -> None:
+    def test_executor_family_mismatch_fails_closed(self) -> None:
         friend = next(item for item in CANONICAL_CAPABILITY_BINDINGS if item.capability_id == "friend")
         mutated = type(friend)(
             friend.capability_id,
@@ -39,10 +39,11 @@ class PhaseDCrossSurfaceParityTests(unittest.TestCase):
             friend.label,
             friend.ui_ref,
             friend.contract_ref,
+            friend.runtime_ref,
             "mismatched/executor",
             friend.observation_ref,
-            friend.state_ref,
             friend.evidence_ref,
+            friend.state_ref,
             friend.inspector_ref,
             friend.status,
             friend.notes,
@@ -52,7 +53,7 @@ class PhaseDCrossSurfaceParityTests(unittest.TestCase):
             "CANONICAL_CAPABILITY_BINDINGS",
             tuple(mutated if item.capability_id == "friend" else item for item in CANONICAL_CAPABILITY_BINDINGS),
         ):
-            self.assertIn("friend: registry/delegation executor mismatch", validator.validate())
+            self.assertIn("friend: registry executor family mismatch", validator.validate())
 
     def test_missing_final_gate_hook_fails_closed(self) -> None:
         with patch.object(validator, "ROOT", validator.ROOT):
