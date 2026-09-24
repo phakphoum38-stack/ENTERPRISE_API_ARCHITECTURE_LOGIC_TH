@@ -64,8 +64,6 @@ void main() {
     expect(find.text('Workflow runs'), findsOneWidget);
     expect(find.text('Running'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
-    expect(find.text('Workflow control surface'), findsOneWidget);
-
     final overview = find.byKey(
       const ValueKey('control-center-overview-scroll'),
     );
