@@ -20,8 +20,12 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PROJECT_001.json",
     "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json",
     "current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json",
+    "current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json",
     "current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json",
     "apps/research_os_flutter/lib/src/features/control_center/native_control_audit_view.dart",
+    "apps/research_os_flutter/lib/src/features/projects/project_experience_page.dart",
+    "tools/research_os_api/test_project_routes.py",
+    "apps/research_os_flutter/test/project_experience_page_test.dart",
     "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
     "tools/project_scale_execution.py",
     "tools/test_project_scale_execution.py",
@@ -74,6 +78,7 @@ def main() -> None:
         "current/RESEARCH_OS_PROJECT_001.json",
         "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json",
         "current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json",
+        "current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json",
         "current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
