@@ -12,6 +12,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import Mapping
 
 LIFECYCLE = (
@@ -19,6 +20,14 @@ LIFECYCLE = (
     "OBSERVE", "EVIDENCE", "COMPLETE", "RECOVER",
 )
 TERMINAL = frozenset({"COMPLETE", "RECOVER"})
+_APPEND_LOCKS: dict[str, Lock] = {}
+_APPEND_LOCKS_GUARD = Lock()
+
+
+def _append_lock(path: Path) -> Lock:
+    key = str(path.resolve())
+    with _APPEND_LOCKS_GUARD:
+        return _APPEND_LOCKS.setdefault(key, Lock())
 
 
 def _canonical(value: object) -> str:
@@ -127,8 +136,12 @@ class LifecycleEvidenceLedger:
         if record.recovery_required and not record.recovery_reason:
             raise ValueError("recovery_required requires recovery_reason")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8") as stream:
-            stream.write(_canonical(asdict(record)) + "\n")
+        # Multiple project workers may append to the shared evidence plane concurrently.
+        # Serialize complete JSONL records so concurrent writes cannot interleave bytes.
+        with _append_lock(self.path):
+            with self.path.open("a", encoding="utf-8") as stream:
+                stream.write(_canonical(asdict(record)) + "\n")
+                stream.flush()
 
     def read(self) -> tuple[LifecycleEvidence, ...]:
         if not self.path.exists():
