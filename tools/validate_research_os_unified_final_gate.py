@@ -27,6 +27,11 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json",
     "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+    "tools/test_platform_operating_control.py",
     "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
     "apps/research_os_flutter/test/owner_experience_page_test.dart",
     "apps/research_os_flutter/lib/src/features/control_center/native_control_audit_view.dart",
@@ -95,6 +100,10 @@ def main() -> None:
         "current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json",
         "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
             fail(f"required completion contract is not bound: {contract_ref}")
