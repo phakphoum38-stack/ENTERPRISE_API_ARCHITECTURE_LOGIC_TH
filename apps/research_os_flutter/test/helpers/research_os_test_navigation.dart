@@ -90,8 +90,8 @@ class ResearchOsTestNavigation {
   }) async {
     expect(
       researchNavigationItems.length,
-      17,
-      reason: 'The shared application surface must contain 17 destinations.',
+      18,
+      reason: 'The shared application surface must contain 18 destinations.',
     );
 
     final indexes = researchNavigationItems.map((item) => item.index).toSet();
