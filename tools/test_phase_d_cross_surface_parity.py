@@ -56,15 +56,15 @@ class PhaseDCrossSurfaceParityTests(unittest.TestCase):
             self.assertIn("friend: registry executor family mismatch", validator.validate())
 
     def test_missing_final_gate_hook_fails_closed(self) -> None:
-        original_read_text = validator.Path.read_text
-
-        def read_text_without_phase_d_hook(path, *args, **kwargs):
-            text = original_read_text(path, *args, **kwargs)
-            if str(path).endswith(".github/workflows/research-os-unified-final-gate.yml"):
-                return text.replace("tools.test_phase_d_cross_surface_parity", "tools.test_phase_d_cross_surface_parity_REMOVED")
-            return text
-
-        with patch.object(validator.Path, "read_text", read_text_without_phase_d_hook):
+        original = validator._read_unified_final_gate
+        with patch.object(
+            validator,
+            "_read_unified_final_gate",
+            lambda root: original(root).replace(
+                "tools.test_phase_d_cross_surface_parity",
+                "tools.test_phase_d_cross_surface_parity_REMOVED",
+            ),
+        ):
             self.assertIn(
                 "Unified Final Gate is missing the Phase D parity test",
                 validator.validate(),
