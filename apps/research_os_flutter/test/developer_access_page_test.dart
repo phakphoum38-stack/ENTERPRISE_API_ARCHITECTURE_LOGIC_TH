@@ -70,7 +70,7 @@ void main() {
     final developerAccessScroll = find.descendant(
       of: find.byKey(const Key('developer-access-scroll')),
       matching: find.byType(Scrollable),
-    );
+    ).first;
     final pendingHeading = find.textContaining('คำขอที่รออนุมัติ (1)');
     await tester.scrollUntilVisible(
       pendingHeading,
