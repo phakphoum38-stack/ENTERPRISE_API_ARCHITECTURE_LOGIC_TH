@@ -236,7 +236,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: ListTile(
                     leading: Icon(provider == 'openai' ? Icons.auto_awesome_outlined : Icons.psychology_outlined),
                     title: Text(label),
-                    subtitle: Text('State: $state • Adapter: \${connection['adapter'] ?? 'unknown'}'),
+                    subtitle: Text("State: $state • Adapter: ${connection['adapter'] ?? 'unknown'}"),
                     trailing: Wrap(
                       spacing: 8,
                       children: [
