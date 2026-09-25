@@ -125,6 +125,13 @@
       "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
       "apps/research_os_flutter/lib/src/app_shell.dart"
     ]
+    ,
+    [
+      "AI Providers",
+      18,
+      "apps/research_os_flutter/lib/src/features/ai_providers/ai_provider_connections_page.dart",
+      "apps/research_os_flutter/lib/src/app_shell.dart"
+    ]
   ],
   "non_surface_bindings": {
     "control_center_audit": "apps/research_os_flutter/lib/src/features/control_center/native_control_audit_view.dart",
