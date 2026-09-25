@@ -221,6 +221,44 @@
       ]
     },
     {
+      "match": "current/RESEARCH_OS_AI_PROVIDER_CONNECTION_CONTRACT.json",
+      "components": [
+        "ai_provider_connection",
+        "credential_boundary",
+        "evidence"
+      ],
+      "gates": [
+        "ai_provider_connection",
+        "evidence_lineage",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/research_os_ai_provider_connection.py",
+      "components": [
+        "ai_provider_connection",
+        "credential_boundary",
+        "evidence"
+      ],
+      "gates": [
+        "ai_provider_connection",
+        "evidence_lineage",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "apps/research_os_flutter/lib/src/features/ai_providers/",
+      "components": [
+        "product_surface",
+        "ai_provider_connection"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ]
+    },
+    {
       "match": "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
       "components": [
         "platform_governance"
