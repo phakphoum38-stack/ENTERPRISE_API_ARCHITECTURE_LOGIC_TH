@@ -67,8 +67,10 @@ jobs:
         run: |
           flutter pub get
           flutter analyze
+          flutter test
           flutter test test/platform_surface_parity_test.dart
           flutter test test/desktop_shell_test.dart
+          echo "RESEARCH_OS_SHARED_SOURCE_VALIDATION=PASS"
 
       - name: Bootstrap target platform in isolated workspace
         shell: bash
