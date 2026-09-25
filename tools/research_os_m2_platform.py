@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Platform-level M.2 discovery facade built on the existing audit index.
+"""Platform-level M.2 discovery facade built on the existing audit index.\n\nContract: current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json.
 
 M.2 remains descriptive/read-only. It does not authorize, merge, release, or
 mutate runtime state. The facade adds vertical/horizontal search, bounded
