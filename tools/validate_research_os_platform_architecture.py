@@ -53,7 +53,11 @@ def main()->None:
     if missing: fail("missing canonical anchors: "+", ".join(missing))
     contract=json.loads(CONTRACT.read_text(encoding="utf-8"))
     inv=json.loads(INVENTORY.read_text(encoding="utf-8"))
-    comps={c["id"]:c for c in inv.get("components",[])}
+    declared=inv.get("components",[])
+    if len(declared) != len(REQUIRED_IDS): fail(f"platform component count must be exactly {len(REQUIRED_IDS)}, got {len(declared)}")
+    declared_ids=[c.get("id") for c in declared]
+    if len(set(declared_ids)) != len(declared_ids): fail("duplicate platform component ids")
+    comps={c["id"]:c for c in declared}
     missing_ids=[i for i in REQUIRED_IDS if i not in comps]
     if missing_ids: fail("missing component inventory ids: "+", ".join(missing_ids))
     bad=[]
@@ -64,6 +68,9 @@ def main()->None:
         if c.get("lifecycle")!="ACTIVE": bad.append(f"{cid}.lifecycle")
         if not c.get("contracts") or not c.get("tests") or not c.get("evidence") or not c.get("gates"):
             bad.append(f"{cid}.proof")
+        if not (ROOT/c["canonical"]).exists(): bad.append(f"{cid}:canonical:{c["canonical"]}")
+        for dependency in c.get("dependencies",[]):
+            if dependency not in comps: bad.append(f"{cid}:dependency:{dependency}")
         for ref in c.get("contracts",[])+c.get("tests",[])+c.get("evidence",[]):
             if not (ROOT/ref).exists(): bad.append(f"{cid}:{ref}")
     if bad: fail("component proof incomplete: "+", ".join(sorted(set(bad))))
@@ -75,7 +82,10 @@ def main()->None:
         if anchor not in text: fail("final gate anchor missing: "+anchor)
     if "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json" not in text:
         fail("platform architecture audit is not bound to Unified Final Gate")
-    if set(contract["required_component_ids"]) != set(REQUIRED_IDS):
+    required_contract_ids=contract["required_component_ids"]
+    if len(required_contract_ids) != len(REQUIRED_IDS) or len(set(required_contract_ids)) != len(required_contract_ids):
+        fail("audit contract required component ids must be exactly 18 unique ids")
+    if set(required_contract_ids) != set(REQUIRED_IDS):
         fail("audit contract component set drifted")
     inv_text=json.dumps(inv)
     for marker in ("final_gate_is_single_release_authority","nvme_is_storage_backed_memory_not_dram","unknown_runner_capability_is_not_available"):
