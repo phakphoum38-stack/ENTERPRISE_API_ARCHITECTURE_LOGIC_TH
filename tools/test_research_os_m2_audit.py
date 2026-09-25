@@ -6,6 +6,8 @@ class M2AuditIndexTests(unittest.TestCase):
   index=build_index()
   self.assertRegex(index["source_sha"],r"^[0-9a-f]{40}$")
   self.assertGreater(index["inventory"]["files"],0)
+  self.assertTrue(index["integrity"]["test_case_inventory"])
+  self.assertGreater(index["inventory"]["test_case_inventory"]["discovered_test_cases"],0)
   self.assertTrue(all(index["integrity"].values()))
  def test_expected_capabilities_are_discoverable(self):
   rows={r["path"]:r for r in build_index()["files"]}

@@ -2,6 +2,10 @@
 """Build a source-SHA-pinned searchable M.2 inventory and relationship graph."""
 from __future__ import annotations
 import argparse,json,re,subprocess
+try:
+ from research_os_test_case_inventory import discover as discover_test_cases
+except ModuleNotFoundError:
+ from tools.research_os_test_case_inventory import discover as discover_test_cases
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -56,6 +60,7 @@ def required_authority_paths(by_path):
 
 def build_index():
  source=git_sha(); ps=files(); by_path={rel(p):p for p in ps}; rows=[]
+ test_case_inventory=discover_test_cases()
  required_contracts,required_workflows=required_authority_paths(by_path)
  for p in ps:
   path=rel(p); txt=read_text(p)
@@ -122,6 +127,7 @@ def build_index():
  integrity={
   "exact_source_sha":bool(re.fullmatch(r"[0-9a-f]{40}",source)),
   "inventory_completeness":bool(rows),
+  "test_case_inventory":test_case_inventory["source_sha"]==source and test_case_inventory["inventory"]["test_files"]>0 and test_case_inventory["inventory"]["discovered_test_cases"]>0,
   "duplicate_path_detection":len({r["path"] for r in rows})==len(rows),
   "unique_node_ids":len(node_ids)==len(nodes),
   "no_dangling_edges":not dangling,
@@ -135,7 +141,7 @@ def build_index():
   "final_gate_node":final_gate_exists and "FINAL_GATE:UNIFIED" in targets,
  }
  return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V2","source_sha":source,"root":str(ROOT),
-  "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"required_contracts":len(required_contracts),"required_workflows":len(required_workflows),"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
+  "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"required_contracts":len(required_contracts),"required_workflows":len(required_workflows),"test_case_inventory":test_case_inventory["inventory"],"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
   "integrity":integrity,"findings":findings,"nodes":nodes,"edges":edges,"files":rows,"dangling_edges":dangling}
 def build_graph(): return build_index()
 def main():
