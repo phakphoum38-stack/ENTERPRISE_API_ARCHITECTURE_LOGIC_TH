@@ -37,5 +37,9 @@ void main(){
     await tester.tap(find.text('Connect').first);
     await tester.pumpAndSettle();
     expect(find.text('API_FALLBACK'),findsOneWidget);
+    expect(find.text('Health Check'),findsOneWidget);
+    await tester.tap(find.text('Disconnect'));
+    await tester.pumpAndSettle();
+    expect(find.text('NOT_CONNECTED'),findsOneWidget);
   });
 }
