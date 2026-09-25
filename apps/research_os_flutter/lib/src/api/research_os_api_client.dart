@@ -66,6 +66,15 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> getProviders() => _getJson('/v1/providers');
   Future<Map<String, dynamic>> getAIProviderConnections() =>
       _getJson('/v1/ai/connections');
+
+  Future<Map<String, dynamic>> connectAIProvider(String provider) =>
+      _postJson('/v1/ai/connections/connect', <String, Object?>{'provider': provider});
+
+  Future<Map<String, dynamic>> disconnectAIProvider(String provider) =>
+      _postJson('/v1/ai/connections/disconnect', <String, Object?>{'provider': provider});
+
+  Future<Map<String, dynamic>> healthCheckAIProvider(String provider) =>
+      _postJson('/v1/ai/connections/health', <String, Object?>{'provider': provider});
   Future<Map<String, dynamic>> getKnowledgeArtifacts() =>
       _getJson('/v1/knowledge/artifacts');
   Future<Map<String, dynamic>> getKnowledgeGraph() =>
