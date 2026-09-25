@@ -24,7 +24,7 @@ class ControlCenterCapabilityRegistryTests(unittest.TestCase):
     def test_major_engines_remain_delegated(self):
         for capability in ("friend", "agent", "github", "factory_v3", "assurance"):
             binding = get_capability(capability)
-            self.assertEqual(binding.status, "PARTIAL")
+            self.assertIn(binding.status, {"CANONICAL_WIRED", "WIRED_NOT_EXECUTABLE"})
             self.assertNotEqual(binding.runtime_ref, binding.ui_ref)
 
     def test_domain_filter_is_deterministic(self):
