@@ -130,7 +130,7 @@ def validate() -> list[str]:
                 failures.append("navigation_entry_missing_destination_id")
             else:
                 destination_ids.append(entry.split(marker, 1)[1].split("'", 1)[0])
-            index_match = re.search(r",\\s*(\\d+)\\s*,", entry)
+            index_match = re.search(r",\s*(\d+)\s*,", entry)
             if index_match is None:
                 failures.append("navigation_entry_missing_index")
             else:
