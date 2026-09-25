@@ -49,6 +49,10 @@ jobs:
         run: python tools/platform_core_completion.py
       - name: Validate complete platform architecture
         run: python tools/validate_research_os_platform_architecture.py
+      - name: Validate Flutter convergence map
+        run: |
+          python tools/validate_research_os_flutter_convergence_map.py
+          python -m unittest tools.test_validate_research_os_flutter_convergence_map -v
       - name: Validate unified UX and light-beam contract
         run: |
           python tools/validate_research_os_unified_ux.py
