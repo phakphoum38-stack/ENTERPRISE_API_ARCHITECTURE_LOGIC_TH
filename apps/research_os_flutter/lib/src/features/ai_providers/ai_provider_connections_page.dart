@@ -110,12 +110,10 @@ class _ProviderCard extends StatelessWidget {
         const SizedBox(height:14),
         Row(children:<Widget>[
           FilledButton.icon(
-            onPressed:busy?null:onConnect,
-            icon:busy?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.link),
+            onPressed:busy?null:(connected?onHealthCheck:onConnect),
+            icon:busy?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)):Icon(connected?Icons.health_and_safety_outlined:Icons.link),
             label:Text(connected?'Health Check':'Connect'),
           ),
-          const SizedBox(width:8),
-          OutlinedButton(onPressed:busy?null:(connected?onHealthCheck:onConnect),child:Text(connected?'Reconnect':'Connect')),
           const SizedBox(width:8),
           OutlinedButton(onPressed:busy||!connected?null:onDisconnect,child:const Text('Disconnect')),
         ]),
