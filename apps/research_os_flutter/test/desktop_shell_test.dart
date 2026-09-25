@@ -54,6 +54,31 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 
 void main() {
   testWidgets(
+    'narrow iOS host still renders the canonical shared product UI',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ResearchOSAppShell(
+            apiClient: DesktopShellApiClient(),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(find.byKey(const Key('research-os-sidebar-v2')), findsOneWidget);
+      expect(find.byKey(const Key('desktop-content-pane')), findsOneWidget);
+      expect(find.byType(Drawer), findsNothing);
+      expect(find.byKey(const Key('desktop-status-bar')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'desktop shell shows the futuristic Research OS sidebar',
     (tester) async {
       tester.view.physicalSize = const Size(1440, 1000);
