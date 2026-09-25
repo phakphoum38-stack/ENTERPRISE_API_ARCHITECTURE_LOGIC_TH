@@ -251,6 +251,10 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             if path == "/v1/providers":
                 self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})
                 return
+            if path == "/v1/ai/connections":
+                from tools.research_os_ai_provider_connection import inspect
+                self._send(HTTPStatus.OK, inspect())
+                return
             if path == "/v1/auth/providers":
                 self._send(HTTPStatus.OK, {"providers": provider_catalog()})
                 return
