@@ -255,6 +255,13 @@ jobs:
         run: |
           python tools/platform_production_completion.py
           python -m unittest tools.test_platform_production_completion -v
+      - name: Platform composition and continuity validation
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_platform_service.py
+          python -m unittest tools.test_platform_service tools.test_validate_platform_service -v
+
       - name: Complete platform architecture audit
         env:
           PYTHONPATH: .
