@@ -261,6 +261,13 @@ jobs:
         run: |
           python tools/validate_platform_service.py
           python -m unittest tools.test_platform_service tools.test_validate_platform_service -v
+      - name: Platform operationalization validation
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_platform_operationalization.py
+          python -m unittest tools.test_platform_operationalization -v
+          python tools/platform_operationalization.py --lifecycle UNKNOWN
 
       - name: Complete platform architecture audit
         env:
