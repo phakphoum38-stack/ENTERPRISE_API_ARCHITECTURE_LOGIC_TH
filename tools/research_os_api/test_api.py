@@ -183,3 +183,42 @@ class ResearchOSAPITests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    @patch.dict(
+        os.environ,
+        {
+            "RESEARCH_OS_OPENAI_API_KEY": "test-secret",
+            "RESEARCH_OS_OPENAI_MODEL": "gpt-test",
+            "RESEARCH_OS_SOURCE_SHA": "test-sha",
+        },
+        clear=False,
+    )
+    def test_ai_provider_connect_is_secret_safe_and_evidenced(self):
+        status, payload = self.request(
+            "POST", "/v1/ai/connections/openai/connect", {}
+        )
+        self.assertEqual(200, status)
+        self.assertEqual("CONNECT", payload["connection"]["operation"])
+        self.assertEqual("CONNECTED", payload["connection"]["state"])
+        self.assertFalse(payload["connection"]["secret_exposed"])
+        self.assertEqual("test-sha", payload["evidence"]["source_sha"])
+        self.assertIn("timestamp", payload["evidence"])
+        self.assertIn("result_hash", payload["evidence"])
+        self.assertNotIn("test-secret", json.dumps(payload))
+
+    def test_ai_provider_connect_without_credentials_is_not_connected(self):
+        with patch.dict(
+            os.environ,
+            {
+                "RESEARCH_OS_OPENAI_API_KEY": "",
+                "RESEARCH_OS_OPENAI_MODEL": "",
+            },
+            clear=False,
+        ):
+            status, payload = self.request(
+                "POST", "/v1/ai/connections/openai/connect", {}
+            )
+        self.assertEqual(200, status)
+        self.assertEqual("NOT_CONNECTED", payload["connection"]["state"])
+        self.assertFalse(payload["connection"]["secret_exposed"])
+\n
