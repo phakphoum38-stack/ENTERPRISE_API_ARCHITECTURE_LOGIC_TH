@@ -67,6 +67,8 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_COMPLETE_1_12_CONTRACT.json
   - current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json
   - current/RESEARCH_OS_TEST_CASE_INVENTORY_CONTRACT.json
+  - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_CONTRACT.json
+  - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_EVIDENCE_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml

@@ -261,6 +261,13 @@ jobs:
         run: |
           python tools/validate_platform_service.py
           python -m unittest tools.test_platform_service tools.test_validate_platform_service -v
+      - name: AI provider connection boundary validation
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest tools.test_research_os_ai_provider_connection -v
+          python tools/research_os_ai_provider_connection.py
+
       - name: Platform operationalization validation
         env:
           PYTHONPATH: .

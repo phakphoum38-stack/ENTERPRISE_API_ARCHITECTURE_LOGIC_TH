@@ -1,0 +1,11 @@
+{
+ "contract_id":"research-os-ai-provider-connection-evidence-v1",
+ "version":1,
+ "status":"ACTIVE",
+ "source":"current/RESEARCH_OS_AI_PROVIDER_CONNECTION_CONTRACT.json",
+ "required_fields":["provider","operation","state","source_sha","timestamp","result_hash"],
+ "secret_values_forbidden":true,
+ "release_authority":"FINAL_GATE",
+ "unknown":"HOLD",
+ "sha_mismatch":"STOP"
+}

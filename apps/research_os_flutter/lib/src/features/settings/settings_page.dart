@@ -28,6 +28,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String? _error;
   String _activeProvider = 'unknown';
   List<String> _providers = const <String>[];
+  List<Map<String, dynamic>> _aiConnections = const <Map<String, dynamic>>[];
   late final TextEditingController _apiController;
 
   @override
@@ -50,11 +51,16 @@ class _SettingsPageState extends State<SettingsPage> {
     });
     try {
       final payload = await widget.apiClient.getProviders();
+      final connections = await widget.apiClient.getAIProviderConnections();
       if (!mounted) return;
       final rawProviders = payload['providers'];
+      final rawConnections = connections['providers'];
       setState(() {
         _activeProvider = payload['active']?.toString() ?? 'unknown';
         _providers = rawProviders is List ? rawProviders.map((item) => item.toString()).toList() : const <String>[];
+        _aiConnections = rawConnections is List
+            ? rawConnections.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList()
+            : const <Map<String, dynamic>>[];
         _loading = false;
       });
     } on Object catch (error) {
@@ -211,6 +217,41 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ],
+          ),
+        ),
+        const SizedBox(height: 28),
+        EnterpriseSection(
+          title: 'AI Provider Connections',
+          subtitle: 'GPT / OpenAI และ Gemini — Connector ก่อน API fallback',
+          child: Column(
+            children: _aiConnections.map((connection) {
+              final provider = connection['provider']?.toString() ?? 'unknown';
+              final label = connection['label']?.toString() ?? provider;
+              final state = connection['state']?.toString() ?? 'HOLD';
+              final fallback = connection['api_fallback_available'] == true;
+              final connected = state == 'CONNECTED';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Card(
+                  child: ListTile(
+                    leading: Icon(provider == 'openai' ? Icons.auto_awesome_outlined : Icons.psychology_outlined),
+                    title: Text(label),
+                    subtitle: Text("State: $state • Adapter: ${connection['adapter'] ?? 'unknown'}"),
+                    trailing: Wrap(
+                      spacing: 8,
+                      children: [
+                        if (fallback) const Chip(label: Text('API fallback')),
+                        FilledButton(
+                          key: Key('settings-connect-$provider'),
+                          onPressed: _loading ? null : _loadProviders,
+                          child: Text(connected ? 'Connected' : 'Connect / Test'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
         const SizedBox(height: 28),
