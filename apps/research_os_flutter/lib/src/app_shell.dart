@@ -6,7 +6,6 @@ import 'features/auth/google_login_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
 import 'features/chat/voice_conversation_page.dart';
 import 'features/control_center/native_control_center_page.dart';
-import 'features/connections/ai_provider_connections_page.dart';
 import 'features/developer_access/developer_access_page.dart';
 import 'features/friend/friend_connect_page.dart';
 import 'features/github/github_dashboard_page.dart';
@@ -73,7 +72,6 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
           onNavigate: _select,
         ),
         OwnerExperiencePage(apiClient: widget.apiClient),
-        AIProviderConnectionsPage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
