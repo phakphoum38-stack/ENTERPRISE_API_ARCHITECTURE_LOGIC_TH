@@ -46,6 +46,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from tools.project_registry import ProjectRegistry
+from tools.research_os_ai_provider_connection import AIProviderConnectionError
 from tools.project_scale_readiness import PROJECT_COUNT, build_project_definitions
 import copilot_service
 
@@ -519,7 +520,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
-        except __import__("tools.research_os_ai_provider_connection", fromlist=["AIProviderConnectionError"]).AIProviderConnectionError as exc:
+        except AIProviderConnectionError as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "ai_provider_connection_error", "detail": str(exc)})
         except copilot_service.CopilotChatConfigError as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "copilot_config_error", "detail": str(exc)})
