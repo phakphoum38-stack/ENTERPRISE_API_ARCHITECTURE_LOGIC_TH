@@ -91,8 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '$provider: $state' +
-                (hasEvidence ? ' • evidence recorded' : ''),
+            '$provider: $state${hasEvidence ? ' • evidence recorded' : ''}',
           ),
         ),
       );
