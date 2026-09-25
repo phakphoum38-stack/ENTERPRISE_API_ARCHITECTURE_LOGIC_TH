@@ -5,6 +5,7 @@ import tools.research_os_ai_provider_connection as connection
 
 class AIProviderConnectionTests(unittest.TestCase):
  def setUp(self):
+  connection._SESSION_STATE.clear()
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.evidence_path=Path(self.tmp.name)/"evidence.jsonl"
   self.patch=patch.object(connection,"EVIDENCE_PATH",self.evidence_path);self.patch.start();self.addCleanup(self.patch.stop)
  def test_inspect_is_fail_closed_without_credentials(self):
