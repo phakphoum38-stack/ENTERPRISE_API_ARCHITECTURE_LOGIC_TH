@@ -311,11 +311,9 @@ class ResearchStatusBar extends StatelessWidget {
         color: scheme.surfaceContainerLow,
         border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: <Widget>[
-            Icon(Icons.circle, size: 8, color: scheme.primary),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.circle, size: 8, color: scheme.primary),
           const SizedBox(width: 6),
           const Text('Research OS', style: TextStyle(fontSize: 12)),
           const Spacer(),
@@ -323,8 +321,7 @@ class ResearchStatusBar extends StatelessWidget {
           const _StatusItem(Icons.memory_outlined, 'Memory'),
           const _StatusItem(Icons.apps_outlined, 'Workspace'),
           const _StatusItem(Icons.dns_outlined, 'Local API'),
-          ],
-        ),
+        ],
       ),
     );
   }
