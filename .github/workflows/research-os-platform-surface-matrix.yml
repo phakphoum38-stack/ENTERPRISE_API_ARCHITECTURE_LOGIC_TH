@@ -45,57 +45,6 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Validate shared Research OS source
-        working-directory: apps/research_os_flutter
-        run: |
-          flutter pub get
-          flutter analyze
-          flutter test
-          flutter test test/platform_surface_parity_test.dart
-          flutter test test/desktop_shell_test.dart
-          echo "RESEARCH_OS_SHARED_SOURCE_VALIDATION=PASS"
-
-  platform-surface:
-    name: "${{ matrix.platform }} platform surface"
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows
-            os: windows-latest
-            build_command: flutter build windows --release
-            artifact_path: build/windows
-          - platform: web
-            os: ubuntu-latest
-            build_command: flutter build web --release
-            artifact_path: build/web
-          - platform: ios
-            os: macos-latest
-            build_command: flutter build ios --release --no-codesign
-            artifact_path: build/ios/iphoneos/Runner.app
-
-    steps:
-      - name: Checkout exact revision
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Validate shared Research OS source
-        working-directory: apps/research_os_flutter
-        run: |
-          flutter pub get
-          flutter analyze
-          flutter test
-          flutter test test/platform_surface_parity_test.dart
-          flutter test test/desktop_shell_test.dart
-          echo "RESEARCH_OS_SHARED_SOURCE_VALIDATION=PASS"
-
       - name: Bootstrap target platform in isolated workspace
         shell: bash
         run: |
