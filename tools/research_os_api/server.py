@@ -440,6 +440,21 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 config.set_enabled_services(str(item) for item in services)
                 self._send(HTTPStatus.OK, config.dashboard())
                 return
+            if path in {"/v1/ai/connections/connect", "/v1/ai/connections/disconnect", "/v1/ai/connections/health"}:
+                from tools import research_os_ai_provider_connection as ai_connections
+                provider = str(body.get("provider", "")).strip()
+                if not provider:
+                    raise ValueError("provider is required")
+                if path.endswith("/connect"):
+                    result = ai_connections.connect(provider)
+                elif path.endswith("/disconnect"):
+                    result = ai_connections.disconnect(provider)
+                else:
+                    result = ai_connections.health_check(provider)
+                payload = ai_connections.inspect()
+                payload["result"] = result
+                self._send(HTTPStatus.OK, payload)
+                return
             if path == "/v1/conversations/cloud/sync":
                 principal = self._authorize_cloud_sync()
                 if principal is None:
@@ -504,6 +519,8 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
+        except __import__("tools.research_os_ai_provider_connection", fromlist=["AIProviderConnectionError"]).AIProviderConnectionError as exc:
+            self._send(HTTPStatus.BAD_REQUEST, {"error": "ai_provider_connection_error", "detail": str(exc)})
         except copilot_service.CopilotChatConfigError as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "copilot_config_error", "detail": str(exc)})
         except copilot_service.CopilotChatError as exc:
