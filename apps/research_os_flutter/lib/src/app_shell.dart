@@ -119,4 +119,5 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         ),
       ),
     );
-  }}
+  }
+}
