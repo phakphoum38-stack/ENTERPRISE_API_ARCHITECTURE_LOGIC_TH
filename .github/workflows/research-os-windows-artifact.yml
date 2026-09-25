@@ -202,7 +202,7 @@ jobs:
       - name: Launch smoke test
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path "$env:RUNNER_TEMP/Research-OS-Windows" -Filter $env:APP_EXE_NAME -File | Select-Object -First 1
+          $exe = Get-ChildItem -Path "$env:RUNNER_TEMP/Research-OS-Windows/app" -Filter $env:APP_EXE_NAME -File | Select-Object -First 1
           if (-not $exe) { throw 'Research OS staged executable missing.' }
           $app = Start-Process $exe.FullName -PassThru
           Start-Sleep -Seconds 5
