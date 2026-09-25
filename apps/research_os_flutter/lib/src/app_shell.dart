@@ -19,6 +19,7 @@ import 'features/owner/owner_experience_page.dart';
 import 'features/workflows/workflow_experience_page.dart';
 import 'features/projects/project_experience_page.dart';
 import 'features/settings/settings_page.dart';
+import 'ui/enterprise_navigation.dart';
 import 'ui/research_os_sidebar_v2.dart';
 
 class ResearchOSAppShell extends StatefulWidget {
