@@ -33,7 +33,6 @@ const researchNavigationItems = <ResearchNavItem>[
   ResearchNavItem('Connections', 'GitHub', Icons.account_tree_outlined, 5, destinationId: 'github'),
   ResearchNavItem('Connections', 'Google Workspace', Icons.apps_outlined, 6, destinationId: 'google_workspace'),
   ResearchNavItem('Connections', 'Friend Connect', Icons.support_agent_outlined, 13, destinationId: 'friend_connect'),
-  ResearchNavItem('Connections', 'AI Providers', Icons.hub_outlined, 18, destinationId: 'ai_providers'),
   ResearchNavItem('System', 'Local API & Service', Icons.dns_outlined, 7, destinationId: 'local_api_service'),
   ResearchNavItem('System', 'System Monitor', Icons.monitor_heart_outlined, 8, destinationId: 'system_monitor'),
   ResearchNavItem('System', 'Settings', Icons.settings_outlined, 9, destinationId: 'settings'),
