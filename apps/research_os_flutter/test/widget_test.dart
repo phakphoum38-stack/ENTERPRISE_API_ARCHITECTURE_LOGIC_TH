@@ -314,6 +314,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
     await openSidebarDestination(tester, 9);
+    await tester.pumpAndSettle();
 
     expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsWidgets);
