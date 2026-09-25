@@ -46,6 +46,14 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_COMPLETE_1_12_CONTRACT.json",
     "current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json",
+    "current/RESEARCH_OS_AI_PROVIDER_CONNECTION_CONTRACT.json",
+    "current/RESEARCH_OS_AI_PROVIDER_CONNECTION_EVIDENCE_CONTRACT.json",
+    "tools/research_os_ai_provider_connection.py",
+    "tools/test_research_os_ai_provider_connection.py",
+    "tools/validate_research_os_ai_provider_connection.py",
+    "tools/test_validate_research_os_ai_provider_connection.py",
+    "apps/research_os_flutter/lib/src/features/ai_providers/ai_provider_connections_page.dart",
+    "apps/research_os_flutter/test/ai_provider_connections_page_test.dart",
     "tools/validate_research_os_system_qualification.py",
     "tools/test_validate_research_os_system_qualification.py",
     "tools/research_os_m2_audit.py",
@@ -171,6 +179,8 @@ def main() -> None:
         "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json",
         "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
         "current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json",
+        "current/RESEARCH_OS_AI_PROVIDER_CONNECTION_CONTRACT.json",
+        "current/RESEARCH_OS_AI_PROVIDER_CONNECTION_EVIDENCE_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
             fail(f"required completion contract is not bound: {contract_ref}")
