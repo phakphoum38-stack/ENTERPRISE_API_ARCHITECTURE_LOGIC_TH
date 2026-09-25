@@ -261,6 +261,13 @@ jobs:
         run: |
           python tools/validate_platform_service.py
           python -m unittest tools.test_platform_service tools.test_validate_platform_service -v
+      - name: Platform runtime resolution boundary
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_platform_runtime_resolution.py
+          python -m unittest tools.test_validate_platform_runtime_resolution -v
+
       - name: AI provider connection boundary validation
         env:
           PYTHONPATH: .

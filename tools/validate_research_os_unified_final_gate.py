@@ -41,6 +41,7 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json",
     "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json",
     "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json",
     "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
@@ -53,6 +54,8 @@ REQUIRED_FILES = (
     "tools/validate_platform_completion_schedule.py",
     "tools/validate_platform_service.py",
     "tools/test_platform_service.py",
+    "tools/validate_platform_runtime_resolution.py",
+    "tools/test_validate_platform_runtime_resolution.py",
     "tools/test_validate_platform_service.py",
     "tools/platform_operationalization.py",
     "tools/test_platform_operationalization.py",
@@ -168,6 +171,7 @@ def main() -> None:
         "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
         "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json",
         "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json",
         "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
         "current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json",
@@ -218,7 +222,11 @@ def main() -> None:
     print("DEFERRED_POLICY=EXPLICIT_AND_FAIL_CLOSED")
     print("AEOS_RECHECK=BOUND_TO_FINAL_GATE")
     print("AEOS_RELEASE_AUTHORITY=FINAL_GATE")
+    runtime_resolution = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_platform_runtime_resolution.py")], cwd=ROOT, text=True, capture_output=True)
+    if runtime_resolution.returncode != 0:
+        fail("Platform runtime-resolution validation failed: " + (runtime_resolution.stdout or runtime_resolution.stderr).strip())
     print("M2_AUDIT=BOUND_TO_FINAL_GATE")
+    print("RUNTIME_RESOLUTION=BOUND_TO_PLATFORM")
 
 if __name__ == "__main__":
     main()
