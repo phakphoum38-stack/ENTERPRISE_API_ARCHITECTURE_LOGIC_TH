@@ -97,3 +97,16 @@ The next implementation unit is contract extraction and feature mapping, not del
 5. keep legacy roots as compatibility gates until verification closes them.
 
 This matrix is an architecture control document; it does not authorize deletion or merge by itself.
+
+## Flutter convergence map binding
+
+The file `current/RESEARCH_OS_FLUTTER_CONVERGENCE_MAP.json` is the executable feature-disposition map for the three Flutter roots. It is descriptive and fail-closed: it does not authorize deletion.
+
+- `owner_special/flutter_app` — canonical Owner / Control Center shell; preserve Windows identity and installer boundaries.
+- `apps/research_os_flutter` — feature source; migrate general Research OS capabilities and shared UI/contracts into the canonical shell.
+- `v3/flutter_app` — compatibility source; preserve V3 startup/API behavior and gates until convergence evidence closes them.
+- Classification vocabulary is limited to `canonical`, `migrate`, `adapter`, `platform-only`, and `retire`.
+- Current root-level retirement authorization is explicitly **false**.
+- Validation: `python tools/validate_research_os_flutter_convergence_map.py` and `python -m unittest tools/test_validate_research_os_flutter_convergence_map.py -v`.
+
+The convergence map must be updated before any future root-retirement proposal so feature parity, tests, assets, runner identity, API/version contracts, E2E, installer/provenance, and CI references remain auditable.
