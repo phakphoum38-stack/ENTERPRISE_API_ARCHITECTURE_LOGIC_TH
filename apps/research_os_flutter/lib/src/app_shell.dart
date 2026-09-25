@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
 import 'features/auth/google_login_page.dart';
+import 'features/ai_providers/ai_provider_connections_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
 import 'features/chat/voice_conversation_page.dart';
 import 'features/control_center/native_control_center_page.dart';
@@ -72,6 +73,7 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
           onNavigate: _select,
         ),
         OwnerExperiencePage(apiClient: widget.apiClient),
+        AIProviderConnectionsPage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
