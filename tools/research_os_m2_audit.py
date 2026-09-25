@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a source-SHA-pinned searchable M.2 inventory and relationship graph."""
 from __future__ import annotations
-import argparse,json,re,subprocess
+import argparse,json,re,subprocess\nfrom tools.research_os_test_case_inventory import discover as discover_test_cases
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -55,7 +55,7 @@ def required_authority_paths(by_path):
  return section("required_contracts"), section("required_workflows")
 
 def build_index():
- source=git_sha(); ps=files(); by_path={rel(p):p for p in ps}; rows=[]
+ source=git_sha(); ps=files(); by_path={rel(p):p for p in ps}; rows=[]\n test_case_inventory=discover_test_cases()
  required_contracts,required_workflows=required_authority_paths(by_path)
  for p in ps:
   path=rel(p); txt=read_text(p)
@@ -121,7 +121,7 @@ def build_index():
    findings.append({"state":"INCOMPLETE","code":"CONTRACT_WITHOUT_NAMED_TEST","path":c})
  integrity={
   "exact_source_sha":bool(re.fullmatch(r"[0-9a-f]{40}",source)),
-  "inventory_completeness":bool(rows),
+  "inventory_completeness":bool(rows),\n  "test_case_inventory":test_case_inventory["source_sha"]==source and test_case_inventory["inventory"]["test_files"]>0 and test_case_inventory["inventory"]["discovered_test_cases"]>0,
   "duplicate_path_detection":len({r["path"] for r in rows})==len(rows),
   "unique_node_ids":len(node_ids)==len(nodes),
   "no_dangling_edges":not dangling,
