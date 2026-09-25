@@ -181,8 +181,6 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertIn("anthropic", payload["providers"])
 
 
-if __name__ == "__main__":
-    unittest.main()
 
     @patch.dict(
         os.environ,
@@ -221,4 +219,6 @@ if __name__ == "__main__":
         self.assertEqual(200, status)
         self.assertEqual("NOT_CONNECTED", payload["connection"]["state"])
         self.assertFalse(payload["connection"]["secret_exposed"])
-\n
+
+if __name__ == "__main__":
+    unittest.main()
