@@ -28,6 +28,26 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
+  Future<Map<String, dynamic>> getAIProviderConnections() async => <String, dynamic>{
+        'providers': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 'openai',
+            'label': 'OpenAI / GPT',
+            'state': 'UNAVAILABLE',
+            'route': 'PLATFORM_API_FALLBACK',
+            'model': 'gpt-5.6',
+          },
+          <String, dynamic>{
+            'id': 'gemini',
+            'label': 'Google Gemini',
+            'state': 'UNAVAILABLE',
+            'route': 'PLATFORM_API_FALLBACK',
+            'model': 'gemini-2.5-flash',
+          },
+        ],
+      };
+
+  @override
   Future<Map<String, dynamic>> getGoogleIdentityStatus() async =>
       <String, dynamic>{
         'oauth_configured': false,
@@ -294,6 +314,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
     await openSidebarDestination(tester, 9);
+    await tester.pumpAndSettle();
 
     expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsWidgets);

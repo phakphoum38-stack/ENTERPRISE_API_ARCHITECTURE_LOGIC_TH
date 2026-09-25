@@ -2,8 +2,7 @@ name: Research OS Platform Surface Matrix
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "apps/research_os_flutter/**"
       - "packages/research_os_contracts/**"
@@ -12,8 +11,7 @@ on:
       - "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json"
       - "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json"
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "apps/research_os_flutter/**"
       - "packages/research_os_contracts/**"
@@ -31,7 +29,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  shared-source-validation:
+    name: "shared Research OS source validation"
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Validate shared Research OS source
+        working-directory: apps/research_os_flutter
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter test test/platform_surface_parity_test.dart
+          flutter test test/desktop_shell_test.dart
+          echo "RESEARCH_OS_SHARED_SOURCE_VALIDATION=PASS"
+
   platform-surface:
+    needs: shared-source-validation
     name: "${{ matrix.platform }} platform surface"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
@@ -51,25 +72,14 @@ jobs:
             os: macos-latest
             build_command: flutter build ios --release --no-codesign
             artifact_path: build/ios/iphoneos/Runner.app
-
     steps:
       - name: Checkout exact revision
         uses: actions/checkout@v4
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
-      - name: Validate shared Research OS source
-        working-directory: apps/research_os_flutter
-        run: |
-          flutter pub get
-          flutter analyze
-          flutter test test/platform_surface_parity_test.dart
-          flutter test test/desktop_shell_test.dart
-
       - name: Bootstrap target platform in isolated workspace
         shell: bash
         run: |
@@ -82,7 +92,6 @@ jobs:
           cd "$work/apps/research_os_flutter"
           flutter create --platforms=${{ matrix.platform }} --project-name=research_os_flutter .
           echo "RESEARCH_OS_PLATFORM_WORKSPACE=$work/apps/research_os_flutter" >> "$GITHUB_ENV"
-
       - name: Build target platform
         shell: bash
         run: |
@@ -92,7 +101,6 @@ jobs:
           ${{ matrix.build_command }}
           echo "RESEARCH_OS_PLATFORM_BUILD=PASS"
           test -e "${{ matrix.artifact_path }}"
-
       - name: Verify shared contract remains present
         shell: bash
         run: |

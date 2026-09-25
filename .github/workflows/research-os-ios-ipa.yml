@@ -92,13 +92,11 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Research OS" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleName Research OS" ios/Runner/Info.plist || true
 
-      - name: Flutter analyze, full test, and shared surface parity
+      - name: Flutter analyze on iOS host
         working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         run: |
           flutter pub get
           flutter analyze
-          flutter test
-          flutter test test/platform_surface_parity_test.dart --reporter expanded
 
       - name: Prove Check-in iPhone flow
         working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
