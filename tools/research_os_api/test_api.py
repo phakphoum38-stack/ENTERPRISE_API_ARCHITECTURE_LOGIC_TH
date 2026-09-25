@@ -217,7 +217,7 @@ class ResearchOSAPITests(unittest.TestCase):
                 "POST", "/v1/ai/connections/openai/connect", {}
             )
         self.assertEqual(200, status)
-        self.assertEqual("NOT_CONNECTED", payload["connection"]["state"])
+        self.assertEqual("UNAVAILABLE", payload["connection"]["state"])
         self.assertFalse(payload["connection"]["secret_exposed"])
 
 if __name__ == "__main__":
