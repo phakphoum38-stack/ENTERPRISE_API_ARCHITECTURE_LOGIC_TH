@@ -42,6 +42,7 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
     "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json",
+    "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_COMPLETE_1_12_CONTRACT.json",
     "current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json",
@@ -53,6 +54,9 @@ REQUIRED_FILES = (
     "tools/validate_platform_service.py",
     "tools/test_platform_service.py",
     "tools/test_validate_platform_service.py",
+    "tools/platform_operationalization.py",
+    "tools/test_platform_operationalization.py",
+    "tools/validate_platform_operationalization.py",
     "tools/test_platform_completion_schedule.py",
     "tools/validate_owner_experience_platform.py",
     "tools/test_owner_experience_platform.py",
@@ -162,6 +166,7 @@ def main() -> None:
         "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
         "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json",
+        "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
         "current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
