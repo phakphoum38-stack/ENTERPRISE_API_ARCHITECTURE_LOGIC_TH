@@ -123,7 +123,8 @@ def build_index():
    findings.append({"state":"INCOMPLETE","code":"CONTRACT_WITHOUT_NAMED_TEST","path":c})
  integrity={
   "exact_source_sha":bool(re.fullmatch(r"[0-9a-f]{40}",source)),
-  "inventory_completeness":bool(rows),\n  "test_case_inventory":test_case_inventory["source_sha"]==source and test_case_inventory["inventory"]["test_files"]>0 and test_case_inventory["inventory"]["discovered_test_cases"]>0,
+  "inventory_completeness":bool(rows),
+  "test_case_inventory":test_case_inventory["source_sha"]==source and test_case_inventory["inventory"]["test_files"]>0 and test_case_inventory["inventory"]["discovered_test_cases"]>0,
   "duplicate_path_detection":len({r["path"] for r in rows})==len(rows),
   "unique_node_ids":len(node_ids)==len(nodes),
   "no_dangling_edges":not dangling,
