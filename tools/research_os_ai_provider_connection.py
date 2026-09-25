@@ -90,6 +90,9 @@ def connect(provider: str) -> dict:
     if state == "DEGRADED":
         state = "API_FALLBACK"
         status["state"] = state
+    elif state == "NOT_CONNECTED":
+        state = "UNAVAILABLE"
+        status["state"] = state
     evidence = evidence_record(
         provider=provider,
         operation="CONNECT",
