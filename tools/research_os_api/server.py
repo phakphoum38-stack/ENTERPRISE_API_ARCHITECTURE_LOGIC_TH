@@ -458,6 +458,18 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 deleted = delete_cloud_session(session_id_value, user_id=str(principal["user_id"]))
                 self._send(HTTPStatus.OK, {"session_id": session_id_value, "deleted": deleted})
                 return
+            if path.startswith("/v1/ai/connections/") and path.endswith("/connect"):
+                from tools.research_os_ai_provider_connection import connect
+
+                provider = path.split("/")[4]
+                self._send(HTTPStatus.OK, connect(provider))
+                return
+            if path.startswith("/v1/ai/connections/") and path.endswith("/disconnect"):
+                from tools.research_os_ai_provider_connection import disconnect
+
+                provider = path.split("/")[4]
+                self._send(HTTPStatus.OK, disconnect(provider))
+                return
             if path == "/v1/ai/generate":
                 prompt = str(body.get("prompt", "")).strip()
                 if not prompt:
