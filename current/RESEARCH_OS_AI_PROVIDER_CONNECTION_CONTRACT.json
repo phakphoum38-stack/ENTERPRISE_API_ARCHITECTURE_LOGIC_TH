@@ -5,8 +5,8 @@
   "purpose":"Canonical provider connection boundary for OpenAI/GPT and Gemini with connector-first readiness and API fallback behind the Research OS API.",
   "authority":{"may_execute":false,"may_authorize":false,"may_approve":false,"may_merge":false,"may_release":false,"release_authority":"FINAL_GATE"},
   "providers":[
-    {"id":"openai","label":"OpenAI / GPT","adapter":"openai-compatible","credential_env":["RESEARCH_OS_OPENAI_API_KEY","RESEARCH_OS_OPENAI_ENDPOINT","RESEARCH_OS_OPENAI_MODEL"]},
-    {"id":"gemini","label":"Google Gemini","adapter":"gemini","credential_env":["RESEARCH_OS_GEMINI_API_KEY","RESEARCH_OS_GEMINI_MODEL"]}
+    {"id":"openai","label":"OpenAI / GPT","adapter":"openai-compatible","credential_env":["RESEARCH_OS_OPENAI_API_KEY"],"endpoint_env":"RESEARCH_OS_OPENAI_ENDPOINT","model_env":"RESEARCH_OS_OPENAI_MODEL","default_model":"gpt-5.6"},
+    {"id":"gemini","label":"Google Gemini","adapter":"gemini","credential_env":["RESEARCH_OS_GEMINI_API_KEY","GEMINI_API_KEY"],"endpoint_env":"RESEARCH_OS_GEMINI_ENDPOINT","model_env":"RESEARCH_OS_GEMINI_MODEL","default_model":"gemini-2.5-flash"}
   ],
   "states":["NOT_CONNECTED","CONNECTING","CONNECTED","DEGRADED","API_FALLBACK","UNAVAILABLE","HOLD"],
   "operations":["STATUS","CONNECT","DISCONNECT","HEALTH_CHECK"],
