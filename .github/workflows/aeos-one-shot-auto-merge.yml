@@ -68,8 +68,8 @@ jobs:
           set -euo pipefail
           # --paginate emits one JSON document per page; --slurp wraps all
           # pages into a single JSON array so Python receives valid JSON.
-          prs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls" --paginate --slurp)"
-          pr="$(python3 -c 'import json,sys; pages=json.load(sys.stdin); rows=[p for page in pages for p in page]; matches=[p for p in rows if p.get("state")=="open"]; print(matches[0]["number"] if len(matches)==1 else "")' <<< "$prs")"
+          prs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls?state=all" --paginate --slurp)"
+          pr="$(python3 -c 'import json,sys; pages=json.load(sys.stdin); rows=[p for page in pages for p in page]; matches=[p for p in rows if p.get("state") in {"open","closed"}]; print(matches[0]["number"] if len(matches)==1 else "")' <<< "$prs")"
           test -n "$pr"
 
           # workflow_run can refer to an earlier commit after the PR was synchronized.
