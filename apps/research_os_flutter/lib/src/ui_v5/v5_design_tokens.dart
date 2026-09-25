@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../ui/research_os_design_tokens.dart';
+
 /// Shared visual language for the V5 Friend-centric UI.
 ///
 /// Tokens intentionally derive from the active Material color scheme so V5 can
 /// support light/dark themes without introducing a second hard-coded palette.
 abstract final class ResearchOSV5Tokens {
-  static const double pagePadding = 20;
-  static const double sectionGap = 16;
-  static const double panelGap = 12;
-  static const double compactRadius = 14;
-  static const double panelRadius = 20;
-  static const double largeRadius = 28;
+  static const double pagePadding = ResearchOSDesignTokens.pagePadding;
+  static const double sectionGap = ResearchOSDesignTokens.sectionGap;
+  static const double panelGap = ResearchOSDesignTokens.panelGap;
+  static const double compactRadius = ResearchOSDesignTokens.compactRadius;
+  static const double panelRadius = ResearchOSDesignTokens.panelRadius;
+  static const double largeRadius = ResearchOSDesignTokens.largeRadius;
   static const double sidebarWidth = 248;
   static const double contextWidth = 300;
   static const double composerMaxWidth = 900;
 
-  static const Duration fastMotion = Duration(milliseconds: 140);
-  static const Duration standardMotion = Duration(milliseconds: 220);
+  static const Duration fastMotion = ResearchOSDesignTokens.fastMotion;
+  static const Duration standardMotion = ResearchOSDesignTokens.standardMotion;
 
   static ThemeData apply(ThemeData base) {
     final scheme = base.colorScheme;

@@ -49,6 +49,14 @@ jobs:
         run: python tools/platform_core_completion.py
       - name: Validate complete platform architecture
         run: python tools/validate_research_os_platform_architecture.py
+      - name: Validate unified UX and light-beam contract
+        run: |
+          python tools/validate_research_os_unified_ux.py
+          python -m unittest tools.test_validate_research_os_unified_ux -v
+      - name: Audit legacy UX palette
+        run: |
+          python tools/audit_research_os_ux_legacy.py
+          python -m unittest tools.test_audit_research_os_ux_legacy -v
       - name: Validate platform phases 1-12 completion
         run: python tools/validate_research_os_platform_complete_1_12.py
       - name: Validate exact source identity

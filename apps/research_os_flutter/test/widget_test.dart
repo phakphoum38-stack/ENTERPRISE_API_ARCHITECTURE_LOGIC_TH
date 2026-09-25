@@ -28,6 +28,20 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
       };
 
   @override
+  Future<Map<String, dynamic>> getAIProviderConnections() async =>
+      <String, dynamic>{
+        'providers': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'provider': 'gemini',
+            'label': 'Gemini',
+            'state': 'CONNECTED',
+            'adapter': 'fake-test-adapter',
+            'api_fallback_available': true,
+          },
+        ],
+      };
+
+  @override
   Future<Map<String, dynamic>> getGoogleIdentityStatus() async =>
       <String, dynamic>{
         'oauth_configured': false,

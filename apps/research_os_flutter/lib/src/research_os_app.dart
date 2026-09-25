@@ -4,6 +4,7 @@ import 'api/api_endpoint_store.dart';
 import 'api/research_os_api_client.dart';
 import 'app_shell.dart';
 import 'features/auth/login_page.dart';
+import 'ui/research_os_design_tokens.dart';
 
 class ResearchOSApp extends StatefulWidget {
   const ResearchOSApp({super.key});
@@ -61,88 +62,10 @@ class _ResearchOSAppState extends State<ResearchOSApp> {
   }
 
   ThemeData _buildTheme(Brightness brightness) {
-    final dark = brightness == Brightness.dark;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF1976D2),
-      brightness: brightness,
-      surface: dark ? const Color(0xFF101419) : const Color(0xFFF7F9FC),
-    );
-
-    final borderColor = dark
-        ? Colors.white.withValues(alpha: .10)
-        : Colors.black.withValues(alpha: .08);
-
-    return ThemeData(
-      useMaterial3: true,
-      brightness: brightness,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: dark
-          ? const Color(0xFF0C1015)
-          : const Color(0xFFF3F6FA),
-      dividerColor: borderColor,
-      appBarTheme: AppBarTheme(
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: false,
-        backgroundColor: dark
-            ? const Color(0xFF101419)
-            : const Color(0xFFFDFEFF),
-        surfaceTintColor: Colors.transparent,
-        titleTextStyle: TextStyle(
-          color: scheme.onSurface,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        color: dark ? const Color(0xFF151A21) : Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: borderColor),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: dark ? const Color(0xFF151A21) : Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: scheme.primary, width: 1.4),
-        ),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: BorderSide(color: borderColor),
-        ),
-      ),
-      chipTheme: ChipThemeData(
-        side: BorderSide(color: borderColor),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-      listTileTheme: ListTileThemeData(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    if (brightness == Brightness.dark) {
+      return ResearchOSDesignTokens.darkTheme();
+    }
+    return ResearchOSDesignTokens.lightTheme();
   }
 
   @override
