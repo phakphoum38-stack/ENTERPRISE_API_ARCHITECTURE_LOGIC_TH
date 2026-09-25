@@ -56,6 +56,7 @@ const researchNavigationItems = <ResearchNavItem>[
     capabilityId: 'owner',
     destinationId: 'owner',
   ),
+  ResearchNavItem('Connections', 'AI Providers', Icons.auto_awesome_outlined, 18, destinationId: 'ai_providers'),
 ];
 
 class ResearchSidebar extends StatelessWidget {
