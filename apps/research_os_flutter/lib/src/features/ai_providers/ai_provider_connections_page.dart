@@ -86,7 +86,7 @@ class _ProviderCard extends StatelessWidget {
     final label=(provider['label']??provider['id']).toString();
     final model=(provider['model']??'server default').toString();
     final routeText=(route??'PLATFORM_API_FALLBACK').toString();
-    final summary=connected ? 'Route: ${routeText} • Model: ${model}' : 'Route: PLATFORM_API_FALLBACK • Credentials are not exposed to the client.';
+    final summary=connected ? 'Route: $routeText • Model: $model' : 'Route: PLATFORM_API_FALLBACK • Credentials are not exposed to the client.';
     return Card(
       margin:const EdgeInsets.only(bottom:12),
       child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:<Widget>[
