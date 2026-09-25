@@ -135,7 +135,7 @@ def build_index():
   "final_gate_node":final_gate_exists and "FINAL_GATE:UNIFIED" in targets,
  }
  return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V2","source_sha":source,"root":str(ROOT),
-  "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"required_contracts":len(required_contracts),"required_workflows":len(required_workflows),"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
+  "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"required_contracts":len(required_contracts),"required_workflows":len(required_workflows),"test_case_inventory":test_case_inventory["inventory"],"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
   "integrity":integrity,"findings":findings,"nodes":nodes,"edges":edges,"files":rows,"dangling_edges":dangling}
 def build_graph(): return build_index()
 def main():
