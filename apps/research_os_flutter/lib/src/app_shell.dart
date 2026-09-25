@@ -19,7 +19,6 @@ import 'features/owner/owner_experience_page.dart';
 import 'features/workflows/workflow_experience_page.dart';
 import 'features/projects/project_experience_page.dart';
 import 'features/settings/settings_page.dart';
-import 'ui/enterprise_navigation.dart';
 import 'ui/research_os_sidebar_v2.dart';
 
 class ResearchOSAppShell extends StatefulWidget {
@@ -89,9 +88,6 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final current = researchNavigationItems
-        .firstWhere((item) => item.index == _selectedIndex);
-
     // The product UI is canonical and shared across Windows, Web and iOS.
     // Platform runners/shells provide the host boundary; they do not own a
     // second product UI or navigation surface.
