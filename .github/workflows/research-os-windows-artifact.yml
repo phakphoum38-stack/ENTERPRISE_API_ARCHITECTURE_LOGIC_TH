@@ -73,6 +73,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Research OS branding dependency
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --no-input "Pillow>=10,<13"
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS branding dependency installation failed.' }
+          python -c "from PIL import Image; print('PILLOW_IMPORT=PASS')"
+
       - name: Validate Research OS Flutter source
         working-directory: apps/research_os_flutter
         shell: pwsh
