@@ -203,6 +203,9 @@ def main() -> None:
     governance = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_platform_governance.py")], cwd=ROOT, text=True, capture_output=True)
     if governance.returncode != 0:
         fail("platform governance validation failed: " + (governance.stdout or governance.stderr).strip())
+    ai_connection = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_research_os_ai_provider_connection.py")], cwd=ROOT, text=True, capture_output=True)
+    if ai_connection.returncode != 0:
+        fail("AI provider connection validation failed: " + (ai_connection.stdout or ai_connection.stderr).strip())
     if "m2_audit:" not in text or "m2_audit_integrity_failure: STOP" not in text:
         fail("M.2 audit binding is incomplete")
     owner_special_bindings = (
