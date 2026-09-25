@@ -116,6 +116,10 @@ jobs:
           }
           Set-Location $appWorkspace
 
+          & python "$env:GITHUB_WORKSPACE/scripts/apply-research-os-branding.py" --app-root $appWorkspace --platform windows
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows icon generation failed.' }
+          if (-not (Test-Path 'windows\runner\resources\app_icon.ico')) { throw 'Research OS Windows app_icon.ico is missing.' }
+
           $mainCpp = 'windows\runner\main.cpp'
           $mainText = Get-Content $mainCpp -Raw
           $mainText = $mainText -replace 'Create\(L"research_os_flutter"', 'Create(L"Research OS"'
@@ -168,19 +172,24 @@ jobs:
           $stage = Join-Path $env:RUNNER_TEMP 'Research-OS-Windows'
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Path $stage | Out-Null
-          Copy-Item "$release/*" $stage -Recurse -Force
+          $appStage = Join-Path $stage 'app'
+          New-Item -ItemType Directory -Path $appStage | Out-Null
+          Copy-Item "$release/*" $appStage -Recurse -Force
+          if (-not (Test-Path (Join-Path $appStage $env:APP_EXE_NAME))) { throw 'Research OS executable is not under required app/ path.' }
 
           @"
           Research OS Windows x64
           App: Research OS
           Project: $env:APP_PROJECT_NAME
-          Executable: $env:APP_EXE_NAME
+          Executable: app\\$env:APP_EXE_NAME
           Publisher/Team: $env:APP_COMPANY_NAME
           Desktop commit: $sourceSha
           Identity isolation gate: PASS
           UI gate: flutter analyze + full tests + desktop shell test
           Windows bootstrap: isolated temporary workspace only
           Windows branding: Research OS / Research OS Team
+          Windows icon source: assets/branding/research_os_master.webp
+          Windows artifact layout: app\\$env:APP_EXE_NAME
           "@ | Set-Content (Join-Path $stage 'RESEARCH_OS_BUILD_INFO.txt') -Encoding utf8
 
       - name: Launch smoke test

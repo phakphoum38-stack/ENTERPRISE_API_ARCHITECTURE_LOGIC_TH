@@ -3,15 +3,18 @@ name: Research OS iOS IPA
 on:
   push:
     branches:
+      - main
       - 'feat/chatgpt-style-desktop-shell'
       - 'fix/ios-chat-responsive'
     paths:
       - 'apps/research_os_flutter/**'
+      - 'packages/research_os_contracts/**'
       - 'scripts/apply-research-os-branding.py'
       - '.github/workflows/research-os-ios-ipa.yml'
   pull_request:
     paths:
       - 'apps/research_os_flutter/**'
+      - 'packages/research_os_contracts/**'
       - 'scripts/apply-research-os-branding.py'
       - '.github/workflows/research-os-ios-ipa.yml'
   workflow_dispatch:
@@ -26,6 +29,8 @@ concurrency:
 jobs:
   build-ios-unsigned-ipa:
     # iOS validates the same shared Research OS Flutter application surface.
+    # The generated runner is isolated from the repository checkout so CI never
+    # rewrites or silently promotes platform source into the canonical tree.
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -38,21 +43,35 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate iOS target
-        working-directory: apps/research_os_flutter
+      - name: Create isolated iOS build workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/research-os-ios"
+          rm -rf "$work"
+          mkdir -p "$work/apps" "$work/packages" "$work/scripts"
+          cp -R "$GITHUB_WORKSPACE/apps/research_os_flutter" "$work/apps/"
+          cp -R "$GITHUB_WORKSPACE/packages/research_os_contracts" "$work/packages/"
+          cp "$GITHUB_WORKSPACE/scripts/apply-research-os-branding.py" "$work/scripts/"
+          echo "RESEARCH_OS_IOS_WORKSPACE=$work/apps/research_os_flutter" >> "$GITHUB_ENV"
+
+      - name: Generate iOS target in isolated workspace
+        working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         run: flutter create . --platforms=ios --org com.phakphoum38 --project-name research_os_flutter
 
       - name: Apply Research OS branding
         shell: bash
+        working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         run: |
           python3 -m venv "$RUNNER_TEMP/research-os-ios-branding"
           "$RUNNER_TEMP/research-os-ios-branding/bin/python" -m pip install --disable-pip-version-check pillow
-          "$RUNNER_TEMP/research-os-ios-branding/bin/python" scripts/apply-research-os-branding.py --app-root apps/research_os_flutter --platform ios
+          "$RUNNER_TEMP/research-os-ios-branding/bin/python" "$RUNNER_TEMP/research-os-ios/scripts/apply-research-os-branding.py" --app-root . --platform ios
 
       - name: Set iOS identity
-        working-directory: apps/research_os_flutter
+        working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         shell: bash
         run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
 
@@ -74,7 +93,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleName Research OS" ios/Runner/Info.plist || true
 
       - name: Flutter analyze, full test, and shared surface parity
-        working-directory: apps/research_os_flutter
+        working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         run: |
           flutter pub get
           flutter analyze
@@ -82,19 +101,20 @@ jobs:
           flutter test test/platform_surface_parity_test.dart --reporter expanded
 
       - name: Prove Check-in iPhone flow
-        working-directory: apps/research_os_flutter
+        working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         run: flutter test test/check_in_page_test.dart --reporter expanded
 
       - name: Build unsigned iOS app
-        working-directory: apps/research_os_flutter
+        working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         run: >-
           flutter build ios --release --no-codesign
           --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
 
       - name: Verify iOS app and branding
-        working-directory: apps/research_os_flutter
+        working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         shell: bash
         run: |
+          set -euo pipefail
           APP="build/ios/iphoneos/Runner.app"
           test -d "$APP"
           test -f ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
@@ -106,9 +126,10 @@ jobs:
           test "$DISPLAY_NAME" = "Research OS"
 
       - name: Package unsigned IPA
-        working-directory: apps/research_os_flutter
+        working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         shell: bash
         run: |
+          set -euo pipefail
           rm -rf build/unsigned_ipa
           mkdir -p build/unsigned_ipa/Payload
           cp -R build/ios/iphoneos/Runner.app build/unsigned_ipa/Payload/ResearchOS.app
@@ -117,6 +138,14 @@ jobs:
           cd ..
           shasum -a 256 Research-OS-iOS-responsive-unsigned.ipa | tee Research-OS-iOS-responsive-unsigned.ipa.sha256
           test -s Research-OS-iOS-responsive-unsigned.ipa
+
+      - name: Stage CI artifact in checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/apps/research_os_flutter/build"
+          cp "$RESEARCH_OS_IOS_WORKSPACE/build/Research-OS-iOS-responsive-unsigned.ipa" "$GITHUB_WORKSPACE/apps/research_os_flutter/build/"
+          cp "$RESEARCH_OS_IOS_WORKSPACE/build/Research-OS-iOS-responsive-unsigned.ipa.sha256" "$GITHUB_WORKSPACE/apps/research_os_flutter/build/"
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4

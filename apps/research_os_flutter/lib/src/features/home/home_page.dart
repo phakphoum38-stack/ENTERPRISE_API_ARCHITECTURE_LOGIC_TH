@@ -121,7 +121,12 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  _HealthBadge(ready: apiReady),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _HealthBadge(ready: apiReady),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -274,7 +279,14 @@ class _HealthBadge extends StatelessWidget {
         children: <Widget>[
           Icon(Icons.circle, size: 9, color: ready ? Colors.green : scheme.error),
           const SizedBox(width: 7),
-          Text(ready ? 'System ready' : 'API offline', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          Flexible(
+            child: Text(
+              ready ? 'System ready' : 'API offline',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
         ],
       ),
     );

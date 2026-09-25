@@ -9,7 +9,14 @@
     "current/RESEARCH_OS_PHASE_B_LIFECYCLE_EVIDENCE_CONTRACT.json",
     "current/RESEARCH_OS_PHASE_C_CAPABILITY_E2E_BINDING_CONTRACT.json"
   ],
-  "capabilities": ["control_center", "friend", "agent", "github", "factory_v3", "assurance"],
+  "capabilities": [
+    "control_center",
+    "friend",
+    "agent",
+    "github",
+    "factory_v3",
+    "assurance"
+  ],
   "rules": [
     "one_canonical_capability_registry",
     "one_delegation_binding_per_capability",
@@ -20,7 +27,10 @@
     "platforms_share_one_application_surface",
     "platforms_do_not_create_capability_or_navigation_registries",
     "unresolved_parity_is_not_pass",
-    "final_gate_remains_release_authority"
+    "final_gate_remains_release_authority",
+    "ios_uses_platform_shell_only",
+    "ios_product_ui_is_canonical_shared_application_surface",
+    "ios_does_not_create_mobile_product_ui"
   ],
   "required_evidence_fields": [
     "event_id",
@@ -32,5 +42,9 @@
     "project_id",
     "fingerprint"
   ],
-  "required_platforms": ["windows", "web", "ios"]
+  "required_platforms": [
+    "windows",
+    "web",
+    "ios"
+  ]
 }

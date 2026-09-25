@@ -89,72 +89,36 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final current = researchNavigationItems
-        .firstWhere((item) => item.index == _selectedIndex);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth >= 920) {
-          return Scaffold(
-            body: SafeArea(
-              child: Row(
+    // The product UI is canonical and shared across Windows, Web and iOS.
+    // Platform runners/shells provide the host boundary; they do not own a
+    // second product UI or navigation surface.
+    return Scaffold(
+      body: SafeArea(
+        child: Row(
+          children: <Widget>[
+            ResearchOSSidebarV2(
+              expanded: _sidebarExpanded,
+              selectedIndex: _selectedIndex,
+              onToggle: _toggleSidebar,
+              onSelected: _selectFromSidebar,
+            ),
+            Expanded(
+              child: Column(
+                key: const Key('desktop-content-pane'),
                 children: <Widget>[
-                  ResearchOSSidebarV2(
-                    expanded: _sidebarExpanded,
-                    selectedIndex: _selectedIndex,
-                    onToggle: _toggleSidebar,
-                    onSelected: _selectFromSidebar,
-                  ),
                   Expanded(
-                    child: Column(
-                      key: const Key('desktop-content-pane'),
-                      children: <Widget>[
-                        Expanded(
-                          child: IndexedStack(
-                            index: _selectedIndex,
-                            children: _pages,
-                          ),
-                        ),
-                        const ResearchStatusBar(),
-                      ],
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: _pages,
                     ),
                   ),
+                  const ResearchStatusBar(),
                 ],
               ),
             ),
-          );
-        }
-
-        return Scaffold(
-          drawer: ResearchMobileDrawer(
-            selectedIndex: _selectedIndex,
-            onSelected: (index) {
-              Navigator.of(context).pop();
-              _select(index);
-            },
-          ),
-          appBar: AppBar(
-            titleSpacing: 0,
-            title: Row(
-              children: <Widget>[
-                const ResearchBrandMark(compact: true),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(current.label, overflow: TextOverflow.ellipsis),
-                ),
-              ],
-            ),
-            actions: <Widget>[
-              IconButton(
-                tooltip: 'System Monitor',
-                onPressed: () => _select(8),
-                icon: const Icon(Icons.monitor_heart_outlined),
-              ),
-            ],
-          ),
-          body: IndexedStack(index: _selectedIndex, children: _pages),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

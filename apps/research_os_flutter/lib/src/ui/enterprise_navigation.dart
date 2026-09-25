@@ -311,17 +311,39 @@ class ResearchStatusBar extends StatelessWidget {
         color: scheme.surfaceContainerLow,
         border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.circle, size: 8, color: scheme.primary),
-          const SizedBox(width: 6),
-          const Text('Research OS', style: TextStyle(fontSize: 12)),
-          const Spacer(),
-          const _StatusItem(Icons.smart_toy_outlined, 'Agents'),
-          const _StatusItem(Icons.memory_outlined, 'Memory'),
-          const _StatusItem(Icons.apps_outlined, 'Workspace'),
-          const _StatusItem(Icons.dns_outlined, 'Local API'),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 430;
+          final statusItems = compact
+              ? const <Widget>[
+                  _StatusItem(Icons.smart_toy_outlined, 'Agents', compact: true),
+                  _StatusItem(Icons.memory_outlined, 'Memory', compact: true),
+                  _StatusItem(Icons.apps_outlined, 'Workspace', compact: true),
+                  _StatusItem(Icons.dns_outlined, 'Local API', compact: true),
+                ]
+              : const <Widget>[
+                  _StatusItem(Icons.smart_toy_outlined, 'Agents'),
+                  _StatusItem(Icons.memory_outlined, 'Memory'),
+                  _StatusItem(Icons.apps_outlined, 'Workspace'),
+                  _StatusItem(Icons.dns_outlined, 'Local API'),
+                ];
+          return Row(
+            children: <Widget>[
+              Icon(Icons.circle, size: 8, color: scheme.primary),
+              const SizedBox(width: 6),
+              const Flexible(
+                child: Text(
+                  'Research OS',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+              const Spacer(),
+              ...statusItems,
+            ],
+          );
+        },
       ),
     );
   }
@@ -406,20 +428,23 @@ class _SidebarDestination extends StatelessWidget {
 }
 
 class _StatusItem extends StatelessWidget {
-  const _StatusItem(this.icon, this.label);
+  const _StatusItem(this.icon, this.label, {this.compact = false});
   final IconData icon;
   final String label;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 16),
+      padding: const EdgeInsets.only(left: 10),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Icon(icon, size: 15),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(fontSize: 11)),
+          if (!compact) ...<Widget>[
+            const SizedBox(width: 5),
+            Text(label, style: const TextStyle(fontSize: 11)),
+          ],
         ],
       ),
     );
