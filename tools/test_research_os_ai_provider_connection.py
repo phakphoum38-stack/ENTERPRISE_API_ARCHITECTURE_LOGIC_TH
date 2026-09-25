@@ -21,6 +21,7 @@ class AIProviderConnectionTests(unittest.TestCase):
  def test_disconnect_does_not_delete_server_credential(self):
   with patch.dict(os.environ,{"RESEARCH_OS_GEMINI_API_KEY":"test-secret"},clear=True):result=connection.disconnect("gemini")
   self.assertEqual(result["state"],"NOT_CONNECTED");self.assertTrue(result["credential_configured"]);self.assertNotIn("test-secret",self.evidence_path.read_text(encoding="utf-8"))
+  self.assertEqual(connection.inspect()["providers"][1]["state"],"NOT_CONNECTED")
  def test_unknown_provider_fails_closed(self):
   with self.assertRaises(connection.AIProviderConnectionError):connection.connect("unknown")
 if __name__=="__main__":unittest.main()
