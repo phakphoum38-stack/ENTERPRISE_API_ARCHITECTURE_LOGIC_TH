@@ -32,6 +32,25 @@ void main() {
     expect(item.capabilityId, 'control_center');
   });
 
+  test('proven capability identities remain explicitly bound', () {
+    final bound = <String, String>{
+      for (final item in researchNavigationItems)
+        if (item.capabilityId != null) item.destinationId: item.capabilityId!,
+    };
+
+    expect(
+      bound,
+      equals(<String, String>{
+        'agent_center': 'agent',
+        'github': 'github',
+        'friend_connect': 'friend',
+        'workflows': 'factory_v3',
+        'control_center': 'control_center',
+        'owner': 'owner',
+      }),
+    );
+  });
+
   test('capability binding metadata never duplicates navigation destinations', () {
     final bound = researchNavigationItems
         .where((item) => item.capabilityId != null)
