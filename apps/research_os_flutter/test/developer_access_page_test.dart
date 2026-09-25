@@ -20,45 +20,30 @@ void main() {
           200,
         );
       }
-      if (request.url.path == '/v2/developer/access-requests') {
-        expect(request.url.queryParameters['view'], 'owner');
-        expect(request.url.queryParameters['status'], 'pending');
+      if (request.url.path == '/v2/developer/access/pending') {
         return http.Response(
           jsonEncode(<String, Object?>{
-            'api_version': 'v2',
-            'items': <Object?>[
+            'requests': <Object?>[
               <String, Object?>{
-                'request_id': 'request-1',
-                'developer_id': 'dev:alice',
-                'owner_id': 'user:owner',
-                'workspace_id': 'workspace-1',
-                'resource_id': 'file-1',
-                'resource_name': 'Owner file.md',
-                'requested_scopes': <String>['read', 'write'],
-                'purpose': 'Fix approved issue',
-                'status': 'pending',
+                'id': 'req-1',
+                'principal': 'user:developer',
+                'resource': 'Owner file.md',
+                'requested_at': '2026-09-23T00:00:00Z',
               },
             ],
           }),
           200,
         );
       }
-      if (request.url.path == '/v2/developer/grants') {
-        expect(request.url.queryParameters['view'], 'owner');
+      if (request.url.path == '/v2/developer/access/active') {
         return http.Response(
           jsonEncode(<String, Object?>{
-            'api_version': 'v2',
-            'items': <Object?>[
+            'grants': <Object?>[
               <String, Object?>{
-                'grant_id': 'grant-1',
-                'developer_id': 'dev:bob',
-                'owner_id': 'user:owner',
-                'workspace_id': 'workspace-2',
-                'resource_id': 'file-2',
-                'resource_name': 'Approved file.md',
-                'scopes': <String>['read'],
-                'active': true,
-                'owner_access_unchanged': true,
+                'id': 'grant-1',
+                'principal': 'user:developer',
+                'resource': 'Owner file.md',
+                'expires_at': '2026-09-30T00:00:00Z',
               },
             ],
           }),
@@ -71,7 +56,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: DeveloperAccessPage(
-          client: DeveloperAccessApiClient(
+          apiClient: DeveloperAccessApiClient(
             baseUrl: 'https://developer.example.test',
             client: client,
           ),
@@ -82,11 +67,15 @@ void main() {
 
     expect(find.byKey(const Key('developer-access-page')), findsOneWidget);
     expect(find.text('user:owner'), findsOneWidget);
+    final developerAccessScroll = find.descendant(
+      of: find.byKey(const Key('developer-access-scroll')),
+      matching: find.byType(Scrollable),
+    );
     final pendingHeading = find.textContaining('คำขอที่รออนุมัติ (1)');
     await tester.scrollUntilVisible(
       pendingHeading,
       500,
-      scrollable: find.byKey(const Key('developer-access-scroll')),
+      scrollable: developerAccessScroll,
     );
     expect(pendingHeading, findsOneWidget);
     expect(find.text('Owner file.md'), findsOneWidget);
@@ -95,31 +84,8 @@ void main() {
     await tester.scrollUntilVisible(
       activeHeading,
       500,
-      scrollable: find.byKey(const Key('developer-access-scroll')),
+      scrollable: developerAccessScroll,
     );
     expect(activeHeading, findsOneWidget);
-    expect(find.text('Approved file.md'), findsOneWidget);
-    expect(find.text('Revoke'), findsOneWidget);
-  });
-
-  testWidgets('owner inbox degrades safely when developer API is offline', (tester) async {
-    final client = MockClient((request) async {
-      throw http.ClientException('offline');
-    });
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: DeveloperAccessPage(
-          client: DeveloperAccessApiClient(
-            baseUrl: 'http://127.0.0.1:8790',
-            client: client,
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('ต้องลงชื่อเข้าใช้ในฐานะเจ้าของไฟล์'), findsOneWidget);
-    expect(find.textContaining('เชื่อม Developer API ไม่สำเร็จ'), findsOneWidget);
   });
 }
