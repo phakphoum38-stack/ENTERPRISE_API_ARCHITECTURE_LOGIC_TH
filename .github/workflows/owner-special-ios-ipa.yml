@@ -10,6 +10,10 @@ on:
       - 'owner_special/**'
       - 'apps/research_os_flutter/**'
       - '.github/workflows/owner-special-ios-ipa.yml'
+      - 'current/RESEARCH_OS_PLATFORM_*.json'
+      - 'current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json'
+      - 'current/PLATFORM_OPERATIONALIZATION_CONTRACT.json'
+      - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
 
 permissions:
   contents: read

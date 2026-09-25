@@ -7,6 +7,10 @@ on:
       - 'packages/research_os_contracts/**'
       - 'v3/research_os_v3/**'
       - '.github/workflows/owner-special-build-identity-gate.yml'
+      - 'current/RESEARCH_OS_PLATFORM_*.json'
+      - 'current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json'
+      - 'current/PLATFORM_OPERATIONALIZATION_CONTRACT.json'
+      - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
   push:
     branches:
       - 'fix/owner-special-build-identity-gate'

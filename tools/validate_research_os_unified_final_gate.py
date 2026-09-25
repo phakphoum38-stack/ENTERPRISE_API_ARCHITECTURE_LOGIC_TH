@@ -93,6 +93,9 @@ REQUIRED_FILES = (
     ".github/workflows/research-os-phase-e-unified-windows-distribution.yml",
     ".github/workflows/research-os-release-spine-gate.yml",
     ".github/workflows/research-os-unified-final-gate.yml",
+    ".github/workflows/owner-special-build-identity-gate.yml",
+    ".github/workflows/owner-special-friend.yml",
+    ".github/workflows/owner-special-ios-ipa.yml",
     "tools/aeos_master_assurance.py",
     "tools/validate_aeos_final_gate_binding.py",
     "tools/test_validate_aeos_final_gate_binding.py",
@@ -192,6 +195,18 @@ def main() -> None:
         fail("platform governance validation failed: " + (governance.stdout or governance.stderr).strip())
     if "m2_audit:" not in text or "m2_audit_integrity_failure: STOP" not in text:
         fail("M.2 audit binding is incomplete")
+    owner_special_bindings = (
+        "  - .github/workflows/owner-special-build-identity-gate.yml",
+        "  - .github/workflows/owner-special-friend.yml",
+        "  - .github/workflows/owner-special-ios-ipa.yml",
+        "  duplicate_platform_forbidden: true",
+        "  duplicate_runtime_forbidden: true",
+        "  duplicate_release_authority_forbidden: true",
+        "  release_authority_remains: final_gate",
+    )
+    missing_owner = [item for item in owner_special_bindings if item not in text]
+    if missing_owner:
+        fail("Owner Special binding is incomplete: " + ", ".join(missing_owner))
     missing_spine = [item for item in EXPECTED_SPINE if f"  - {item}" not in text]
     if missing_spine:
         fail("unified spine is incomplete: " + ", ".join(missing_spine))
