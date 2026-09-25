@@ -42,6 +42,7 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json",
+    "current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json",
     "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json",
     "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
@@ -172,6 +173,7 @@ def main() -> None:
         "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json",
+        "current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json",
         "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json",
         "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
         "current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json",
@@ -194,6 +196,17 @@ def main() -> None:
         fail("navigation registry is empty")
     if sorted(indexes) != list(range(len(indexes))):
         fail(f"navigation indexes drifted: {indexes}")
+    capability_convergence = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "validate_research_os_capability_convergence.py")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if capability_convergence.returncode != 0:
+        fail(
+            "Capability convergence validation failed: "
+            + (capability_convergence.stdout or capability_convergence.stderr).strip()
+        )
     governance = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_platform_governance.py")], cwd=ROOT, text=True, capture_output=True)
     if governance.returncode != 0:
         fail("platform governance validation failed: " + (governance.stdout or governance.stderr).strip())

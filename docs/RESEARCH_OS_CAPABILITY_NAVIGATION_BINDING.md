@@ -25,18 +25,30 @@ only when an existing canonical capability identity is already available.
 
 ## Current binding
 
-| Navigation destination | Index | Capability ID | Status |
-|---|---:|---|---|
-| Control Center | 14 | `control_center` | BOUND |
+Only proven identities are promoted into navigation metadata.
 
-The `control_center` identity is already declared by
-`tools/control_center_capability_registry.py`. This change does not create
-another executor, runtime, scheduler, authorization system, or navigation
-registry.
+| Navigation destination | Index | Capability ID | Authority | Status |
+|---|---:|---|---|---|
+| Agent Center | 2 | `agent` | canonical capability registry | BOUND |
+| GitHub | 5 | `github` | canonical capability registry | BOUND |
+| Friend Connect | 13 | `friend` | canonical capability registry | BOUND |
+| Workflows | 15 | `factory_v3` | canonical capability registry | BOUND |
+| Control Center | 16 | `control_center` | canonical capability registry | BOUND |
+| Owner | 17 | `owner` | Owner Experience contract | BOUND |
 
-Other destinations remain unchanged until their canonical capability identity
-and authorization contract are proven. A missing binding is therefore not
-silently interpreted as permission.
+The Owner row is intentionally different: Owner is an authority identity, not a
+replacement entry in the executable capability registry. Its identity is
+server-derived and the system-level Owner role is unrestricted by resource or
+scope.
+
+The remaining navigation destinations stay explicitly unbound until a
+canonical capability owner, authorization boundary, evidence path, and
+verification coverage are proven. They remain **HOLD**, never implicit
+permission.
+
+The executable convergence contract is
+`current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json`, validated by
+`tools/validate_research_os_capability_convergence.py`.
 
 ## Authority rule
 
@@ -57,14 +69,17 @@ delegated to the owning subsystem.
 
 ## Verification
 
-The binding test verifies:
+The convergence validator and Flutter binding test verify:
 
-1. the navigation registry still contains exactly 15 destinations;
-2. indexes remain exactly 0–14;
-3. destination labels remain unique;
-4. Control Center resolves to the canonical `control_center` capability ID;
-5. capability IDs do not duplicate across bound destinations;
-6. capability metadata is not treated as an authorization grant.
+1. the single navigation registry still contains exactly 18 destinations;
+2. indexes remain exactly 0–17;
+3. bound capability IDs are unique;
+4. each promoted capability exists in the canonical capability registry;
+5. Owner identity resolves through the Owner Experience contract rather than
+   being fabricated as a backend capability;
+6. unbound destinations remain HOLD and cannot be interpreted as authorization;
+7. capability metadata remains identity-only and cannot grant, authorize, or
+   execute anything.
 
 ## Promotion rule
 

@@ -62,6 +62,7 @@ required_contracts:
   - current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json
+  - current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json
   - current/RESEARCH_OS_UNIFIED_UX_LIGHT_BEAM_CONTRACT.json
   - current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json
   - current/PLATFORM_OPERATIONALIZATION_CONTRACT.json
@@ -88,6 +89,8 @@ required_surface_contracts:
   - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
   - apps/research_os_flutter/test/platform_surface_parity_test.dart
   - apps/research_os_flutter/test/desktop_shell_test.dart
+  - tools/validate_research_os_capability_convergence.py
+  - tools/test_validate_research_os_capability_convergence.py
 
 assurance_recheck:
   authority: existing_aeos_master_assurance
@@ -123,6 +126,8 @@ m2_audit:
 
 navigation:
   source_of_truth: apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
+  capability_convergence_contract: current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json
+  capability_identity_is_not_authorization: true
   cardinality: derived_from_registry
   indexes: derived_from_registry
   duplicate_registry_forbidden: true

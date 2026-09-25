@@ -130,11 +130,11 @@ def validate() -> list[str]:
                 failures.append("navigation_entry_missing_destination_id")
             else:
                 destination_ids.append(entry.split(marker, 1)[1].split("'", 1)[0])
-            numbers = re.findall("[0-9]+", entry)
-            if not numbers:
+            index_match = re.search(r",\s*(\d+)\s*,", entry)
+            if index_match is None:
                 failures.append("navigation_entry_missing_index")
             else:
-                nav_indexes.append(int(numbers[-1]))
+                nav_indexes.append(int(index_match.group(1)))
         if len(nav_indexes) != len(surfaces):
             failures.append("navigation_surface_count_drift")
         if sorted(nav_indexes) != list(range(len(nav_indexes))):

@@ -53,6 +53,11 @@ jobs:
         run: |
           python tools/validate_research_os_flutter_convergence_map.py
           python -m unittest tools.test_validate_research_os_flutter_convergence_map -v
+      - name: Validate capability convergence
+        run: |
+          python tools/validate_research_os_capability_convergence.py
+          python -m unittest tools.test_validate_research_os_capability_convergence -v
+
       - name: Validate unified UX and light-beam contract
         run: |
           python tools/validate_research_os_unified_ux.py
