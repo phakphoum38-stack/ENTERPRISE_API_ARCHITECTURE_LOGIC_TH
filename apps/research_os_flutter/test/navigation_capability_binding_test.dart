@@ -10,7 +10,7 @@ void main() {
     );
     expect(
       researchNavigationItems.map((item) => item.label).toSet(),
-      hasLength(18),
+      hasLength(19),
     );
   });
 
