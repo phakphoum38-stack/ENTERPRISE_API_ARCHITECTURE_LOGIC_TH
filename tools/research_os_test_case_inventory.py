@@ -15,7 +15,7 @@ def discover_python_test_cases(path):
     try: tree=ast.parse(path.read_text(encoding="utf-8"))
     except (OSError,UnicodeDecodeError,SyntaxError): return 0
     return sum(isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name.startswith("test") for n in ast.walk(tree))
-DART_TEST_RE=re.compile(r"(?<![A-Za-z0-9_])testWidgets?\\s*\\(")
+DART_TEST_RE=re.compile(r"(?<![A-Za-z0-9_])testWidgets?\s*\(")
 def discover_dart_test_cases(path):
     try: text=path.read_text(encoding="utf-8")
     except (OSError,UnicodeDecodeError): return 0
