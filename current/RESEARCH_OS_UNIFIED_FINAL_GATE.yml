@@ -76,6 +76,9 @@ required_workflows:
   - .github/workflows/research-os-phase-e-unified-windows-distribution.yml
   - .github/workflows/research-os-release-spine-gate.yml
   - .github/workflows/research-os-unified-final-gate.yml
+  - .github/workflows/owner-special-build-identity-gate.yml
+  - .github/workflows/owner-special-friend.yml
+  - .github/workflows/owner-special-ios-ipa.yml
 
 required_surface_contracts:
   - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
@@ -156,6 +159,21 @@ platform_service:
   read_only_composition: required
   duplicate_runtime_forbidden: true
   release_authority_remains: final_gate
+  unknown_state: HOLD
+  sha_mismatch: STOP
+
+owner_special:
+  release_role: evidence_and_reconciliation_only
+  workflows:
+    - .github/workflows/owner-special-build-identity-gate.yml
+    - .github/workflows/owner-special-friend.yml
+    - .github/workflows/owner-special-ios-ipa.yml
+  canonical_ios_surface: apps/research_os_flutter
+  duplicate_platform_forbidden: true
+  duplicate_runtime_forbidden: true
+  duplicate_release_authority_forbidden: true
+  release_authority_remains: final_gate
+  exact_source_sha: required
   unknown_state: HOLD
   sha_mismatch: STOP
 
