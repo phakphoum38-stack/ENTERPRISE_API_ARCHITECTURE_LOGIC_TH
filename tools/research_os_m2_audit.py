@@ -2,7 +2,7 @@
 """Build a source-SHA-pinned searchable M.2 inventory and relationship graph."""
 from __future__ import annotations
 import argparse,json,re,subprocess
-from tools.research_os_test_case_inventory import discover as discover_test_cases
+from research_os_test_case_inventory import discover as discover_test_cases
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
