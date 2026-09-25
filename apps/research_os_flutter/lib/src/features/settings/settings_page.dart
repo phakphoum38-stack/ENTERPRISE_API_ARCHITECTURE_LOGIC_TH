@@ -25,6 +25,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool _loading = true;
   bool _savingEndpoint = false;
+  String? _connectingProvider;
   String? _error;
   String _activeProvider = 'unknown';
   List<String> _providers = const <String>[];
@@ -69,6 +70,38 @@ class _SettingsPageState extends State<SettingsPage> {
         _error = error.toString();
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _connectAIProvider(String provider) async {
+    if (_connectingProvider != null) return;
+    setState(() {
+      _connectingProvider = provider;
+      _error = null;
+    });
+    try {
+      final result = await widget.apiClient.connectAIProvider(provider);
+      if (!mounted) return;
+      final connection = result['connection'];
+      final state = connection is Map
+          ? connection['state']?.toString() ?? 'HOLD'
+          : 'HOLD';
+      final evidence = result['evidence'];
+      final hasEvidence = evidence is Map && evidence['result_hash'] != null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider + ': ' + state +
+                (hasEvidence ? ' • evidence recorded' : ''),
+          ),
+        ),
+      );
+      await _loadProviders();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _connectingProvider = null);
     }
   }
 
@@ -243,8 +276,16 @@ class _SettingsPageState extends State<SettingsPage> {
                         if (fallback) const Chip(label: Text('API fallback')),
                         FilledButton(
                           key: Key('settings-connect-$provider'),
-                          onPressed: _loading ? null : _loadProviders,
-                          child: Text(connected ? 'Connected' : 'Connect / Test'),
+                          onPressed: _loading || _connectingProvider != null
+                              ? null
+                              : () => _connectAIProvider(provider),
+                          child: _connectingProvider == provider
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Text(connected ? 'Connected' : 'Connect / Test'),
                         ),
                       ],
                     ),
