@@ -41,6 +41,9 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_COMPLETE_1_12_CONTRACT.json",
+    "current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json",
+    "tools/validate_research_os_system_qualification.py",
+    "tools/test_validate_research_os_system_qualification.py",
     "tools/research_os_m2_audit.py",
     "tools/test_research_os_m2_audit.py",
     "tools/validate_platform_completion_schedule.py",
@@ -149,6 +152,7 @@ def main() -> None:
         "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json",
         "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
+        "current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json",
     ):
         if f"  - {contract_ref}" not in text:
             fail(f"required completion contract is not bound: {contract_ref}")
