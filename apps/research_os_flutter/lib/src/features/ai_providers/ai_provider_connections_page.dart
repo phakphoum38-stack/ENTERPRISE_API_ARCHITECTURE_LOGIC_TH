@@ -22,6 +22,13 @@ class _AIProviderConnectionsPageState extends State<AIProviderConnectionsPage> {
     catch(error){if(!mounted)return;setState(()=>_error=error.toString());}
     finally{if(mounted)setState(()=>_busyProvider=null);}
   }
+  Future<void> _healthCheck(String provider) async {
+    setState(()=>_busyProvider=provider);
+    try { final payload=await widget.apiClient.healthCheckAIProvider(provider); if(!mounted)return; setState((){_payload=payload;_error=null;}); }
+    catch(error){if(!mounted)return;setState(()=>_error=error.toString());}
+    finally{if(mounted)setState(()=>_busyProvider=null);}
+  }
+
   Future<void> _disconnect(String provider) async {
     setState(()=>_busyProvider=provider);
     try { final payload=await widget.apiClient.disconnectAIProvider(provider); if(!mounted)return; setState((){_payload=payload;_error=null;}); }
@@ -62,6 +69,7 @@ class _AIProviderConnectionsPageState extends State<AIProviderConnectionsPage> {
                 provider:provider,
                 busy:_busyProvider==provider['id'],
                 onConnect:()=>_connect(provider['id'] as String),
+                onHealthCheck:()=>_healthCheck(provider['id'] as String),
                 onDisconnect:()=>_disconnect(provider['id'] as String),
               ),
             if(_providers.isEmpty&&_error==null)
@@ -74,10 +82,11 @@ class _AIProviderConnectionsPageState extends State<AIProviderConnectionsPage> {
 }
 
 class _ProviderCard extends StatelessWidget {
-  const _ProviderCard({required this.provider,required this.busy,required this.onConnect,required this.onDisconnect});
+  const _ProviderCard({required this.provider,required this.busy,required this.onConnect,required this.onHealthCheck,required this.onDisconnect});
   final Map<String,dynamic> provider;
   final bool busy;
   final VoidCallback onConnect;
+  final VoidCallback onHealthCheck;
   final VoidCallback onDisconnect;
   @override Widget build(BuildContext context) {
     final state=(provider['state']??'HOLD').toString();
@@ -103,8 +112,10 @@ class _ProviderCard extends StatelessWidget {
           FilledButton.icon(
             onPressed:busy?null:onConnect,
             icon:busy?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.link),
-            label:Text(connected?'Reconnect / Health Check':'Connect'),
+            label:Text(connected?'Health Check':'Connect'),
           ),
+          const SizedBox(width:8),
+          OutlinedButton(onPressed:busy?null:(connected?onHealthCheck:onConnect),child:Text(connected?'Reconnect':'Connect')),
           const SizedBox(width:8),
           OutlinedButton(onPressed:busy||!connected?null:onDisconnect,child:const Text('Disconnect')),
         ]),
