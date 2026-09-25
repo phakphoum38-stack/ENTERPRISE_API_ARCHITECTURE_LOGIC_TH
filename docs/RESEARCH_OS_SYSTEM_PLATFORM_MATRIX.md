@@ -30,6 +30,7 @@ Flutter is the presentation/control layer. Platform runners, backend services, F
 | Provenance / Evidence | `current/`, provenance tools and ledgers | Proof lineage, hashes, evidence | Cross-plane assurance | Do not rewrite or relocate canonical evidence casually |
 | Installer / Release | Owner installer + Research OS release workflows | Packaging, clean install, upgrade, uninstall/data preservation | Platform/release boundary | Migrate only after artifact and E2E gates remain equivalent |
 | CI / Gates | GitHub Actions | Build, test, identity, platform and release assurance | Cross-plane verification | Consolidate only after equivalent coverage is proven |
+| Runtime resolution | `current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json` | Resolve validated surface/capability/path into compatible local runtime/resource context | Platform-owned boundary consumed by Flutter | Do not move resolution authority into Flutter; preserve shared Queue/Runner |
 
 ## Flutter convergence target
 
@@ -67,7 +68,8 @@ Flutter is the presentation/control layer. Platform runners, backend services, F
 4. Owner Special Windows identity and installer contracts remain intact.
 5. Platform runners are not treated as duplicate application systems merely because they contain Flutter-generated files.
 6. Backend/runtime/core code is not moved into Flutter merely to achieve a single UI root.
-7. No Git history rewrite, force push, reset, or provenance/baseline alteration is part of convergence.
+7. Path resolution and runtime/resource selection remain Platform-owned and contract-backed; Flutter consumes the result.
+8. No Git history rewrite, force push, reset, or provenance/baseline alteration is part of convergence.
 
 ## Verification gates before retiring a UI root
 
