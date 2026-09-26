@@ -243,6 +243,24 @@ def main() -> None:
     missing_runtime = [marker for marker in runtime_markers if marker not in text]
     if missing_runtime:
         fail("runtime readiness binding is incomplete: " + ", ".join(missing_runtime))
+    operationalization_markers = (
+        "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
+        "tools/platform_operationalization.py",
+        "tools/test_platform_operationalization.py",
+        "tools/validate_platform_operationalization.py",
+        "chat_is_not_source_of_truth: true",
+    )
+    missing_operationalization = [marker for marker in operationalization_markers if marker not in text]
+    if missing_operationalization:
+        fail("platform operationalization binding is incomplete: " + ", ".join(missing_operationalization))
+    operationalization_test = subprocess.run(
+        [sys.executable, "-m", "unittest", "tools.test_platform_operationalization", "-v"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if operationalization_test.returncode != 0:
+        fail("platform operationalization validation failed: " + (operationalization_test.stdout or operationalization_test.stderr).strip())
     runtime_test = subprocess.run(
         [sys.executable, "-m", "unittest", "tools.test_platform_runtime_readiness", "-v"],
         cwd=ROOT,
