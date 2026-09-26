@@ -110,7 +110,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: recon-continuous-reconciliation
-          path: recon-report.json
+          path: |
+            recon-report.json
+            platform-self-reconciliation.json
           if-no-files-found: error
 
       - name: Assert authority boundary
