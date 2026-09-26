@@ -61,22 +61,26 @@ final class CanonicalPlatformAdapterTest extends TestCase
         $this->http->fake(['*' => $this->http->response([], 503)]);
         self::assertSame(
             AuthorizationDecision::UNKNOWN,
-            (new CanonicalAuthorizationGateway($this->client))
+            (new CanonicalAuthorizationGateway($this->client, '/api/v1/platform/authorization/decide'))
                 ->decide($this->context, 'workflow.execute', 'workflow:demo')
         );
     }
 
     public function testWorkflowMessagingEvidenceAndAuditRequireCanonicalIdentifiers(): void
     {
-        $this->http->fake(function (Request $request) {
-            return match ($request->url()) {
-                'https://platform.example.test/api/v1/platform/workflow/dispatch' => $this->http->response(['run_id' => 'run-1'], 200),
-                'https://platform.example.test/api/v1/platform/messaging/publish' => $this->http->response(['message_id' => 'msg-1'], 200),
-                'https://platform.example.test/api/v1/platform/evidence' => $this->http->response(['evidence_id' => 'evidence-1'], 200),
-                'https://platform.example.test/api/v1/platform/audit' => $this->http->response(['audit_id' => 'audit-1'], 200),
-                default => $this->http->response([], 404),
-            };
-        });
+        $this->client = new CanonicalPlatformClient(
+            $this->http,
+            'https://platform.example.test',
+            transport: function (RequestContext $context, string $endpoint, array $payload): array {
+                return match ($endpoint) {
+                    '/api/v1/platform/workflow/dispatch' => ['run_id' => 'run-1'],
+                    '/api/v1/platform/messaging/publish' => ['message_id' => 'msg-1'],
+                    '/api/v1/platform/evidence' => ['evidence_id' => 'evidence-1'],
+                    '/api/v1/platform/audit' => ['audit_id' => 'audit-1'],
+                    default => [],
+                };
+            },
+        );
 
         self::assertSame(
             ['run_id' => 'run-1'],
