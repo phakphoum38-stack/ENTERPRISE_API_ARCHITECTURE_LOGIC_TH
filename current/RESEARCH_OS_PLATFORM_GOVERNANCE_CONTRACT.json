@@ -20,7 +20,9 @@
     "universal_runner": "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
     "runner_installation": "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
     "self_reconciliation": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
-    "self_reconciliation_engine": "tools/platform_self_reconciliation.py"
+    "self_reconciliation_engine": "tools/platform_self_reconciliation.py",
+    "platform_spine_engine": "tools/platform_spine.py",
+    "platform_spine_engine_contract": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json"
   },
   "authority": {
     "governance_mode": "DESCRIPTIVE_AND_VALIDATING",
@@ -152,7 +154,12 @@
     "history_is_immutable",
     "self_reconciliation_is_bounded",
     "deterministic_repair_only",
-    "protected_core_is_fail_closed"
+    "protected_core_is_fail_closed",
+    "platform_spine_is_composition_only",
+    "lifecycle_transitions_are_forward_only",
+    "breaking_contracts_require_migration",
+    "health_is_not_authorization",
+    "high_impact_change_requires_simulation"
   ],
   "change_impact_rules": [
     {
@@ -339,6 +346,28 @@
         "reconciliation",
         "architecture_integrity",
         "repair_safety"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/platform_spine.py",
+      "components": [
+        "platform_spine_engine",
+        "platform_governance"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+      "components": [
+        "platform_spine_engine",
+        "platform_governance"
       ],
       "gates": [
         "assurance",
