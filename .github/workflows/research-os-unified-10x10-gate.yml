@@ -55,6 +55,14 @@ jobs:
         run: |
           $data="$env:RUNNER_TEMP\ResearchOSData"
           New-Item -ItemType Directory -Force -Path $data | Out-Null
+          $python=(Get-Command python -ErrorAction Stop).Source
+          Write-Host "PYTHON_EXE=$python"
+          Push-Location "$PWD\\tools\\research_os_api"
+          try {
+            & $python -u -c "import render_server; print('RENDER_SERVER_IMPORT=PASS')"
+            if($LASTEXITCODE -ne 0){throw "Research OS render_server import failed with exit code $LASTEXITCODE"}
+          } finally { Pop-Location }
+          $env:PYTHONUNBUFFERED='1'
           .\scripts\start-research-os-local.ps1 -DataDir $data -Provider mock -Port 8787 -Background
           $pidFile=Join-Path $data 'run\\research-os-api.pid'
           $errLog=Join-Path $data 'logs\\research-os-api.err.log'
