@@ -1,0 +1,72 @@
+{
+  "contract_id": "platform-work-checkpoint-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Persist compact resumable Platform work state outside Chat so a new session can continue from a verified checkpoint without replaying the conversation.",
+  "authority": {
+    "may_authorize": false,
+    "may_approve": false,
+    "may_execute": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "storage": {
+    "owner": "PLATFORM",
+    "mode": "LOCAL_FIRST",
+    "path": "RESEARCH_OS_DATA_DIR/platform/work_checkpoints.json",
+    "durable_when_data_root_is_durable": true,
+    "chat_is_not_storage": true,
+    "model_reasoning_is_not_stored": true,
+    "full_transcript_is_not_required": true
+  },
+  "record": {
+    "required": [
+      "checkpoint_id",
+      "owner_id",
+      "task_id",
+      "workflow_state",
+      "current_step",
+      "completed_steps",
+      "pending_steps",
+      "evidence_refs",
+      "deferred_work",
+      "context_refs",
+      "next_action",
+      "source_sha",
+      "created_at"
+    ],
+    "workflow_states": ["ACTIVE", "PAUSED", "BLOCKED", "DEFERRED", "COMPLETED"],
+    "append_only": true,
+    "supersedes_previous_checkpoint": true,
+    "secrets_forbidden": true,
+    "transcript_forbidden": true,
+    "reasoning_forbidden": true
+  },
+  "resume": {
+    "source_sha_must_match_current": true,
+    "unknown_or_conflict": "HOLD",
+    "stale_evidence": "HOLD",
+    "missing_context": "HOLD",
+    "completed_checkpoint": "HOLD"
+  },
+  "integration": {
+    "context_recovery": "current/RESEARCH_OS_CONTEXT_RECOVERY.json",
+    "institutional_memory": "current/RESEARCH_OS_INSTITUTIONAL_MEMORY.json",
+    "successor_handoff": "current/RESEARCH_OS_SUCCESSOR_HANDOFF.json",
+    "operationalization": "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
+    "execution": "existing event_queue_stateless_runner",
+    "release": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+  },
+  "principles": [
+    "Checkpoint state is the continuity source for resumable work; Chat is only an interface.",
+    "Only compact state, references and provenance are persisted.",
+    "A changed canonical SHA invalidates the checkpoint until re-verification.",
+    "Deferred work remains explicit and is never promoted by resume.",
+    "Checkpoint storage does not grant execution or release authority."
+  ],
+  "verification": {
+    "implementation": "tools/platform_work_checkpoint.py",
+    "test": "tools/test_platform_work_checkpoint.py"
+  }
+}
