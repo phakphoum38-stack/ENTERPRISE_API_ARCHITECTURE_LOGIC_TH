@@ -8,6 +8,7 @@ from tools.platform_self_reconciliation import (
     is_protected,
     resolve_path,
     replace_reference,
+    reconcile_sources,
 )
 
 
@@ -49,6 +50,12 @@ class PlatformSelfReconciliationTest(unittest.TestCase):
         self.assertEqual(plan.confidence, "DETERMINISTIC")
         updated = replace_reference('"current/missing.json"', plan)
         self.assertEqual(updated, '"tools/missing.json"')
+
+    def test_canonical_reconciliation_scan_has_canonical_sources(self):
+        result = reconcile_sources()
+        self.assertIn("current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json", result["sources"])
+        self.assertIn("current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml", result["sources"])
+        self.assertIn(result["status"], {"PASS", "DRIFT"})
 
     def test_plan_rejects_ambiguous(self):
         result = resolve_path("current/missing.json", ["tools/missing.json", "docs/missing.json"])
