@@ -10,8 +10,10 @@ use ResearchOS\Platform\Contracts\RequestContext;
 
 final class CanonicalAuthorizationGateway implements AuthorizationGateway
 {
-    public function __construct(private readonly CanonicalPlatformClient $client)
-    {
+    public function __construct(
+        private readonly CanonicalPlatformClient $client,
+        private readonly string $endpoint,
+    ) {
     }
 
     public function decide(RequestContext $context, string $capability, string $resource): AuthorizationDecision
@@ -19,7 +21,7 @@ final class CanonicalAuthorizationGateway implements AuthorizationGateway
         try {
             $result = $this->client->post(
                 $context,
-                (string) config('platform.endpoints.authorization'),
+                $this->endpoint,
                 ['capability' => $capability, 'resource' => $resource],
             );
 
