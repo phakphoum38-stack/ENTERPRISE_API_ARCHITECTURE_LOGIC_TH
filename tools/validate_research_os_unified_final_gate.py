@@ -309,6 +309,14 @@ def main() -> None:
     print("IDENTITY_ACCESS_WAVE_1=BOUND_TO_FINAL_GATE")
     print("M2_AUDIT=BOUND_TO_FINAL_GATE")
     print("RUNTIME_RESOLUTION=BOUND_TO_PLATFORM")
+    platform_one_pass = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_research_os_platform_one_pass.py")], cwd=ROOT, text=True, capture_output=True)
+    if platform_one_pass.returncode != 0:
+        fail("Platform one-pass validation failed: " + (platform_one_pass.stdout or platform_one_pass.stderr).strip())
+    print("PLATFORM_ONE_PASS=BOUND_TO_FINAL_GATE")
+    spine = subprocess.run([sys.executable, str(ROOT / "tools" / "platform_spine.py"), "--validate"], cwd=ROOT, text=True, capture_output=True)
+    if spine.returncode != 0:
+        fail("Platform Spine engine validation failed: " + (spine.stdout or spine.stderr).strip())
+    print("PLATFORM_SPINE_ENGINE=BOUND_TO_FINAL_GATE")
 
 if __name__ == "__main__":
     main()
