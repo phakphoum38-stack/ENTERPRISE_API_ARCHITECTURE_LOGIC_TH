@@ -32,6 +32,7 @@ class PlatformProductionHardeningTests(unittest.TestCase):
         self.assertEqual(summary.failure_recovery, "PASS")
         self.assertEqual(summary.evidence_provenance, "PASS")
         self.assertEqual(summary.distribution_contract, "PASS")
+        self.assertEqual(summary.runtime_readiness, "PASS")
         self.assertEqual(summary.production_readiness, "PASS")
 
 
