@@ -1,0 +1,22 @@
+{
+  "name": "research-os/laravel-platform",
+  "description": "Research OS Laravel Platform integration component",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.3",
+    "laravel/framework": "^13.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^12.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "ResearchOS\\Platform\\": "src/Platform/"
+    }
+  },
+  "scripts": {
+    "test": "php artisan test",
+    "analyse": "php artisan about"
+  }
+}
