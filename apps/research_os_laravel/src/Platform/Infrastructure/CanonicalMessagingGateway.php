@@ -10,15 +10,17 @@ use RuntimeException;
 
 final class CanonicalMessagingGateway implements MessagingGateway
 {
-    public function __construct(private readonly CanonicalPlatformClient $client)
-    {
+    public function __construct(
+        private readonly CanonicalPlatformClient $client,
+        private readonly string $endpoint,
+    ) {
     }
 
     public function publish(RequestContext $context, string $topic, array $payload): string
     {
         $result = $this->client->post(
             $context,
-            (string) config('platform.endpoints.messaging'),
+            $this->endpoint,
             ['topic' => $topic, 'payload' => $payload],
         );
 
