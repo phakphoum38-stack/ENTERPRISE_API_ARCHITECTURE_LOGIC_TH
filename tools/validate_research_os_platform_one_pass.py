@@ -2,6 +2,8 @@
 """Validate the complete Research OS Platform Spine as one canonical composition."""
 from __future__ import annotations
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +24,9 @@ REQUIRED = [
     "tools/platform_self_reconciliation.py",
     "tools/platform_runtime_readiness.py",
     "tools/platform_operationalization.py",
+    "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+    "tools/platform_spine.py",
+    "tools/test_platform_spine.py",
     "tools/validate_platform_self_reconciliation.py",
     "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
 ]
@@ -90,7 +95,11 @@ def main() -> int:
     for anchor in ("release_authority: final_gate","release_blocked_by_unresolved_deferred: true","platform_service:","self_reconciliation:","runtime_readiness:"):
         if anchor not in gate: fail("final gate anchor missing: " + anchor)
     if "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json" not in gate: fail("completion contract is not bound to Final Gate")
-    if ".github/workflows/research-os-platform-one-pass-completion.yml" not in gate: fail("completion workflow is not bound to Final Gate")
+    if "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json" not in gate: fail("spine engine contract is not bound to Final Gate")
+    if "tools/platform_spine.py" not in gate or "tools/test_platform_spine.py" not in gate: fail("spine engine is not bound to Final Gate")
+    spine = subprocess.run([sys.executable, "tools/platform_spine.py", "--validate"], cwd=ROOT, text=True, capture_output=True)
+    if spine.returncode != 0:
+        fail("Platform Spine engine validation failed: " + (spine.stdout or spine.stderr).strip())
     print("PLATFORM_ONE_PASS=PASS")
     print("PLATFORM_SPINE=COMPLETE")
     print("PLATFORM_REGISTRY=SCHEMA_DRIVEN")
