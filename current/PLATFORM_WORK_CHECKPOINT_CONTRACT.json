@@ -36,7 +36,13 @@
       "source_sha",
       "created_at"
     ],
-    "workflow_states": ["ACTIVE", "PAUSED", "BLOCKED", "DEFERRED", "COMPLETED"],
+    "workflow_states": [
+      "ACTIVE",
+      "PAUSED",
+      "BLOCKED",
+      "DEFERRED",
+      "COMPLETED"
+    ],
     "append_only": true,
     "supersedes_previous_checkpoint": true,
     "secrets_forbidden": true,
