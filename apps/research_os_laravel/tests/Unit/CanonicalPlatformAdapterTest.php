@@ -54,7 +54,7 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
         self::assertSame(
             AuthorizationDecision::UNKNOWN,
-            (new CanonicalAuthorizationGateway($this->client))
+            (new CanonicalAuthorizationGateway($this->client, '/api/v1/platform/authorization/decide'))
                 ->decide($this->context, 'workflow.execute', 'workflow:demo')
         );
 
@@ -68,11 +68,15 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
     public function testWorkflowMessagingEvidenceAndAuditRequireCanonicalIdentifiers(): void
     {
-        $this->http->fakeSequence()
-            ->push(['run_id' => 'run-1'], 200)
-            ->push(['message_id' => 'msg-1'], 200)
-            ->push(['evidence_id' => 'evidence-1'], 200)
-            ->push(['audit_id' => 'audit-1'], 200);
+        $this->http->fake(function (Request $request) {
+            return match ($request->url()) {
+                'https://platform.example.test/api/v1/platform/workflow/dispatch' => $this->http->response(['run_id' => 'run-1'], 200),
+                'https://platform.example.test/api/v1/platform/messaging/publish' => $this->http->response(['message_id' => 'msg-1'], 200),
+                'https://platform.example.test/api/v1/platform/evidence' => $this->http->response(['evidence_id' => 'evidence-1'], 200),
+                'https://platform.example.test/api/v1/platform/audit' => $this->http->response(['audit_id' => 'audit-1'], 200),
+                default => $this->http->response([], 404),
+            };
+        });
 
         self::assertSame(
             ['run_id' => 'run-1'],
