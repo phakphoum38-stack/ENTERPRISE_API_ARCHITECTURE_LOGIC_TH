@@ -213,7 +213,8 @@ def main() -> None:
             "Identity/access convergence validation failed: "
             + (identity_access.stdout or identity_access.stderr).strip()
         )
-    capability_convergence = subprocess.run(\n        [sys.executable, str(ROOT / "tools" / "validate_research_os_capability_convergence.py")],
+    capability_convergence = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "validate_research_os_capability_convergence.py")],
         cwd=ROOT,
         text=True,
         capture_output=True,
