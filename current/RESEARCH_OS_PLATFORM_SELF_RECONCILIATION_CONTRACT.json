@@ -12,7 +12,8 @@
     "existing_repair_pipeline": "tools/repair_diff_pipeline.py",
     "existing_change_impact": "tools/platform_change_impact.py",
     "existing_discovery": "tools/platform_discovery.py",
-    "existing_graph": "tools/platform_graph.py"
+    "existing_graph": "tools/platform_graph.py",
+    "plane_boundary": "current/PLANE_BOUNDARY_CONTRACT.json"
   },
   "authority": {
     "mode": "RECONCILIATION_AND_VALIDATION",
