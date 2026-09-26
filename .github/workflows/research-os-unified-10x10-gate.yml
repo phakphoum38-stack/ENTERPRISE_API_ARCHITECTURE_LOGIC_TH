@@ -57,6 +57,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path $data | Out-Null
           $python=(Get-Command python -ErrorAction Stop).Source
           Write-Host "PYTHON_EXE=$python"
+          $env:PYTHONPATH="$PWD"
+          & $python -m unittest tools.test_research_os_api_import_boundary -v
+          if($LASTEXITCODE -ne 0){throw "Research OS API import-boundary regression failed with exit code $LASTEXITCODE"}
           Push-Location "$PWD\\tools\\research_os_api"
           try {
             & $python -u -c "import render_server; print('RENDER_SERVER_IMPORT=PASS')"
