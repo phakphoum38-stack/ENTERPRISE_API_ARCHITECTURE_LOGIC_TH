@@ -1,0 +1,45 @@
+{
+  "wave": "1",
+  "name": "identity-access",
+  "status": "EXTRACTED",
+  "canonical_ui_root": "apps/research_os_flutter",
+  "identity": {
+    "source": "/v1/auth/status",
+    "session": "tools/research_os_api/api_auth.py",
+    "context": "tools/research_os_api/identity_context.py"
+  },
+  "policy": {
+    "authority": "owner_special/research_os_friend/policy.py:OwnerPolicy",
+    "approval": "ApprovalGate",
+    "execution": "FriendOrchestrator"
+  },
+  "owner": {
+    "role": "OWNER",
+    "highest_privilege": true,
+    "resource_or_scope_bound": false,
+    "client_may_grant_authority": false
+  },
+  "surface": {
+    "destination_id": "google_sign_in",
+    "login": "apps/research_os_flutter/lib/src/features/auth/login_page.dart",
+    "provider": "apps/research_os_flutter/lib/src/features/auth/google_login_page.dart",
+    "api_client": "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
+  },
+  "disposition": {
+    "identity": "canonical-source",
+    "policy": "existing-authority",
+    "ui": "migrate",
+    "runtime": "do-not-duplicate"
+  },
+  "next_source_change": {
+    "required": true,
+    "change": "bind the canonical navigation identity metadata after source-write verification",
+    "must_preserve": [
+      "server-derived identity",
+      "OwnerPolicy authority",
+      "ApprovalGate authority",
+      "FriendOrchestrator execution",
+      "Owner unbounded by resource or scope"
+    ]
+  }
+}
