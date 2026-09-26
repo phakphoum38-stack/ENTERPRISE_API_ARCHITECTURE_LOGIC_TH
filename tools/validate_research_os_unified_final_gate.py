@@ -42,6 +42,7 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
     "current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json",
     "current/RESEARCH_OS_AUTHORIZATION_CONVERGENCE_CONTRACT.json",
     "current/RESEARCH_OS_IDENTITY_ACCESS_WAVE_1_MAP.json",
@@ -66,6 +67,9 @@ REQUIRED_FILES = (
     "tools/test_platform_runtime_readiness.py",
     "tools/test_validate_platform_runtime_resolution.py",
     "tools/test_validate_platform_service.py",
+    "tools/platform_self_reconciliation.py",
+    "tools/validate_platform_self_reconciliation.py",
+    "tools/test_platform_self_reconciliation.py",
     "tools/platform_operationalization.py",
     "tools/test_platform_operationalization.py",
     "tools/validate_platform_operationalization.py",
@@ -295,6 +299,10 @@ def main() -> None:
     print("DEFERRED_POLICY=EXPLICIT_AND_FAIL_CLOSED")
     print("AEOS_RECHECK=BOUND_TO_FINAL_GATE")
     print("AEOS_RELEASE_AUTHORITY=FINAL_GATE")
+    self_reconciliation = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_platform_self_reconciliation.py")], cwd=ROOT, text=True, capture_output=True)
+    if self_reconciliation.returncode != 0:
+        fail("Platform self-reconciliation validation failed: " + (self_reconciliation.stdout or self_reconciliation.stderr).strip())
+    print("SELF_RECONCILIATION=BOUND_TO_PLATFORM")
     runtime_resolution = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_platform_runtime_resolution.py")], cwd=ROOT, text=True, capture_output=True)
     if runtime_resolution.returncode != 0:
         fail("Platform runtime-resolution validation failed: " + (runtime_resolution.stdout or runtime_resolution.stderr).strip())
