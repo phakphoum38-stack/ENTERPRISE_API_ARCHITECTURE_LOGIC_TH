@@ -1,0 +1,33 @@
+name: Research OS Platform One-Pass Completion
+
+on:
+  pull_request:
+    paths:
+      - 'current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json'
+      - 'current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json'
+      - 'tools/validate_research_os_platform_one_pass.py'
+      - 'tools/test_research_os_platform_one_pass.py'
+      - 'docs/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION.md'
+      - '.github/workflows/research-os-platform-one-pass-completion.yml'
+      - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json'
+      - 'current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json'
+      - 'tools/validate_research_os_platform_one_pass.py'
+      - 'tools/test_research_os_platform_one_pass.py'
+      - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
+
+jobs:
+  platform-one-pass:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate one-pass Platform spine
+        run: python tools/validate_research_os_platform_one_pass.py
+      - name: Test one-pass Platform spine
+        run: python tools/test_research_os_platform_one_pass.py
