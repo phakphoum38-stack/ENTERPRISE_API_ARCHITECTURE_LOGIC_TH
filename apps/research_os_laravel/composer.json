@@ -22,7 +22,7 @@
     }
   },
   "scripts": {
-    "test": "php artisan test",
+    "test": "phpunit",
     "analyse": "php artisan about",
     "contract": "php artisan research-os:contract"
   }
