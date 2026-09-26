@@ -13,6 +13,7 @@ ENGINE = ROOT / "tools" / "platform_self_reconciliation.py"
 
 REQUIRED = (
     "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "current/PLANE_BOUNDARY_CONTRACT.json",
     "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
     "current/ARCHITECTURE_INVARIANTS.md",
     "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
