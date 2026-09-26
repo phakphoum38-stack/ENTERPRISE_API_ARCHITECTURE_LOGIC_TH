@@ -244,7 +244,7 @@ def main() -> None:
     if missing_runtime:
         fail("runtime readiness binding is incomplete: " + ", ".join(missing_runtime))
     runtime_test = subprocess.run(
-        [sys.executable, str(ROOT / "tools" / "test_platform_runtime_readiness.py")],
+        [sys.executable, "-m", "unittest", "tools.test_platform_runtime_readiness", "-v"],
         cwd=ROOT,
         text=True,
         capture_output=True,
