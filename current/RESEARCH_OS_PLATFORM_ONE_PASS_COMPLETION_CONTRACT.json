@@ -50,7 +50,9 @@
     "self_reconciliation": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
     "runtime_readiness": "current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json",
     "operationalization": "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
-    "final_gate": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+    "final_gate": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+    "platform_spine_engine": "tools/platform_spine.py",
+    "platform_spine_engine_contract": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json"
   },
   "lifecycle": {
     "states": [
@@ -208,6 +210,20 @@
     "no_duplicate_registry_authority",
     "no_duplicate_release_authority",
     "main_is_release_baseline",
-    "platform_is_composition_layer"
-  ]
+    "platform_is_composition_layer",
+    "platform_spine_engine_is_shared_validation_layer",
+    "high_impact_changes_require_simulation",
+    "health_never_grants_authorization"
+  ],
+  "spine_engine": {
+    "registry": "SCHEMA_DRIVEN",
+    "dependency_graph": "CANONICAL",
+    "lifecycle": "FORWARD_ONLY",
+    "compatibility": "BREAKING_REQUIRES_MIGRATION",
+    "impact": "TRANSITIVE",
+    "health": "NON_AUTHORIZING",
+    "drift": "FAIL_CLOSED",
+    "simulation": "REQUIRED_FOR_HIGH_IMPACT",
+    "release_authority": "FINAL_GATE"
+  }
 }
