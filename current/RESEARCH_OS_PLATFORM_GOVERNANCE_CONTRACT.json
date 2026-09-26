@@ -18,7 +18,9 @@
     "change_impact_control": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
     "control_center_contract": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
     "universal_runner": "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
-    "runner_installation": "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json"
+    "runner_installation": "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
+    "self_reconciliation": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+    "self_reconciliation_engine": "tools/platform_self_reconciliation.py"
   },
   "authority": {
     "governance_mode": "DESCRIPTIVE_AND_VALIDATING",
@@ -70,6 +72,11 @@
       "domain": "runner_installation",
       "canonical": "tools/research_os_api/runner_installer.py",
       "role": "VERIFIED_INSTALLATION_AND_BOOTSTRAP_ADAPTER"
+    },
+    {
+      "domain": "self_reconciliation",
+      "canonical": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+      "role": "BOUNDED_RECONCILIATION_AND_VALIDATION"
     }
   ],
   "component_lifecycle": [
@@ -142,7 +149,10 @@
     "exact_sha_identity",
     "cross_project_isolation",
     "conflict_stop_release_reconcile",
-    "history_is_immutable"
+    "history_is_immutable",
+    "self_reconciliation_is_bounded",
+    "deterministic_repair_only",
+    "protected_core_is_fail_closed"
   ],
   "change_impact_rules": [
     {
@@ -310,6 +320,30 @@
         "assurance",
         "unified_final_gate"
       ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+      "components": [
+        "platform_governance",
+        "reconciliation",
+        "architecture_integrity"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/platform_self_reconciliation.py",
+      "components": [
+        "reconciliation",
+        "architecture_integrity",
+        "repair_safety"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
     }
   ]
-}
+}\n
