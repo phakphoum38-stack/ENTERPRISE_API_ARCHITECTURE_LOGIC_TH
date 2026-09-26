@@ -1,0 +1,62 @@
+{
+  "contract_id": "research-os-platform-continuity-workflow-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Bind persisted Platform work checkpoints to the existing context recovery, successor handoff, Workflow, Queue, Stateless Runner and Evidence planes without creating a second runtime.",
+  "authority": {
+    "may_authorize": false,
+    "may_execute": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "continuity": {
+    "checkpoint": "current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json",
+    "context_recovery": "current/RESEARCH_OS_CONTEXT_RECOVERY.json",
+    "institutional_memory": "current/RESEARCH_OS_INSTITUTIONAL_MEMORY.json",
+    "successor_handoff": "current/RESEARCH_OS_SUCCESSOR_HANDOFF.json"
+  },
+  "execution": {
+    "workflow_state_is_input": true,
+    "queue": "v3/research_os_v3/queue.py",
+    "runner": "v3/research_os_v3/runner.py",
+    "engine_calls_runner_directly": false,
+    "path": [
+      "CHECKPOINT",
+      "RESUME_VALIDATION",
+      "WORKFLOW_STATE",
+      "EVENT",
+      "QUEUE",
+      "STATELESS_RUNNER",
+      "EVIDENCE",
+      "SUCCESSOR_CHECKPOINT"
+    ]
+  },
+  "recovery": {
+    "sha_mismatch": "HOLD",
+    "missing_context": "HOLD",
+    "unknown": "HOLD",
+    "deferred": "PRESERVE",
+    "successor_requires_context_recovery": true,
+    "successor_requires_reverification": true,
+    "certification_inheritance": false
+  },
+  "resource_safety": {
+    "conflict": "REJECT",
+    "release_resources": true,
+    "ack_or_reconcile_delivery": true,
+    "same_version_overwrite": false,
+    "alternate_version_branching": true
+  },
+  "evidence": {
+    "source_sha_bound": true,
+    "append_only": true,
+    "correlation_bound": true,
+    "terminal_recovery_is_explicit": true
+  },
+  "required_validation": [
+    "tools/test_platform_work_checkpoint.py",
+    "tools/test_platform_continuity_workflow.py"
+  ]
+}
