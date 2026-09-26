@@ -22,7 +22,7 @@ from tools.research_os_api.local_storage import data_root
 
 ROOT = Path(__file__).resolve().parents[1]
 _LOCK = threading.RLock()
-_SAFE = re.compile(r"^[^\\x00-\\x1f\\x7f]{1,128}$")
+_SAFE = re.compile(r"^[^\x00-\x1f\x7f]{1,128}$")
 _STATES = {"ACTIVE", "PAUSED", "BLOCKED", "DEFERRED", "COMPLETED"}
 _MAX_ITEMS = 64
 _MAX_TEXT = 512
@@ -41,7 +41,7 @@ def _store_path() -> Path:
 
 def _validate_id(value: str, field: str) -> str:
     value = str(value or "").strip()
-    if (not value or not _SAFE.fullmatch(value) or "/" in value or "\\\\" in value or value in {".", ".."}):
+    if (not value or not _SAFE.fullmatch(value) or "/" in value or "\\" in value or value in {".", ".."}):
         raise ValueError(f"invalid {field}")
     return value
 
