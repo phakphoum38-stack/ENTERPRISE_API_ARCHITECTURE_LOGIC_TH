@@ -39,16 +39,19 @@ from memory import build_context, search_memory
 from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 from oauth_handoff import consume_handoff
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# The API supports both repository-root module execution and direct execution
+# from tools/research_os_api (the latter is used by the Windows/local launcher).
+# Bootstrap the repository import boundary before importing Platform modules.
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 from providers import ProviderError, build_provider
 from tools.platform_work_checkpoint import (
     create_checkpoint,
     list_checkpoints,
     resume_checkpoint,
 )
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from tools.project_registry import ProjectRegistry
 from tools.project_scale_readiness import PROJECT_COUNT, build_project_definitions
