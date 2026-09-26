@@ -192,10 +192,12 @@ def main() -> None:
     entries = re.findall(r"ResearchNavItem\((.*?)\),\s*(?=ResearchNavItem|$)", registry, flags=re.DOTALL)
     indexes: list[int] = []
     for entry in entries:
-        numbers = re.findall(r"\b(\d+)\b", entry)
-        if not numbers:
+        index_match = re.search(r",\s*(\d+)\s*,\s*(?:required:|destinationId:|capabilityId:|\})", entry)
+        if index_match is None:
+            index_match = re.search(r",\s*(\d+)\s*,", entry)
+        if index_match is None:
             fail("navigation entry is missing a stable index")
-        indexes.append(int(numbers[-1]))
+        indexes.append(int(index_match.group(1)))
     if not indexes:
         fail("navigation registry is empty")
     if sorted(indexes) != list(range(len(indexes))):
