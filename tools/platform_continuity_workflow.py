@@ -99,7 +99,7 @@ def dispatch_checkpoint(
         state = {
             "runner.claimed": "OBSERVE",
             "runner.completed": "COMPLETE",
-            "runner.retry": "RECOVER",
+            "runner.retry": "OBSERVE",
             "runner.failed": "RECOVER",
         }.get(event_type)
         if state is None:
@@ -143,6 +143,10 @@ def dispatch_checkpoint(
     result = runner_with_sink.run_once(handler)
     if result is None:
         raise RuntimeError("checkpoint dispatch produced no runner result")
+    while result.status == "retry":
+        result = runner_with_sink.run_once(handler)
+        if result is None:
+            raise RuntimeError("retrying checkpoint dispatch produced no runner result")
 
     terminal_state = "COMPLETED" if result.status == "completed" else "DEFERRED"
     successor = create_checkpoint(
