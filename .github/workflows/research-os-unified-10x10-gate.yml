@@ -55,9 +55,46 @@ jobs:
         run: |
           $data="$env:RUNNER_TEMP\ResearchOSData"
           New-Item -ItemType Directory -Force -Path $data | Out-Null
+          $python=(Get-Command python -ErrorAction Stop).Source
+          Write-Host "PYTHON_EXE=$python"
+          $env:PYTHONPATH="$PWD"
+          & $python -m unittest tools.test_research_os_api_import_boundary -v
+          if($LASTEXITCODE -ne 0){throw "Research OS API import-boundary regression failed with exit code $LASTEXITCODE"}
+          Push-Location "$PWD\\tools\\research_os_api"
+          try {
+            & $python -u -c "import render_server; print('RENDER_SERVER_IMPORT=PASS')"
+            if($LASTEXITCODE -ne 0){throw "Research OS render_server import failed with exit code $LASTEXITCODE"}
+          } finally { Pop-Location }
+          $env:PYTHONUNBUFFERED='1'
           .\scripts\start-research-os-local.ps1 -DataDir $data -Provider mock -Port 8787 -Background
-          for($i=0;$i-lt 40;$i++){try{$h=Invoke-RestMethod 'http://127.0.0.1:8787/health' -TimeoutSec 2;if($h.status -eq 'ok'){Write-Host 'PORT_8787=PASS';return}}catch{};Start-Sleep -Milliseconds 500}
-          throw '8787 did not become ready'
+          $pidFile=Join-Path $data 'run\\research-os-api.pid'
+          $errLog=Join-Path $data 'logs\\research-os-api.err.log'
+          $outLog=Join-Path $data 'logs\\research-os-api.out.log'
+          if(-not (Test-Path $pidFile)){throw "API PID file was not created: $pidFile"}
+          $pidText=(Get-Content $pidFile -Raw).Trim()
+          $apiPid=0
+          if(-not [int]::TryParse($pidText,[ref]$apiPid)){throw "Invalid API PID file content: $pidText"}
+          Write-Host "API_PID=$apiPid"
+          for($i=0;$i-lt 40;$i++){
+            $process=Get-Process -Id $apiPid -ErrorAction SilentlyContinue
+            if(-not $process){
+              Write-Host '--- API STDOUT ---'
+              if(Test-Path $outLog){Get-Content $outLog -Tail 120}
+              Write-Host '--- API STDERR ---'
+              if(Test-Path $errLog){Get-Content $errLog -Tail 120}
+              throw "Research OS Local API exited before readiness. PID=$apiPid"
+            }
+            try{
+              $h=Invoke-RestMethod 'http://127.0.0.1:8787/health' -TimeoutSec 2
+              if($h.status -eq 'ok'){Write-Host 'PORT_8787=PASS';return}
+            }catch{}
+            Start-Sleep -Milliseconds 500
+          }
+          Write-Host '--- API STDOUT ---'
+          if(Test-Path $outLog){Get-Content $outLog -Tail 120}
+          Write-Host '--- API STDERR ---'
+          if(Test-Path $errLog){Get-Content $errLog -Tail 120}
+          throw '8787 did not become ready; captured API logs above.'
 
       - name: Start and execute actual V3 Master 8788 + 10x10
         shell: pwsh

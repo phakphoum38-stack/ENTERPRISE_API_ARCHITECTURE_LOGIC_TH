@@ -10,6 +10,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+# Establish the repository import boundary for every child Python process. The local
+# launcher intentionally starts render_server.py from tools/research_os_api, while
+# Platform modules remain canonical under the repository-level tools package.
+$repoPythonPath = $RepoRoot
+if ([string]::IsNullOrWhiteSpace($env:PYTHONPATH)) {
+  $env:PYTHONPATH = $repoPythonPath
+} elseif (($env:PYTHONPATH -split [IO.Path]::PathSeparator) -notcontains $repoPythonPath) {
+  $env:PYTHONPATH = "$repoPythonPath$([IO.Path]::PathSeparator)$env:PYTHONPATH"
+}
 $ApiDir = Join-Path $RepoRoot "tools\research_os_api"
 $FriendScript = Join-Path $RepoRoot "owner_special\scripts\run_friend_service.py"
 $RunDir = Join-Path $DataDir "run"
