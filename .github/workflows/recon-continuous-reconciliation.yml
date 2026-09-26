@@ -94,6 +94,18 @@ jobs:
           print(json.dumps(result, indent=2, sort_keys=True))
           PY
 
+      - name: Validate Platform self-reconciliation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/validate_platform_self_reconciliation.py
+
+      - name: Run canonical Platform reconciliation scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/platform_self_reconciliation.py --scan | tee platform-self-reconciliation.json
+
       - name: Publish Recon evidence
         uses: actions/upload-artifact@v4
         with:
