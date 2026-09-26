@@ -9,7 +9,9 @@
     "tools/platform_graph.py",
     "current/ARCHITECTURE_INVARIANTS.md",
     "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
-    "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json"
+    "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+    "tools/platform_spine.py"
   ],
   "components": [
     {
@@ -717,6 +719,7 @@
       "kind": "PLATFORM_SPINE_COMPLETION_VALIDATOR",
       "lifecycle": "ACTIVE",
       "dependencies": [
+        "platform_spine_engine",
         "platform_workspace",
         "platform_graph",
         "change_impact_control",
@@ -749,6 +752,52 @@
         "drift_binding",
         "migration_boundary",
         "simulation_boundary"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_spine_engine",
+      "canonical": "tools/platform_spine.py",
+      "kind": "PLATFORM_SPINE_ENGINE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_graph",
+        "change_impact_control",
+        "self_reconciliation",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_spine.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION.md",
+        "tools/platform_spine.py"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "registry_validation",
+        "dependency_validation",
+        "impact_analysis",
+        "lifecycle_validation",
+        "compatibility_validation",
+        "health_validation",
+        "drift_detection",
+        "migration_validation",
+        "simulation"
       ],
       "authority": {
         "mode": "NONE"
