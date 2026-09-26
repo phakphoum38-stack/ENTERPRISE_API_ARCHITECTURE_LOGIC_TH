@@ -127,9 +127,10 @@ def dispatch_checkpoint(
         worker_id=runner.worker_id,
         event_sink=record,
     )
+    execution_task_id = f"{checkpoint_id}-dispatch"
     queue.enqueue(
         QueueTask(
-            checkpoint["task_id"],
+            execution_task_id,
             checkpoint["task_id"],
             {
                 "checkpoint_id": checkpoint_id,
