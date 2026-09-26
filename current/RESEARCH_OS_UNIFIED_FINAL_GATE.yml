@@ -77,6 +77,7 @@ required_contracts:
   - current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -222,6 +223,20 @@ continuity:
   chat_is_not_source_of_truth: true
   source_sha_mismatch: HOLD
   deferred_work_must_be_preserved: true
+
+self_reconciliation:
+  contract: current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json
+  implementation: tools/platform_self_reconciliation.py
+  validator: tools/validate_platform_self_reconciliation.py
+  test: tools/test_platform_self_reconciliation.py
+  exact_source_sha: required
+  deterministic_repair_only: true
+  protected_core_fail_closed: true
+  sandbox_before_apply: true
+  snapshot_before_apply: true
+  post_recon_required: true
+  rollback_required: true
+  release_authority_remains: final_gate
 
 operationalization:
   contract: current/PLATFORM_OPERATIONALIZATION_CONTRACT.json
