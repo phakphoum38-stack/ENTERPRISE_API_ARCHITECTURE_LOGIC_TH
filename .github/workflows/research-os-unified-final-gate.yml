@@ -49,6 +49,10 @@ jobs:
         run: python tools/platform_core_completion.py
       - name: Validate complete platform architecture
         run: python tools/validate_research_os_platform_architecture.py
+      - name: Validate Laravel Platform boundary
+        run: |
+          python tools/validate_research_os_laravel_platform.py
+          python -m unittest tools.test_validate_research_os_laravel_platform -v
       - name: Validate Flutter convergence map
         run: |
           python tools/validate_research_os_flutter_convergence_map.py
@@ -321,9 +325,49 @@ jobs:
           python tools/validate_research_os_platform_complete_1_12.py
           python -m unittest tools.test_validate_research_os_platform_complete_1_12 -v
 
+  laravel_surface:
+    name: Laravel Platform surface
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/research_os_laravel
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, dom, fileinfo, openssl, pdo
+          coverage: none
+      - name: Validate Laravel Platform source boundary
+        run: |
+          set -euo pipefail
+          test -f composer.json
+          test -f artisan
+          test -f bootstrap/app.php
+          test -f routes/api.php
+          test -d src/Platform
+          grep -q 'direct_engine_to_runner.*false' ../../current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Contract command
+        run: php artisan research-os:contract
+      - name: Framework smoke
+        run: php artisan about
+      - name: Route smoke
+        run: php artisan route:list --path=api/v1
+      - name: Platform tests
+        run: vendor/bin/phpunit --testsuite='Research OS Laravel Platform'
+
   decision:
     name: Unified release decision
-    needs: [contract, aeos_recheck, m2_audit, flutter_surface, python_surface]
+    needs: [contract, aeos_recheck, m2_audit, flutter_surface, python_surface, laravel_surface]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -334,6 +378,7 @@ jobs:
           PYTHON_SURFACE: ${{ needs.python_surface.result }}
           AEOS_RECHECK: ${{ needs.aeos_recheck.result }}
           M2_AUDIT: ${{ needs.m2_audit.result }}
+          LARAVEL_SURFACE: ${{ needs.laravel_surface.result }}
         run: |
           set -euo pipefail
           printf 'contract=%s\n' "$CONTRACT"
@@ -341,10 +386,12 @@ jobs:
           printf 'python_surface=%s\n' "$PYTHON_SURFACE"
           printf 'aeos_recheck=%s\n' "$AEOS_RECHECK"
           printf 'm2_audit=%s\n' "$M2_AUDIT"
+          printf 'laravel_surface=%s\n' "$LARAVEL_SURFACE"
           test "$CONTRACT" = success
           test "$FLUTTER_SURFACE" = success
           test "$PYTHON_SURFACE" = success
           test "$AEOS_RECHECK" = success
           test "$M2_AUDIT" = success
+          test "$LARAVEL_SURFACE" = success
           echo "RESEARCH_OS_UNIFIED_FINAL_GATE=PASS"
           echo "RELEASE_AUTHORITY=FINAL_GATE"
