@@ -6,6 +6,14 @@ class PlatformProductionCompletionTests(unittest.TestCase):
     def test_reconciliation_passes(self) -> None:
         self.assertEqual(validate_production_completion(), ())
 
+    def test_operationalization_is_required_proof(self) -> None:
+        from tools.platform_production_completion import ROOT
+        import json
+        contract = json.loads((ROOT / "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json").read_text(encoding="utf-8"))
+        self.assertEqual(contract["authority"]["release_authority"], "FINAL_GATE")
+        self.assertFalse(contract["authority"]["may_execute"])
+        self.assertTrue(contract["continuity"]["chat_is_not_source_of_truth"])
+
     def test_runtime_readiness_is_required_proof(self) -> None:
         from tools.platform_production_completion import ROOT
         import json
