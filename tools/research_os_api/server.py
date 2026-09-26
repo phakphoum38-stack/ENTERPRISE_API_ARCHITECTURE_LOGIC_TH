@@ -40,6 +40,11 @@ from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 from oauth_handoff import consume_handoff
 from providers import ProviderError, build_provider
+from tools.platform_work_checkpoint import (
+    create_checkpoint,
+    list_checkpoints,
+    resume_checkpoint,
+)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
@@ -300,6 +305,21 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 email = ((result.get("account") or {}).get("email") or "Google account")
                 self._send_html(HTTPStatus.OK, f"<html><body><h2>Research OS connected to Google Workspace</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
                 return
+            if path == "/v1/platform/work-checkpoints":
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                if not user_id:
+                    raise ValueError("verified session identity is incomplete")
+                params = parse_qs(parsed.query)
+                task_id = str(params.get("task_id", [""])[0]).strip() or None
+                records = list_checkpoints(user_id, task_id)
+                self._send(HTTPStatus.OK, {
+                    "checkpoints": records,
+                    "count": len(records),
+                    "source": "platform-work-checkpoint",
+                    "chat_is_not_source_of_truth": True,
+                })
+                return
             if path == "/v1/conversations/cloud":
                 principal = self._authorize_cloud_sync()
                 if principal is None:
@@ -356,6 +376,39 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = self._read_json()
+            if path == "/v1/platform/work-checkpoints":
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                if not user_id:
+                    raise ValueError("verified session identity is incomplete")
+                payload = dict(body)
+                payload.pop("owner_id", None)
+                record = create_checkpoint(
+                    owner_id=user_id,
+                    task_id=str(payload.get("task_id", "")),
+                    workflow_state=str(payload.get("workflow_state", "")),
+                    current_step=str(payload.get("current_step", "")),
+                    completed_steps=payload.get("completed_steps"),
+                    pending_steps=payload.get("pending_steps"),
+                    evidence_refs=payload.get("evidence_refs"),
+                    deferred_work=payload.get("deferred_work"),
+                    context_refs=payload.get("context_refs"),
+                    next_action=str(payload.get("next_action", "recon")),
+                    source_sha=payload.get("source_sha"),
+                    supersedes=payload.get("supersedes"),
+                )
+                self._send(HTTPStatus.CREATED, {"checkpoint": record, "persisted": True, "chat_is_not_source_of_truth": True})
+                return
+            if path == "/v1/platform/work-checkpoints/resume":
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                if not user_id:
+                    raise ValueError("verified session identity is incomplete")
+                checkpoint_id = str(body.get("checkpoint_id", "")).strip()
+                if not checkpoint_id:
+                    raise ValueError("checkpoint_id is required")
+                self._send(HTTPStatus.OK, resume_checkpoint(user_id, checkpoint_id))
+                return
             if path == "/v1/auth/providers/login":
                 provider = str(body.get("provider", "")).strip().lower()
                 if provider == "google":
