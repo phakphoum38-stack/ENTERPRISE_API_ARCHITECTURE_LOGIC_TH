@@ -84,5 +84,35 @@ class PlatformWorkCheckpointTests(unittest.TestCase):
                 )
 
 
+    def test_superseded_checkpoint_is_not_resumable(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            os.environ["RESEARCH_OS_DATA_DIR"] = raw
+            try:
+                sha = "a" * 40
+                with patch("tools.platform_work_checkpoint.canonical_sha", return_value=sha):
+                    parent = create_checkpoint(
+                        owner_id="owner",
+                        task_id="task-003",
+                        workflow_state="ACTIVE",
+                        current_step="step",
+                        source_sha=sha,
+                        next_action="resume",
+                    )
+                    child = create_checkpoint(
+                        owner_id="owner",
+                        task_id="task-003",
+                        workflow_state="ACTIVE",
+                        current_step="step-2",
+                        source_sha=sha,
+                        supersedes=parent["checkpoint_id"],
+                        next_action="resume",
+                    )
+                    result = resume_checkpoint("owner", parent["checkpoint_id"])
+                    self.assertEqual(result["status"], "HOLD")
+                    self.assertIn("checkpoint_superseded", result["failures"])
+                    self.assertEqual(resume_checkpoint("owner", child["checkpoint_id"])["status"], "READY")
+            finally:
+                os.environ.pop("RESEARCH_OS_DATA_DIR", None)
+
 if __name__ == "__main__":
     unittest.main()
