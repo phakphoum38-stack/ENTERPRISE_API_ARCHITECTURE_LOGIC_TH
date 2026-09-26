@@ -18,6 +18,10 @@ REQUIRED = (
     "packages/research_os_contracts/lib/migration_contract.dart",
     "current/AEOS_ASSURANCE_OF_ASSURANCE_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json",
+    "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
+    "tools/platform_operationalization.py",
+    "tools/test_platform_operationalization.py",
+    "tools/validate_platform_operationalization.py",
     "tools/platform_runtime_readiness.py",
     "tools/test_platform_runtime_readiness.py",
 )
