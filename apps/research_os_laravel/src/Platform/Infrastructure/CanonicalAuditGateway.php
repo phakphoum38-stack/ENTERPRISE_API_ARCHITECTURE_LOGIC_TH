@@ -10,15 +10,17 @@ use RuntimeException;
 
 final class CanonicalAuditGateway implements AuditGateway
 {
-    public function __construct(private readonly CanonicalPlatformClient $client)
-    {
+    public function __construct(
+        private readonly CanonicalPlatformClient $client,
+        private readonly string $endpoint,
+    ) {
     }
 
     public function record(RequestContext $context, array $event): string
     {
         $result = $this->client->post(
             $context,
-            (string) config('platform.endpoints.audit'),
+            $this->endpoint,
             ['event' => $event],
         );
 
