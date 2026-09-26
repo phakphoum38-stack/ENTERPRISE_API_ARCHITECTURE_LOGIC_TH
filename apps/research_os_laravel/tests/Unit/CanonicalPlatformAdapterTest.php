@@ -36,7 +36,7 @@ final class CanonicalPlatformAdapterTest extends TestCase
     {
         $this->http->fake(['*' => $this->http->response(['decision' => 'ALLOWED'], 200)]);
 
-        $decision = (new CanonicalAuthorizationGateway($this->client))
+        $decision = (new CanonicalAuthorizationGateway($this->client, '/api/v1/platform/authorization/decide'))
             ->decide($this->context, 'workflow.execute', 'workflow:demo');
 
         self::assertSame(AuthorizationDecision::ALLOWED, $decision);
@@ -76,19 +76,19 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
         self::assertSame(
             ['run_id' => 'run-1'],
-            (new CanonicalWorkflowGateway($this->client))->dispatch($this->context, 'workflow.start', ['id' => 'w1'])
+            (new CanonicalWorkflowGateway($this->client, '/api/v1/platform/workflow/dispatch'))->dispatch($this->context, 'workflow.start', ['id' => 'w1'])
         );
         self::assertSame(
             'msg-1',
-            (new CanonicalMessagingGateway($this->client))->publish($this->context, 'workflow.events', ['id' => 'w1'])
+            (new CanonicalMessagingGateway($this->client, '/api/v1/platform/messaging/publish'))->publish($this->context, 'workflow.events', ['id' => 'w1'])
         );
         self::assertSame(
             'evidence-1',
-            (new CanonicalEvidenceGateway($this->client))->record($this->context, ['type' => 'workflow.started'])
+            (new CanonicalEvidenceGateway($this->client, '/api/v1/platform/evidence'))->record($this->context, ['type' => 'workflow.started'])
         );
         self::assertSame(
             'audit-1',
-            (new CanonicalAuditGateway($this->client))->record($this->context, ['action' => 'workflow.start'])
+            (new CanonicalAuditGateway($this->client, '/api/v1/platform/audit'))->record($this->context, ['action' => 'workflow.start'])
         );
     }
 
@@ -98,7 +98,7 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
         self::assertSame(
             'identity-1',
-            (new CanonicalIdentityGateway($this->client))->resolve($this->context)
+            (new CanonicalIdentityGateway($this->client, '/api/v1/platform/identity/resolve'))->resolve($this->context)
         );
     }
 }
