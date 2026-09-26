@@ -60,6 +60,45 @@ class PlatformContinuityWorkflowTests(unittest.TestCase):
             finally:
                 os.environ.pop("RESEARCH_OS_DATA_DIR", None)
 
+    def test_retry_is_drained_before_successor_creation(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            os.environ["RESEARCH_OS_DATA_DIR"] = str(root / "data")
+            try:
+                sha = "a" * 40
+                with patch("tools.platform_work_checkpoint.canonical_sha", return_value=sha):
+                    checkpoint = create_checkpoint(
+                        owner_id="owner",
+                        task_id="continuity-retry-001",
+                        workflow_state="ACTIVE",
+                        current_step="retryable-step",
+                        source_sha=sha,
+                        next_action="dispatch",
+                    )
+                    queue = DurableTaskQueue(root / "queue.db")
+                    ledger = LifecycleEvidenceLedger(root / "evidence.jsonl")
+                    runner = StatelessResearchRunner(queue, max_attempts=2, worker_id="retry-runner")
+                    attempts = {"count": 0}
+
+                    def handler(_task: object) -> None:
+                        attempts["count"] += 1
+                        if attempts["count"] == 1:
+                            raise RuntimeError("transient")
+
+                    result = dispatch_checkpoint(
+                        owner_id="owner",
+                        checkpoint_id=checkpoint["checkpoint_id"],
+                        queue=queue,
+                        runner=runner,
+                        ledger=ledger,
+                        handler=handler,
+                    )
+                    self.assertEqual(result.status, "COMPLETED")
+                    self.assertEqual(attempts["count"], 2)
+                    self.assertEqual(len(result.evidence_refs), 4)
+            finally:
+                os.environ.pop("RESEARCH_OS_DATA_DIR", None)
+
     def test_resume_is_fail_closed_on_sha_drift(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             os.environ["RESEARCH_OS_DATA_DIR"] = str(raw)
