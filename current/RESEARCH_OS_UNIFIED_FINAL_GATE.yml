@@ -75,6 +75,7 @@ required_contracts:
   - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_CONTRACT.json
   - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_EVIDENCE_CONTRACT.json
   - current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -190,6 +191,18 @@ owner_special:
   exact_source_sha: required
   unknown_state: HOLD
   sha_mismatch: STOP
+
+runtime_readiness:
+  contract: current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
+  implementation: tools/platform_runtime_readiness.py
+  test: tools/test_platform_runtime_readiness.py
+  unknown_state: STOP
+  invalid_transition: STOP
+  health_required_before_ready: true
+  source_sha_required: true
+  correlation_id_required: true
+  evidence_is_projection_only: true
+  release_authority_remains: final_gate
 
 continuity:
   contract: current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json
