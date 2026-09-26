@@ -79,6 +79,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -91,6 +92,7 @@ required_workflows:
   - .github/workflows/owner-special-build-identity-gate.yml
   - .github/workflows/owner-special-friend.yml
   - .github/workflows/owner-special-ios-ipa.yml
+  - .github/workflows/research-os-platform-one-pass-completion.yml
 
 required_surface_contracts:
   - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
@@ -100,6 +102,8 @@ required_surface_contracts:
   - tools/test_validate_research_os_capability_convergence.py
   - tools/validate_research_os_identity_access_wave1.py
   - tools/test_validate_research_os_identity_access_wave1.py
+  - tools/validate_research_os_platform_one_pass.py
+  - tools/test_research_os_platform_one_pass.py
 
 assurance_recheck:
   authority: existing_aeos_master_assurance
@@ -248,4 +252,16 @@ operationalization:
   chat_is_not_source_of_truth: true
   unknown_state: HOLD
   sha_mismatch: HOLD
+  release_authority_remains: final_gate
+
+platform_one_pass_completion:
+  contract: current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json
+  implementation: tools/validate_research_os_platform_one_pass.py
+  test: tools/test_research_os_platform_one_pass.py
+  descriptive_validating_only: true
+  duplicate_runtime_forbidden: true
+  duplicate_authorization_forbidden: true
+  duplicate_evidence_forbidden: true
+  duplicate_queue_forbidden: true
+  duplicate_registry_authority_forbidden: true
   release_authority_remains: final_gate

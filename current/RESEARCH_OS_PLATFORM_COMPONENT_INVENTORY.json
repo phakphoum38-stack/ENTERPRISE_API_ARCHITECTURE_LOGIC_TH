@@ -8,7 +8,8 @@
     "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
     "tools/platform_graph.py",
     "current/ARCHITECTURE_INVARIANTS.md",
-    "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json"
+    "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json"
   ],
   "components": [
     {
@@ -701,6 +702,53 @@
       "capabilities": [
         "reconcile",
         "validate"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_one_pass_completion",
+      "canonical": "tools/validate_research_os_platform_one_pass.py",
+      "kind": "PLATFORM_SPINE_COMPLETION_VALIDATOR",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace",
+        "platform_graph",
+        "change_impact_control",
+        "self_reconciliation",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_research_os_platform_one_pass.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION.md",
+        "tools/validate_research_os_platform_one_pass.py"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "platform_spine_completion",
+        "lifecycle_validation",
+        "compatibility_validation",
+        "dependency_validation",
+        "impact_binding",
+        "health_binding",
+        "drift_binding",
+        "migration_boundary",
+        "simulation_boundary"
       ],
       "authority": {
         "mode": "NONE"
