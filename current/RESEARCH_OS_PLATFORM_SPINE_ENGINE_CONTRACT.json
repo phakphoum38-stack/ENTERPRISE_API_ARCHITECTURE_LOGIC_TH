@@ -1,0 +1,36 @@
+{
+  "contract_id": "research-os-platform-spine-engine-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "purpose": "Canonical read-only engine for validating the complete Research OS Platform Spine as one composition without creating duplicate runtime, authorization, evidence, queue or release authorities.",
+  "authority": {"may_execute": false, "may_authorize": false, "may_approve": false, "may_merge": false, "may_release": false, "release_authority": "FINAL_GATE"},
+  "inputs": {
+    "component_registry": "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json",
+    "component_schema": "current/RESEARCH_OS_PLATFORM_COMPONENT_REGISTRY_SCHEMA.json",
+    "plane_boundary": "current/PLANE_BOUNDARY_CONTRACT.json",
+    "governance": "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "one_pass_contract": "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json",
+    "final_gate": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+  },
+  "capabilities": {
+    "registry_validation": true,
+    "dependency_cycle_detection": true,
+    "forbidden_plane_edge_detection": true,
+    "transitive_impact_analysis": true,
+    "lifecycle_transition_validation": true,
+    "compatibility_validation": true,
+    "health_validation": true,
+    "drift_detection": true,
+    "migration_plan_validation": true,
+    "high_impact_simulation": true
+  },
+  "lifecycle": {"states": ["PROPOSED","EXPERIMENTAL","ACTIVE","DEPRECATED","RETIRED"], "allowed_transitions": [["PROPOSED","EXPERIMENTAL"],["EXPERIMENTAL","ACTIVE"],["ACTIVE","DEPRECATED"],["DEPRECATED","RETIRED"]], "backward_transition": "FORBIDDEN", "required_component_retirement": "REQUIRES_REGISTRY_GOVERNANCE_CHANGE"},
+  "compatibility": {"registry_schema_major": 1, "platform_contract_major": 1, "unknown": "HOLD", "breaking_change": "NEW_CONTRACT_VERSION_AND_MIGRATION"},
+  "health": {"states": ["READY","DEGRADED","BLOCKED","RETIRED"], "unknown": "HOLD", "health_is_not_authorization": true},
+  "impact": {"blast_radius": ["LOCAL","COMPONENT","PROJECT","CROSS_PROJECT","PLATFORM"], "unknown": "HOLD", "required_categories": ["contracts","workflows","tests","final_gate","invariants","product_surfaces"]},
+  "simulation": {"high_impact_threshold": "CROSS_PROJECT", "required_checks": ["dependency","impact","contract","failure","rollback"], "simulation_has_no_release_authority": true},
+  "drift": {"unknown": "HOLD", "canonical_path_must_exist": true, "declared_contracts_tests_evidence_must_exist": true},
+  "security": {"chain": ["Identity","Capability","Policy","Authorization","Entitlement","Execution","Evidence"], "resource_conflict": "REJECT_AND_RELEASE", "bypass": "FORBIDDEN"},
+  "runtime": {"execution_pattern": "Engine -> Event/Queue -> Stateless Worker", "direct_engine_to_runner": false, "idempotency_required": true},
+  "repair": {"evidence_before_patch": true, "minimal_patch": true, "ambiguous_target": "STOP", "protected_core": "STOP", "snapshot_before_apply": true, "sandbox_before_apply": true, "post_recon_required": true, "rollback_required": true}
+}
