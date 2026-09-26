@@ -63,6 +63,8 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json
   - current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json
+  - current/RESEARCH_OS_AUTHORIZATION_CONVERGENCE_CONTRACT.json
+  - current/RESEARCH_OS_IDENTITY_ACCESS_WAVE_1_MAP.json
   - current/RESEARCH_OS_UNIFIED_UX_LIGHT_BEAM_CONTRACT.json
   - current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json
   - current/PLATFORM_OPERATIONALIZATION_CONTRACT.json
@@ -91,6 +93,8 @@ required_surface_contracts:
   - apps/research_os_flutter/test/desktop_shell_test.dart
   - tools/validate_research_os_capability_convergence.py
   - tools/test_validate_research_os_capability_convergence.py
+  - tools/validate_research_os_identity_access_wave1.py
+  - tools/test_validate_research_os_identity_access_wave1.py
 
 assurance_recheck:
   authority: existing_aeos_master_assurance
