@@ -12,7 +12,12 @@
   ],
   "scale": {
     "project_count": 100,
-    "concurrency_levels": [10, 20, 50, 100],
+    "concurrency_levels": [
+      10,
+      20,
+      50,
+      100
+    ],
     "shared_platform_required": true,
     "project_isolation_required": true,
     "cross_project_resource_mutation_forbidden": true,
@@ -27,9 +32,15 @@
       "retry_exhaustion",
       "timeout",
       "cancellation",
-      "resource_conflict"
+      "resource_conflict",
+      "runtime_startup_failure"
     ],
-    "terminal_states": ["COMPLETE", "RECOVER", "FAILED", "CANCELLED"],
+    "terminal_states": [
+      "COMPLETE",
+      "RECOVER",
+      "FAILED",
+      "CANCELLED"
+    ],
     "retry_requires_attempt_identity": true,
     "timeout_is_explicit": true,
     "cancellation_is_explicit": true,
@@ -85,7 +96,8 @@
       "distribution_integrity",
       "rollback_plan",
       "observability",
-      "final_gate_aggregation"
+      "final_gate_aggregation",
+      "runtime_readiness_state_machine"
     ],
     "unknown_blocks_release": true,
     "deferred_blocks_release": true,
