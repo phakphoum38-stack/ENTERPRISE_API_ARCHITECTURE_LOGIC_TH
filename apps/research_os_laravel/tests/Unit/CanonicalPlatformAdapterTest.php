@@ -58,7 +58,7 @@ final class CanonicalPlatformAdapterTest extends TestCase
                 ->decide($this->context, 'workflow.execute', 'workflow:demo')
         );
 
-        Http::fake(['*' => Http::response([], 503)]);
+        $this->http->fake(['*' => $this->http->response([], 503)]);
         self::assertSame(
             AuthorizationDecision::UNKNOWN,
             (new CanonicalAuthorizationGateway($this->client))
@@ -94,7 +94,7 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
     public function testIdentityRequiresCanonicalIdentity(): void
     {
-        Http::fake(['*' => Http::response(['identity' => 'identity-1'], 200)]);
+        $this->http->fake(['*' => $this->http->response(['identity' => 'identity-1'], 200)]);
 
         self::assertSame(
             'identity-1',
