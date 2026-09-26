@@ -19,6 +19,7 @@ from tools.lifecycle_evidence import LifecycleEvidence, LifecycleEvidenceLedger
 from v3.research_os_v3.queue import DurableTaskQueue, LeaseOwnershipError, QueueTask
 from v3.research_os_v3.runner import StatelessResearchRunner
 from v3.worker_pool import BoundedWorkerPool, QueueSaturatedError, TaskTimeoutError, WorkerPoolClosedError
+from tools.platform_runtime_readiness import validate_readiness_sequence
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class HardeningSummary:
     failure_recovery: str
     evidence_provenance: str
     distribution_contract: str
+    runtime_readiness: str
     production_readiness: str
 
 
@@ -181,6 +183,10 @@ def validate_scale_contract(root: Path) -> tuple[str, ...]:
 
 
 def run_platform_hardening(root: Path) -> HardeningSummary:
+    readiness_failures = validate_readiness_sequence([
+        "PROCESS_START", "DEPENDENCY_READY", "IMPORT_READY",
+        "LISTENER_READY", "HEALTH_OK", "READY",
+    ])
     scale_failures = validate_scale_contract(root) + prove_100_project_scale(root)
     recovery_failures = prove_failure_recovery()
     evidence_failures = prove_evidence_provenance()
@@ -199,6 +205,7 @@ def run_platform_hardening(root: Path) -> HardeningSummary:
         failure_recovery="PASS" if not recovery_failures else "FAIL",
         evidence_provenance="PASS" if not evidence_failures else "FAIL",
         distribution_contract="PASS" if not distribution_failures else "FAIL",
+        runtime_readiness="PASS" if not readiness_failures else "FAIL",
         production_readiness=readiness,
     )
 
