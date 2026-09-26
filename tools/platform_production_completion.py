@@ -17,6 +17,9 @@ REQUIRED = (
     "current/RESEARCH_OS_PHASE_E_UNIFIED_WINDOWS_DISTRIBUTION_CONTRACT.json",
     "packages/research_os_contracts/lib/migration_contract.dart",
     "current/AEOS_ASSURANCE_OF_ASSURANCE_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json",
+    "tools/platform_runtime_readiness.py",
+    "tools/test_platform_runtime_readiness.py",
 )
 
 def validate_production_completion() -> tuple[str, ...]:
@@ -27,6 +30,8 @@ def validate_production_completion() -> tuple[str, ...]:
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     if contract.get("status") != "ACTIVE":
         failures.append("completion_contract_not_active")
+    if contract.get("required_proofs", {}).get("runtime_readiness_state_machine") is not True:
+        failures.append("runtime_readiness_proof_missing")
     failures.extend(f"missing:{p}" for p in REQUIRED if not (ROOT / p).is_file())
     gate = (ROOT / "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml").read_text(encoding="utf-8")
     validator = (ROOT / "tools/validate_research_os_unified_final_gate.py").read_text(encoding="utf-8")
@@ -42,6 +47,15 @@ def validate_production_completion() -> tuple[str, ...]:
         failures.append("completion_contract_not_bound_to_final_gate")
     if "RESEARCH_OS_PLATFORM_PRODUCTION_COMPLETION_CONTRACT.json" not in validator:
         failures.append("completion_contract_not_bound_to_validator")
+    if "runtime_readiness:" not in gate or "RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json" not in gate:
+        failures.append("runtime_readiness_not_bound_to_final_gate")
+    readiness = json.loads((ROOT / "current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json").read_text(encoding="utf-8"))
+    if readiness.get("authority", {}).get("release_authority") != "FINAL_GATE":
+        failures.append("runtime_readiness_release_authority_drift")
+    if readiness.get("authority", {}).get("may_execute") is not False:
+        failures.append("runtime_readiness_may_not_execute")
+    if readiness.get("rules", {}).get("evidence_is_projection_only") is not True:
+        failures.append("runtime_readiness_evidence_authority_drift")
     if governance.get("authority", {}).get("release_authority") != "FINAL_GATE":
         failures.append("governance_release_authority_drift")
     if completeness.get("verification_policy", {}).get("unknown_policy") != "FAIL":
