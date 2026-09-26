@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Factory;
 use ResearchOS\Platform\Contracts\AuthorizationDecision;
 use ResearchOS\Platform\Contracts\RequestContext;
 use ResearchOS\Platform\Infrastructure\CanonicalAuditGateway;
@@ -21,25 +21,26 @@ final class CanonicalPlatformAdapterTest extends TestCase
 {
     private RequestContext $context;
     private CanonicalPlatformClient $client;
+    private Factory $http;
 
     protected function setUp(): void
     {
         parent::setUp();
-        config()->set('platform.canonical.base_url', 'https://platform.example.test');
-        Http::fake();
+        $this->http = new Factory();
+        $this->http->fake();
         $this->context = new RequestContext('req-123', 'corr-456', 'owner', '1.0.0');
-        $this->client = app(CanonicalPlatformClient::class);
+        $this->client = new CanonicalPlatformClient($this->http, 'https://platform.example.test');
     }
 
     public function testAuthorizationReturnsCanonicalDecision(): void
     {
-        Http::fake(['*' => Http::response(['decision' => 'ALLOWED'], 200)]);
+        $this->http->fake(['*' => $this->http->response(['decision' => 'ALLOWED'], 200)]);
 
         $decision = (new CanonicalAuthorizationGateway($this->client))
             ->decide($this->context, 'workflow.execute', 'workflow:demo');
 
         self::assertSame(AuthorizationDecision::ALLOWED, $decision);
-        Http::assertSent(fn (Request $request) =>
+        $this->http->assertSent(fn (Request $request) =>
             $request->url() === 'https://platform.example.test/api/v1/platform/authorization/decide'
             && $request->header('X-Request-Id')[0] === 'req-123'
             && $request->header('X-Correlation-Id')[0] === 'corr-456'
@@ -49,7 +50,7 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
     public function testAuthorizationFailsClosedForTransportOrMalformedDecision(): void
     {
-        Http::fake(['*' => Http::response(['decision' => 'NOT_A_DECISION'], 200)]);
+        $this->http->fake(['*' => $this->http->response(['decision' => 'NOT_A_DECISION'], 200)]);
 
         self::assertSame(
             AuthorizationDecision::UNKNOWN,
@@ -67,7 +68,7 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
     public function testWorkflowMessagingEvidenceAndAuditRequireCanonicalIdentifiers(): void
     {
-        Http::fakeSequence()
+        $this->http->fakeSequence()
             ->push(['run_id' => 'run-1'], 200)
             ->push(['message_id' => 'msg-1'], 200)
             ->push(['evidence_id' => 'evidence-1'], 200)
