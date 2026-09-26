@@ -75,6 +75,7 @@ required_contracts:
   - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_CONTRACT.json
   - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_EVIDENCE_CONTRACT.json
   - current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
 
 required_workflows:
@@ -209,6 +210,9 @@ continuity:
   work_checkpoint_contract: current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json
   work_checkpoint_implementation: tools/platform_work_checkpoint.py
   work_checkpoint_test: tools/test_platform_work_checkpoint.py
+  continuity_workflow_contract: current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json
+  continuity_workflow_implementation: tools/platform_continuity_workflow.py
+  continuity_workflow_test: tools/test_platform_continuity_workflow.py
   chat_transcript_not_required_for_resume: true
   compact_state_only: true
   source_sha_mismatch: HOLD

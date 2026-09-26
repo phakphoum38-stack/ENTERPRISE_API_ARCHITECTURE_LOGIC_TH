@@ -163,6 +163,11 @@ def resume_checkpoint(owner_id: str, checkpoint_id: str) -> dict[str, Any]:
         failures.append("source_sha_mismatch")
     if checkpoint.get("workflow_state") == "COMPLETED":
         failures.append("already_completed")
+    if any(
+        isinstance(item, dict) and item.get("supersedes") == checkpoint_id
+        for item in list_checkpoints(owner_id)
+    ):
+        failures.append("checkpoint_superseded")
     if checkpoint.get("workflow_state") not in _STATES:
         failures.append("invalid_workflow_state")
     if checkpoint.get("supersedes"):
