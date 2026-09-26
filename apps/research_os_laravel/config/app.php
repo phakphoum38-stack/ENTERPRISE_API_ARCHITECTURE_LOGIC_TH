@@ -14,7 +14,4 @@ return [
     'maintenance' => [
         'driver' => 'file',
     ],
-    'providers' => [
-        App\Providers\AppServiceProvider::class,
-    ],
 ];
