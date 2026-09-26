@@ -234,3 +234,36 @@ Final Gate
 `docs/V3_5_SYSTEM_STRUCTURE.md`
 
 > Design Once. Build Everywhere. Scale Forever.
+
+
+## 13. Platform Work Continuity
+
+Research OS Platform persists compact resumable work checkpoints outside Chat. A checkpoint records task/workflow state, current step, completed/pending steps, evidence/context references, deferred work, source SHA, and next action. It does not store model reasoning or require the full chat transcript.
+
+The continuity rule is:
+
+```text
+Chat / Surface
+    ↓
+Platform Work Checkpoint
+    ↓
+Source SHA + Evidence + Context
+    ↓
+Resume validation
+    ↓
+Existing Workflow / Queue / Stateless Runner
+```
+
+A new session can resume only when the checkpoint is valid and its source SHA matches the current canonical revision. SHA drift, unknown/conflict, missing context, or completed checkpoints fail closed. Checkpoint storage never grants execution, authorization, merge, or release authority.
+
+Implementation:
+- `tools/platform_work_checkpoint.py`
+- `tools/test_platform_work_checkpoint.py`
+- `current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json`
+
+API:
+- `GET /v1/platform/work-checkpoints`
+- `POST /v1/platform/work-checkpoints`
+- `POST /v1/platform/work-checkpoints/resume`
+
+> Chat is an interface. Research OS Platform state and evidence are the continuity source.
