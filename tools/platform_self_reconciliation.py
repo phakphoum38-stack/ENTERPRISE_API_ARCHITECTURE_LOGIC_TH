@@ -87,7 +87,7 @@ def resolve_path(reference: str, files: Iterable[str]) -> PathResolution:
 
 
 def is_protected(path: str) -> bool:
-    normalized = path.replace("\\", "/").lstrip("./")
+    normalized = path.replace("\\", "/")
     return any(normalized == prefix.rstrip("/") or normalized.startswith(prefix) for prefix in PROTECTED_PREFIXES)
 
 
