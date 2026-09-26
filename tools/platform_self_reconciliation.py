@@ -92,7 +92,8 @@ def is_protected(path: str) -> bool:
 
 
 def extract_local_references(text: str) -> tuple[str, ...]:
-    return tuple(sorted(set(match.group(1) for match in REFERENCE_RE.finditer(text))))
+    references = {match.group(1) for match in REFERENCE_RE.finditer(text)}
+    return tuple(sorted(reference for reference in references if not reference.endswith("/")))
 
 
 def reconcile_file(path: str, files: Iterable[str], root: Path = ROOT) -> list[PathResolution]:
