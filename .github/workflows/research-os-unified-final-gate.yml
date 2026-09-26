@@ -363,7 +363,7 @@ jobs:
       - name: Route smoke
         run: php artisan route:list --path=api/v1
       - name: Platform tests
-        run: php artisan test --testsuite='Research OS Laravel Platform'
+        run: vendor/bin/phpunit --testsuite='Research OS Laravel Platform'
 
   decision:
     name: Unified release decision
