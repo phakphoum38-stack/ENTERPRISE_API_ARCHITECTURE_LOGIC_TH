@@ -18,6 +18,7 @@ class UnifiedFinalGateValidatorTest(unittest.TestCase):
         self.assertIn("UNIFIED_FINAL_GATE_CONTRACT=PASS", result.stdout)
         self.assertIn("AEOS_RECHECK=BOUND_TO_FINAL_GATE", result.stdout)
         self.assertIn("AEOS_RELEASE_AUTHORITY=FINAL_GATE", result.stdout)
+        self.assertIn("RUNTIME_RESOLUTION=BOUND_TO_PLATFORM", result.stdout)
 
 
 if __name__ == "__main__":
