@@ -55,6 +55,8 @@ class PlatformSelfReconciliationTest(unittest.TestCase):
         result = reconcile_sources()
         self.assertIn("current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json", result["sources"])
         self.assertIn("current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml", result["sources"])
+        self.assertIn("current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json", result["sources"])
+        self.assertEqual(result["component_registry"], "CONSUMED")
         self.assertIn(result["status"], {"PASS", "DRIFT"})
 
     def test_plan_rejects_ambiguous(self):
