@@ -25,14 +25,14 @@ def _navigation_entries(text: str) -> dict[str, tuple[int, str | None]]:
     entries: dict[str, tuple[int, str | None]] = {}
     for raw in matches:
         destination = re.search(r"destinationId:\s*'([^']+)'", raw)
-        index = re.findall(r"\b(\d+)\b", raw)
-        if destination is None or not index:
+        index_match = re.search(r",\s*(\d+)\s*,", raw)
+        if destination is None or index_match is None:
             fail("navigation entry is missing destinationId or stable index")
         capability = re.search(r"capabilityId:\s*'([^']+)'", raw)
         key = destination.group(1)
         if key in entries:
             fail(f"duplicate navigation destination: {key}")
-        entries[key] = (int(index[-1]), capability.group(1) if capability else None)
+        entries[key] = (int(index_match.group(1)), capability.group(1) if capability else None)
     if not entries:
         fail("navigation registry is empty")
     return entries
