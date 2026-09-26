@@ -2,6 +2,7 @@
 """Validate the complete Research OS Platform Spine as one canonical composition."""
 from __future__ import annotations
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
