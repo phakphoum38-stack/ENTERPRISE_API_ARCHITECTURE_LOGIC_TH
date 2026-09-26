@@ -8,15 +8,23 @@
     "laravel/framework": "^13.0"
   },
   "require-dev": {
+    "pestphp/pest": "^4.0",
     "phpunit/phpunit": "^12.0"
   },
   "autoload": {
     "psr-4": {
+      "App\\": "app/",
       "ResearchOS\\Platform\\": "src/Platform/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
     }
   },
   "scripts": {
     "test": "php artisan test",
-    "analyse": "php artisan about"
+    "analyse": "php artisan about",
+    "contract": "php artisan research-os:contract"
   }
 }

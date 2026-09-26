@@ -1,0 +1,12 @@
+#!/usr/bin/env php
+<?php
+
+use IlluminateFoundationApplication;
+use IlluminateFoundationConfigurationExceptions;
+use IlluminateFoundationConfigurationMiddleware;
+
+$app = require __DIR__.'/bootstrap/app.php';
+
+$status = $app->handleCommand(new Symfony\Component\Console\Input\ArgvInput);
+
+exit($status);
