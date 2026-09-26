@@ -28,12 +28,30 @@ final class AppServiceProvider extends ServiceProvider
             (float) config('platform.canonical.connect_timeout', 3),
         ));
 
-        $this->app->bind(IdentityGateway::class, CanonicalIdentityGateway::class);
-        $this->app->bind(AuthorizationGateway::class, CanonicalAuthorizationGateway::class);
-        $this->app->bind(WorkflowGateway::class, CanonicalWorkflowGateway::class);
-        $this->app->bind(MessagingGateway::class, CanonicalMessagingGateway::class);
-        $this->app->bind(EvidenceGateway::class, CanonicalEvidenceGateway::class);
-        $this->app->bind(AuditGateway::class, CanonicalAuditGateway::class);
+        $this->app->bind(IdentityGateway::class, fn ($app) => new CanonicalIdentityGateway(
+            $app->make(CanonicalPlatformClient::class),
+            (string) config('platform.endpoints.identity'),
+        ));
+        $this->app->bind(AuthorizationGateway::class, fn ($app) => new CanonicalAuthorizationGateway(
+            $app->make(CanonicalPlatformClient::class),
+            (string) config('platform.endpoints.authorization'),
+        ));
+        $this->app->bind(WorkflowGateway::class, fn ($app) => new CanonicalWorkflowGateway(
+            $app->make(CanonicalPlatformClient::class),
+            (string) config('platform.endpoints.workflow'),
+        ));
+        $this->app->bind(MessagingGateway::class, fn ($app) => new CanonicalMessagingGateway(
+            $app->make(CanonicalPlatformClient::class),
+            (string) config('platform.endpoints.messaging'),
+        ));
+        $this->app->bind(EvidenceGateway::class, fn ($app) => new CanonicalEvidenceGateway(
+            $app->make(CanonicalPlatformClient::class),
+            (string) config('platform.endpoints.evidence'),
+        ));
+        $this->app->bind(AuditGateway::class, fn ($app) => new CanonicalAuditGateway(
+            $app->make(CanonicalPlatformClient::class),
+            (string) config('platform.endpoints.audit'),
+        ));
     }
 
     public function boot(): void
