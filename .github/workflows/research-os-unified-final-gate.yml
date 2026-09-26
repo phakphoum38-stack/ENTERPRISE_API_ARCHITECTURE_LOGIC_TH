@@ -58,6 +58,11 @@ jobs:
           python tools/validate_research_os_capability_convergence.py
           python -m unittest tools.test_validate_research_os_capability_convergence -v
 
+      - name: Validate identity and access convergence wave 1
+        run: |
+          python tools/validate_research_os_identity_access_wave1.py
+          python -m unittest tools.test_validate_research_os_identity_access_wave1 -v
+
       - name: Validate unified UX and light-beam contract
         run: |
           python tools/validate_research_os_unified_ux.py
