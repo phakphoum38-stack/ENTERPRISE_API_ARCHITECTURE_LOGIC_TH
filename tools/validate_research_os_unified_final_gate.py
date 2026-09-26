@@ -43,6 +43,10 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json",
     "current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json",
+    "current/RESEARCH_OS_AUTHORIZATION_CONVERGENCE_CONTRACT.json",
+    "current/RESEARCH_OS_IDENTITY_ACCESS_WAVE_1_MAP.json",
+    "tools/validate_research_os_identity_access_wave1.py",
+    "tools/test_validate_research_os_identity_access_wave1.py",
     "current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json",
     "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
@@ -196,8 +200,7 @@ def main() -> None:
         fail("navigation registry is empty")
     if sorted(indexes) != list(range(len(indexes))):
         fail(f"navigation indexes drifted: {indexes}")
-    capability_convergence = subprocess.run(
-        [sys.executable, str(ROOT / "tools" / "validate_research_os_capability_convergence.py")],
+    identity_access = subprocess.run(\n        [sys.executable, str(ROOT / "tools" / "validate_research_os_identity_access_wave1.py")],\n        cwd=ROOT,\n        text=True,\n        capture_output=True,\n    )\n    if identity_access.returncode != 0:\n        fail(\n            "Identity/access convergence validation failed: "\n            + (identity_access.stdout or identity_access.stderr).strip()\n        )\n    capability_convergence = subprocess.run(\n        [sys.executable, str(ROOT / "tools" / "validate_research_os_capability_convergence.py")],
         cwd=ROOT,
         text=True,
         capture_output=True,
@@ -238,6 +241,7 @@ def main() -> None:
     runtime_resolution = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_platform_runtime_resolution.py")], cwd=ROOT, text=True, capture_output=True)
     if runtime_resolution.returncode != 0:
         fail("Platform runtime-resolution validation failed: " + (runtime_resolution.stdout or runtime_resolution.stderr).strip())
+    print("IDENTITY_ACCESS_WAVE_1=BOUND_TO_FINAL_GATE")
     print("M2_AUDIT=BOUND_TO_FINAL_GATE")
     print("RUNTIME_RESOLUTION=BOUND_TO_PLATFORM")
 
