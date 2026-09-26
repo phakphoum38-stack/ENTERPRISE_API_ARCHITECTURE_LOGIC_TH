@@ -28,7 +28,20 @@
       ],
       "gates": [
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "CORE",
+      "capabilities": [
+        "discover",
+        "register"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "platform_graph",
@@ -49,7 +62,20 @@
       ],
       "gates": [
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "CORE",
+      "capabilities": [
+        "inspect",
+        "dependency_graph"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "navigation",
@@ -72,7 +98,19 @@
         "flutter_surface",
         "platform_surface_matrix",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "navigate"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "product_surface",
@@ -95,7 +133,19 @@
         "flutter_surface",
         "platform_surface_matrix",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "surface_inventory"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "project_identity",
@@ -117,7 +167,19 @@
       "gates": [
         "project_scale",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "identify_project"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "workflow",
@@ -139,7 +201,19 @@
       "gates": [
         "flutter_surface",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "describe_workflow"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "evidence",
@@ -162,7 +236,23 @@
       "gates": [
         "evidence_lineage",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "record_evidence",
+        "verify_lineage"
+      ],
+      "authority": {
+        "mode": "CANONICAL",
+        "scope": [
+          "evidence"
+        ]
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "control_center",
@@ -190,7 +280,19 @@
       "gates": [
         "flutter_surface",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "operate_control_plane"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "release",
@@ -213,7 +315,22 @@
       "gates": [
         "unified_final_gate",
         "release_spine"
-      ]
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "release_gate"
+      ],
+      "authority": {
+        "mode": "CANONICAL",
+        "scope": [
+          "release"
+        ]
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "owner",
@@ -236,7 +353,22 @@
       "gates": [
         "flutter_surface",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "owner_experience"
+      ],
+      "authority": {
+        "mode": "UNBOUNDED_PRIVILEGE",
+        "scope": [
+          "owner"
+        ]
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "defect_control",
@@ -261,7 +393,19 @@
         "assurance",
         "unified_final_gate",
         "flutter_surface"
-      ]
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "defect_control"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "schedule_control",
@@ -286,7 +430,19 @@
         "project_scale",
         "unified_final_gate",
         "flutter_surface"
-      ]
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "schedule_control"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "risk_control",
@@ -311,7 +467,19 @@
         "assurance",
         "unified_final_gate",
         "flutter_surface"
-      ]
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "risk_assessment"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "change_impact_control",
@@ -336,7 +504,19 @@
       "gates": [
         "unified_final_gate",
         "flutter_surface"
-      ]
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "impact_analysis"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "memory_fabric",
@@ -361,7 +541,19 @@
       "gates": [
         "assurance",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "memory"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "universal_runner",
@@ -387,7 +579,19 @@
       "gates": [
         "assurance",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "runner_lifecycle"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "runner_installation",
@@ -412,7 +616,19 @@
       "gates": [
         "assurance",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "runner_installation"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "owner_experience_platform",
@@ -441,7 +657,19 @@
         "flutter_surface",
         "platform_surface_matrix",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "owner_platform"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     },
     {
       "id": "self_reconciliation",
@@ -467,7 +695,20 @@
       "gates": [
         "assurance",
         "unified_final_gate"
-      ]
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "reconcile",
+        "validate"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     }
   ],
   "rules": [
@@ -481,5 +722,32 @@
     "unknown_runner_capability_is_not_available",
     "cloud_drive_is_distribution_not_runtime",
     "verified_package_required_before_install"
-  ]
+  ],
+  "schema_version": 1,
+  "component_model_version": 1,
+  "count_is_informational": true,
+  "required_component_selection": "component.required == true",
+  "lifecycle_model": [
+    "PROPOSED",
+    "EXPERIMENTAL",
+    "ACTIVE",
+    "DEPRECATED",
+    "RETIRED"
+  ],
+  "classes": [
+    "CORE",
+    "PLATFORM",
+    "ASSURANCE",
+    "EXPERIENCE",
+    "EXTENSION"
+  ],
+  "registry_semantics": {
+    "single_source_of_truth": true,
+    "registry_is_descriptive_metadata": true,
+    "count_is_not_a_contract": true,
+    "required_components_are_explicit": true,
+    "optional_components_may_be_added_without_validator_changes": true,
+    "dependency_references_must_resolve": true,
+    "authority_is_explicit": true
+  }
 }

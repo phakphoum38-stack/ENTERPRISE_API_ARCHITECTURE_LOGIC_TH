@@ -18,6 +18,8 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "current" / "RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json"
+COMPONENT_REGISTRY = ROOT / "current" / "RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json"
+COMPONENT_SCHEMA = ROOT / "current" / "RESEARCH_OS_PLATFORM_COMPONENT_REGISTRY_SCHEMA.json"
 PROTECTED_PREFIXES = (
     ".github/workflows/",
     "current/RESEARCH_OS_UNIFIED_FINAL_GATE",
@@ -102,17 +104,38 @@ def reconcile_file(path: str, files: Iterable[str], root: Path = ROOT) -> list[P
 
 
 def canonical_reconciliation_targets(root: Path = ROOT) -> tuple[str, ...]:
-    """Return only existing canonical source documents; no new registry is created."""
-    governance = root / "current" / "RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json"
-    final_gate = root / "current" / "RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
-    registry = root / "current" / "PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json"
+    """Return canonical source documents, including the schema-driven component registry."""
     return tuple(
         path for path in (
             "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
             "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
             "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+            "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json",
+            "current/RESEARCH_OS_PLATFORM_COMPONENT_REGISTRY_SCHEMA.json",
         ) if (root / path).is_file()
     )
+
+def reconcile_component_registry(root: Path = ROOT) -> list[dict[str, object]]:
+    """Check registry paths and dependency references without becoming a second authority."""
+    if not COMPONENT_REGISTRY.is_file() or not COMPONENT_SCHEMA.is_file():
+        return [{"status": "MISSING", "source": "component_registry"}]
+    registry = json.loads(COMPONENT_REGISTRY.read_text(encoding="utf-8"))
+    components = registry.get("components", [])
+    ids = {item.get("id") for item in components}
+    findings: list[dict[str, object]] = []
+    if registry.get("count_is_informational") is not True:
+        findings.append({"status": "DRIFT", "finding": "component_count_policy"})
+    if registry.get("required_component_selection") != "component.required == true":
+        findings.append({"status": "DRIFT", "finding": "required_component_selection"})
+    for component in components:
+        cid = component.get("id", "<missing>")
+        canonical = component.get("canonical")
+        if component.get("lifecycle") != "RETIRED" and (not canonical or not (root / canonical).is_file()):
+            findings.append({"status": "MISSING", "component": cid, "reference": canonical})
+        for dependency in component.get("dependencies", []):
+            if dependency not in ids:
+                findings.append({"status": "MISSING", "component": cid, "dependency": dependency})
+    return findings
 
 
 def reconcile_sources(root: Path = ROOT) -> dict[str, object]:
@@ -128,12 +151,14 @@ def reconcile_sources(root: Path = ROOT) -> dict[str, object]:
                     "target": resolution.target,
                     "candidates": list(resolution.candidates),
                 })
+    findings.extend(reconcile_component_registry(root))
     return {
         "status": "PASS" if not findings else "DRIFT",
         "sources": list(canonical_reconciliation_targets(root)),
         "finding_count": len(findings),
         "findings": findings,
         "tracked_file_count": len(files),
+        "component_registry": "CONSUMED",
     }
 
 

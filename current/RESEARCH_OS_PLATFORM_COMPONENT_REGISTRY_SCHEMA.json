@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "research-os-platform-component-registry-schema-v1",
+  "title": "Research OS Platform Component Registry Schema",
+  "type": "object",
+  "required": [
+    "registry_id",
+    "schema_version",
+    "status",
+    "components",
+    "registry_semantics"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE"
+      ]
+    },
+    "count_is_informational": {
+      "type": "boolean",
+      "const": true
+    },
+    "required_component_selection": {
+      "type": "string",
+      "const": "component.required == true"
+    },
+    "lifecycle_model": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "PROPOSED",
+          "EXPERIMENTAL",
+          "ACTIVE",
+          "DEPRECATED",
+          "RETIRED"
+        ]
+      },
+      "minItems": 5
+    },
+    "classes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "CORE",
+          "PLATFORM",
+          "ASSURANCE",
+          "EXPERIENCE",
+          "EXTENSION"
+        ]
+      },
+      "minItems": 5
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "required",
+          "class",
+          "canonical",
+          "kind",
+          "lifecycle",
+          "dependencies",
+          "contracts",
+          "tests",
+          "evidence",
+          "gates",
+          "capabilities",
+          "authority",
+          "compatibility"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "class": {
+            "type": "string",
+            "enum": [
+              "CORE",
+              "PLATFORM",
+              "ASSURANCE",
+              "EXPERIENCE",
+              "EXTENSION"
+            ]
+          },
+          "canonical": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "EXPERIMENTAL",
+              "ACTIVE",
+              "DEPRECATED",
+              "RETIRED"
+            ]
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contracts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "authority": {
+            "type": "object",
+            "required": [
+              "mode"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "compatibility": {
+            "type": "object",
+            "required": [
+              "registry_schema",
+              "platform_contract"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
