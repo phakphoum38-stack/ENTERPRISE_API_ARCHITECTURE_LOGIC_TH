@@ -11,14 +11,18 @@ use RuntimeException;
 
 final class CanonicalPlatformClient
 {
-    public function __construct(private readonly Factory $http)
-    {
+    public function __construct(
+        private readonly Factory $http,
+        private readonly string $baseUrl,
+        private readonly float $timeout = 10.0,
+        private readonly float $connectTimeout = 3.0,
+    ) {
     }
 
     /** @param array<string, mixed> $payload */
     public function post(RequestContext $context, string $endpoint, array $payload): array
     {
-        $baseUrl = rtrim((string) config('platform.canonical.base_url', ''), '/');
+        $baseUrl = rtrim($this->baseUrl, '/');
         if ($baseUrl === '') {
             throw new RuntimeException('Canonical Research OS Platform URL is not configured.');
         }
@@ -39,8 +43,8 @@ final class CanonicalPlatformClient
         return $this->http
             ->acceptJson()
             ->asJson()
-            ->timeout((float) config('platform.canonical.timeout', 10))
-            ->connectTimeout((float) config('platform.canonical.connect_timeout', 3))
+            ->timeout($this->timeout)
+            ->connectTimeout($this->connectTimeout)
             ->withHeaders([
                 'X-Request-Id' => $context->requestId,
                 'X-Correlation-Id' => $context->correlationId,
