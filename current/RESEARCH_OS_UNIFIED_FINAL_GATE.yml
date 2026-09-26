@@ -76,6 +76,7 @@ required_contracts:
   - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_EVIDENCE_CONTRACT.json
   - current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -192,6 +193,18 @@ owner_special:
   unknown_state: HOLD
   sha_mismatch: STOP
 
+runtime_readiness:
+  contract: current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
+  implementation: tools/platform_runtime_readiness.py
+  test: tools/test_platform_runtime_readiness.py
+  unknown_state: STOP
+  invalid_transition: STOP
+  health_required_before_ready: true
+  source_sha_required: true
+  correlation_id_required: true
+  evidence_is_projection_only: true
+  release_authority_remains: final_gate
+
 continuity:
   contract: current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json
   work_checkpoint_contract: current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json
@@ -209,3 +222,14 @@ continuity:
   chat_is_not_source_of_truth: true
   source_sha_mismatch: HOLD
   deferred_work_must_be_preserved: true
+
+operationalization:
+  contract: current/PLATFORM_OPERATIONALIZATION_CONTRACT.json
+  implementation: tools/platform_operationalization.py
+  validator: tools/validate_platform_operationalization.py
+  test: tools/test_platform_operationalization.py
+  source_sha_required: true
+  chat_is_not_source_of_truth: true
+  unknown_state: HOLD
+  sha_mismatch: HOLD
+  release_authority_remains: final_gate
