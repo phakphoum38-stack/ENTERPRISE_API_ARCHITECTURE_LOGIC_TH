@@ -40,7 +40,7 @@ REQUIRED_IDS=(
 "platform_workspace","platform_graph","navigation","product_surface","project_identity",
 "workflow","evidence","control_center","release","owner","defect_control","schedule_control",
 "risk_control","change_impact_control","memory_fabric","universal_runner","runner_installation",
-"owner_experience_platform",
+"owner_experience_platform","self_reconciliation",
 )
 
 def fail(msg:str)->None:
@@ -84,7 +84,7 @@ def main()->None:
         fail("platform architecture audit is not bound to Unified Final Gate")
     required_contract_ids=contract["required_component_ids"]
     if len(required_contract_ids) != len(REQUIRED_IDS) or len(set(required_contract_ids)) != len(required_contract_ids):
-        fail("audit contract required component ids must be exactly 18 unique ids")
+        fail("audit contract required component ids must match the canonical component inventory")
     if set(required_contract_ids) != set(REQUIRED_IDS):
         fail("audit contract component set drifted")
     inv_text=json.dumps(inv)
