@@ -413,6 +413,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2ErrorEnvelope'
 
+  /v1/platform/work-checkpoints:
+    get:
+      summary: List authenticated owner's compact Platform work checkpoints
+      parameters:
+        - name: task_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Checkpoint history
+        "401":
+          description: Valid Research OS session required
+    post:
+      summary: Persist one compact resumable Platform work checkpoint
+      description: Stores state, references and provenance; chat transcripts and model reasoning are not stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformWorkCheckpointInput'
+      responses:
+        "201":
+          description: Checkpoint persisted
+        "400":
+          description: Invalid checkpoint
+        "401":
+          description: Valid Research OS session required
+  /v1/platform/work-checkpoints/resume:
+    post:
+      summary: Validate and resume an authenticated owner's checkpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checkpoint_id]
+              properties:
+                checkpoint_id:
+                  type: string
+      responses:
+        "200":
+          description: Resume decision
+        "400":
+          description: Invalid request
+        "401":
+          description: Valid Research OS session required
+        "404":
+          description: Checkpoint not found
+
 components:
   parameters:
     RunId:
@@ -528,6 +581,268 @@ components:
         "404":
           description: Orchestration run not found
   schemas:
+    PlatformWorkCheckpointInput:
+      type: object
+      required: [task_id, workflow_state, current_step]
+      properties:
+        task_id:
+          type: string
+        workflow_state:
+          type: string
+          enum: [ACTIVE, PAUSED, BLOCKED, DEFERRED, COMPLETED]
+        current_step:
+          type: string
+        completed_steps:
+          type: array
+          items:
+            type: string
+        pending_steps:
+          type: array
+          items:
+            type: string
+        evidence_refs:
+          type: array
+          items:
+            type: string
+        deferred_work:
+          type: array
+          items:
+            type: string
+        context_refs:
+          type: array
+          items:
+            type: string
+        next_action:
+          type: string
+        source_sha:
+          type: string
+          pattern: '^[0-9a-f]{40}      type: object
+      required: [objective]
+      properties:
+        step_id:
+          type: string
+        objective:
+          type: string
+          minLength: 1
+        requested_agent:
+          type: [string, 'null']
+        depends_on:
+          type: array
+          items:
+            type: string
+        context:
+          type: object
+          additionalProperties: true
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+          description: Maximum explicit execution attempts for this delegated step.
+    V2OrchestrationRun:
+      type: object
+      required: [run_id, objective, status, steps]
+      properties:
+        run_id:
+          type: string
+        objective:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: number
+        updated_at:
+          type: number
+        steps:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    V2PageMetadata:
+      type: object
+      required: [page_size, returned]
+      properties:
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        returned:
+          type: integer
+          minimum: 0
+        next_cursor:
+          type: [string, 'null']
+    V2OrchestrationPage:
+      type: object
+      required: [api_version, items, page, filters]
+      properties:
+        api_version:
+          const: v2
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2OrchestrationRun'
+        page:
+          $ref: '#/components/schemas/V2PageMetadata'
+        filters:
+          type: object
+          additionalProperties: true
+    V2AgentCatalog:
+      type: object
+      required: [api_version, agents, count]
+      properties:
+        api_version:
+          const: v2
+        count:
+          type: integer
+          minimum: 0
+        agents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    V2Workspace:
+      type: object
+      required: [workspace_id, name, created_at, updated_at]
+      properties:
+        workspace_id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        created_at:
+          type: number
+        updated_at:
+          type: number
+    V2WorkspaceList:
+      type: object
+      required: [api_version, workspaces, count]
+      properties:
+        api_version:
+          const: v2
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2Workspace'
+        count:
+          type: integer
+          minimum: 0
+    V2Provenance:
+      type: object
+      required: [source_type, source_id, evidence, imported_at]
+      properties:
+        source_type:
+          type: string
+        source_id:
+          type: string
+        source_path:
+          type: [string, 'null']
+        evidence:
+          type: array
+          items:
+            type: string
+        imported_at:
+          type: number
+    V2KnowledgeRecord:
+      type: object
+      required: [record_id, workspace_id, kind, title, content, content_hash, provenance, tags, updated_at, score]
+      properties:
+        record_id:
+          type: string
+        workspace_id:
+          type: string
+        kind:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        content_hash:
+          type: string
+        provenance:
+          $ref: '#/components/schemas/V2Provenance'
+        tags:
+          type: array
+          items:
+            type: string
+        updated_at:
+          type: number
+        score:
+          type: integer
+          minimum: 0
+    V2KnowledgePage:
+      type: object
+      required: [api_version, workspace_id, items, page, filters]
+      properties:
+        api_version:
+          const: v2
+        workspace_id:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2KnowledgeRecord'
+        page:
+          $ref: '#/components/schemas/V2PageMetadata'
+        filters:
+          type: object
+          required: [q, kinds]
+          properties:
+            q:
+              type: string
+            kinds:
+              type: array
+              items:
+                type: string
+    V2Readiness:
+      type: object
+      required: [api_version, version, ready, runtime, agents, provider, storage, checked_at]
+      properties:
+        api_version:
+          const: v2
+        version:
+          type: string
+        ready:
+          type: boolean
+        runtime:
+          type: object
+          additionalProperties: true
+        agents:
+          type: object
+          additionalProperties: true
+        provider:
+          type: object
+          additionalProperties: true
+        storage:
+          type: object
+          additionalProperties: true
+        checked_at:
+          type: number
+    V2ErrorEnvelope:
+      type: object
+      required: [api_version, error]
+      properties:
+        api_version:
+          const: v2
+        error:
+          type: object
+          required: [code, message, status]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            status:
+              type: integer
+
+        supersedes:
+          type: [string, 'null']
+
     DelegatedStepInput:
       type: object
       required: [objective]
