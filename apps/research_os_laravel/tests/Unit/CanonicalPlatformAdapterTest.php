@@ -54,15 +54,24 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
     public function testAuthorizationFailsClosedForTransportOrMalformedDecision(): void
     {
-        $this->http->fake(['*' => $this->http->response(['decision' => 'NOT_A_DECISION'], 200)]);
-
+        $this->client = new CanonicalPlatformClient(
+            $this->http,
+            'https://platform.example.test',
+            transport: fn (RequestContext $context, string $endpoint, array $payload): array => ['decision' => 'NOT_A_DECISION'],
+        );
         self::assertSame(
             AuthorizationDecision::UNKNOWN,
             (new CanonicalAuthorizationGateway($this->client, '/api/v1/platform/authorization/decide'))
                 ->decide($this->context, 'workflow.execute', 'workflow:demo')
         );
 
-        $this->http->fake(['*' => $this->http->response([], 503)]);
+        $this->client = new CanonicalPlatformClient(
+            $this->http,
+            'https://platform.example.test',
+            transport: function (RequestContext $context, string $endpoint, array $payload): array {
+                throw new \RuntimeException('transport down');
+            },
+        );
         self::assertSame(
             AuthorizationDecision::UNKNOWN,
             (new CanonicalAuthorizationGateway($this->client, '/api/v1/platform/authorization/decide'))
