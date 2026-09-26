@@ -84,6 +84,14 @@ The following states cannot silently become success:
 3. Workflow observability must not become workflow self-dispatch.
 4. No hidden autonomous work is considered valid without observable output/evidence.
 
+## Article XIII — Platform Self-Reconciliation
+
+1. Recon is the structural source for repository path/reference resolution; AI must not be treated as the structural source of truth.
+2. Automatic repair is limited to deterministic, uniquely resolvable defects.
+3. Ambiguous, protected, security-sensitive, or semantically uncertain findings fail closed.
+4. Automatic repair requires isolation, snapshot/rollback, post-repair Recon, validation, and evidence.
+5. Self-reconciliation cannot grant authorization, approval, merge, or release authority.
+
 ## Article XII — Release Rule
 
 > No agent can create, modify, or reinterpret evidence in a way that grants itself approval or release authority.
