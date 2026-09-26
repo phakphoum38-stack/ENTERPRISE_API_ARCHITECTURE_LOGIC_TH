@@ -100,6 +100,42 @@ def reconcile_file(path: str, files: Iterable[str], root: Path = ROOT) -> list[P
     return [resolve_path(reference, files) for reference in extract_local_references(text)]
 
 
+def canonical_reconciliation_targets(root: Path = ROOT) -> tuple[str, ...]:
+    """Return only existing canonical source documents; no new registry is created."""
+    governance = root / "current" / "RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json"
+    final_gate = root / "current" / "RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+    registry = root / "current" / "PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json"
+    return tuple(
+        path for path in (
+            "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+            "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+            "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+        ) if (root / path).is_file()
+    )
+
+
+def reconcile_sources(root: Path = ROOT) -> dict[str, object]:
+    files = tracked_files(root)
+    findings: list[dict[str, object]] = []
+    for source in canonical_reconciliation_targets(root):
+        for resolution in reconcile_file(source, files, root):
+            if resolution.status != "FOUND":
+                findings.append({
+                    "source": source,
+                    "reference": resolution.requested,
+                    "status": resolution.status,
+                    "target": resolution.target,
+                    "candidates": list(resolution.candidates),
+                })
+    return {
+        "status": "PASS" if not findings else "DRIFT",
+        "sources": list(canonical_reconciliation_targets(root)),
+        "finding_count": len(findings),
+        "findings": findings,
+        "tracked_file_count": len(files),
+    }
+
+
 def build_plan(
     source_sha: str,
     owner_file: str,
@@ -137,7 +173,12 @@ def main() -> int:
     parser.add_argument("--reference")
     parser.add_argument("--file")
     parser.add_argument("--source-sha", default="UNKNOWN")
+    parser.add_argument("--scan", action="store_true")
     args = parser.parse_args()
+
+    if args.scan:
+        print(json.dumps(reconcile_sources(), sort_keys=True))
+        return 0 if reconcile_sources()["status"] == "PASS" else 1
 
     files = tracked_files()
     if args.reference:
