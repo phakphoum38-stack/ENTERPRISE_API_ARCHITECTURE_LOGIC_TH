@@ -21,7 +21,7 @@ final class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(CanonicalPlatformClient::class);
+        $this->app->singleton(CanonicalPlatformClient::class, fn () => new CanonicalPlatformClient(\n            $this->app->make(\Illuminate\\Http\\Client\\Factory::class),\n            (string) config('platform.canonical.base_url', ''),\n            (float) config('platform.canonical.timeout', 10),\n            (float) config('platform.canonical.connect_timeout', 3),\n        ));
 
         $this->app->bind(IdentityGateway::class, CanonicalIdentityGateway::class);
         $this->app->bind(AuthorizationGateway::class, CanonicalAuthorizationGateway::class);
