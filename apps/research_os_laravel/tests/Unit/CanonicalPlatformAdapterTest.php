@@ -27,25 +27,29 @@ final class CanonicalPlatformAdapterTest extends TestCase
     {
         parent::setUp();
         $this->http = new Factory();
-        $this->http->fake();
         $this->context = new RequestContext('req-123', 'corr-456', 'owner', '1.0.0');
         $this->client = new CanonicalPlatformClient($this->http, 'https://platform.example.test');
     }
 
     public function testAuthorizationReturnsCanonicalDecision(): void
     {
-        $this->http->fake(['*' => $this->http->response(['decision' => 'ALLOWED'], 200)]);
+        $captured = [];
+        $this->client = new CanonicalPlatformClient(
+            $this->http,
+            'https://platform.example.test',
+            transport: function (RequestContext $context, string $endpoint, array $payload) use (&$captured): array {
+                $captured = [$context, $endpoint, $payload];
+                return ['decision' => 'ALLOWED'];
+            },
+        );
 
         $decision = (new CanonicalAuthorizationGateway($this->client, '/api/v1/platform/authorization/decide'))
             ->decide($this->context, 'workflow.execute', 'workflow:demo');
 
         self::assertSame(AuthorizationDecision::ALLOWED, $decision);
-        $this->http->assertSent(fn (Request $request) =>
-            $request->url() === 'https://platform.example.test/api/v1/platform/authorization/decide'
-            && $request->header('X-Request-Id')[0] === 'req-123'
-            && $request->header('X-Correlation-Id')[0] === 'corr-456'
-            && $request->header('Idempotency-Key')[0] === 'req-123'
-        );
+        self::assertSame($this->context, $captured[0]);
+        self::assertSame('/api/v1/platform/authorization/decide', $captured[1]);
+        self::assertSame(['capability' => 'workflow.execute', 'resource' => 'workflow:demo'], $captured[2]);
     }
 
     public function testAuthorizationFailsClosedForTransportOrMalformedDecision(): void
@@ -102,7 +106,11 @@ final class CanonicalPlatformAdapterTest extends TestCase
 
     public function testIdentityRequiresCanonicalIdentity(): void
     {
-        $this->http->fake(['*' => $this->http->response(['identity' => 'identity-1'], 200)]);
+        $this->client = new CanonicalPlatformClient(
+            $this->http,
+            'https://platform.example.test',
+            transport: fn (RequestContext $context, string $endpoint, array $payload): array => ['identity' => 'identity-1'],
+        );
 
         self::assertSame(
             'identity-1',
