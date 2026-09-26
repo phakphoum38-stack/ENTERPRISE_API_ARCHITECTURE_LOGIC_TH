@@ -48,7 +48,8 @@
     "unknown_or_conflict": "HOLD",
     "stale_evidence": "HOLD",
     "missing_context": "HOLD",
-    "completed_checkpoint": "HOLD"
+    "completed_checkpoint": "HOLD",
+    "superseded_checkpoint": "HOLD"
   },
   "integration": {
     "context_recovery": "current/RESEARCH_OS_CONTEXT_RECOVERY.json",
