@@ -20,7 +20,7 @@ def build()->dict:
             "provenance": bool(item.get("canonical") and item.get("evidence")),
             "gate": bool(item.get("gates")),
         }
-        components.append({"id":item.get("id"),"lifecycle":item.get("lifecycle"),"dependencies":item.get("dependencies",[]),"coverage":coverage})
+        components.append({"id":item.get("id"),"required":item.get("required",False),"class":item.get("class"),"lifecycle":item.get("lifecycle"),"capabilities":item.get("capabilities",[]),"authority":item.get("authority",{}),"compatibility":item.get("compatibility",{}),"dependencies":item.get("dependencies",[]),"coverage":coverage})
     return {"registry_id":data.get("registry_id"),"required_dimensions":list(REQUIRED),"components":components,"component_count":len(components)}
 def main()->int:
     p=argparse.ArgumentParser(description=__doc__); p.add_argument("--json",action="store_true"); a=p.parse_args()
