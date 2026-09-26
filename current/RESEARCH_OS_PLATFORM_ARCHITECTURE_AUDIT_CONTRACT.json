@@ -4,7 +4,7 @@
   "status":"ACTIVE",
   "purpose":"Single platform-level integrity contract reconciling existing Research OS Platform components, contracts, execution/evidence planes, product surfaces, governance, scale readiness, distribution and Unified Final Gate without duplicate authority.",
   "scope":["PLATFORM_CORE","CONTROL_PLANE","EXECUTION_PLANE","EVIDENCE_AND_ASSURANCE","PRODUCT_SURFACES","GOVERNANCE","100_PROJECT_SCALE","UNIFIED_DISTRIBUTION"],
-  "required_component_ids":["platform_workspace","platform_graph","navigation","product_surface","project_identity","workflow","evidence","control_center","release","owner","defect_control","schedule_control","risk_control","change_impact_control","memory_fabric","universal_runner","runner_installation","owner_experience_platform"],
+  "required_component_ids":["platform_workspace","platform_graph","navigation","product_surface","project_identity","workflow","evidence","control_center","release","owner","defect_control","schedule_control","risk_control","change_impact_control","memory_fabric","universal_runner","runner_installation","owner_experience_platform","self_reconciliation"],
   "required_invariants":{
     "single_final_gate":true,"shared_execution_plane":true,"shared_evidence_plane":true,
     "owner_is_unbounded_privilege_boundary":true,"resource_conflict_is_reject_and_release":true,

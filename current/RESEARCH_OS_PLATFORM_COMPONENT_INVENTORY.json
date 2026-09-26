@@ -7,7 +7,8 @@
     "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
     "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
     "tools/platform_graph.py",
-    "current/ARCHITECTURE_INVARIANTS.md"
+    "current/ARCHITECTURE_INVARIANTS.md",
+    "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json"
   ],
   "components": [
     {
@@ -439,6 +440,32 @@
       "gates": [
         "flutter_surface",
         "platform_surface_matrix",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "id": "self_reconciliation",
+      "canonical": "tools/platform_self_reconciliation.py",
+      "kind": "RECONCILIATION_ENGINE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace",
+        "platform_graph",
+        "change_impact_control",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_self_reconciliation.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION.md",
+        "tools/validate_platform_self_reconciliation.py"
+      ],
+      "gates": [
+        "assurance",
         "unified_final_gate"
       ]
     }

@@ -47,6 +47,14 @@ This document defines architectural rules that must remain true across Friend Se
 - **INV-024 — Evidence coverage is attributable:** Completeness requires implementation, test, contract, evidence, provenance, and applicable gate coverage.
 - **INV-025 — Governance is non-authoritative:** Governance validators may fail closed and report evidence, but cannot execute, authorize, approve, merge, or release.
 
+## Self-Reconciliation
+
+- **INV-026 — Recon before repair:** Structural repair must resolve the target against canonical repository state before mutation.
+- **INV-027 — Deterministic repair only:** Automatic repair requires exactly one safe target and a minimal bounded replacement.
+- **INV-028 — Protected-core fail closed:** Authorization, owner privilege, evidence/audit integrity, security boundaries, and release authority cannot be auto-repaired.
+- **INV-029 — Post-repair reconciliation:** Every applied repair must be reconciled and validated again before promotion.
+- **INV-030 — Repair reversibility:** Automatic repair must be performed in an isolated repair context with snapshot/rollback evidence.
+
 ## Enforcement Principle
 
 Each invariant should be enforced by the narrowest appropriate mechanism:
