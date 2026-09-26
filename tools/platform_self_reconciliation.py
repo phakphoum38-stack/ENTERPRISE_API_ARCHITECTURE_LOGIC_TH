@@ -177,8 +177,9 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.scan:
-        print(json.dumps(reconcile_sources(), sort_keys=True))
-        return 0 if reconcile_sources()["status"] == "PASS" else 1
+        result = reconcile_sources()
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["status"] == "PASS" else 1
 
     files = tracked_files()
     if args.reference:
