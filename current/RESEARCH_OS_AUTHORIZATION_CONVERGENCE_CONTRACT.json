@@ -1,0 +1,40 @@
+{
+  "contract_id": "research-os-auth-authorization-convergence-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Converge existing server-derived authentication and authorization boundaries into the canonical Research OS surface without moving authority into Flutter or creating a duplicate policy/runtime.",
+  "identity": {
+    "authentication_authority": "tools/research_os_api/api_auth.py",
+    "session_verification": "tools/research_os_api/auth_session.py",
+    "identity_context": "tools/research_os_api/identity_context.py",
+    "status_endpoint": "/v1/auth/status",
+    "server_derived": true
+  },
+  "authorization": {
+    "authority": "owner_special/research_os_friend/policy.py:OwnerPolicy",
+    "approval_authority": "ApprovalGate",
+    "execution_authority": "FriendOrchestrator",
+    "flutter_may_observe": true,
+    "flutter_may_grant": false,
+    "flutter_may_authorize": false,
+    "flutter_may_execute": false
+  },
+  "owner": {
+    "identity_source": "/v1/auth/status",
+    "role": "OWNER",
+    "highest_privilege": true,
+    "resource_or_scope_bound": false,
+    "client_may_grant_authority": false
+  },
+  "canonical_surface": {
+    "navigation_destination_id": "google_sign_in",
+    "capability_id": "auth",
+    "ui_root": "apps/research_os_flutter",
+    "api_client": "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
+  },
+  "rules": ["identity_must_be_server_derived", "authentication_and_authorization_are_distinct", "authorization_remains_outside_flutter", "owner_is_unbounded_by_resource_or_scope", "unknown_identity_is_fail_closed", "unknown_authorization_is_fail_closed", "no_new_runtime", "no_new_authorization_authority", "no_new_navigation_registry", "capability_id_is_identity_metadata_only"],
+  "verification": {
+    "validator": "tools/validate_research_os_auth_authorization_convergence.py",
+    "test": "tools/test_validate_research_os_auth_authorization_convergence.py"
+  }
+}
