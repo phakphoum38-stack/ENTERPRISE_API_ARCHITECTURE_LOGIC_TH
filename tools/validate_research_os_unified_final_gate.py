@@ -60,6 +60,9 @@ REQUIRED_FILES = (
     "tools/validate_platform_service.py",
     "tools/test_platform_service.py",
     "tools/validate_platform_runtime_resolution.py",
+    "current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json",
+    "tools/platform_runtime_readiness.py",
+    "tools/test_platform_runtime_readiness.py",
     "tools/test_validate_platform_runtime_resolution.py",
     "tools/test_validate_platform_service.py",
     "tools/platform_operationalization.py",
@@ -229,6 +232,25 @@ def main() -> None:
         fail("platform governance validation failed: " + (governance.stdout or governance.stderr).strip())
     if "m2_audit:" not in text or "m2_audit_integrity_failure: STOP" not in text:
         fail("M.2 audit binding is incomplete")
+    runtime_markers = (
+        "runtime_readiness:",
+        "current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json",
+        "tools/platform_runtime_readiness.py",
+        "tools/test_platform_runtime_readiness.py",
+        "health_required_before_ready: true",
+        "evidence_is_projection_only: true",
+    )
+    missing_runtime = [marker for marker in runtime_markers if marker not in text]
+    if missing_runtime:
+        fail("runtime readiness binding is incomplete: " + ", ".join(missing_runtime))
+    runtime_test = subprocess.run(
+        [sys.executable, "-m", "unittest", "tools.test_platform_runtime_readiness", "-v"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if runtime_test.returncode != 0:
+        fail("runtime readiness validation failed: " + (runtime_test.stdout or runtime_test.stderr).strip())
     owner_special_bindings = (
         "  - .github/workflows/owner-special-build-identity-gate.yml",
         "  - .github/workflows/owner-special-friend.yml",
