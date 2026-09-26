@@ -80,6 +80,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -104,6 +105,8 @@ required_surface_contracts:
   - tools/test_validate_research_os_identity_access_wave1.py
   - tools/validate_research_os_platform_one_pass.py
   - tools/test_research_os_platform_one_pass.py
+  - tools/platform_spine.py
+  - tools/test_platform_spine.py
 
 assurance_recheck:
   authority: existing_aeos_master_assurance
@@ -264,4 +267,17 @@ platform_one_pass_completion:
   duplicate_evidence_forbidden: true
   duplicate_queue_forbidden: true
   duplicate_registry_authority_forbidden: true
+  release_authority_remains: final_gate
+
+platform_spine_engine:
+  contract: current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json
+  implementation: tools/platform_spine.py
+  test: tools/test_platform_spine.py
+  descriptive_validating_only: true
+  dependency_cycles: STOP
+  forbidden_plane_edges: STOP
+  unknown_impact: HOLD
+  breaking_change_without_migration: STOP
+  health_is_not_authorization: true
+  high_impact_requires_simulation: true
   release_authority_remains: final_gate
