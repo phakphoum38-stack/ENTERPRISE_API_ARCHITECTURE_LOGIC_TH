@@ -202,7 +202,18 @@ def main() -> None:
         fail("navigation registry is empty")
     if sorted(indexes) != list(range(len(indexes))):
         fail(f"navigation indexes drifted: {indexes}")
-    identity_access = subprocess.run(\n        [sys.executable, str(ROOT / "tools" / "validate_research_os_identity_access_wave1.py")],\n        cwd=ROOT,\n        text=True,\n        capture_output=True,\n    )\n    if identity_access.returncode != 0:\n        fail(\n            "Identity/access convergence validation failed: "\n            + (identity_access.stdout or identity_access.stderr).strip()\n        )\n    capability_convergence = subprocess.run(\n        [sys.executable, str(ROOT / "tools" / "validate_research_os_capability_convergence.py")],
+    identity_access = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "validate_research_os_identity_access_wave1.py")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if identity_access.returncode != 0:
+        fail(
+            "Identity/access convergence validation failed: "
+            + (identity_access.stdout or identity_access.stderr).strip()
+        )
+    capability_convergence = subprocess.run(\n        [sys.executable, str(ROOT / "tools" / "validate_research_os_capability_convergence.py")],
         cwd=ROOT,
         text=True,
         capture_output=True,
