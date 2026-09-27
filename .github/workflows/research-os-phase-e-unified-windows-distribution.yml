@@ -18,7 +18,7 @@ on:
       - "tools/**"
       - "v3/**"
       - "current/**"
-      - "installer/research-os-unified.iss"
+      - "owner_special/installer/owner-special-platform.iss"
       - "scripts/**"
 
 permissions:
