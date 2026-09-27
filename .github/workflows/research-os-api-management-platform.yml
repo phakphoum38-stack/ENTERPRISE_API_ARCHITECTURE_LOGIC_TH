@@ -22,5 +22,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: python tools/validate_research_os_api_management_platform.py
-      - run: python -m unittest tools.research_os_api.api_platform.test_management_service -v
+      - run: python -m unittest tools.research_os_api.api_platform.test_management_service tools.research_os_api.test_api_key_durable_store -v
       - run: python tools/validate_research_os_unified_final_gate.py
