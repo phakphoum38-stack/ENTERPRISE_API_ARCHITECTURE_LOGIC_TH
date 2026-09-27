@@ -1,0 +1,35 @@
+{
+  "contract_id": "research-os-platform-digital-twin-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "purpose": "Read-only deterministic shadow projection of the canonical Platform registry and dependency graph for impact analysis, simulation and future-state planning.",
+  "authority": {
+    "mode": "READ_ONLY_PROJECTION",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "sources": [
+    "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json",
+    "current/RESEARCH_OS_PLATFORM_COMPONENT_REGISTRY_SCHEMA.json",
+    "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+    "tools/platform_spine.py"
+  ],
+  "operations": [
+    "snapshot",
+    "impact",
+    "simulate"
+  ],
+  "invariants": [
+    "canonical_registry_is_source_of_truth",
+    "projection_is_deterministic",
+    "projection_never_mutates_runtime_state",
+    "projection_never_grants_authority",
+    "unknown_targets_hold",
+    "cross_project_simulation_remains_required",
+    "final_gate_remains_release_authority"
+  ]
+}
