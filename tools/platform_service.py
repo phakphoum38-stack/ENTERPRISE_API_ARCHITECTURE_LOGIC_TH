@@ -77,10 +77,8 @@ class PlatformService:
             "repository": "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH",
             "source_sha": canonical_sha(),
             "protected_baseline_sha": canonical_sha(),
-            "active_work": ["platform-complete-build"],
-            "deferred_work": [
-                "flutter_windows_analyze_test_failures",
-            ],
+            "active_work": [],
+            "deferred_work": [],
             "decisions": [
                 "platform_is_the_reusable_root",
                 "research_os_is_a_product_surface",
@@ -96,6 +94,7 @@ class PlatformService:
                 "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
                 "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
                 "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+                "current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json",
             ],
             "open_risks": [],
             "unknowns": [],
