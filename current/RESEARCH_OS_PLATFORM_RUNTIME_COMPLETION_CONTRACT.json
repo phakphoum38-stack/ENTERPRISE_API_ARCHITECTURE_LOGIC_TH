@@ -1,0 +1,12 @@
+{
+  "contract_id":"research-os-platform-runtime-completion-v1",
+  "version":"1.0.0",
+  "status":"ACTIVE",
+  "purpose":"Complete the executable Platform runtime layer by composing existing canonical authorities.",
+  "authority":{"mode":"DESCRIPTIVE_VALIDATING","may_execute":false,"may_authorize":false,"may_approve":false,"may_merge":false,"may_release":false,"release_authority":"FINAL_GATE"},
+  "laravel":{"implementation":"apps/research_os_laravel","modules":["Tools","Control","Operations","Configuration","Versioning","Observability"],"canonical_platform_remains_authority":true},
+  "runtime":{"engine_to_queue_to_stateless_worker":true,"direct_engine_to_runner":false,"idempotency_required":true,"resource_conflict_fail_closed":true},
+  "context":{"request_id":true,"correlation_id":true,"actor":true,"contract_version":true},
+  "unknown_state":"HOLD",
+  "release_authority":"FINAL_GATE"
+}
