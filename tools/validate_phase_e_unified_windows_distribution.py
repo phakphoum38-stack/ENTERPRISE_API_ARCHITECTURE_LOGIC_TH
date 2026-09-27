@@ -128,8 +128,11 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
         errors.append("legacy Owner Special UI identity remains in canonical Platform Setup")
     if not (root / "apps/research_os_flutter").is_dir():
         errors.append("canonical Platform UI root is missing")
-    if not (root / "assets/branding/research_os.ico").is_file():
-        errors.append("canonical Research OS branding icon is missing")
+    if not (root / "apps/research_os_flutter/assets/branding/research_os_master.webp").is_file():
+        errors.append("canonical Research OS master branding asset is missing")
+    branding_script = root / "scripts/apply-research-os-branding.py"
+    if not branding_script.is_file():
+        errors.append("canonical Research OS branding generator is missing")
 
     workflow = _read_phase_e_workflow(root)
     for marker in (
@@ -147,6 +150,8 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
         "WINDOWS_INSTALL_E2E_EVIDENCE.json",
         "Verify canonical Platform UI binding for Owner Special Setup",
         "OWNER_SPECIAL_PLATFORM_UI=PASS",
+        "Generate canonical Platform installer branding",
+        "Canonical Platform installer branding generation failed.",
     ):
         if marker not in workflow:
             errors.append(f"Phase E workflow missing required marker: {marker}")
