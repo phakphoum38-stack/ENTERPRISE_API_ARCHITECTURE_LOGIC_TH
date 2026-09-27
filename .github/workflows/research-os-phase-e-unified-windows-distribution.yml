@@ -317,7 +317,22 @@ jobs:
 
           $setupLog = Join-Path $env:RUNNER_TEMP 'research-os-owner-platform-setup.log'
           $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /TASKS="desktopicon" /LOG="' + $setupLog + '"'
-          $process = Start-Process -FilePath $setup.FullName -ArgumentList $arguments -Wait -PassThru
+          $process = Start-Process -FilePath $setup.FullName -ArgumentList $arguments -PassThru
+          $deadline = (Get-Date).AddMinutes(8)
+          while (-not $process.HasExited -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 10
+            $process.Refresh()
+            if (Test-Path $setupLog) { Get-Content $setupLog -Tail 40 | Out-Host }
+          }
+          if (-not $process.HasExited) {
+            Write-Host '--- Owner Special Setup timeout diagnostics ---'
+            if (Test-Path $setupLog) { Get-Content $setupLog -Tail 200 | Out-Host }
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+              Where-Object { $_.ExecutablePath -like "$installRoot*" -or $_.CommandLine -like "*$installRoot*" -or $_.Name -in @('Setup.tmp','powershell.exe','ResearchOS.ServiceHost.exe','ResearchOS.Owner.ServiceHost.exe') } |
+              Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw 'Owner Special Setup exceeded 8 minute E2E timeout.'
+          }
           if ($process.ExitCode -ne 0) {
             if (Test-Path $setupLog) { Get-Content $setupLog -Tail 200 | Out-Host }
             throw "Installer exited with code $($process.ExitCode)."
@@ -441,7 +456,20 @@ jobs:
 
           $uninstaller = Join-Path $installRoot 'unins000.exe'
           if (-not (Test-Path $uninstaller)) { throw 'Inno Setup uninstaller missing.' }
-          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -PassThru
+          $uninstallDeadline = (Get-Date).AddMinutes(5)
+          while (-not $uninstall.HasExited -and (Get-Date) -lt $uninstallDeadline) {
+            Start-Sleep -Seconds 5
+            $uninstall.Refresh()
+          }
+          if (-not $uninstall.HasExited) {
+            Write-Host '--- Uninstaller timeout diagnostics ---'
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+              Where-Object { $_.ExecutablePath -like "$installRoot*" -or $_.CommandLine -like "*$installRoot*" -or $_.Name -in @('powershell.exe','ResearchOS.ServiceHost.exe','ResearchOS.Owner.ServiceHost.exe') } |
+              Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
+            Stop-Process -Id $uninstall.Id -Force -ErrorAction SilentlyContinue
+            throw 'Research OS uninstaller exceeded 5 minute E2E timeout.'
+          }
           if ($uninstall.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstall.ExitCode)." }
 
           for ($i = 0; $i -lt 30; $i++) {
