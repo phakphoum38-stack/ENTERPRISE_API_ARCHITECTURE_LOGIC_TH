@@ -2,8 +2,9 @@
 
 - Document ID: ROS-LARAVEL-PLATFORM-FOUNDATION
 - Version: 1.0.0
-- Status: Proposed for integration
+- Status: ACTIVE / INTEGRATED / PRODUCTION-QUALIFIED
 - Baseline: main
+- Current reconciliation: PR #652 merged into `main` on 2026-09-27
 
 ## Purpose
 
@@ -71,3 +72,8 @@ Laravel transports and adapts these decisions but cannot manufacture an ALLOWED 
 9. Unified Final Gate and merge.
 
 Implementation may be marked DEFERRED only when its boundary and contract are already defined and the deferral is recorded.
+
+
+## Current status
+
+The Laravel Platform boundary, runtime composition, canonical adapters, governance registration and Production Certification binding are integrated on `main`. Remaining Flutter failures, where explicitly deferred by the existing release contracts, remain deferred and are not promoted by this document.
