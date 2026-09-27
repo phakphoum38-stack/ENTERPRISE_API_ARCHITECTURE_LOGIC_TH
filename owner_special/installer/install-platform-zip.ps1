@@ -52,7 +52,7 @@ try {
     }
 
     New-Item -ItemType Directory -Force -Path $TargetRoot | Out-Null
-    & robocopy.exe $staging $TargetRoot /E /COPY:DAT /R:2 /W:1 /NFL /NDL /NP | Out-Host
+    & robocopy.exe $staging $TargetRoot /E /COPY:DAT /J /XJ /R:2 /W:1 /NFL /NDL /NP /TEE /LOG+:"$env:TEMP\\ResearchOS-Platform-robocopy.log" | Out-Host
     $copyCode = $LASTEXITCODE
     if ($copyCode -gt 7) { throw "Platform ZIP staged copy failed: robocopy exit code $copyCode" }
     foreach ($required in @(
