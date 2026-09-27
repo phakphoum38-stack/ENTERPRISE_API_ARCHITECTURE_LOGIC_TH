@@ -60,7 +60,7 @@ def main() -> int:
         "status: MISSING",
     )
     for capability in ("organizations", "projects", "applications", "api_catalog", "api_versions",
-                       "endpoints", "plans", "webhooks", "developer_portal", "sdk_metadata"):
+                       "endpoints", "plans", "gateway_routing", "webhooks", "developer_portal", "sdk_metadata", "api_products"):
         start = matrix.find(f"  {capability}:")
         if start < 0:
             fail("capability missing: " + capability)
