@@ -55,3 +55,9 @@ Filename: "{app}\app\{#MyAppExeName}"; Description: "Launch Research OS"; Workin
 [UninstallRun]
 Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\owner_special\scripts\install-owner-service.ps1"" -Action uninstall -Root ""{app}"" -DataDir ""{commonappdata}\ResearchOSOwnerSpecial"" -ServiceName ""ResearchOSOwnerFriendService"" -Port 8790"; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\scripts\research-os-service.ps1"" -Action uninstall -DataDir ""{commonappdata}\ResearchOS"""; Flags: runhidden waituntilterminated
+
+[UninstallDelete]
+; Remove runtime-generated files (for example Python bytecode/cache) that are not tracked by [Files].
+; [UninstallRun] above has already stopped the packaged services before this cleanup runs.
+Type: filesandordirs
+Name: "{app}\\*"
