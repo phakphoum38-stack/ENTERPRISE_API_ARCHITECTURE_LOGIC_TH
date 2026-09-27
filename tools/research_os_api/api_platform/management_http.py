@@ -12,6 +12,7 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, urlsplit
 
 from tools.research_os_api.api_platform.management_service import ManagementService
+from tools.research_os_api.api_platform.sdk_metadata import build_sdk_metadata
 
 RESOURCE_BY_SEGMENT = {
     "organizations": "organizations", "projects": "projects", "applications": "applications",
@@ -44,6 +45,8 @@ class ManagementHTTP:
         body = body or {}
         if not parts:
             return 200, {"service": "research-os-api-management", "namespace": "/platform/v1", "status": "ready"}
+        if parts[0] == "sdk-metadata" and method == "GET":
+            return 200, build_sdk_metadata()
 
         # Nested collections.
         if parts[0] == "developer-portal":
