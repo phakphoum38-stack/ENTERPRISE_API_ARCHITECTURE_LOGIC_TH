@@ -19,7 +19,10 @@
     "current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json",
     "tools/validate_research_os_platform_runtime_completion.py",
     "current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json",
-    "tools/validate_research_os_platform_production_certification.py"
+    "tools/validate_research_os_platform_production_certification.py",
+    "tools/validate_research_os_api_management_platform.py",
+    "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml",
+    "tools/research_os_api/api_platform/management_service.py"
   ],
   "components": [
     {
