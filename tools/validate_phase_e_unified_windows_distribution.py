@@ -114,6 +114,26 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
     if install_e2e.get("release_authority") != "FINAL_GATE":
         errors.append("installer E2E release authority drifted")
 
+    installer = (root / "owner_special/installer/owner-special-platform.iss").read_text(encoding="utf-8")
+    for marker in (
+        "AppPublisher={#MyAppPublisher}",
+        "SetupIconFile=..\\..\\assets\\branding\\research_os.ico",
+        "research_os_flutter.exe",
+        "Research OS Platform installer",
+        "canonical Research OS Platform ZIP",
+    ):
+        if marker not in installer:
+            errors.append(f"canonical Owner Special Platform Setup missing UI marker: {marker}")
+    if "Research OS Owner Special" in installer:
+        errors.append("legacy Owner Special UI identity remains in canonical Platform Setup")
+    if not (root / "apps/research_os_flutter").is_dir():
+        errors.append("canonical Platform UI root is missing")
+    if not (root / "apps/research_os_flutter/assets/branding/research_os_master.webp").is_file():
+        errors.append("canonical Research OS master branding asset is missing")
+    branding_script = root / "scripts/apply-research-os-branding.py"
+    if not branding_script.is_file():
+        errors.append("canonical Research OS branding generator is missing")
+
     workflow = _read_phase_e_workflow(root)
     for marker in (
         "TARGET_SHA",
@@ -128,6 +148,10 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
         "runtime\\python\\python.exe",
         "Installer install run uninstall E2E",
         "WINDOWS_INSTALL_E2E_EVIDENCE.json",
+        "Verify canonical Platform UI binding for Owner Special Setup",
+        "OWNER_SPECIAL_PLATFORM_UI=PASS",
+        "Generate canonical Platform installer branding",
+        "Canonical Platform installer branding generation failed.",
     ):
         if marker not in workflow:
             errors.append(f"Phase E workflow missing required marker: {marker}")
