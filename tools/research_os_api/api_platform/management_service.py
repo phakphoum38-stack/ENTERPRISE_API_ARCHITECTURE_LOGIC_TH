@@ -170,6 +170,16 @@ class ManagementService:
                 self._add_typed(resource, _decode(resource, payload))
 
     def _add_typed(self, resource: str, obj: Any) -> Any:
+        # API keys are credential lifecycle records and require their effective
+        # entitlement at the management boundary; the registry validates the
+        # application relationship and scope subset.
+        if resource == "api_keys":
+            if obj.entitlement_id is None:
+                raise ValueError("api key requires entitlement_id")
+            entitlement = self.registry.entitlements.get(obj.entitlement_id)
+            if entitlement is None:
+                raise ValueError("api key references unknown entitlement")
+            return self.registry.add_api_key(obj, entitlement_scope_ids=entitlement.scope_ids)
         method = {
             "organizations": "add_organization", "projects": "add_project",
             "applications": "add_application", "apis": "add_api", "versions": "add_version",
@@ -179,13 +189,6 @@ class ManagementService:
         }.get(resource)
         if method is None:
             raise ValueError(f"unsupported management resource: {resource}")
-        if resource == "api_keys":
-            if obj.entitlement_id is None:
-                raise ValueError("api key requires entitlement_id")
-            entitlement = self.registry.entitlements.get(obj.entitlement_id)
-            if entitlement is None:
-                raise ValueError("api key references unknown entitlement")
-            return self.registry.add_api_key(obj, entitlement_scope_ids=entitlement.scope_ids)
         return getattr(self.registry, method)(obj)
 
     def _persist(self, resource: str, obj: Any, *, actor: str, action: str) -> dict[str, Any]:
@@ -311,7 +314,9 @@ class ManagementService:
                     if name == resource and key == identifier:
                         obj = candidate
                     if name == "api_keys":
-                        rebuilt.add_api_key(obj, entitlement_scope_ids=obj.scopes)
+                        if obj.entitlement_id is None or obj.entitlement_id not in rebuilt.entitlements:
+                            raise ValueError("api key references unknown entitlement")
+                        rebuilt.add_api_key(obj, entitlement_scope_ids=rebuilt.entitlements[obj.entitlement_id].scope_ids)
                     elif name == "portals":
                         rebuilt.set_portal(obj)
                     else:
