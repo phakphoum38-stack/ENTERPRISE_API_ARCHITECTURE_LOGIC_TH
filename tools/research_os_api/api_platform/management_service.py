@@ -15,6 +15,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Type
 
+from tools.research_os_api.api_key_store import JsonAPIKeyStore
+from tools.research_os_api.api_keys import APIKeyManager
 from tools.research_os_api.api_management_models import (
     API, APIEndpoint, APIKey, APIVersion, APIProduct, Application,
     DeveloperPortalMetadata, Entitlement, GatewayRoute, Lifecycle, Organization,
@@ -152,6 +154,8 @@ class ManagementService:
         self.store = store
         self.registry = ManagementRegistry()
         self._load()
+        key_path = Path(os.getenv("RESEARCH_OS_API_KEY_STORE", str(self.store.path.with_name("api_keys.json"))))
+        self.key_manager = APIKeyManager(JsonAPIKeyStore(key_path))
 
     @classmethod
     def from_env(cls) -> "ManagementService":
@@ -185,6 +189,49 @@ class ManagementService:
         self.store.record_audit(actor, resource, identifier, action, "success")
         return payload
 
+    def create_api_key(self, payload: dict[str, Any], *, actor: str = "system") -> dict[str, Any]:
+        application_id = str(payload.get("application_id", "")).strip()
+        principal_id = str(payload.get("principal_id", "")).strip()
+        scopes = frozenset(str(value) for value in payload.get("scopes", []))
+        if not application_id or not principal_id:
+            raise ValueError("application_id and principal_id are required")
+        application = _decode("applications", self.get("applications", application_id))
+        if application.application_id != application_id:
+            raise ValueError("application mismatch")
+        raw = payload.get("raw_secret")
+        if raw is not None:
+            raise ValueError("raw_secret is server-generated")
+        expires = payload.get("expires_at")
+        expires_at = datetime.fromisoformat(expires) if isinstance(expires, str) and expires else None
+        record, secret = self.key_manager.create(principal_id, set(scopes), expires_at=expires_at)
+        obj = APIKey(record.key_id, application_id, record.fingerprint, tuple(sorted(scopes)), record.created_at, record.expires_at, record.revoked_at)
+        self._add_typed("api_keys", obj)
+        result = self._persist("api_keys", obj, actor=actor, action="create")
+        result["raw_secret"] = secret
+        return result
+
+    def revoke_api_key(self, key_id: str, *, actor: str = "system") -> dict[str, Any]:
+        record = self.key_manager.revoke(key_id)
+        current = _decode("api_keys", self.get("api_keys", key_id))
+        updated = replace(current, revoked_at=record.revoked_at)
+        self._replace_and_validate("api_keys", key_id, updated)
+        result = self._persist("api_keys", updated, actor=actor, action="revoke")
+        return result
+
+    def rotate_api_key(self, key_id: str, payload: dict[str, Any], *, actor: str = "system") -> dict[str, Any]:
+        current = _decode("api_keys", self.get("api_keys", key_id))
+        scopes = frozenset(str(value) for value in payload.get("scopes", current.scopes))
+        expires = payload.get("expires_at")
+        expires_at = datetime.fromisoformat(expires) if isinstance(expires, str) and expires else None
+        record, secret = self.key_manager.rotate(key_id, str(payload.get("principal_id") or current.application_id), set(scopes), expires_at=expires_at)
+        old = replace(current, revoked_at=record.created_at)
+        self._replace_and_validate("api_keys", key_id, old)
+        self._persist("api_keys", old, actor=actor, action="rotate_revoke")
+        replacement = APIKey(record.key_id, current.application_id, record.fingerprint, tuple(sorted(scopes)), record.created_at, record.expires_at, record.revoked_at)
+        self._add_typed("api_keys", replacement)
+        result = self._persist("api_keys", replacement, actor=actor, action="rotate_create")
+        result["raw_secret"] = secret
+        return result
     def create(self, resource: str, payload: dict[str, Any], *, actor: str = "system") -> dict[str, Any]:
         if resource not in RESOURCE_TYPES:
             raise ValueError("unknown management resource")
