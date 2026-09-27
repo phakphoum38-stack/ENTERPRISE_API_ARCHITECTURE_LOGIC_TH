@@ -1,6 +1,6 @@
 #define MyAppName "Research OS"
 #define MyAppVersion "3.0.0"
-#define MyAppPublisher "Research OS Owner Special"
+#define MyAppPublisher "Research OS Team"
 #define MyAppExeName "research_os_flutter.exe"
 
 #ifndef PlatformZip
@@ -28,13 +28,19 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 Compression=lzma2/ultra64
 SolidCompression=yes
-WizardStyle=modern
+WizardStyle=modern dynamic windows11 hidebevels includetitlebar
+SetupIconFile=..\..\assets\branding\research_os.ico
+UninstallDisplayIcon={app}\app\{#MyAppExeName}
 OutputDir=output
 OutputBaseFilename=Research-OS-Owner-Special-Setup-{#MyAppVersion}-x64
 UninstallDisplayName=Research OS
 SetupLogging=yes
 CloseApplications=yes
 RestartApplications=no
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoProductName={#MyAppName}
+VersionInfoDescription=Research OS Platform installer
+VersionInfoOriginalFileName=Research-OS-Owner-Special-Setup-{#MyAppVersion}-x64.exe
 
 [Files]
 Source: "{#PlatformZip}"; DestDir: "{app}"; Flags: ignoreversion
@@ -134,6 +140,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     Log('Owner Special Setup is the Platform installation entry point.');
+    Log('Installer UI identity: canonical Research OS Platform.');
     Log('Installation payload: canonical Research OS Platform ZIP.');
     if not InstallCanonicalPlatform() then begin
       MsgBox('Research OS Platform installation failed. Setup will stop.', mbCriticalError, MB_OK);
