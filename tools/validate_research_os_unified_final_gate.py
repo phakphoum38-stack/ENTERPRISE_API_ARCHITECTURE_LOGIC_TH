@@ -129,7 +129,7 @@ REQUIRED_FILES = (
     "apps/research_os_flutter/test/platform_surface_parity_test.dart",
     "apps/research_os_flutter/test/desktop_shell_test.dart",
     "tools/validate_research_os_api_management_platform.py",
-    "tools/research_os_api_platform/README.md",
+    "tools/research_os_api/api_platform/README.md",
     "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml",
     "tools/research_os_api/api_platform/API_PLATFORM_CAPABILITY_MATRIX.yaml",
     "tools/research_os_api/api_platform/management_service.py",
