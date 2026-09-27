@@ -74,6 +74,33 @@ class ManagementHTTP:
                     return 200, self.service.rotate_api_key(identifier, body, actor=actor)
                 return 200, self.service.lifecycle(RESOURCE_BY_SEGMENT[parent], identifier, action, actor=actor)
 
+        if len(parts) == 3 and parts[0] == "apis" and parts[2] == "versions":
+            api_id = parts[1]
+            if method == "GET":
+                values = [value for value in self.service.list("versions") if value.get("api_id") == api_id]
+                return 200, {"items": values, "count": len(values)}
+            if method == "POST":
+                payload = dict(body); payload["api_id"] = api_id
+                return 201, self.service.create("versions", payload, actor=actor)
+
+        if len(parts) == 3 and parts[0] == "versions" and parts[2] == "endpoints":
+            version_id = parts[1]
+            if method == "GET":
+                values = [value for value in self.service.list("endpoints") if value.get("version_id") == version_id]
+                return 200, {"items": values, "count": len(values)}
+            if method == "POST":
+                payload = dict(body); payload["version_id"] = version_id
+                return 201, self.service.create("endpoints", payload, actor=actor)
+
+        if len(parts) == 3 and parts[0] == "plans" and parts[2] == "entitlements":
+            plan_id = parts[1]
+            if method == "GET":
+                values = [value for value in self.service.list("entitlements") if value.get("plan_id") == plan_id]
+                return 200, {"items": values, "count": len(values)}
+            if method == "POST":
+                payload = dict(body); payload["plan_id"] = plan_id
+                return 201, self.service.create("entitlements", payload, actor=actor)
+
         # Standard resource collection/item operations.
         resource = RESOURCE_BY_SEGMENT.get(parts[0])
         if resource is None:
