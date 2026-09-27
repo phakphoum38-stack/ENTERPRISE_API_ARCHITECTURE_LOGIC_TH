@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 OWNER_WORKFLOW = WORKFLOWS / "owner-special-friend.yml"
 RESEARCH_WORKFLOW = WORKFLOWS / "research-os-windows-artifact.yml"
+UNIFIED_WINDOWS_WORKFLOW = WORKFLOWS / "research-os-phase-e-unified-windows-distribution.yml"
 OWNER_MANIFEST = ROOT / "owner_special" / "OWNER_MANIFEST.json"
 OWNER_IDENTITY_GATE = ROOT / "owner_special" / "scripts" / "verify-owner-build-identity.ps1"
 OWNER_EXE = "research_os_owner_special.exe"
@@ -27,6 +28,11 @@ PROTECTED_WORKFLOWS = {
     "research-os-build-ready-source.yml",
     "research-os-windows-source-bundle.yml",
 }
+
+COMPOSITE_RELEASE_WORKFLOWS = {
+    "research-os-phase-e-unified-windows-distribution.yml",
+}
+
 
 
 def fail(errors: list[str], message: str) -> None:
@@ -60,6 +66,30 @@ def main() -> int:
                         errors,
                         f"OWNER_LEAKAGE: non-Owner protected workflow {rel} references Owner-specific identity/source.",
                     )
+
+        if UNIFIED_WINDOWS_WORKFLOW.is_file():
+            unified_text = UNIFIED_WINDOWS_WORKFLOW.read_text(encoding="utf-8")
+            unified_required = [
+                "Research OS Unified Windows Distribution",
+                "installer/research-os-unified.iss",
+                "Research-OS-Unified-Setup-",
+                "DISTRIBUTION_MANIFEST.json",
+                "WINDOWS_INSTALL_E2E_EVIDENCE.json",
+                "RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION",
+                "RELEASE_EVIDENCE.json",
+                "research_os_owner_special.exe",
+                "verify-owner-build-identity.ps1",
+                "release_authority = 'FINAL_GATE'",
+            ]
+            for token in unified_required:
+                if token not in unified_text:
+                    fail(errors, f"UNIFIED_WINDOWS_INSTALLER_GATE_INCOMPLETE: {UNIFIED_WINDOWS_WORKFLOW.name} is missing required token: {token}")
+            if "Research-OS-Owner-Special-Setup-1.3.1-x64.exe" in unified_text:
+                fail(errors, "UNIFIED_WINDOWS_OWNER_INSTALLER_LEAK: canonical Research OS workflow references the Owner Special installer artifact.")
+            if "Research-OS-Unified-Setup-" not in unified_text:
+                fail(errors, "UNIFIED_WINDOWS_SETUP_MISSING: canonical Research OS workflow does not build the unified Setup.exe.")
+        else:
+            fail(errors, f"Missing canonical Research OS Windows installer workflow: {UNIFIED_WINDOWS_WORKFLOW}")
 
         if OWNER_WORKFLOW.is_file():
             owner_text = OWNER_WORKFLOW.read_text(encoding="utf-8")
