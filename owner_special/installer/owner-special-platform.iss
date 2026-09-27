@@ -141,7 +141,7 @@ begin
     Log('Canonical Platform ZIP missing from Setup payload: ' + ZipPath);
     Exit;
   end;
-  Log('Canonical Platform ZIP payload exists. Size=' + IntToStr(GetFileSize(ZipPath)) + ' bytes');
+  Log('Canonical Platform ZIP payload exists.');
   Parameters :=
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
     AddBackslash(TargetRoot) + 'install-platform-zip.ps1" ' +
