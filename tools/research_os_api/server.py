@@ -387,7 +387,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, github_dashboard(repository))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (ValueError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
+        except (ValueError, KeyError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except GitHubStatusError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
