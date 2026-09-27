@@ -9,6 +9,8 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $RepoRoot 'tools\research_os_service\ResearchOS.ServiceHost.csproj'
 $PublishDir = Join-Path $RepoRoot 'tools\research_os_service\publish'
+$PackagedServiceDir = Join-Path $RepoRoot 'service_host'
+$PackagedServiceExe = Join-Path $PackagedServiceDir 'ResearchOS.ServiceHost.exe'
 $ServiceExe = Join-Path $PublishDir 'ResearchOS.ServiceHost.exe'
 $BundledPython = Join-Path $RepoRoot 'runtime\python\python.exe'
 $ApiPort = 8787
@@ -170,7 +172,13 @@ switch ($Action) {
   'install' {
     Require-Admin
 
-    if (-not (Test-Path $ServiceExe)) {
+    if (Test-Path $PackagedServiceExe) {
+      # Canonical installer layout: the self-contained ServiceHost is staged in
+      # service_host. Never require the source .csproj or a developer SDK.
+      $ServiceExe = $PackagedServiceExe
+      Write-Host "Using packaged Research OS ServiceHost: $ServiceExe"
+    }
+    elseif (-not (Test-Path $ServiceExe)) {
       if (-not (Test-Path $Project)) {
         throw "ServiceHost binary/project not found under: $RepoRoot"
       }
@@ -228,8 +236,18 @@ switch ($Action) {
     sc.exe failureflag $ServiceName 1 | Out-Null
     Set-ServiceEnvironment -PythonPath $python
 
-    Start-Service -Name $ServiceName
-    Wait-ServiceState 'Running' | Out-Null
+    try {
+      Start-Service -Name $ServiceName
+      Wait-ServiceState 'Running' | Out-Null
+    }
+    catch {
+      $svc = Get-ServiceSafe
+      Write-Error "Research OS Service failed to start. Status=$($svc.Status) StartType=$((Get-CimInstance Win32_Service -Filter \"Name='$ServiceName'\").StartMode)"
+      Write-Error "Service executable: $ServiceExe"
+      Write-Error "Repo root: $RepoRoot"
+      Write-Error "Data dir: $DataDir"
+      throw
+    }
 
     Write-Host 'Research OS Service installed and started.'
     Write-Host "Service : $ServiceName"
