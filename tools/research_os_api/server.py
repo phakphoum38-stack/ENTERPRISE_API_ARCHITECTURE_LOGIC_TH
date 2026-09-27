@@ -46,6 +46,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from tools.research_os_api.api_platform.management_http import ManagementHTTP
+from tools.research_os_api.api_platform.management_service import ManagementService
 from providers import ProviderError, build_provider
 from tools.platform_work_checkpoint import (
     create_checkpoint,
@@ -54,8 +56,6 @@ from tools.platform_work_checkpoint import (
 )
 
 from tools.project_registry import ProjectRegistry
-from tools.research_os_api.api_platform.management_http import ManagementHTTP
-from tools.research_os_api.api_platform.management_service import ManagementService
 from tools.project_scale_readiness import PROJECT_COUNT, build_project_definitions
 import copilot_service
 
