@@ -102,9 +102,9 @@ jobs:
           test -n "$setup" && test -s "$setup"
           test -n "$platform_zip" && test -s "$platform_zip"
           test -n "$manifest" && test -n "$manifest_hash" && test -n "$install_e2e" && test -n "$release_evidence"
-          python3 - "$SOURCE_SHA" "$setup" "$manifest" "$manifest_hash" "$install_e2e" "$release_evidence" <<'PY'
+          python3 - "$SOURCE_SHA" "$setup" "$manifest" "$manifest_hash" "$install_e2e" "$release_evidence" "$platform_zip" <<'PY'
           import hashlib, json, pathlib, sys
-          source_sha, setup, manifest, manifest_hash, install_e2e, release_evidence = sys.argv[1:]
+          source_sha, setup, manifest, manifest_hash, install_e2e, release_evidence, platform_zip = sys.argv[1:]
           m = json.loads(pathlib.Path(manifest).read_text(encoding="utf-8-sig"))
           e2e = json.loads(pathlib.Path(install_e2e).read_text(encoding="utf-8-sig"))
           release = json.loads(pathlib.Path(release_evidence).read_text(encoding="utf-8-sig"))
