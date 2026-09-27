@@ -1,0 +1,66 @@
+{
+  "contract_id": "research-os-platform-north-star-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "purpose": "Canonical long-term architecture boundary for evolving the Research OS Platform into a governed Enterprise Control Plane without creating a second authority.",
+  "authority": {
+    "mode": "DESCRIPTIVE_ARCHITECTURE",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "evolution_layers": [
+    {"name":"PLATFORM_FOUNDATION","state":"IMPLEMENTED"},
+    {"name":"UNIFIED_CONTROL_PLANE","state":"BOUND_BY_EXISTING_PLATFORM_SPINE"},
+    {"name":"AGENTIC_PLATFORM","state":"BOUND_BY_EXISTING_IDENTITY_POLICY_TOOL_AI_CONTRACTS"},
+    {"name":"AUTONOMOUS_PLATFORM","state":"EXTENSION_BOUNDARY"},
+    {"name":"ENTERPRISE_OPERATING_SYSTEM","state":"NORTH_STAR_ONLY"}
+  ],
+  "canonical_flow": [
+    "INTENT",
+    "GOVERNANCE",
+    "IDENTITY",
+    "CAPABILITY",
+    "POLICY",
+    "AUTHORIZATION",
+    "ENTITLEMENT",
+    "ADMISSION",
+    "EXECUTION",
+    "EVIDENCE",
+    "RECONCILIATION",
+    "LEARNING"
+  ],
+  "authority_rules": [
+    "AI_IS_NOT_AUTHORITY",
+    "SURFACE_IS_NOT_AUTHORITY",
+    "CREDENTIAL_IS_NOT_POLICY",
+    "MANAGEMENT_DOES_NOT_GRANT_RUNTIME_AUTHORITY",
+    "CONTROL_PLANE_DOES_NOT_DUPLICATE_RUNTIME",
+    "EVERY_EXECUTION_PRODUCES_EVIDENCE",
+    "RESOURCE_CONFLICT_FAILS_CLOSED",
+    "ENGINE_DOES_NOT_DIRECTLY_CALL_RUNNER",
+    "FINAL_GATE_IS_RELEASE_AUTHORITY"
+  ],
+  "future_boundaries": {
+    "agent_identity_governance": "COMPOSE_EXISTING_IDENTITY_AUTHORITY",
+    "resource_economics": "COMPOSE_EXISTING_RESOURCE_CONTROL_AND_BUDGETS",
+    "human_approval": "COMPOSE_EXISTING_POLICY_GATE_AND_APPROVAL",
+    "context_plane": "COMPOSE_MEMORY_FABRIC_RESOURCE_GRAPH_AND_EVIDENCE",
+    "digital_twin": "READ_ONLY_PLATFORM_PROJECTION",
+    "self_healing": "BOUNDED_RECONCILIATION_ONLY",
+    "simulation": "NO_RELEASE_AUTHORITY"
+  },
+  "non_duplication": [
+    "registry",
+    "authorization",
+    "policy",
+    "queue",
+    "runner",
+    "evidence",
+    "control_plane",
+    "release_authority"
+  ]
+}

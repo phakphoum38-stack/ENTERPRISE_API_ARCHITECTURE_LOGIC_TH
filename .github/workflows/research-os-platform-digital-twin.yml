@@ -1,0 +1,32 @@
+name: Research OS Platform Digital Twin
+
+on:
+  pull_request:
+    paths:
+      - 'current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json'
+      - 'current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json'
+      - 'current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json'
+      - 'tools/platform_digital_twin.py'
+      - 'tools/test_platform_digital_twin.py'
+      - 'tools/validate_research_os_platform_digital_twin.py'
+      - '.github/workflows/research-os-platform-digital-twin.yml'
+      - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json'
+      - 'current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json'
+      - 'tools/platform_digital_twin.py'
+      - 'tools/validate_research_os_platform_digital_twin.py'
+jobs:
+  digital-twin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Digital Twin boundary
+        run: python tools/validate_research_os_platform_digital_twin.py
+      - name: Test Digital Twin
+        run: python tools/test_platform_digital_twin.py
