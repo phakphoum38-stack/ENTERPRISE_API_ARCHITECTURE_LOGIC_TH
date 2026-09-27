@@ -26,11 +26,65 @@ if ($null -eq $zipItem) {
     throw "Platform ZIP missing: $ZipPath"
 }
 Write-Diagnostic "STEP verify-zip-exists result=FOUND length=$($zipItem.Length) full_name=$($zipItem.FullName)"
-$actualZipSha = (Get-FileHash -LiteralPath $zipItem.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-Write-Diagnostic "STEP verify-zip-sha256 actual=$actualZipSha expected=$(Normalize-Hash $ExpectedZipSha256)"
-if ($actualZipSha -ne (Normalize-Hash $ExpectedZipSha256)) {
+
+Write-Diagnostic "STEP verify-zip-readability begin path=$($zipItem.FullName)"
+$zipStream = $null
+try {
+    $zipStream = [System.IO.File]::Open(
+        $zipItem.FullName,
+        [System.IO.FileMode]::Open,
+        [System.IO.FileAccess]::Read,
+        [System.IO.FileShare]::Read
+    )
+    Write-Diagnostic "STEP verify-zip-readability result=PASS length=$($zipStream.Length)"
+}
+catch {
+    Write-Diagnostic "STEP verify-zip-readability result=FAIL message=$($_.Exception.Message)"
+    throw "Platform ZIP is not readable: $($zipItem.FullName). $($_.Exception.Message)"
+}
+finally {
+    if ($null -ne $zipStream) {
+        $zipStream.Dispose()
+    }
+}
+
+Write-Diagnostic "STEP verify-zip-sha256 begin algorithm=SHA256 path=$($zipItem.FullName)"
+$actualZipSha = $null
+try {
+    $hashResult = Get-FileHash -LiteralPath $zipItem.FullName -Algorithm SHA256 -ErrorAction Stop
+    if ($null -eq $hashResult -or [string]::IsNullOrWhiteSpace([string]$hashResult.Hash)) {
+        throw "Get-FileHash returned no SHA256 hash."
+    }
+    $actualZipSha = ([string]$hashResult.Hash).Trim().ToLowerInvariant()
+    Write-Diagnostic "STEP verify-zip-sha256 computed=$actualZipSha"
+}
+catch {
+    $getFileHashError = $_.Exception.Message
+    Write-Diagnostic "STEP verify-zip-sha256 get-filehash-failed message=$getFileHashError"
+    Write-Diagnostic "STEP verify-zip-sha256 fallback=certutil"
+    $certutilOutput = & certutil.exe -hashfile "$($zipItem.FullName)" SHA256 2>&1
+    $certutilCode = $LASTEXITCODE
+    Write-Diagnostic "STEP verify-zip-sha256 certutil-exit-code=$certutilCode"
+    if ($certutilCode -ne 0) {
+        throw "Unable to compute Platform ZIP SHA256 with Get-FileHash or certutil. Get-FileHash: $getFileHashError"
+    }
+    $hashLine = $certutilOutput | ForEach-Object {
+        if ([string]$_ -match '([0-9A-Fa-f]{64})') {
+            $Matches[1]
+        }
+    } | Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace([string]$hashLine)) {
+        throw "certutil did not return a valid SHA256 hash."
+    }
+    $actualZipSha = ([string]$hashLine).Trim().ToLowerInvariant()
+    Write-Diagnostic "STEP verify-zip-sha256 certutil-computed=$actualZipSha"
+}
+$expectedZipSha = Normalize-Hash $ExpectedZipSha256
+Write-Diagnostic "STEP verify-zip-sha256 actual=$actualZipSha expected=$expectedZipSha"
+if ($actualZipSha -ne $expectedZipSha) {
     throw "Platform ZIP SHA256 mismatch: expected $ExpectedZipSha256 actual $actualZipSha"
 }
+Write-Diagnostic "STEP verify-zip-sha256 result=PASS"
 
 Write-Diagnostic "STEP validate-zip-entries"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
