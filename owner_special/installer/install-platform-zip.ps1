@@ -17,10 +17,15 @@ Write-Diagnostic "START ZipPath=$ZipPath TargetRoot=$TargetRoot ExpectedZipSha25
 
 function Normalize-Hash([string]$Value) { return $Value.Trim().ToLowerInvariant() }
 
-Write-Diagnostic "STEP verify-zip-exists"
-if (-not (Test-Path $ZipPath -PathType Leaf)) { throw "Platform ZIP missing: $ZipPath" }
-$actualZipSha = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-Write-Diagnostic "STEP verify-zip-sha256 actual=$actualZipSha"
+Write-Diagnostic "STEP verify-zip-exists path=$ZipPath"
+$zipItem = Get-Item -LiteralPath $ZipPath -ErrorAction SilentlyContinue
+if ($null -eq $zipItem) {
+    Write-Diagnostic "STEP verify-zip-exists result=MISSING"
+    throw "Platform ZIP missing: $ZipPath"
+}
+Write-Diagnostic "STEP verify-zip-exists result=FOUND length=$($zipItem.Length) full_name=$($zipItem.FullName)"
+$actualZipSha = (Get-FileHash -LiteralPath $zipItem.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+Write-Diagnostic "STEP verify-zip-sha256 actual=$actualZipSha expected=$(Normalize-Hash $ExpectedZipSha256)"
 if ($actualZipSha -ne (Normalize-Hash $ExpectedZipSha256)) {
     throw "Platform ZIP SHA256 mismatch: expected $ExpectedZipSha256 actual $actualZipSha"
 }
