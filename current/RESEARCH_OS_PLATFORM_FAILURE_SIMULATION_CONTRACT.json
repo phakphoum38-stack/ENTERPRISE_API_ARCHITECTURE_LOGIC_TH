@@ -1,0 +1,8 @@
+{
+  "contract_id":"research-os-platform-failure-simulation-v1",
+  "version":"1.0.0",
+  "status":"ACTIVE",
+  "scenarios":["dependency_failure","contract_mismatch","stale_delivery","resource_conflict","worker_crash","timeout","retry_exhaustion","dlq","rollback","idempotency"],
+  "expected":{"resource_conflict":"REJECT_AND_RELEASE","stale_delivery":"REJECT","unknown":"HOLD","direct_engine_to_runner":false},
+  "authority":{"mode":"DESCRIPTIVE_VALIDATING","may_authorize":false,"may_release":false,"release_authority":"FINAL_GATE"}
+}
