@@ -123,6 +123,8 @@ def validate(root: Path = ROOT) -> tuple[str, ...]:
         "DISTRIBUTION_MANIFEST.sha256",
         "RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION",
         "research_os_owner_special.exe",
+        "Research-OS-Platform-Windows-x64-",
+        "Research-OS-Owner-Special-Setup-",
         "runtime\\python\\python.exe",
         "Installer install run uninstall E2E",
         "WINDOWS_INSTALL_E2E_EVIDENCE.json",

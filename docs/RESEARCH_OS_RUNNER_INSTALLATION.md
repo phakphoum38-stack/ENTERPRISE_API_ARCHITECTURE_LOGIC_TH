@@ -20,7 +20,7 @@ Execution directly from a synchronized folder is avoided because synchronization
 After installation, the local runtime can operate without the Cloud Drive being mounted.
 
 ## Existing Windows installer
-The canonical Windows installer remains `installer/research-os-unified.iss`. This contract does not create a second Windows installer authority.
+The canonical Windows installation entry point is the Owner Special Setup (`owner_special/installer/owner-special-platform.iss`). It installs the exact SHA-bound Research OS Platform ZIP; the ZIP is the Platform artifact and the Setup.exe is only the installation UX/entry point.
 
 ## Integrity
 A package manifest binds package ID, version, platform, architecture, source commit SHA, artifact SHA-256, and per-file SHA-256 entries. Digest mismatch, unsafe paths, missing identity, or unsupported platform/architecture are rejected.

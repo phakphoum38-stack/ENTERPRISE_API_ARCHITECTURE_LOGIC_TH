@@ -13,7 +13,7 @@ UNIFIED_WINDOWS_WORKFLOW = WORKFLOWS / "research-os-phase-e-unified-windows-dist
 OWNER_MANIFEST = ROOT / "owner_special" / "OWNER_MANIFEST.json"
 OWNER_IDENTITY_GATE = ROOT / "owner_special" / "scripts" / "verify-owner-build-identity.ps1"
 OWNER_EXE = "research_os_owner_special.exe"
-OWNER_SETUP = "Research-OS-Owner-Special-Setup-1.3.1-x64.exe"
+OWNER_SETUP = "Research-OS-Owner-Special-Setup-3.0.0-x64.exe"
 
 # Candidate/experimental workflows may intentionally construct a disposable
 # runner in a temporary directory. These are not canonical release pipelines.
@@ -71,8 +71,9 @@ def main() -> int:
             unified_text = UNIFIED_WINDOWS_WORKFLOW.read_text(encoding="utf-8")
             unified_required = [
                 "Research OS Unified Windows Distribution",
-                "installer/research-os-unified.iss",
-                "Research-OS-Unified-Setup-",
+                "owner_special/installer/owner-special-platform.iss",
+                "Research-OS-Owner-Special-Setup-",
+                "Research-OS-Platform-Windows-x64-",
                 "DISTRIBUTION_MANIFEST.json",
                 "WINDOWS_INSTALL_E2E_EVIDENCE.json",
                 "RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION",
@@ -84,10 +85,12 @@ def main() -> int:
             for token in unified_required:
                 if token not in unified_text:
                     fail(errors, f"UNIFIED_WINDOWS_INSTALLER_GATE_INCOMPLETE: {UNIFIED_WINDOWS_WORKFLOW.name} is missing required token: {token}")
-            if "Research-OS-Owner-Special-Setup-1.3.1-x64.exe" in unified_text:
-                fail(errors, "UNIFIED_WINDOWS_OWNER_INSTALLER_LEAK: canonical Research OS workflow references the Owner Special installer artifact.")
-            if "Research-OS-Unified-Setup-" not in unified_text:
-                fail(errors, "UNIFIED_WINDOWS_SETUP_MISSING: canonical Research OS workflow does not build the unified Setup.exe.")
+            if "Research-OS-Unified-Setup-" in unified_text:
+                fail(errors, "UNIFIED_WINDOWS_LEGACY_SETUP: canonical Research OS workflow still references the retired Platform Setup.exe.")
+            if "Research-OS-Owner-Special-Setup-" not in unified_text:
+                fail(errors, "OWNER_SPECIAL_SETUP_MISSING: canonical Research OS workflow does not build the Owner Special Setup.exe.")
+            if "Research-OS-Platform-Windows-x64-" not in unified_text:
+                fail(errors, "PLATFORM_ZIP_MISSING: canonical Research OS workflow does not package the Platform ZIP.")
         else:
             fail(errors, f"Missing canonical Research OS Windows installer workflow: {UNIFIED_WINDOWS_WORKFLOW}")
 
@@ -141,6 +144,7 @@ def main() -> int:
     print("- Owner identity/source is isolated to the dedicated Owner workflow.")
     print("- Dedicated Owner workflow contains identity, installer, and bundle gates.")
     print("- Research OS Windows artifact workflow contains no Owner identity/source.")
+    print("- Canonical Windows installation entry point is Owner Special Setup.exe and its payload is the canonical Research OS Platform ZIP.")
     print("- Owner manifest and identity verifier are present and valid.")
     return 0
 

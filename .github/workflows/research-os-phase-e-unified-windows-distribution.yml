@@ -18,7 +18,7 @@ on:
       - "tools/**"
       - "v3/**"
       - "current/**"
-      - "installer/research-os-unified.iss"
+      - "owner_special/installer/owner-special-platform.iss"
       - "scripts/**"
 
 permissions:
@@ -214,16 +214,34 @@ jobs:
           "$mh  DISTRIBUTION_MANIFEST.json" | Set-Content "$p\DISTRIBUTION_MANIFEST.sha256" -Encoding ascii
           Write-Host 'RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION=PASS'
 
-      - name: Build unified installer
+      - name: Package canonical Research OS Platform ZIP
+        shell: pwsh
+        run: |
+          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
+          $sha = (git rev-parse HEAD).Trim()
+          $zip = "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Platform-Windows-x64-$sha.zip"
+          Compress-Archive -Path "$p\*" -DestinationPath $zip -CompressionLevel Optimal
+          $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$zipHash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
+          "PLATFORM_ZIP_PATH=$zip" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "PLATFORM_ZIP_SHA256=$zipHash" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "RESEARCH_OS_PLATFORM_ZIP=PASS sha256=$zipHash"
+
+      - name: Build Owner Special Setup.exe around canonical Platform ZIP
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
           $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-          $stagingRoot = "$env:GITHUB_WORKSPACE\phase-e\package"
-          if (-not (Test-Path $stagingRoot)) { throw "Distribution staging root not found: $stagingRoot" }
-          & $iscc "/DPackageRoot=$stagingRoot" "$env:GITHUB_WORKSPACE\installer\research-os-unified.iss"
-          if ($LASTEXITCODE -ne 0) { throw 'Unified installer build failed.' }
+          $tokens = $null; $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$env:GITHUB_WORKSPACE\owner_special\installer\install-platform-zip.ps1", [ref]$tokens, [ref]$errors)
+          if ($errors.Count -gt 0) { $errors | Format-List | Out-Host; throw 'Owner Platform ZIP bootstrap PowerShell syntax validation failed.' }
+          $sourceSha = (git rev-parse HEAD).Trim()
+          & $iscc "/DPlatformZip=$env:PLATFORM_ZIP_PATH" "/DPlatformZipSha256=$env:PLATFORM_ZIP_SHA256" "/DPlatformSourceSha=$sourceSha" "$env:GITHUB_WORKSPACE\owner_special\installer\owner-special-platform.iss"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Special Platform Setup.exe build failed.' }
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw 'Owner Special Platform Setup.exe missing.' }
+          Write-Host "OWNER_SPECIAL_PLATFORM_SETUP=PASS setup=$($setup.Name)"
 
       - name: Installer install run uninstall E2E
         shell: pwsh
@@ -231,8 +249,10 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $package = "$env:GITHUB_WORKSPACE\phase-e\package"
-          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\installer\output\Research-OS-Unified-Setup-*-x64.exe" | Select-Object -First 1
-          if (-not $setup) { throw 'Unified installer missing for E2E.' }
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw 'Owner Special Platform Setup.exe missing for E2E.' }
+          $platformZip = Get-ChildItem "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Platform-Windows-x64-*.zip" | Select-Object -First 1
+          if (-not $platformZip) { throw 'Canonical Research OS Platform ZIP missing for E2E.' }
 
           $targetSha = (git rev-parse HEAD).Trim()
           $installRoot = Join-Path $env:ProgramFiles 'Research OS'
@@ -242,6 +262,9 @@ jobs:
           $manifestHash = Join-Path $package 'DISTRIBUTION_MANIFEST.sha256'
           $manifestHashValue = (Get-FileHash $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
           $setupHash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $platformZipHash = (Get-FileHash $platformZip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expectedPlatformZipHash = (Get-Content "$($platformZip.FullName).sha256" -Raw).Trim().Split()[0].ToLowerInvariant()
+          if ($platformZipHash -ne $expectedPlatformZipHash) { throw 'Canonical Platform ZIP SHA256 sidecar mismatch.' }
           $checks = [ordered]@{}
 
           $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /TASKS="desktopicon"'
@@ -265,7 +288,8 @@ jobs:
             'service_host\ResearchOS.Owner.ServiceHost.exe',
             'scripts\research-os-service.ps1',
             'DISTRIBUTION_MANIFEST.json',
-            'DISTRIBUTION_MANIFEST.sha256'
+            'DISTRIBUTION_MANIFEST.sha256',
+            'OWNER_SPECIAL_PLATFORM_INSTALL_PROVENANCE.json'
           )) {
             if (-not (Test-Path (Join-Path $installRoot $relative))) {
               throw "Installed distribution component missing: $relative"
@@ -280,6 +304,15 @@ jobs:
           $installedManifestHash = (Get-FileHash (Join-Path $installRoot 'DISTRIBUTION_MANIFEST.json') -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($installedManifestHash -ne $manifestHashValue) { throw 'Installed manifest SHA256 mismatch.' }
           $checks['manifest_provenance'] = $true
+          $checks['platform_zip_integrity'] = $true
+
+          $installedProvenance = Join-Path $installRoot 'OWNER_SPECIAL_PLATFORM_INSTALL_PROVENANCE.json'
+          $provenance = Get-Content $installedProvenance -Raw | ConvertFrom-Json
+          if ($provenance.source_sha -ne $targetSha) { throw 'Installed Platform provenance source SHA mismatch.' }
+          if ($provenance.platform_zip_sha256 -ne $platformZipHash) { throw 'Installed Platform provenance ZIP SHA mismatch.' }
+          if ($provenance.distribution_manifest_sha256 -ne $manifestHashValue) { throw 'Installed Platform provenance manifest SHA mismatch.' }
+          if ($provenance.release_authority -ne 'FINAL_GATE' -or $provenance.installer_role -ne 'OWNER_SPECIAL') { throw 'Installed Platform provenance authority mismatch.' }
+          $checks['owner_special_platform_binding'] = $true
 
           # Windows service state is mutable and Get-Service returns a snapshot.
           # The installer may return before the SCM transitions the service to Running,
@@ -386,7 +419,10 @@ jobs:
             schema = 'research-os.windows-installer-e2e.v1'
             source_sha = $targetSha
             installer = $setup.Name
+            installer_role = 'OWNER_SPECIAL'
             installer_sha256 = $setupHash
+            platform_zip = $platformZip.Name
+            platform_zip_sha256 = $platformZipHash
             manifest_sha256 = $manifestHashValue
             manifest_hash_file = (Get-Content $manifestHash -Raw).Trim()
             install_root = $installRoot
@@ -395,29 +431,37 @@ jobs:
           } | ConvertTo-Json -Depth 8 | Set-Content "$env:GITHUB_WORKSPACE\phase-e\WINDOWS_INSTALL_E2E_EVIDENCE.json" -Encoding utf8
           Write-Host 'WINDOWS_INSTALL_E2E=PASS'
 
-      - name: Package and hash distribution
+      - name: Publish Platform + Owner Special release evidence
         shell: pwsh
         run: |
-          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
-          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\installer\output\Research-OS-Unified-Setup-*-x64.exe" | Select-Object -First 1
-          if (-not $setup) { throw 'Unified installer missing.' }
           $sha = (git rev-parse HEAD).Trim()
-          $zip = "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Unified-Windows-x64-$sha.zip"
-          Compress-Archive -Path "$p\*","$($setup.FullName)" -DestinationPath $zip -CompressionLevel Optimal
-          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
-          [ordered]@{source_sha=$sha; artifact=(Split-Path $zip -Leaf); artifact_sha256=$hash; release_authority='FINAL_GATE'} | ConvertTo-Json | Set-Content "$env:GITHUB_WORKSPACE\phase-e\RELEASE_EVIDENCE.json" -Encoding utf8
+          $platformZip = Get-ChildItem "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Platform-Windows-x64-*.zip" | Select-Object -First 1
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $platformZip -or -not $setup) { throw 'Canonical Platform ZIP or Owner Special Setup.exe missing.' }
+          $platformHash = (Get-FileHash $platformZip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          [ordered]@{
+            schema = 'research-os.windows-release-evidence.v2'
+            source_sha = $sha
+            platform_zip = $platformZip.Name
+            platform_zip_sha256 = $platformHash
+            owner_special_setup = $setup.Name
+            owner_special_setup_sha256 = $setupHash
+            release_authority = 'FINAL_GATE'
+            installer_role = 'OWNER_SPECIAL'
+            installation_payload = 'RESEARCH_OS_PLATFORM_ZIP'
+          } | ConvertTo-Json -Depth 5 | Set-Content "$env:GITHUB_WORKSPACE\phase-e\RELEASE_EVIDENCE.json" -Encoding utf8
 
       - uses: actions/upload-artifact@v6
         with:
           name: Research-OS-Unified-Windows-x64-${{ env.TARGET_SHA }}
           path: |
-            phase-e/Research-OS-Unified-Windows-x64-*.zip
-            phase-e/Research-OS-Unified-Windows-x64-*.zip.sha256
+            phase-e/Research-OS-Platform-Windows-x64-*.zip
+            phase-e/Research-OS-Platform-Windows-x64-*.zip.sha256
             phase-e/RELEASE_EVIDENCE.json
             phase-e/WINDOWS_INSTALL_E2E_EVIDENCE.json
             phase-e/package/DISTRIBUTION_MANIFEST.json
             phase-e/package/DISTRIBUTION_MANIFEST.sha256
-            installer/output/Research-OS-Unified-Setup-*-x64.exe
+            owner_special/installer/output/Research-OS-Owner-Special-Setup-*-x64.exe
           if-no-files-found: error
           retention-days: 30

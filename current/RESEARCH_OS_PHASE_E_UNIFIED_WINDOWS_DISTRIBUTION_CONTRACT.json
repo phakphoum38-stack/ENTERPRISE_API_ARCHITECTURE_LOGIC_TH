@@ -45,7 +45,11 @@
     "manifest_required": true,
     "sha256_required": true,
     "source_sha_must_match_manifest": true,
-    "artifact_sha256_required": true
+    "artifact_sha256_required": true,
+    "platform_zip_required": true,
+    "platform_zip_sha256_required": true,
+    "owner_special_setup_required": true,
+    "owner_special_setup_is_install_entrypoint": true
   },
   "authority": {
     "final_gate_remains_release_authority": true,
@@ -63,6 +67,13 @@
     "automatic_release",
     "installer_source_layout_dependency"
   ],
+  "windows_install_entrypoint": {
+    "installer": "owner_special/installer/owner-special-platform.iss",
+    "role": "OWNER_SPECIAL",
+    "payload": "RESEARCH_OS_PLATFORM_ZIP",
+    "platform_zip_pattern": "Research-OS-Platform-Windows-x64-<source_sha>.zip",
+    "release_authority": "FINAL_GATE"
+  },
   "install_e2e": {
     "evidence_required": true,
     "install_required": true,

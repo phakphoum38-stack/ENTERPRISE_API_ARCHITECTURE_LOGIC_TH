@@ -93,12 +93,14 @@ jobs:
           test "$match" = "1"
           rm -rf canonical-release && mkdir -p canonical-release
           gh run download "$WINDOWS_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$expected" --dir canonical-release
-          setup="$(find canonical-release -type f -name 'Research-OS-Unified-Setup-*-x64.exe' -print -quit)"
+          setup="$(find canonical-release -type f -name 'Research-OS-Owner-Special-Setup-*-x64.exe' -print -quit)"
           manifest="$(find canonical-release -type f -name 'DISTRIBUTION_MANIFEST.json' -print -quit)"
           manifest_hash="$(find canonical-release -type f -name 'DISTRIBUTION_MANIFEST.sha256' -print -quit)"
           install_e2e="$(find canonical-release -type f -name 'WINDOWS_INSTALL_E2E_EVIDENCE.json' -print -quit)"
           release_evidence="$(find canonical-release -type f -name 'RELEASE_EVIDENCE.json' -print -quit)"
+          platform_zip="$(find canonical-release -type f -name 'Research-OS-Platform-Windows-x64-*.zip' -print -quit)"
           test -n "$setup" && test -s "$setup"
+          test -n "$platform_zip" && test -s "$platform_zip"
           test -n "$manifest" && test -n "$manifest_hash" && test -n "$install_e2e" && test -n "$release_evidence"
           python3 - "$SOURCE_SHA" "$setup" "$manifest" "$manifest_hash" "$install_e2e" "$release_evidence" <<'PY'
           import hashlib, json, pathlib, sys
@@ -117,13 +119,18 @@ jobs:
           assert all(e2e["checks"].values())
           assert release["source_sha"] == source_sha
           assert release["release_authority"] == "FINAL_GATE"
+          assert release["installer_role"] == "OWNER_SPECIAL"
+          assert release["installation_payload"] == "RESEARCH_OS_PLATFORM_ZIP"
+          assert release["platform_zip"] == pathlib.Path(platform_zip).name
+          assert release["platform_zip_sha256"] == hashlib.sha256(pathlib.Path(platform_zip).read_bytes()).hexdigest()
+          assert release["owner_special_setup"] == pathlib.Path(setup).name
           assert pathlib.Path(setup).stat().st_size > 0
-          print("RESEARCH_OS_CANONICAL_SETUP=PASS")
+          print("RESEARCH_OS_OWNER_SPECIAL_SETUP=PASS")
           print(f"setup={pathlib.Path(setup).name}")
           print(f"setup_sha256={hashlib.sha256(pathlib.Path(setup).read_bytes()).hexdigest()}")
           PY
           echo "RESEARCH_OS_WINDOWS_SOURCE_SHA=$SOURCE_SHA"
-          echo "RESEARCH_OS_CANONICAL_WINDOWS_INSTALLER=PASS"
+          echo "RESEARCH_OS_OWNER_SPECIAL_SETUP_INSTALLER=PASS"
           echo "artifact=$expected"
   nightly-source-check:
     name: Scheduled source freshness check
