@@ -1,0 +1,101 @@
+{
+  "contract_id": "research-os-platform-evolution-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "purpose": "Canonical evolution and certification layer that composes the existing Research OS Platform spine without creating a second registry, runtime, authorization authority, evidence ledger, control plane, or release authority.",
+  "authority": {
+    "mode": "DESCRIPTIVE_VALIDATING",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "canonical_sources": {
+    "registry": "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json",
+    "registry_schema": "current/RESEARCH_OS_PLATFORM_COMPONENT_REGISTRY_SCHEMA.json",
+    "governance": "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "spine": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+    "spine_engine": "tools/platform_spine.py",
+    "reconciliation": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+    "change_impact": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+    "final_gate": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+  },
+  "evolution": {
+    "contract_versioning": {
+      "supported_major": 1,
+      "unknown": "HOLD",
+      "breaking_change": "NEW_CONTRACT_VERSION_AND_MIGRATION"
+    },
+    "compatibility": {
+      "required_metadata": ["registry_schema", "platform_contract"],
+      "unknown": "HOLD",
+      "breaking_requires": ["PLAN", "COMPATIBILITY", "MIGRATE", "VALIDATE", "EVIDENCE", "RETIRE_OLD"],
+      "rollback_required": true
+    },
+    "lifecycle": {
+      "states": ["PROPOSED", "EXPERIMENTAL", "ACTIVE", "DEPRECATED", "RETIRED"],
+      "backward_transition": "FORBIDDEN",
+      "required_component_retirement": "REQUIRES_REGISTRY_GOVERNANCE_CHANGE"
+    },
+    "ownership": {
+      "mode": "METADATA_ONLY",
+      "required_for_governance": ["authority", "lifecycle", "compatibility"],
+      "owner_does_not_grant_runtime_or_authorization_power": true
+    },
+    "impact": {
+      "required_categories": ["contracts", "workflows", "tests", "final_gate", "invariants", "product_surfaces"],
+      "unknown": "HOLD",
+      "high_impact_threshold": "CROSS_PROJECT"
+    },
+    "simulation": {
+      "required_for": "CROSS_PROJECT",
+      "checks": ["dependency", "impact", "contract", "failure", "rollback"],
+      "no_release_authority": true
+    },
+    "reconciliation": {
+      "pipeline": ["RECON", "LOCALIZE", "BOUNDARY", "PLAN", "SANDBOX", "PATCH", "VALIDATE", "POST_RECON", "EVIDENCE"],
+      "ambiguous_target": "STOP",
+      "protected_core": "STOP"
+    },
+    "ai_code_writer": {
+      "required_path": ["REGISTRY", "RECON", "DEPENDENCY_GRAPH", "CONTRACT", "CHANGE_BOUNDARY", "CODE_WRITER", "VALIDATION", "EVIDENCE"],
+      "must_not_invent_canonical_authority": true
+    },
+    "experience": {
+      "platforms": ["windows", "web", "ios"],
+      "navigation_is_registry_derived": true,
+      "direct_runtime_mutation": false
+    }
+  },
+  "certification": {
+    "required_proofs": [
+      "registry_schema",
+      "dependency_graph",
+      "lifecycle",
+      "compatibility",
+      "change_impact",
+      "simulation",
+      "reconciliation_boundary",
+      "security_chain",
+      "runtime_spine",
+      "release_authority"
+    ],
+    "unknown_is_not_pass": true,
+    "release_authority_remains": "FINAL_GATE"
+  },
+  "invariants": [
+    "reuse_existing_capabilities",
+    "no_duplicate_registry_authority",
+    "no_duplicate_runtime",
+    "no_duplicate_queue",
+    "no_duplicate_authorization",
+    "no_duplicate_evidence",
+    "no_duplicate_release_authority",
+    "health_is_not_authorization",
+    "resource_conflict_is_fail_closed",
+    "engine_does_not_directly_call_runner",
+    "main_is_release_baseline"
+  ]
+}

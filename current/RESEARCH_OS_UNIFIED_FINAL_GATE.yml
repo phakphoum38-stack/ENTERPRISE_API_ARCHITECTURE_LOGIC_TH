@@ -81,6 +81,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -94,6 +95,7 @@ required_workflows:
   - .github/workflows/owner-special-friend.yml
   - .github/workflows/owner-special-ios-ipa.yml
   - .github/workflows/research-os-platform-one-pass-completion.yml
+  - .github/workflows/research-os-platform-evolution.yml
 
 required_surface_contracts:
   - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
