@@ -93,6 +93,7 @@ required_contracts:
   - current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json
 
 required_workflows:
+  - .github/workflows/continuous-generated-release.yml
   - .github/workflows/research-os-gate.yml
   - .github/workflows/research-os-final-gate.yml
   - .github/workflows/research-os-platform-surface-matrix.yml
