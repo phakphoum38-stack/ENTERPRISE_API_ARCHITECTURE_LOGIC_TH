@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -8,6 +9,10 @@ from tools.research_os_api.api_platform.management_service import JsonManagement
 
 
 class ManagementServiceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("RESEARCH_OS_API_KEY_PEPPER", "test-only-pepper")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.service = ManagementService(JsonManagementStore(Path(self.temp.name) / "management.json"))
