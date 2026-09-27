@@ -52,7 +52,19 @@ try {
     }
 
     New-Item -ItemType Directory -Force -Path $TargetRoot | Out-Null
-    Copy-Item -Path (Join-Path $staging '*') -Destination $TargetRoot -Recurse -Force
+    & robocopy.exe $staging $TargetRoot /E /COPY:DAT /R:2 /W:1 /NFL /NDL /NP | Out-Host
+    $copyCode = $LASTEXITCODE
+    if ($copyCode -gt 7) { throw "Platform ZIP staged copy failed: robocopy exit code $copyCode" }
+    foreach ($required in @(
+        'app\\research_os_flutter.exe',
+        'owner_special\\app\\research_os_owner_special.exe',
+        'owner_special\\scripts\\install-owner-service.ps1',
+        'scripts\\research-os-service.ps1',
+        'service_host\\ResearchOS.ServiceHost.exe',
+        'service_host\\ResearchOS.Owner.ServiceHost.exe'
+    )) {
+        if (-not (Test-Path (Join-Path $TargetRoot $required) -PathType Leaf)) { throw "Platform ZIP installation is incomplete; missing $required" }
+    }
 
     $provenance = [ordered]@{
         schema = 'research-os.owner-special-platform-install.v1'
