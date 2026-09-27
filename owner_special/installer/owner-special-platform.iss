@@ -57,7 +57,6 @@ Name: "{autodesktop}\Research OS"; Filename: "{app}\app\{#MyAppExeName}"; Workin
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: checkedonce
 Name: "startapp"; Description: "Launch Research OS after setup"; GroupDescription: "After setup:"; Flags: checkedonce
-Name: "startapp"; Description: "Launch Research OS after setup"; GroupDescription: "After setup:"; Flags: checkedonce
 
 [Run]
 Filename: "{app}\app\{#MyAppExeName}"; Description: "Launch Research OS"; WorkingDir: "{app}\app"; Flags: nowait postinstall skipifsilent; Tasks: startapp
