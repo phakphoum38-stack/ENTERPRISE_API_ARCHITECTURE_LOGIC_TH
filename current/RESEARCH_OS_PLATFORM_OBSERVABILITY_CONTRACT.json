@@ -1,0 +1,10 @@
+{
+  "contract_id":"research-os-platform-observability-v1",
+  "version":"1.0.0",
+  "status":"ACTIVE",
+  "required_context":["request_id","correlation_id","actor","contract_version"],
+  "lineage":["request","workflow","delivery","worker","evidence","audit","gate"],
+  "unknown":"HOLD",
+  "health_is_not_authorization":true,
+  "release_authority":"FINAL_GATE"
+}
