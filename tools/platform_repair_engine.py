@@ -3,7 +3,7 @@
 from __future__ import annotations
 import argparse,json,subprocess
 from pathlib import Path
-from platform_self_reconciliation import tracked_files,resolve_path,build_plan,is_protected,replace_reference
+from tools.platform_self_reconciliation import tracked_files,resolve_path,build_plan,is_protected,replace_reference
 ROOT=Path(__file__).resolve().parents[1]
 def plan(reference:str, owner_file:str, source_sha:str="UNKNOWN")->dict:
     files=tracked_files(ROOT); r=resolve_path(reference,files)
