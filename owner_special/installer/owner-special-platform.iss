@@ -77,7 +77,7 @@ Type: filesandordirs; Name: "{app}\*"
 [Code]
 procedure LogDiagnosticFile(const FileName: String);
 var
-  Contents: String;
+  Contents: AnsiString;
 begin
   if not FileExists(FileName) then
   begin
