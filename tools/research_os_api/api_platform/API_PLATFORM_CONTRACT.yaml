@@ -61,6 +61,7 @@ resources:
   api_keys:
     collection: /platform/v1/applications/{application_id}/keys
     operations: [create, list, get, revoke, rotate]
+    entitlement_binding: required
     raw_secret: never_persisted
   plans:
     collection: /platform/v1/plans
