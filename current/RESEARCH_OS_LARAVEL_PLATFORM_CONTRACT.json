@@ -1,7 +1,7 @@
 {
   "document_id": "ROS-LARAVEL-PLATFORM-CONTRACT",
   "version": "1.0.0",
-  "status": "proposed",
+  "status": "active",
   "platform": "research-os-laravel",
   "baseline_platform": "research-os-main",
   "authority": {

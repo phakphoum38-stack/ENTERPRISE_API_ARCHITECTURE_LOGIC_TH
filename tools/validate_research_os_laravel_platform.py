@@ -34,6 +34,13 @@ def main() -> int:
         raise SystemExit(f"LARAVEL_PLATFORM_MISSING={missing}")
 
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if contract.get("status") != "active":
+        raise SystemExit("LARAVEL_PLATFORM_CONTRACT_STATUS=FAIL: contract must be active")
+    authority = contract.get("authority", {})
+    if authority.get("security_decisions") != "canonical_research_os_platform":
+        raise SystemExit("LARAVEL_PLATFORM_AUTHORITY=FAIL: security decisions must remain canonical")
+    if authority.get("release") != "research_os_unified_final_gate":
+        raise SystemExit("LARAVEL_PLATFORM_AUTHORITY=FAIL: release must remain unified final gate")
     delivery = contract["delivery"]
     assert delivery["direct_engine_to_runner"] is False
     assert delivery["idempotency_required"] is True
