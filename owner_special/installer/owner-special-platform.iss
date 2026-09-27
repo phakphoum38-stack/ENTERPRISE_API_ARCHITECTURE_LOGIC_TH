@@ -78,6 +78,7 @@ Type: filesandordirs; Name: "{app}\*"
 procedure LogDiagnosticFile(const FileName: String);
 var
   Contents: AnsiString;
+  TextContents: String;
   Line: String;
   NewLinePos: Integer;
 begin
@@ -93,20 +94,21 @@ begin
   end;
 
   Log('--- Research OS Platform bootstrap diagnostics ---');
-  Contents := StringChangeEx(String(Contents), #13#10, #10, True);
-  Contents := StringChangeEx(Contents, #13, #10, True);
-  while Contents <> '' do
+  TextContents := Contents;
+  TextContents := StringChangeEx(TextContents, #13#10, #10, True);
+  TextContents := StringChangeEx(TextContents, #13, #10, True);
+  while TextContents <> '' do
   begin
-    NewLinePos := Pos(#10, Contents);
+    NewLinePos := Pos(#10, TextContents);
     if NewLinePos = 0 then
     begin
-      Line := Contents;
-      Contents := '';
+      Line := TextContents;
+      TextContents := '';
     end
     else
     begin
-      Line := Copy(Contents, 1, NewLinePos - 1);
-      Delete(Contents, 1, NewLinePos);
+      Line := Copy(TextContents, 1, NewLinePos - 1);
+      Delete(TextContents, 1, NewLinePos);
     end;
     if Line <> '' then Log(Line);
   end;
