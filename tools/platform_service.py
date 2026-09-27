@@ -77,7 +77,7 @@ class PlatformService:
             "repository": "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH",
             "source_sha": canonical_sha(),
             "protected_baseline_sha": canonical_sha(),
-            "active_work": ["platform-complete-build"],
+            "active_work": [],
             "deferred_work": [],
             "decisions": [
                 "platform_is_the_reusable_root",
@@ -94,6 +94,7 @@ class PlatformService:
                 "current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json",
                 "current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json",
                 "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+                "current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json",
             ],
             "open_risks": [],
             "unknowns": [],
