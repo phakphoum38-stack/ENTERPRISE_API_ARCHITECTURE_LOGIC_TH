@@ -13,5 +13,8 @@ return [
         'messaging' => '/api/v1/platform/messaging/publish',
         'evidence' => '/api/v1/platform/evidence',
         'audit' => '/api/v1/platform/audit',
+        'tools' => '/api/v1/platform/tools/invoke',
+        'control' => '/api/v1/platform/control/execute',
+        'operations' => '/api/v1/platform/operations/snapshot',
     ],
 ];

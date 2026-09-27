@@ -48,6 +48,18 @@ final class CanonicalPlatformClient
         return $json;
     }
 
+    public function get(string $endpoint): array {
+        $baseUrl = rtrim($this->baseUrl, '/');
+        if ($baseUrl === '') { throw new RuntimeException('Canonical Research OS Platform URL is not configured.'); }
+        $response = $this->http->acceptJson()->timeout($this->timeout)->connectTimeout($this->connectTimeout)
+            ->withHeaders(['X-Request-Id'=>$endpoint,'X-Correlation-Id'=>$endpoint])
+            ->get($baseUrl.$endpoint);
+        $response->throw();
+        $json=$response->json();
+        if (!is_array($json)) { throw new RuntimeException('Canonical Research OS Platform returned a non-object response.'); }
+        return $json;
+    }
+
     private function request(RequestContext $context): PendingRequest
     {
         return $this->http
