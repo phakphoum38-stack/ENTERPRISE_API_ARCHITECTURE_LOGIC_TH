@@ -214,16 +214,31 @@ jobs:
           "$mh  DISTRIBUTION_MANIFEST.json" | Set-Content "$p\DISTRIBUTION_MANIFEST.sha256" -Encoding ascii
           Write-Host 'RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION=PASS'
 
-      - name: Build unified installer
+      - name: Package canonical Research OS Platform ZIP
+        shell: pwsh
+        run: |
+          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
+          $sha = (git rev-parse HEAD).Trim()
+          $zip = "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Platform-Windows-x64-$sha.zip"
+          Compress-Archive -Path "$p\*" -DestinationPath $zip -CompressionLevel Optimal
+          $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$zipHash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
+          "PLATFORM_ZIP_PATH=$zip" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "PLATFORM_ZIP_SHA256=$zipHash" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "RESEARCH_OS_PLATFORM_ZIP=PASS sha256=$zipHash"
+
+      - name: Build Owner Special Setup.exe around canonical Platform ZIP
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
           $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-          $stagingRoot = "$env:GITHUB_WORKSPACE\phase-e\package"
-          if (-not (Test-Path $stagingRoot)) { throw "Distribution staging root not found: $stagingRoot" }
-          & $iscc "/DPackageRoot=$stagingRoot" "$env:GITHUB_WORKSPACE\installer\research-os-unified.iss"
-          if ($LASTEXITCODE -ne 0) { throw 'Unified installer build failed.' }
+          $sourceSha = (git rev-parse HEAD).Trim()
+          & $iscc "/DPlatformZip=$env:PLATFORM_ZIP_PATH" "/DPlatformZipSha256=$env:PLATFORM_ZIP_SHA256" "/DPlatformSourceSha=$sourceSha" "$env:GITHUB_WORKSPACE\owner_special\installer\owner-special-platform.iss"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Special Platform Setup.exe build failed.' }
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw 'Owner Special Platform Setup.exe missing.' }
+          Write-Host "OWNER_SPECIAL_PLATFORM_SETUP=PASS setup=$($setup.Name)"
 
       - name: Installer install run uninstall E2E
         shell: pwsh
