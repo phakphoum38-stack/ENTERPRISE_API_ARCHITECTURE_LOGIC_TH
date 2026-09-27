@@ -52,7 +52,7 @@ try {
     }
 
     New-Item -ItemType Directory -Force -Path $TargetRoot | Out-Null
-    Copy-Item -LiteralPath (Join-Path $staging '*') -Destination $TargetRoot -Recurse -Force
+    Copy-Item -Path (Join-Path $staging '*') -Destination $TargetRoot -Recurse -Force
 
     $provenance = [ordered]@{
         schema = 'research-os.owner-special-platform-install.v1'
