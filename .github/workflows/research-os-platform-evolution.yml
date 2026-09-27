@@ -1,0 +1,39 @@
+name: Research OS Platform Evolution
+
+on:
+  pull_request:
+    paths:
+      - 'current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json'
+      - 'current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json'
+      - 'current/RESEARCH_OS_PLATFORM_COMPONENT_REGISTRY_SCHEMA.json'
+      - 'current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json'
+      - 'current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json'
+      - 'tools/platform_spine.py'
+      - 'tools/validate_platform_self_reconciliation.py'
+      - 'tools/validate_research_os_platform_evolution.py'
+      - 'tools/test_validate_research_os_platform_evolution.py'
+      - 'tools/validate_research_os_unified_final_gate.py'
+      - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json'
+      - 'tools/validate_research_os_platform_evolution.py'
+      - 'tools/test_validate_research_os_platform_evolution.py'
+      - 'tools/validate_research_os_unified_final_gate.py'
+      - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
+
+jobs:
+  platform-evolution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Platform Evolution
+        run: python tools/validate_research_os_platform_evolution.py
+      - name: Test Platform Evolution
+        run: python tools/test_validate_research_os_platform_evolution.py
+      - name: Validate Unified Final Gate binding
+        run: python tools/validate_research_os_unified_final_gate.py
