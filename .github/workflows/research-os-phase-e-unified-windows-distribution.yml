@@ -223,6 +223,22 @@ jobs:
           Compress-Archive -Path "$p\*" -DestinationPath $zip -CompressionLevel Optimal
           $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$zipHash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\\','/') })
+            foreach ($requiredZipEntry in @(
+              'app/research_os_flutter.exe',
+              'owner_special/app/research_os_owner_special.exe',
+              'DISTRIBUTION_MANIFEST.json',
+              'DISTRIBUTION_MANIFEST.sha256'
+            )) {
+              if ($requiredZipEntry -notin $names) { throw "Canonical Platform ZIP is missing required entry: $requiredZipEntry" }
+            }
+            Write-Host "PLATFORM_ZIP_ENTRY_GATE=PASS entries=$($names.Count)"
+          } finally {
+            $archive.Dispose()
+          }
           "PLATFORM_ZIP_PATH=$zip" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "PLATFORM_ZIP_SHA256=$zipHash" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "RESEARCH_OS_PLATFORM_ZIP=PASS sha256=$zipHash"
