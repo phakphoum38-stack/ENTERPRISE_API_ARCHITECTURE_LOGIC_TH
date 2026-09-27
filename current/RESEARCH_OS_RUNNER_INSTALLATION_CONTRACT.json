@@ -49,6 +49,7 @@
     "source_sha_must_match_manifest": true,
     "manifest_digest_must_match": true,
     "artifact_digest_must_match": true,
+    "platform_zip_digest_must_match": true,
     "unknown_package_is_rejected": true,
     "platform_mismatch_is_rejected": true,
     "architecture_mismatch_is_rejected": true,
@@ -68,7 +69,9 @@
     "windows_x64": {
       "platform": "windows",
       "architecture": "x86_64",
-      "installer": "installer/research-os-unified.iss",
+      "installer": "owner_special/installer/owner-special-platform.iss",
+      "payload": "Research-OS-Platform-Windows-x64-<source_sha>.zip",
+      "installer_role": "OWNER_SPECIAL",
       "bootstrap_supported": true
     },
     "linux_x64": {
