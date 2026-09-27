@@ -19,6 +19,32 @@ Write-Diagnostic "START ZipPath=$ZipPath TargetRoot=$TargetRoot ExpectedZipSha25
 
 function Normalize-Hash([string]$Value) { return $Value.Trim().ToLowerInvariant() }
 
+function Get-Sha256([string]$Path) {
+    try {
+        $hashResult = Get-FileHash -LiteralPath $Path -Algorithm SHA256 -ErrorAction Stop
+        if ($null -eq $hashResult -or [string]::IsNullOrWhiteSpace([string]$hashResult.Hash)) {
+            throw "Get-FileHash returned no SHA256 hash."
+        }
+        return ([string]$hashResult.Hash).Trim().ToLowerInvariant()
+    }
+    catch {
+        $getFileHashError = $_.Exception.Message
+        Write-Diagnostic "SHA256 fallback=certutil path=$Path get-filehash-error=$getFileHashError"
+        $certutilOutput = & certutil.exe -hashfile "$Path" SHA256 2>&1
+        $certutilCode = $LASTEXITCODE
+        if ($certutilCode -ne 0) {
+            throw "Unable to compute SHA256 for $Path with Get-FileHash or certutil. Get-FileHash: $getFileHashError"
+        }
+        $hashLine = $certutilOutput | ForEach-Object {
+            if ([string]$_ -match '([0-9A-Fa-f]{64})') { $Matches[1] }
+        } | Select-Object -First 1
+        if ([string]::IsNullOrWhiteSpace([string]$hashLine)) {
+            throw "certutil did not return a valid SHA256 hash for $Path."
+        }
+        return ([string]$hashLine).Trim().ToLowerInvariant()
+    }
+}
+
 Write-Diagnostic "STEP verify-zip-exists path=$ZipPath"
 $zipItem = Get-Item -LiteralPath $ZipPath -ErrorAction SilentlyContinue
 if ($null -eq $zipItem) {
@@ -122,7 +148,8 @@ try {
     if ([string]$manifest.company_name -ne 'Research OS Team') { throw 'Platform company identity mismatch.' }
 
     Write-Diagnostic "STEP validate-manifest-sha"
-    $manifestSha = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $manifestSha = Get-Sha256 $manifestPath
+    Write-Diagnostic "STEP validate-manifest-sha actual=$manifestSha"
     $declaredManifestSha = (Get-Content $manifestHashPath -Raw).Trim().Split()[0].ToLowerInvariant()
     if ($manifestSha -ne $declaredManifestSha) {
         throw "Platform manifest SHA mismatch: declared $declaredManifestSha actual $manifestSha"
