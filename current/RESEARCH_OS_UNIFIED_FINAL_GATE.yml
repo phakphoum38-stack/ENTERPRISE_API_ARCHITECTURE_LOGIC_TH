@@ -311,3 +311,16 @@ production_certification:
   unknown_state: STOP
   deferred_is_not_pass: true
   release_authority_remains: final_gate
+
+api_management_platform:
+  contract: tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml
+  capability_matrix: tools/research_os_api/api_platform/API_PLATFORM_CAPABILITY_MATRIX.yaml
+  implementation: tools/research_os_api/api_platform/management_service.py
+  http: tools/research_os_api/api_platform/management_http.py
+  sdk_metadata: tools/research_os_api/api_platform/sdk_metadata.py
+  validator: tools/validate_research_os_api_management_platform.py
+  test: tools/research_os_api/api_platform/test_management_service.py
+  metadata_only: true
+  runtime_authority_remains: resource_control_plane
+  unknown_state: STOP
+  release_authority_remains: final_gate
