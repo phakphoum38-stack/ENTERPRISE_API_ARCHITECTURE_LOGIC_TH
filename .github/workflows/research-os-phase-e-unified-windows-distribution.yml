@@ -227,11 +227,21 @@ jobs:
           "PLATFORM_ZIP_SHA256=$zipHash" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "RESEARCH_OS_PLATFORM_ZIP=PASS sha256=$zipHash"
 
+      - name: Generate canonical Platform installer branding
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pillow
+          if ($LASTEXITCODE -ne 0) { throw 'Pillow installation failed.' }
+          python "$env:GITHUB_WORKSPACE\\scripts\\apply-research-os-branding.py" --app-root "$env:GITHUB_WORKSPACE" --master "$env:GITHUB_WORKSPACE\\apps\\research_os_flutter\\assets\\branding\\research_os_master.webp"
+          if ($LASTEXITCODE -ne 0) { throw 'Canonical Platform installer branding generation failed.' }
+          if (-not (Test-Path "$env:GITHUB_WORKSPACE\\assets\\branding\\research_os.ico" -PathType Leaf)) { throw 'Canonical Research OS installer icon generation failed.' }
+
       - name: Verify canonical Platform UI binding for Owner Special Setup
         shell: pwsh
         run: |
           $installer = "$env:GITHUB_WORKSPACE\\owner_special\\installer\\owner-special-platform.iss"
           $canonicalUiRoot = "$env:GITHUB_WORKSPACE\\apps\\research_os_flutter"
+          $master = "$env:GITHUB_WORKSPACE\\apps\\research_os_flutter\\assets\\branding\\research_os_master.webp"
           $icon = "$env:GITHUB_WORKSPACE\\assets\\branding\\research_os.ico"
           if (-not (Test-Path $canonicalUiRoot -PathType Container)) { throw 'Canonical Platform UI root missing: apps/research_os_flutter' }
           if (-not (Test-Path $icon -PathType Leaf)) { throw 'Canonical Research OS branding icon missing.' }
