@@ -1035,6 +1035,47 @@
         "registry_schema": "1.x",
         "platform_contract": "1.x"
       }
+    },
+    {
+      "id": "api_management_platform",
+      "canonical": "tools/validate_research_os_api_management_platform.py",
+      "kind": "API_MANAGEMENT_PLATFORM",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_runtime_completion",
+        "release"
+      ],
+      "contracts": [
+        "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml"
+      ],
+      "tests": [
+        "tools/research_os_api/api_platform/test_management_service.py",
+        "tools/research_os_api/test_api_key_durable_store.py"
+      ],
+      "evidence": [
+        "docs/API_MANAGEMENT_PLATFORM_CONTRACT.md",
+        "tools/research_os_api/api_platform/API_PLATFORM_CAPABILITY_MATRIX.yaml"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "api_management",
+        "durable_metadata",
+        "credential_lifecycle",
+        "management_http",
+        "sdk_metadata"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
     }
   ],
   "rules": [
