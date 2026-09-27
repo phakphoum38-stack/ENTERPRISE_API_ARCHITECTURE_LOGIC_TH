@@ -23,6 +23,8 @@ navigation map, not a second authority.
 | Continuous Reconciliation | `.github/workflows/recon-continuous-reconciliation.yml` + self-reconciliation validator | ACTIVE |
 | Control Plane | Native Control Center / Platform operating contracts | ACTIVE |
 | Assurance | AEOS + platform validators + evidence lineage | ACTIVE |
+| API Management Platform | `tools/research_os_api/api_platform/` + management qualification gate | ACTIVE / PRODUCTION-QUALIFIED |
+| Laravel Platform | `apps/research_os_laravel/` + canonical Laravel contract/validator | ACTIVE / PRODUCTION-QUALIFIED |
 | Unified Final Gate | `current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml` | SINGLE RELEASE AUTHORITY |
 
 ## Non-duplication rule
@@ -42,3 +44,8 @@ boundaries remain fail-closed.
 ## Dynamic component evolution
 
 The component registry is schema-driven. Component count is informational only; required components are explicit metadata. Optional extensions, lifecycle transitions, capabilities, authority metadata, dependency references, and compatibility metadata are validated without hard-coding the component list into validator code.
+
+
+## Current reconciliation baseline
+
+The current `main` baseline includes the production-qualified API Management Platform and Laravel Platform integration. Both are registered as canonical Platform components and are bound to governance and the Unified Final Gate. This map is descriptive only; it does not create authority or duplicate runtime capabilities.

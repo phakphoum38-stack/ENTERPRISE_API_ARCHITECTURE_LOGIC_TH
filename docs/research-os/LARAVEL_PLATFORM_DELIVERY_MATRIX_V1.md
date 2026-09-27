@@ -14,8 +14,13 @@
 | Operations | health/readiness surface | canonical operations gateway | health gate | READY |
 | Versioning | policy + interface | compatibility adapter | contract gate | READY |
 | Control | API contract + interface | canonical control gateway | E2E boundary | READY |
-| Client integration | shared Research OS surface contracts | Windows/Web/iOS surface gates | cross-surface parity | BOUND |
+| Client integration | shared Research OS surface contracts | Windows/Web/iOS surface gates | cross-surface parity | BOUND / QUALIFIED BY PLATFORM CERTIFICATION |
 
-The Laravel runtime is now a composed Platform surface: Tools, Control and Operations are implemented through canonical gateways; client integration is governed by the shared Research OS surface contracts and existing cross-platform gates. This matrix describes implementation/qualification state and does not create a second authority.
+The Laravel runtime is now a composed Platform surface: Tools, Control and Operations are implemented through canonical gateways; Laravel is registered as a required Platform component; API Management is registered and qualified as a canonical management component; client integration is governed by the shared Research OS surface contracts and existing cross-platform gates. This matrix describes implementation/qualification state and does not create a second authority.
 
 DEFERRED work must be recorded explicitly in the canonical continuity snapshot; an empty deferred set means there is no currently recorded deferred item in that snapshot.
+
+
+## Reconciliation note
+
+This matrix reflects the current `main` state after Laravel registration and API Management production qualification. It is not a second authority; the canonical registry, contracts and Unified Final Gate remain authoritative.
