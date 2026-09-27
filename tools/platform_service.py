@@ -78,9 +78,7 @@ class PlatformService:
             "source_sha": canonical_sha(),
             "protected_baseline_sha": canonical_sha(),
             "active_work": ["platform-complete-build"],
-            "deferred_work": [
-                "flutter_windows_analyze_test_failures",
-            ],
+            "deferred_work": [],
             "decisions": [
                 "platform_is_the_reusable_root",
                 "research_os_is_a_product_surface",
