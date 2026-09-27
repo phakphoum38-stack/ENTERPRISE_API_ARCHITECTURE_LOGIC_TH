@@ -180,7 +180,12 @@ class ManagementService:
         if method is None:
             raise ValueError(f"unsupported management resource: {resource}")
         if resource == "api_keys":
-            return self.registry.add_api_key(obj, entitlement_scope_ids=obj.scopes)
+            if obj.entitlement_id is None:
+                raise ValueError("api key requires entitlement_id")
+            entitlement = self.registry.entitlements.get(obj.entitlement_id)
+            if entitlement is None:
+                raise ValueError("api key references unknown entitlement")
+            return self.registry.add_api_key(obj, entitlement_scope_ids=entitlement.scope_ids)
         return getattr(self.registry, method)(obj)
 
     def _persist(self, resource: str, obj: Any, *, actor: str, action: str) -> dict[str, Any]:
@@ -194,8 +199,14 @@ class ManagementService:
         application_id = str(payload.get("application_id", "")).strip()
         principal_id = str(payload.get("principal_id", "")).strip()
         scopes = frozenset(str(value) for value in payload.get("scopes", []))
+        entitlement_id = str(payload.get("entitlement_id", "")).strip()
         if not application_id or not principal_id:
             raise ValueError("application_id and principal_id are required")
+        if not entitlement_id:
+            raise ValueError("entitlement_id is required")
+        entitlement = _decode("entitlements", self.get("entitlements", entitlement_id))
+        if not set(scopes).issubset(set(entitlement.scope_ids)):
+            raise ValueError("api key scopes exceed entitlement")
         application = _decode("applications", self.get("applications", application_id))
         if application.application_id != application_id:
             raise ValueError("application mismatch")
@@ -205,7 +216,7 @@ class ManagementService:
         expires = payload.get("expires_at")
         expires_at = datetime.fromisoformat(expires) if isinstance(expires, str) and expires else None
         record, secret = self.key_manager.create(principal_id, set(scopes), expires_at=expires_at)
-        obj = APIKey(record.key_id, application_id, record.fingerprint, tuple(sorted(scopes)), record.created_at, record.expires_at, record.revoked_at)
+        obj = APIKey(record.key_id, application_id, record.fingerprint, tuple(sorted(scopes)), record.created_at, record.expires_at, record.revoked_at, entitlement_id)
         self._add_typed("api_keys", obj)
         result = self._persist("api_keys", obj, actor=actor, action="create")
         result["raw_secret"] = secret
@@ -222,13 +233,19 @@ class ManagementService:
     def rotate_api_key(self, key_id: str, payload: dict[str, Any], *, actor: str = "system") -> dict[str, Any]:
         current = _decode("api_keys", self.get("api_keys", key_id))
         scopes = frozenset(str(value) for value in payload.get("scopes", current.scopes))
+        entitlement_id = str(payload.get("entitlement_id", current.entitlement_id or "")).strip()
+        if not entitlement_id:
+            raise ValueError("entitlement_id is required")
+        entitlement = _decode("entitlements", self.get("entitlements", entitlement_id))
+        if not set(scopes).issubset(set(entitlement.scope_ids)):
+            raise ValueError("api key scopes exceed entitlement")
         expires = payload.get("expires_at")
         expires_at = datetime.fromisoformat(expires) if isinstance(expires, str) and expires else None
         record, secret = self.key_manager.rotate(key_id, self.key_manager.get(key_id).principal_id, set(scopes), expires_at=expires_at)
         old = replace(current, revoked_at=record.created_at)
         self._replace_and_validate("api_keys", key_id, old)
         self._persist("api_keys", old, actor=actor, action="rotate_revoke")
-        replacement = APIKey(record.key_id, current.application_id, record.fingerprint, tuple(sorted(scopes)), record.created_at, record.expires_at, record.revoked_at)
+        replacement = APIKey(record.key_id, current.application_id, record.fingerprint, tuple(sorted(scopes)), record.created_at, record.expires_at, record.revoked_at, entitlement_id)
         self._add_typed("api_keys", replacement)
         result = self._persist("api_keys", replacement, actor=actor, action="rotate_create")
         result["raw_secret"] = secret
