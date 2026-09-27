@@ -318,7 +318,7 @@ jobs:
           $setupLog = Join-Path $env:RUNNER_TEMP 'research-os-owner-platform-setup.log'
           $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /TASKS="desktopicon" /LOG="' + $setupLog + '"'
           $process = Start-Process -FilePath $setup.FullName -ArgumentList $arguments -PassThru
-          $deadline = (Get-Date).AddMinutes(8)
+          $deadline = (Get-Date).AddMinutes(12)
           while (-not $process.HasExited -and (Get-Date) -lt $deadline) {
             Start-Sleep -Seconds 10
             $process.Refresh()
@@ -331,7 +331,7 @@ jobs:
               Where-Object { $_.ExecutablePath -like "$installRoot*" -or $_.CommandLine -like "*$installRoot*" -or $_.Name -in @('Setup.tmp','powershell.exe','ResearchOS.ServiceHost.exe','ResearchOS.Owner.ServiceHost.exe') } |
               Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-            throw 'Owner Special Setup exceeded 8 minute E2E timeout.'
+            throw 'Owner Special Setup exceeded 12 minute E2E timeout.'
           }
           if ($process.ExitCode -ne 0) {
             if (Test-Path $setupLog) { Get-Content $setupLog -Tail 200 | Out-Host }

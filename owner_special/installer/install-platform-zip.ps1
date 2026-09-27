@@ -13,17 +13,104 @@ function Write-Diagnostic([string]$Message) {
 }
 
 try { Set-Content -LiteralPath $DiagnosticLogPath -Value '' -Encoding utf8 } catch { }
+# Diagnostic preflight is intentionally explicit so installer failures remain observable.
+# Phase-E trigger marker: canonical Platform ZIP bootstrap diagnostics.
 Write-Diagnostic "START ZipPath=$ZipPath TargetRoot=$TargetRoot ExpectedZipSha256=$ExpectedZipSha256 ExpectedSourceSha=$ExpectedSourceSha"
 
 function Normalize-Hash([string]$Value) { return $Value.Trim().ToLowerInvariant() }
 
-Write-Diagnostic "STEP verify-zip-exists"
-if (-not (Test-Path $ZipPath -PathType Leaf)) { throw "Platform ZIP missing: $ZipPath" }
-$actualZipSha = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-Write-Diagnostic "STEP verify-zip-sha256 actual=$actualZipSha"
-if ($actualZipSha -ne (Normalize-Hash $ExpectedZipSha256)) {
+function Get-Sha256([string]$Path) {
+    try {
+        $hashResult = Get-FileHash -LiteralPath $Path -Algorithm SHA256 -ErrorAction Stop
+        if ($null -eq $hashResult -or [string]::IsNullOrWhiteSpace([string]$hashResult.Hash)) {
+            throw "Get-FileHash returned no SHA256 hash."
+        }
+        return ([string]$hashResult.Hash).Trim().ToLowerInvariant()
+    }
+    catch {
+        $getFileHashError = $_.Exception.Message
+        Write-Diagnostic "SHA256 fallback=certutil path=$Path get-filehash-error=$getFileHashError"
+        $certutilOutput = & certutil.exe -hashfile "$Path" SHA256 2>&1
+        $certutilCode = $LASTEXITCODE
+        if ($certutilCode -ne 0) {
+            throw "Unable to compute SHA256 for $Path with Get-FileHash or certutil. Get-FileHash: $getFileHashError"
+        }
+        $hashLine = $certutilOutput | ForEach-Object {
+            if ([string]$_ -match '([0-9A-Fa-f]{64})') { $Matches[1] }
+        } | Select-Object -First 1
+        if ([string]::IsNullOrWhiteSpace([string]$hashLine)) {
+            throw "certutil did not return a valid SHA256 hash for $Path."
+        }
+        return ([string]$hashLine).Trim().ToLowerInvariant()
+    }
+}
+
+Write-Diagnostic "STEP verify-zip-exists path=$ZipPath"
+$zipItem = Get-Item -LiteralPath $ZipPath -ErrorAction SilentlyContinue
+if ($null -eq $zipItem) {
+    Write-Diagnostic "STEP verify-zip-exists result=MISSING"
+    throw "Platform ZIP missing: $ZipPath"
+}
+Write-Diagnostic "STEP verify-zip-exists result=FOUND length=$($zipItem.Length) full_name=$($zipItem.FullName)"
+
+Write-Diagnostic "STEP verify-zip-readability begin path=$($zipItem.FullName)"
+$zipStream = $null
+try {
+    $zipStream = [System.IO.File]::Open(
+        $zipItem.FullName,
+        [System.IO.FileMode]::Open,
+        [System.IO.FileAccess]::Read,
+        [System.IO.FileShare]::Read
+    )
+    Write-Diagnostic "STEP verify-zip-readability result=PASS length=$($zipStream.Length)"
+}
+catch {
+    Write-Diagnostic "STEP verify-zip-readability result=FAIL message=$($_.Exception.Message)"
+    throw "Platform ZIP is not readable: $($zipItem.FullName). $($_.Exception.Message)"
+}
+finally {
+    if ($null -ne $zipStream) {
+        $zipStream.Dispose()
+    }
+}
+
+Write-Diagnostic "STEP verify-zip-sha256 begin algorithm=SHA256 path=$($zipItem.FullName)"
+$actualZipSha = $null
+try {
+    $hashResult = Get-FileHash -LiteralPath $zipItem.FullName -Algorithm SHA256 -ErrorAction Stop
+    if ($null -eq $hashResult -or [string]::IsNullOrWhiteSpace([string]$hashResult.Hash)) {
+        throw "Get-FileHash returned no SHA256 hash."
+    }
+    $actualZipSha = ([string]$hashResult.Hash).Trim().ToLowerInvariant()
+    Write-Diagnostic "STEP verify-zip-sha256 computed=$actualZipSha"
+}
+catch {
+    $getFileHashError = $_.Exception.Message
+    Write-Diagnostic "STEP verify-zip-sha256 get-filehash-failed message=$getFileHashError"
+    Write-Diagnostic "STEP verify-zip-sha256 fallback=certutil"
+    $certutilOutput = & certutil.exe -hashfile "$($zipItem.FullName)" SHA256 2>&1
+    $certutilCode = $LASTEXITCODE
+    Write-Diagnostic "STEP verify-zip-sha256 certutil-exit-code=$certutilCode"
+    if ($certutilCode -ne 0) {
+        throw "Unable to compute Platform ZIP SHA256 with Get-FileHash or certutil. Get-FileHash: $getFileHashError"
+    }
+    $hashLine = $certutilOutput | ForEach-Object {
+        if ([string]$_ -match '([0-9A-Fa-f]{64})') {
+            $Matches[1]
+        }
+    } | Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace([string]$hashLine)) {
+        throw "certutil did not return a valid SHA256 hash."
+    }
+    $actualZipSha = ([string]$hashLine).Trim().ToLowerInvariant()
+    Write-Diagnostic "STEP verify-zip-sha256 certutil-computed=$actualZipSha"
+}
+$expectedZipSha = Normalize-Hash $ExpectedZipSha256
+Write-Diagnostic "STEP verify-zip-sha256 actual=$actualZipSha expected=$expectedZipSha"
+if ($actualZipSha -ne $expectedZipSha) {
     throw "Platform ZIP SHA256 mismatch: expected $ExpectedZipSha256 actual $actualZipSha"
 }
+Write-Diagnostic "STEP verify-zip-sha256 result=PASS"
 
 Write-Diagnostic "STEP validate-zip-entries"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -61,7 +148,8 @@ try {
     if ([string]$manifest.company_name -ne 'Research OS Team') { throw 'Platform company identity mismatch.' }
 
     Write-Diagnostic "STEP validate-manifest-sha"
-    $manifestSha = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $manifestSha = Get-Sha256 $manifestPath
+    Write-Diagnostic "STEP validate-manifest-sha actual=$manifestSha"
     $declaredManifestSha = (Get-Content $manifestHashPath -Raw).Trim().Split()[0].ToLowerInvariant()
     if ($manifestSha -ne $declaredManifestSha) {
         throw "Platform manifest SHA mismatch: declared $declaredManifestSha actual $manifestSha"
@@ -69,7 +157,7 @@ try {
 
     Write-Diagnostic "STEP robocopy-to-target"
     New-Item -ItemType Directory -Force -Path $TargetRoot | Out-Null
-    & robocopy.exe $staging $TargetRoot /E /COPY:DAT /J /XJ /R:2 /W:1 /NFL /NDL /NP /TEE /LOG+:"$env:TEMP\\ResearchOS-Platform-robocopy.log" | Out-Host
+    & robocopy.exe $staging $TargetRoot /E /COPY:DAT /DCOPY:DAT /J /MT:16 /XJ /R:2 /W:1 /NFL /NDL /NP /LOG+:"$env:TEMP\\ResearchOS-Platform-robocopy.log"
     $copyCode = $LASTEXITCODE
     Write-Diagnostic "STEP robocopy-result exit_code=$copyCode"
     if ($copyCode -gt 7) { throw "Platform ZIP staged copy failed: robocopy exit code $copyCode" }
