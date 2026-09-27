@@ -39,7 +39,7 @@ def main() -> int:
         "namespace: /platform/v1",
         "management_owns:",
         "runtime_owns:",
-        "raw_api_key: never_persisted",
+        "raw_secret: never_persisted",
         "management_state_does_not_authorize_execution",
     ):
         if marker not in contract:
