@@ -265,7 +265,7 @@ jobs:
           foreach ($marker in @(
             'AppName={#MyAppName}',
             'AppPublisher={#MyAppPublisher}',
-            'SetupIconFile=..\\..\\assets\\branding\\research_os.ico',
+            'SetupIconFile=..\..\assets\branding\research_os.ico',
             'research_os_flutter.exe',
             'Research OS Platform installer',
             'Installation payload: canonical Research OS Platform ZIP.'
