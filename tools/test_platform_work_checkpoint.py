@@ -90,7 +90,7 @@ class PlatformWorkCheckpointTests(unittest.TestCase):
             try:
                 sha = "a" * 40
                 with patch("tools.platform_work_checkpoint.canonical_sha", return_value=sha):
-                    parent = create_checkpoint(
+                    parent = checkpoint.create_checkpoint(
                         owner_id="owner",
                         task_id="task-003",
                         workflow_state="ACTIVE",
@@ -98,7 +98,7 @@ class PlatformWorkCheckpointTests(unittest.TestCase):
                         source_sha=sha,
                         next_action="resume",
                     )
-                    child = create_checkpoint(
+                    child = checkpoint.create_checkpoint(
                         owner_id="owner",
                         task_id="task-003",
                         workflow_state="ACTIVE",
@@ -107,10 +107,10 @@ class PlatformWorkCheckpointTests(unittest.TestCase):
                         supersedes=parent["checkpoint_id"],
                         next_action="resume",
                     )
-                    result = resume_checkpoint("owner", parent["checkpoint_id"])
+                    result = checkpoint.resume_checkpoint("owner", parent["checkpoint_id"])
                     self.assertEqual(result["status"], "HOLD")
                     self.assertIn("checkpoint_superseded", result["failures"])
-                    self.assertEqual(resume_checkpoint("owner", child["checkpoint_id"])["status"], "READY")
+                    self.assertEqual(checkpoint.resume_checkpoint("owner", child["checkpoint_id"])["status"], "READY")
             finally:
                 os.environ.pop("RESEARCH_OS_DATA_DIR", None)
 
