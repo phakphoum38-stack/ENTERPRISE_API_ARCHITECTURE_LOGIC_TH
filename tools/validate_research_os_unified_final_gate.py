@@ -44,6 +44,13 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RECON_REPAIR_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json",
+    "tools/validate_research_os_platform_runtime_completion.py",
+    "tools/test_validate_research_os_platform_runtime_completion.py",
     "current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json",
     "current/RESEARCH_OS_AUTHORIZATION_CONVERGENCE_CONTRACT.json",
     "current/RESEARCH_OS_IDENTITY_ACCESS_WAVE_1_MAP.json",
@@ -322,6 +329,10 @@ def main() -> None:
     if spine.returncode != 0:
         fail("Platform Spine engine validation failed: " + (spine.stdout or spine.stderr).strip())
     print("PLATFORM_SPINE_ENGINE=BOUND_TO_FINAL_GATE")
+    runtime_completion = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_research_os_platform_runtime_completion.py")], cwd=ROOT, text=True, capture_output=True)
+    if runtime_completion.returncode != 0:
+        fail("Platform runtime completion validation failed: " + (runtime_completion.stdout or runtime_completion.stderr).strip())
+    print("PLATFORM_RUNTIME_COMPLETION=BOUND_TO_FINAL_GATE")
 
 if __name__ == "__main__":
     main()
