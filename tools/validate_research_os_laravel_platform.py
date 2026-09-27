@@ -20,6 +20,13 @@ def main() -> int:
         APP / "routes" / "api.php",
         APP / "src" / "Platform" / "Contracts" / "AuthorizationGateway.php",
         APP / "src" / "Platform" / "Contracts" / "WorkflowGateway.php",
+        APP / "src" / "Platform" / "Infrastructure" / "CanonicalToolGateway.php",
+        APP / "src" / "Platform" / "Infrastructure" / "CanonicalControlGateway.php",
+        APP / "src" / "Platform" / "Infrastructure" / "CanonicalOperationsGateway.php",
+        APP / "src" / "Platform" / "Application" / "ToolApplicationService.php",
+        APP / "src" / "Platform" / "Application" / "ControlApplicationService.php",
+        APP / "src" / "Platform" / "Application" / "OperationsApplicationService.php",
+        APP / "src" / "Platform" / "Application" / "VersionApplicationService.php",
         APP / "tests" / "Unit" / "PlatformBoundaryTest.php",
     ]
     missing = [str(p.relative_to(ROOT)) for p in required if not p.is_file()]
