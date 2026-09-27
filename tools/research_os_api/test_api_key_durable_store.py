@@ -8,6 +8,9 @@ from tools.research_os_api.api_keys import APIKeyManager
 
 
 class DurableAPIKeyTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("RESEARCH_OS_API_KEY_PEPPER", "test-only-pepper")
     def test_create_verify_rotate_and_revoke_without_plaintext_persistence(self):
         with tempfile.TemporaryDirectory() as temp:
             path = os.path.join(temp, "keys.json")
