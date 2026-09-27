@@ -394,6 +394,20 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
+    def do_PATCH(self) -> None:  # noqa: N802
+        path = urlsplit(self.path).path
+        try:
+            body = self._read_json()
+            if path.startswith("/platform/v1"):
+                status, payload = _management_http().dispatch("PATCH", self.path, self.headers, body)
+                self._send(status, payload)
+                return
+            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+        except (ValueError, KeyError) as exc:
+            self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
+        except Exception as exc:
+            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
+
     def do_POST(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
         try:
