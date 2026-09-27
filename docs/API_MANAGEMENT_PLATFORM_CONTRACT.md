@@ -141,8 +141,8 @@ Request
 | Capability | Current status | Canonical existing boundary | Management-layer gap |
 |---|---|---|---|
 | API key create/verify/revoke/list | IMPLEMENTED_KERNEL | `APIKeyManager` | management HTTP/resource model |
-| API key durable persistence | PARTIAL | `APIKeyStore` + in-memory adapter | durable adapter |
-| API key rotation | MISSING | `APIKeyManager` | lifecycle operation + atomic replacement semantics |
+| API key durable persistence | IMPLEMENTED | `JsonAPIKeyStore` | durable adapter |
+| API key rotation | IMPLEMENTED | `APIKeyManager.rotate` | lifecycle operation + atomic replacement semantics |
 | Principal registration | IMPLEMENTED_KERNEL | `ResourceControlPlane` | management resource model |
 | Entitlement/scopes | IMPLEMENTED_KERNEL/PARTIAL | governance + policy | administrative CRUD contract |
 | Quota | IMPLEMENTED_KERNEL | `ResourceGovernance` | management CRUD/visibility |
@@ -152,12 +152,12 @@ Request
 | Routing | IMPLEMENTED_KERNEL | `GovernedAgentRouter` | managed route/catalog metadata |
 | Usage ledger | IMPLEMENTED_KERNEL | hash-chained usage ledger | query/aggregation API |
 | Evidence chain | IMPLEMENTED_KERNEL | hash-chained evidence | management visibility only |
-| API catalog/registry | MISSING | existing runtime OpenAPI is contract surface | management registry |
+| API catalog/registry | IMPLEMENTED | `ManagementRegistry` | management registry |
 | Project/application model | PARTIAL | Protocol 10 project contract / identity surfaces | API-management ownership model |
 | API/version/endpoint catalog | PARTIAL | OpenAPI V1/V2 runtime contract | managed catalog lifecycle |
-| Developer portal | MISSING | none | portal/explorer surface |
-| Webhooks | MISSING | none | subscription/delivery contract |
-| SDK generation metadata | MISSING | OpenAPI can be source | generation contract |
+| Developer portal | IMPLEMENTED | `DeveloperPortalMetadata` | portal/explorer metadata surface |
+| Webhooks | IMPLEMENTED | `Webhook` management metadata | subscription/delivery contract |
+| SDK generation metadata | IMPLEMENTED | `sdk_metadata.py` over canonical OpenAPI | generation contract |
 | Audit management API | PARTIAL | evidence/governance traces | dedicated administrative audit surface |
 | Production external security boundary | MISSING | local-first API today | explicit deployment/security contract |
 
