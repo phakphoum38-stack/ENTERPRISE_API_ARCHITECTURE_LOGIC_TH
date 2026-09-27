@@ -1,0 +1,36 @@
+name: Research OS Platform Final Baseline
+on:
+  push:
+    branches: [main, "feat/research-os-platform-final-baseline-lock"]
+  pull_request:
+    paths:
+      - "current/RESEARCH_OS_PLATFORM_FINAL_BASELINE_CONTRACT.json"
+      - "tools/validate_research_os_platform_final_baseline.py"
+      - "tools/test_validate_research_os_platform_final_baseline.py"
+      - "tools/platform_spine.py"
+      - "tools/platform_continuity_workflow.py"
+      - "current/RESEARCH_OS_PLATFORM_*.json"
+      - "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  final-baseline:
+    name: Final Platform Baseline Qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Contract test
+        run: python -m unittest tools.test_validate_research_os_platform_final_baseline -v
+      - name: Platform final baseline
+        run: python tools/validate_research_os_platform_final_baseline.py
+      - name: Emit source provenance
+        run: |
+          echo "SOURCE_SHA=${GITHUB_SHA}"
+          git rev-parse HEAD
