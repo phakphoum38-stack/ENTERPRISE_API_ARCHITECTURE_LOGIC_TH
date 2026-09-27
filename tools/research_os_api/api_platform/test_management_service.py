@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -8,6 +9,10 @@ from tools.research_os_api.api_platform.management_service import JsonManagement
 
 
 class ManagementServiceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("RESEARCH_OS_API_KEY_PEPPER", "test-only-pepper")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.service = ManagementService(JsonManagementStore(Path(self.temp.name) / "management.json"))
@@ -44,6 +49,20 @@ class ManagementServiceTests(unittest.TestCase):
         self.service.create("apis", {"api_id": "api-1", "project_id": "proj-1", "name": "Research API"})
         updated = self.service.lifecycle("apis", "api-1", "disable")
         self.assertEqual(updated["lifecycle"], "disabled")
+
+    def test_api_key_scope_is_bound_to_entitlement(self):
+        self.service.create("organizations", {"organization_id": "org-1", "name": "Research"})
+        self.service.create("projects", {"project_id": "proj-1", "organization_id": "org-1", "name": "Platform"})
+        self.service.create("applications", {"application_id": "app-1", "project_id": "proj-1", "name": "Console"})
+        self.service.create("scopes", {"scope_id": "scope:read", "name": "scope:read"})
+        self.service.create("scopes", {"scope_id": "scope:write", "name": "scope:write"})
+        self.service.create("plans", {"plan_id": "plan-1", "project_id": "proj-1", "name": "default"})
+        self.service.create("entitlements", {"entitlement_id": "ent-1", "plan_id": "plan-1", "scope_ids": ["scope:read"]})
+        with self.assertRaises(ValueError):
+            self.service.create_api_key({"application_id": "app-1", "principal_id": "principal-1", "entitlement_id": "ent-1", "scopes": ["scope:write"]})
+        result = self.service.create_api_key({"application_id": "app-1", "principal_id": "principal-1", "entitlement_id": "ent-1", "scopes": ["scope:read"]})
+        self.assertEqual(result["entitlement_id"], "ent-1")
+        self.assertIn("raw_secret", result)
 
     def test_http_auth_and_crud(self):
         http = ManagementHTTP(self.service, lambda headers: {"user_id": "owner"} if headers.get("X-Test-Auth") else None)

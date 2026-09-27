@@ -60,7 +60,7 @@ A managed operation with method, path, request/response contract metadata, requi
 An authorization capability string. Scope grants must be evaluated together with principal, application, entitlement, and policy.
 
 ### API Key
-A credential bound to an application/principal and a set of scopes. Raw credentials are returned only at creation/rotation time and are never persisted as plaintext.
+A credential bound to an application/principal, an entitlement, and a set of scopes. The requested scopes must be a subset of the effective entitlement scopes. Raw credentials are returned only at creation/rotation time and are never persisted as plaintext.
 
 ### Plan
 A reusable commercial/operational policy bundle. A plan references entitlements rather than implementing quota or budget logic itself.
@@ -128,7 +128,7 @@ Request
 3. No second quota, policy, budget, reservation, usage, or evidence engine may be introduced.
 4. Provider credentials remain separate from consumer API keys.
 5. Raw API keys must never be persisted in plaintext.
-6. Scope assignment is explicit and must be validated against effective entitlement.
+6. Scope assignment is explicit, API keys must reference an effective entitlement, and requested scopes must be validated against that entitlement.
 7. API/version/endpoint identifiers are stable management identities and are not derived from display names.
 8. API versioning is independent from application/product release versioning.
 9. Usage records are measurements; evidence records establish execution/provenance facts; neither independently grants authority.
@@ -140,11 +140,11 @@ Request
 
 | Capability | Current status | Canonical existing boundary | Management-layer gap |
 |---|---|---|---|
-| API key create/verify/revoke/list | IMPLEMENTED_KERNEL | `APIKeyManager` | management HTTP/resource model |
+| API key create/verify/revoke/list | IMPLEMENTED | `APIKeyManager` + management lifecycle | management HTTP/resource model |
 | API key durable persistence | IMPLEMENTED | `JsonAPIKeyStore` | durable adapter |
 | API key rotation | IMPLEMENTED | `APIKeyManager.rotate` | lifecycle operation + atomic replacement semantics |
 | Principal registration | IMPLEMENTED_KERNEL | `ResourceControlPlane` | management resource model |
-| Entitlement/scopes | IMPLEMENTED_KERNEL/PARTIAL | governance + policy | administrative CRUD contract |
+| Entitlement/scopes | IMPLEMENTED | management entitlement binding + runtime governance | administrative CRUD/visibility |
 | Quota | IMPLEMENTED_KERNEL | `ResourceGovernance` | management CRUD/visibility |
 | Rate limiting | PARTIAL | governance primitives | explicit API-management policy model |
 | Budget | IMPLEMENTED_KERNEL | `BudgetLedger` | management CRUD/visibility |
@@ -161,18 +161,16 @@ Request
 | Audit management API | PARTIAL | evidence/governance traces | dedicated administrative audit surface |
 | Production external security boundary | MISSING | local-first API today | explicit deployment/security contract |
 
-## 7. Management namespace direction
+## 7. Current management namespace
 
-The management API must be reconciled with the existing `/v1` runtime API rather than silently replacing it.
-
-Recommended separation:
+Management and runtime are explicitly separated:
 
 ```text
+/platform/v1/...        management plane
 /v1/...                 runtime/consumer API
-/v1/management/...      administrative API management surface
 ```
 
-The final namespace must be validated against the existing OpenAPI contract before implementation. No existing runtime route is to be repurposed merely to fit the management model.
+No existing runtime route is repurposed merely to fit the management model.
 
 ## 8. Lifecycle examples
 
@@ -229,16 +227,20 @@ API request
 - No mutation of historical baselines or fixtures.
 - No implementation of every management feature in one change.
 
-## 10. Next implementation slices
+## 10. Reconciled implementation state
 
-1. Canonical management domain types + invariants.
-2. API/project/application registry boundary.
-3. Management OpenAPI contract reconciled with current runtime OpenAPI.
-4. Durable API-key store + explicit rotation semantics.
-5. Administrative plan/entitlement/quota/budget APIs over existing kernel.
-6. Usage/cost/audit query surfaces.
-7. Developer portal/explorer metadata.
-8. Webhook and SDK contracts.
-9. External deployment security boundary.
+The current `main` baseline contains the management registry/service, `/platform/v1` HTTP binding, durable API-key storage, rotation/revocation, and Unified Final Gate binding. API keys are explicitly bound to an entitlement and management creation/rotation fails closed when requested scopes exceed that entitlement. Runtime authorization remains owned by the Resource Control Plane.
+
+## 11. Remaining production boundary
+
+1. External/public deployment security boundary (TLS, network policy, request controls, and production ingress).
+2. Explicit management usage/cost/audit query exposure over existing canonical ledgers.
+3. Webhook delivery hardening and SDK generation lifecycle where not already covered by existing gates.
+4. Ongoing reconciliation against the canonical Unified Final Gate.
+
+
+
+
+
 
 Each slice must remain independently reviewable and must not weaken existing governance or evidence gates.

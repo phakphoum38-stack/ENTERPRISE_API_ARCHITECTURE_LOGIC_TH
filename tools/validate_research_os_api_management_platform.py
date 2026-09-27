@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED = (
     "tools/research_os_api/api_management_models.py",
+    "docs/API_MANAGEMENT_PLATFORM_CONTRACT.md",
     "tools/research_os_api/api_key_store.py",
     "tools/research_os_api/api_keys.py",
     "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml",
@@ -84,6 +85,7 @@ def main() -> int:
     print("MANAGEMENT_METADATA=CANONICAL")
     print("API_KEY_PERSISTENCE=DURABLE_DIGEST_ONLY")
     print("API_KEY_ROTATION=BOUND")
+    print("API_KEY_ENTITLEMENT_BINDING=ENFORCED")
     print("MANAGEMENT_HTTP=BOUND_TO_RESEARCH_OS_API")
     print("RUNTIME_AUTHORITY=RESOURCE_CONTROL_PLANE")
     print("RELEASE_AUTHORITY=FINAL_GATE")
