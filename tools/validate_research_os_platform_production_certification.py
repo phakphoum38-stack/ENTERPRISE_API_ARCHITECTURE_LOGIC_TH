@@ -15,6 +15,9 @@ REQUIRED=[
 "tools/platform_spine.py",
 "tools/platform_self_reconciliation.py",
 "apps/research_os_laravel/README.md",
+"tools/validate_research_os_api_management_platform.py",
+"tools/research_os_api/api_platform/management_service.py",
+"tools/research_os_api/api_platform/management_http.py",
 "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
 "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
 ]
@@ -32,6 +35,7 @@ def main():
       ["tools/validate_research_os_platform_runtime_completion.py"],
       ["tools/platform_spine.py","--validate"],
       ["tools/validate_platform_self_reconciliation.py"],
+      ["tools/validate_research_os_api_management_platform.py"],
     ]
     for cmd in checks:
         r=run(*cmd)
@@ -41,6 +45,7 @@ def main():
             return 1
     print("PRODUCTION_CERTIFICATION=PASS")
     print("PLATFORM_RUNTIME=QUALIFIED")
+    print("API_MANAGEMENT=QUALIFIED")
     print("RECON_REPAIR=BOUNDED")
     print("FAILURE_RECOVERY=QUALIFIED")
     print("OBSERVABILITY=QUALIFIED")
