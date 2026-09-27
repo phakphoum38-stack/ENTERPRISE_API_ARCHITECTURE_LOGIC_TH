@@ -227,6 +227,28 @@ jobs:
           "PLATFORM_ZIP_SHA256=$zipHash" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "RESEARCH_OS_PLATFORM_ZIP=PASS sha256=$zipHash"
 
+      - name: Verify canonical Platform UI binding for Owner Special Setup
+        shell: pwsh
+        run: |
+          $installer = "$env:GITHUB_WORKSPACE\\owner_special\\installer\\owner-special-platform.iss"
+          $canonicalUiRoot = "$env:GITHUB_WORKSPACE\\apps\\research_os_flutter"
+          $icon = "$env:GITHUB_WORKSPACE\\assets\\branding\\research_os.ico"
+          if (-not (Test-Path $canonicalUiRoot -PathType Container)) { throw 'Canonical Platform UI root missing: apps/research_os_flutter' }
+          if (-not (Test-Path $icon -PathType Leaf)) { throw 'Canonical Research OS branding icon missing.' }
+          $text = Get-Content $installer -Raw
+          foreach ($marker in @(
+            'AppName={#MyAppName}',
+            'AppPublisher={#MyAppPublisher}',
+            'SetupIconFile=..\\..\\assets\\branding\\research_os.ico',
+            'research_os_flutter.exe',
+            'Research OS Platform installer',
+            'Installation payload: canonical Research OS Platform ZIP.'
+          )) {
+            if ($text -notlike "*$marker*") { throw "Owner Special Platform Setup is not bound to canonical Platform UI marker: $marker" }
+          }
+          if ($text -match 'Research OS Owner Special') { throw 'Legacy Owner Special UI identity remains in canonical Platform Setup.' }
+          Write-Host 'OWNER_SPECIAL_PLATFORM_UI=PASS'
+
       - name: Build Owner Special Setup.exe around canonical Platform ZIP
         shell: pwsh
         run: |
