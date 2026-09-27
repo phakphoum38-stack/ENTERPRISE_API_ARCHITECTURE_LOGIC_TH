@@ -1084,7 +1084,7 @@
     },
     {
       "id": "laravel_platform",
-      "canonical": "apps/research_os_laravel",
+      "canonical": "apps/research_os_laravel/README.md",
       "kind": "PLATFORM_INTEGRATION_CONTROL_PLANE",
       "lifecycle": "ACTIVE",
       "dependencies": [
