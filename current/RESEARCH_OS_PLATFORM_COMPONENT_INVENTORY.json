@@ -17,7 +17,9 @@
     "current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json",
-    "tools/validate_research_os_platform_runtime_completion.py"
+    "tools/validate_research_os_platform_runtime_completion.py",
+    "current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json",
+    "tools/validate_research_os_platform_production_certification.py"
   ],
   "components": [
     {
@@ -987,6 +989,44 @@
       "capabilities": [
         "ai_code_writer_boundary",
         "recon_binding"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_production_certification",
+      "canonical": "tools/validate_research_os_platform_production_certification.py",
+      "kind": "PRODUCTION_CERTIFICATION_VALIDATOR",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_runtime_completion",
+        "platform_spine_engine",
+        "self_reconciliation",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_validate_research_os_platform_production_certification.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "production_certification",
+        "runtime_qualification"
       ],
       "authority": {
         "mode": "NONE"

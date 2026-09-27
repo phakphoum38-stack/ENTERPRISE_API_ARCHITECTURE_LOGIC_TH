@@ -333,6 +333,10 @@ def main() -> None:
     if runtime_completion.returncode != 0:
         fail("Platform runtime completion validation failed: " + (runtime_completion.stdout or runtime_completion.stderr).strip())
     print("PLATFORM_RUNTIME_COMPLETION=BOUND_TO_FINAL_GATE")
+    production = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_research_os_platform_production_certification.py")], cwd=ROOT, text=True, capture_output=True)
+    if production.returncode != 0:
+        fail("Platform production certification failed: " + (production.stdout or production.stderr).strip())
+    print("PRODUCTION_CERTIFICATION=BOUND_TO_FINAL_GATE")
 
 if __name__ == "__main__":
     main()
