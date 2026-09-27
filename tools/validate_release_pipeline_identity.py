@@ -143,8 +143,8 @@ def main() -> int:
     print("- Candidate/experimental workflows are explicitly outside this canonical gate.")
     print("- Owner identity/source is isolated to the dedicated Owner workflow.")
     print("- Dedicated Owner workflow contains identity, installer, and bundle gates.")
-    print("- Research OS Windows artifact workflow contains no Owner identity/source.
-    - Canonical Windows installation entry point is Owner Special Setup.exe and its payload is the canonical Research OS Platform ZIP.")
+    print("- Research OS Windows artifact workflow contains no Owner identity/source.")
+    print("- Canonical Windows installation entry point is Owner Special Setup.exe and its payload is the canonical Research OS Platform ZIP.")
     print("- Owner manifest and identity verifier are present and valid.")
     return 0
 
