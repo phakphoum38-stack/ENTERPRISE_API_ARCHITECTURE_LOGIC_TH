@@ -127,6 +127,12 @@ class APIKeyManager:
         except KeyError as exc:
             raise APIKeyError("unknown key") from exc
 
+    def get(self, key_id: str) -> APIKeyRecord:
+        stored = self._store.get(key_id)
+        if stored is None:
+            raise APIKeyError("unknown key")
+        return APIKeyRecord.from_stored(stored)
+
     def rotate(
         self, key_id: str, principal_id: str, scopes: set[str] | frozenset[str], *,
         expires_at: datetime | None = None, now: datetime | None = None,
