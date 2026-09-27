@@ -223,6 +223,22 @@ jobs:
           Compress-Archive -Path "$p\*" -DestinationPath $zip -CompressionLevel Optimal
           $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$zipHash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\\','/') })
+            foreach ($requiredZipEntry in @(
+              'app/research_os_flutter.exe',
+              'owner_special/app/research_os_owner_special.exe',
+              'DISTRIBUTION_MANIFEST.json',
+              'DISTRIBUTION_MANIFEST.sha256'
+            )) {
+              if ($requiredZipEntry -notin $names) { throw "Canonical Platform ZIP is missing required entry: $requiredZipEntry" }
+            }
+            Write-Host "PLATFORM_ZIP_ENTRY_GATE=PASS entries=$($names.Count)"
+          } finally {
+            $archive.Dispose()
+          }
           "PLATFORM_ZIP_PATH=$zip" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "PLATFORM_ZIP_SHA256=$zipHash" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "RESEARCH_OS_PLATFORM_ZIP=PASS sha256=$zipHash"
@@ -299,9 +315,13 @@ jobs:
           if ($platformZipHash -ne $expectedPlatformZipHash) { throw 'Canonical Platform ZIP SHA256 sidecar mismatch.' }
           $checks = [ordered]@{}
 
-          $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /TASKS="desktopicon"'
+          $setupLog = Join-Path $env:RUNNER_TEMP 'research-os-owner-platform-setup.log'
+          $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /TASKS="desktopicon" /LOG="' + $setupLog + '"'
           $process = Start-Process -FilePath $setup.FullName -ArgumentList $arguments -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "Installer exited with code $($process.ExitCode)." }
+          if ($process.ExitCode -ne 0) {
+            if (Test-Path $setupLog) { Get-Content $setupLog -Tail 200 | Out-Host }
+            throw "Installer exited with code $($process.ExitCode)."
+          }
 
           foreach ($relative in @(
             'app\research_os_flutter.exe',
@@ -324,6 +344,9 @@ jobs:
             'OWNER_SPECIAL_PLATFORM_INSTALL_PROVENANCE.json'
           )) {
             if (-not (Test-Path (Join-Path $installRoot $relative))) {
+              if (Test-Path $setupLog) { Write-Host '--- Owner Special Setup log ---'; Get-Content $setupLog -Tail 200 | Out-Host }
+              $bootstrapLog = Join-Path $env:TEMP 'ResearchOS-Platform-robocopy.log'
+              if (Test-Path $bootstrapLog) { Write-Host '--- Platform ZIP robocopy log ---'; Get-Content $bootstrapLog -Tail 200 | Out-Host }
               throw "Installed distribution component missing: $relative"
             }
           }
