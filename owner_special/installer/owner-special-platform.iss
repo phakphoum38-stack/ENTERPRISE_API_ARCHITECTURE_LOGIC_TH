@@ -78,7 +78,6 @@ Type: filesandordirs; Name: "{app}\*"
 procedure LogDiagnosticFile(const FileName: String);
 var
   Contents: AnsiString;
-  TextContents: String;
   Line: String;
   NewLinePos: Integer;
 begin
@@ -92,24 +91,22 @@ begin
     Log('Unable to read platform bootstrap diagnostic file: ' + FileName);
     Exit;
   end;
-
   Log('--- Research OS Platform bootstrap diagnostics ---');
-  TextContents := Contents;
-  TextContents := StringChangeEx(TextContents, #13#10, #10, True);
-  TextContents := StringChangeEx(TextContents, #13, #10, True);
-  while TextContents <> '' do
+  while Contents <> '' do
   begin
-    NewLinePos := Pos(#10, TextContents);
+    NewLinePos := Pos(#10, Contents);
     if NewLinePos = 0 then
     begin
-      Line := TextContents;
-      TextContents := '';
+      Line := String(Contents);
+      Contents := '';
     end
     else
     begin
-      Line := Copy(TextContents, 1, NewLinePos - 1);
-      Delete(TextContents, 1, NewLinePos);
+      Line := Copy(Contents, 1, NewLinePos - 1);
+      Delete(Contents, 1, NewLinePos);
     end;
+    if (Line <> '') and (Line[Length(Line)] = #13) then
+      Delete(Line, Length(Line), 1);
     if Line <> '' then Log(Line);
   end;
   Log('--- End Research OS Platform bootstrap diagnostics ---');
