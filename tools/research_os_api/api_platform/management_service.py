@@ -163,6 +163,7 @@ class ManagementService:
         return cls(JsonManagementStore(root / "management.json"))
 
     def _load(self) -> None:
+        self.registry = ManagementRegistry()
         state = self.store.snapshot().get("resources", {})
         for resource in RELATION_ORDER:
             for payload in state.get(resource, {}).values():
@@ -223,7 +224,7 @@ class ManagementService:
         scopes = frozenset(str(value) for value in payload.get("scopes", current.scopes))
         expires = payload.get("expires_at")
         expires_at = datetime.fromisoformat(expires) if isinstance(expires, str) and expires else None
-        record, secret = self.key_manager.rotate(key_id, str(payload.get("principal_id") or current.application_id), set(scopes), expires_at=expires_at)
+        record, secret = self.key_manager.rotate(key_id, self.key_manager.get(key_id).principal_id, set(scopes), expires_at=expires_at)
         old = replace(current, revoked_at=record.created_at)
         self._replace_and_validate("api_keys", key_id, old)
         self._persist("api_keys", old, actor=actor, action="rotate_revoke")
