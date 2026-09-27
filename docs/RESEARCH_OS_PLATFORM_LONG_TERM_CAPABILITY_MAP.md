@@ -25,6 +25,13 @@ navigation map, not a second authority.
 | Assurance | AEOS + platform validators + evidence lineage | ACTIVE |
 | API Management Platform | `tools/research_os_api/api_platform/` + management qualification gate | ACTIVE / PRODUCTION-QUALIFIED |
 | Laravel Platform | `apps/research_os_laravel/` + canonical Laravel contract/validator | ACTIVE / PRODUCTION-QUALIFIED |
+| Enterprise Control Plane North Star | `current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json` | ACTIVE / ARCHITECTURE BOUNDARY |
+| Agent Identity / Governance | `current/IDENTITY_AUTHORITY_CONTRACT.json` + existing agent runtime/governance contracts | ACTIVE / COMPOSED |
+| Policy-as-Code / Approval | `current/POLICY_GATE_CONTRACT.json` + existing approval controls | ACTIVE / COMPOSED |
+| Resource Economics | `tools/research_os_api/resource_control_plane.py` + `tools/research_os_api/budgets.py` + admission controls | ACTIVE / COMPOSED |
+| Context / Memory Plane | `tools/research_os_api/memory_fabric.py` + Platform Graph + Evidence | ACTIVE / COMPOSED |
+| Platform Digital Twin | `current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json` + `tools/platform_digital_twin.py` | ACTIVE / READ-ONLY |
+| Autonomous / Enterprise OS | North Star extension boundary only; no new authority introduced | FUTURE / BOUNDARY |
 | Unified Final Gate | `current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml` | SINGLE RELEASE AUTHORITY |
 
 ## Non-duplication rule
