@@ -12,7 +12,10 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from api_key_store import APIKeyStore, InMemoryAPIKeyStore, JsonAPIKeyStore, StoredAPIKey
+try:
+    from api_key_store import APIKeyStore, InMemoryAPIKeyStore, JsonAPIKeyStore, StoredAPIKey
+except ModuleNotFoundError:
+    from tools.research_os_api.api_key_store import APIKeyStore, InMemoryAPIKeyStore, JsonAPIKeyStore, StoredAPIKey
 
 
 class APIKeyError(ValueError):
