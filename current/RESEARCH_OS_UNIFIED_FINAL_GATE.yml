@@ -290,8 +290,8 @@ platform_spine_engine:
   high_impact_requires_simulation: true
   release_authority_remains: final_gate
 
-    runtime_completion:
-      contract: current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json
+  runtime_completion:
+    contract: current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json
       validator: tools/validate_research_os_platform_runtime_completion.py
       test: tools/test_validate_research_os_platform_runtime_completion.py
       laravel_runtime: required
