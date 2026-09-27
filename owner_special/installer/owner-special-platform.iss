@@ -78,20 +78,41 @@ Type: filesandordirs; Name: "{app}\*"
 procedure LogDiagnosticFile(const FileName: String);
 var
   Contents: AnsiString;
+  TextContents: String;
+  Line: String;
+  NewLinePos: Integer;
 begin
   if not FileExists(FileName) then
   begin
     Log('Platform bootstrap diagnostic file not found: ' + FileName);
     Exit;
   end;
-  if LoadStringFromFile(FileName, Contents) then
+  if not LoadStringFromFile(FileName, Contents) then
   begin
-    Log('--- Research OS Platform bootstrap diagnostics ---');
-    Log(Contents);
-    Log('--- End Research OS Platform bootstrap diagnostics ---');
-  end
-  else
     Log('Unable to read platform bootstrap diagnostic file: ' + FileName);
+    Exit;
+  end;
+
+  Log('--- Research OS Platform bootstrap diagnostics ---');
+  TextContents := Contents;
+  TextContents := StringChangeEx(TextContents, #13#10, #10, True);
+  TextContents := StringChangeEx(TextContents, #13, #10, True);
+  while TextContents <> '' do
+  begin
+    NewLinePos := Pos(#10, TextContents);
+    if NewLinePos = 0 then
+    begin
+      Line := TextContents;
+      TextContents := '';
+    end
+    else
+    begin
+      Line := Copy(TextContents, 1, NewLinePos - 1);
+      Delete(TextContents, 1, NewLinePos);
+    end;
+    if Line <> '' then Log(Line);
+  end;
+  Log('--- End Research OS Platform bootstrap diagnostics ---');
 end;
 
 function RunPowerShellChecked(const Description, Parameters: String): Boolean;
@@ -117,11 +138,13 @@ begin
   TargetRoot := ExpandConstant('{app}');
   DiagnosticLogPath := ExpandConstant('{tmp}\ResearchOS-Platform-install.log');
   ZipPath := AddBackslash(TargetRoot) + '{#PlatformZipName}';
+  Log('Canonical Platform ZIP payload path: ' + ZipPath);
   if not FileExists(ZipPath) then
   begin
     Log('Canonical Platform ZIP missing from Setup payload: ' + ZipPath);
     Exit;
   end;
+  Log('Canonical Platform ZIP payload exists. Size=' + IntToStr(GetFileSize(ZipPath)) + ' bytes');
   Parameters :=
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
     AddBackslash(TargetRoot) + 'install-platform-zip.ps1" ' +
