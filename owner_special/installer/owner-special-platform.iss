@@ -2,14 +2,18 @@
 #define MyAppVersion "3.0.0"
 #define MyAppPublisher "Research OS Owner Special"
 #define MyAppExeName "research_os_flutter.exe"
+
 #ifndef PlatformZip
-#define PlatformZip "..\\phase-e\\Research-OS-Platform-Windows-x64.zip"
+#error "PlatformZip must be supplied by the canonical Platform distribution workflow."
 #endif
 #ifndef PlatformZipSha256
-#define PlatformZipSha256 ""
+#error "PlatformZipSha256 must be supplied by the canonical Platform distribution workflow."
 #endif
 #ifndef PlatformSourceSha
-#define PlatformSourceSha ""
+#error "PlatformSourceSha must be supplied by the canonical Platform distribution workflow."
+#endif
+#ifndef PlatformZipName
+#error "PlatformZipName must be supplied by the canonical Platform distribution workflow."
 #endif
 
 [Setup]
@@ -17,7 +21,7 @@ AppId={{C6E8D8B0-2D6A-4B3D-8A7A-8A0F6B8A3E11}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\\Research OS
+DefaultDirName={autopf}\Research OS
 DefaultGroupName=Research OS
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
@@ -37,32 +41,112 @@ Source: "{#PlatformZip}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "install-platform-zip.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
-Name: "{commonappdata}\\ResearchOS"
-Name: "{commonappdata}\\ResearchOS\\database"
-Name: "{commonappdata}\\ResearchOS\\sessions"
-Name: "{commonappdata}\\ResearchOS\\artifacts"
-Name: "{commonappdata}\\ResearchOS\\backups"
-Name: "{commonappdata}\\ResearchOS\\logs"
-Name: "{commonappdata}\\ResearchOS\\workspaces"
-Name: "{commonappdata}\\ResearchOSOwnerSpecial"
+Name: "{commonappdata}\ResearchOS"
+Name: "{commonappdata}\ResearchOS\database"
+Name: "{commonappdata}\ResearchOS\sessions"
+Name: "{commonappdata}\ResearchOS\artifacts"
+Name: "{commonappdata}\ResearchOS\backups"
+Name: "{commonappdata}\ResearchOS\logs"
+Name: "{commonappdata}\ResearchOS\workspaces"
+Name: "{commonappdata}\ResearchOSOwnerSpecial"
 
 [Icons]
-Name: "{group}\\Research OS"; Filename: "{app}\\app\\{#MyAppExeName}"; WorkingDir: "{app}\\app"
-Name: "{autodesktop}\\Research OS"; Filename: "{app}\\app\\{#MyAppExeName}"; WorkingDir: "{app}\\app"; Tasks: desktopicon
+Name: "{group}\Research OS"; Filename: "{app}\app\{#MyAppExeName}"; WorkingDir: "{app}\app"
+Name: "{autodesktop}\Research OS"; Filename: "{app}\app\{#MyAppExeName}"; WorkingDir: "{app}\app"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: checkedonce
 Name: "startapp"; Description: "Launch Research OS after setup"; GroupDescription: "After setup:"; Flags: checkedonce
+Name: "startapp"; Description: "Launch Research OS after setup"; GroupDescription: "After setup:"; Flags: checkedonce
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\\install-platform-zip.ps1"" -ZipPath ""{app}\\Research-OS-Platform-Windows-x64.zip"" -TargetRoot ""{app}"" -ExpectedZipSha256 ""{#PlatformZipSha256}"" -ExpectedSourceSha ""{#PlatformSourceSha}"""; StatusMsg: "Installing Research OS Platform from the canonical ZIP..."; Flags: runhidden waituntilterminated
-Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\\scripts\\research-os-service.ps1"" -Action install -DataDir ""{commonappdata}\\ResearchOS"""; StatusMsg: "Installing Research OS Windows Service..."; Flags: runhidden waituntilterminated
-Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\\owner_special\\scripts\\install-owner-service.ps1"" -Action install -Root ""{app}"" -DataDir ""{commonappdata}\\ResearchOSOwnerSpecial"" -ServiceName ""ResearchOSOwnerFriendService"" -OwnerId ""owner"" -Port 8790"; StatusMsg: "Installing Research OS Owner Friend Service..."; Flags: runhidden waituntilterminated
-Filename: "{app}\\app\\{#MyAppExeName}"; Description: "Launch Research OS"; WorkingDir: "{app}\\app"; Flags: nowait postinstall skipifsilent; Tasks: startapp
+Filename: "{app}\app\{#MyAppExeName}"; Description: "Launch Research OS"; WorkingDir: "{app}\app"; Flags: nowait postinstall skipifsilent; Tasks: startapp
 
 [UninstallRun]
-Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\\owner_special\\scripts\\install-owner-service.ps1"" -Action uninstall -Root ""{app}"" -DataDir ""{commonappdata}\\ResearchOSOwnerSpecial"" -ServiceName ""ResearchOSOwnerFriendService"" -Port 8790"; Flags: runhidden waituntilterminated
-Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\\scripts\\research-os-service.ps1"" -Action uninstall -DataDir ""{commonappdata}\\ResearchOS"""; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\owner_special\scripts\install-owner-service.ps1"" -Action uninstall -Root ""{app}"" -DataDir ""{commonappdata}\ResearchOSOwnerSpecial"" -ServiceName ""ResearchOSOwnerFriendService"" -Port 8790"; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\scripts\research-os-service.ps1"" -Action uninstall -DataDir ""{commonappdata}\ResearchOS"""; Flags: runhidden waituntilterminated
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}\\*"
+Type: filesandordirs; Name: "{app}\*"
+
+[Code]
+function RunPowerShellChecked(const Description, Parameters: String): Boolean;
+var
+  ResultCode: Integer;
+  PowerShellExe: String;
+begin
+  Result := False;
+  PowerShellExe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  Log(Description);
+  Log('PowerShell: ' + PowerShellExe);
+  Log('Parameters: ' + Parameters);
+  if not Exec(PowerShellExe, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then Exit;
+  Log(Description + ' exit code: ' + IntToStr(ResultCode));
+  Result := ResultCode = 0;
+end;
+
+function InstallCanonicalPlatform(): Boolean;
+var
+  ZipPath, TargetRoot, Parameters: String;
+begin
+  Result := False;
+  TargetRoot := ExpandConstant('{app}');
+  ZipPath := AddBackslash(TargetRoot) + '{#PlatformZipName}';
+  if not FileExists(ZipPath) then
+  begin
+    Log('Canonical Platform ZIP missing from Setup payload: ' + ZipPath);
+    Exit;
+  end;
+  Parameters :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    AddBackslash(TargetRoot) + 'install-platform-zip.ps1" ' +
+    '-ZipPath "' + ZipPath + '" ' +
+    '-TargetRoot "' + TargetRoot + '" ' +
+    '-ExpectedZipSha256 "{#PlatformZipSha256}" ' +
+    '-ExpectedSourceSha "{#PlatformSourceSha}"';
+  if not RunPowerShellChecked('Installing Research OS Platform from canonical ZIP', Parameters) then Exit;
+  Result := True;
+end;
+
+function InstallResearchOsService(): Boolean;
+var Parameters: String;
+begin
+  Parameters :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    ExpandConstant('{app}\scripts\research-os-service.ps1') +
+    '" -Action install -DataDir "' + ExpandConstant('{commonappdata}\ResearchOS') + '"';
+  Result := RunPowerShellChecked('Installing Research OS Windows Service', Parameters);
+end;
+
+function InstallOwnerFriendService(): Boolean;
+var Parameters: String;
+begin
+  Parameters :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    ExpandConstant('{app}\owner_special\scripts\install-owner-service.ps1') +
+    '" -Action install -Root "' + ExpandConstant('{app}') +
+    '" -DataDir "' + ExpandConstant('{commonappdata}\ResearchOSOwnerSpecial') +
+    '" -ServiceName "ResearchOSOwnerFriendService" -OwnerId "owner" -Port 8790';
+  Result := RunPowerShellChecked('Installing Research OS Owner Friend Service', Parameters);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+  begin
+    Log('Owner Special Setup is the Platform installation entry point.');
+    Log('Installation payload: canonical Research OS Platform ZIP.');
+    if not InstallCanonicalPlatform() then begin
+      MsgBox('Research OS Platform installation failed. Setup will stop.', mbCriticalError, MB_OK);
+      Abort;
+    end;
+    if not InstallResearchOsService() then begin
+      MsgBox('Research OS Windows Service installation failed. Setup will stop.', mbCriticalError, MB_OK);
+      Abort;
+    end;
+    if not InstallOwnerFriendService() then begin
+      MsgBox('Research OS Owner Friend Service installation failed. Setup will stop.', mbCriticalError, MB_OK);
+      Abort;
+    end;
+  end;
+end;
