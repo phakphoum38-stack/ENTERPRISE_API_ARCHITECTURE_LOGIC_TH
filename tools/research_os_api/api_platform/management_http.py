@@ -59,9 +59,19 @@ class ManagementHTTP:
                     return 201, self.service.create("portals", payload, actor=actor)
                 return 200, self.service.update("portals", project_id, body, actor=actor)
 
+        if parts[0] == "applications" and len(parts) >= 5 and parts[2] == "keys":
+            key_id = parts[3]
+            action = parts[4]
+            if action == "revoke":
+                return 200, self.service.revoke_api_key(key_id, actor=actor)
+            if action == "rotate":
+                return 200, self.service.rotate_api_key(key_id, body, actor=actor)
+
         if parts[0] == "applications" and len(parts) >= 3 and parts[2] == "keys":
             application_id = parts[1]
             if method == "GET":
+                if len(parts) == 4:
+                    return 200, self.service.get("api_keys", parts[3])
                 values = [value for value in self.service.list("api_keys") if value.get("application_id") == application_id]
                 return 200, {"items": values, "count": len(values)}
             if method == "POST":
