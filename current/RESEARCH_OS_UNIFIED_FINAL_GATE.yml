@@ -82,6 +82,11 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RECON_REPAIR_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -96,6 +101,7 @@ required_workflows:
   - .github/workflows/owner-special-ios-ipa.yml
   - .github/workflows/research-os-platform-one-pass-completion.yml
   - .github/workflows/research-os-platform-evolution.yml
+  - .github/workflows/research-os-platform-runtime-completion.yml
 
 required_surface_contracts:
   - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
@@ -283,3 +289,15 @@ platform_spine_engine:
   health_is_not_authorization: true
   high_impact_requires_simulation: true
   release_authority_remains: final_gate
+
+    runtime_completion:
+      contract: current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json
+      validator: tools/validate_research_os_platform_runtime_completion.py
+      test: tools/test_validate_research_os_platform_runtime_completion.py
+      laravel_runtime: required
+      recon_repair: required
+      failure_simulation: required
+      observability: required
+      ai_code_writer: recon_bound
+      unknown_state: STOP
+      release_authority_remains: final_gate
