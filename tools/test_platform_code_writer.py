@@ -1,5 +1,5 @@
 import unittest
-from platform_code_writer import plan
+from tools.platform_code_writer import plan
 class CodeWriterTest(unittest.TestCase):
     def test_requires_canonical_pipeline(self):
         self.assertEqual(plan(["REGISTRY","RECON","DEPENDENCY_GRAPH","CONTRACT","CHANGE_BOUNDARY","CODE_WRITER","VALIDATION","EVIDENCE"])["status"],"PASS")
