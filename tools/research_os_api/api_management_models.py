@@ -82,6 +82,7 @@ class APIKey:
     created_at: datetime
     expires_at: Optional[datetime] = None
     revoked_at: Optional[datetime] = None
+    entitlement_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
