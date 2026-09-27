@@ -18,34 +18,34 @@ capabilities:
     owner: resource_control_plane
     note: Principal registration and API-key authentication exist in the existing kernel.
   api_keys:
-    status: PARTIAL
+    status: IMPLEMENTED_API
     owner: api_management_platform
     dependencies: [resource_control_plane]
-    gaps: [durable_store, rotation, management_http]
+    gaps: []
   organizations:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   projects:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   applications:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   api_catalog:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   api_versions:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   endpoints:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   scopes:
     status: PARTIAL
     owner: api_management_platform
     dependencies: [existing_scope_model]
   plans:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   entitlements:
     status: PARTIAL
@@ -67,7 +67,7 @@ capabilities:
     status: IMPLEMENTED_KERNEL
     owner: resource_control_plane
   gateway_routing:
-    status: PARTIAL
+    status: IMPLEMENTED_API
     owner: api_management_platform
     dependencies: [resource_control_plane]
   usage:
@@ -83,16 +83,16 @@ capabilities:
     owner: resource_control_plane
     note: Evidence chain exists; management audit query surface remains to be built.
   webhooks:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   developer_portal:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   sdk_metadata:
-    status: MISSING
+    status: IMPLEMENTED_API
     owner: api_management_platform
   api_products:
-    status: CONTRACT_ONLY
+    status: IMPLEMENTED_API
     owner: api_management_platform
   production_network_security:
     status: MISSING

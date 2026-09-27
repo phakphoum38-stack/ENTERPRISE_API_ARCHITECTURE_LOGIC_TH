@@ -12,7 +12,10 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from api_key_store import APIKeyStore, InMemoryAPIKeyStore, StoredAPIKey
+try:
+    from api_key_store import APIKeyStore, InMemoryAPIKeyStore, JsonAPIKeyStore, StoredAPIKey
+except ModuleNotFoundError:
+    from tools.research_os_api.api_key_store import APIKeyStore, InMemoryAPIKeyStore, JsonAPIKeyStore, StoredAPIKey
 
 
 class APIKeyError(ValueError):
@@ -66,7 +69,11 @@ class APIKeyManager:
     PREFIX = "ro_live_"
 
     def __init__(self, store: APIKeyStore | None = None) -> None:
-        self._store = store or InMemoryAPIKeyStore()
+        if store is not None:
+            self._store = store
+        else:
+            path = os.getenv("RESEARCH_OS_API_KEY_STORE")
+            self._store = JsonAPIKeyStore(path) if path else InMemoryAPIKeyStore()
 
     def create(
         self,
@@ -123,5 +130,22 @@ class APIKeyManager:
         except KeyError as exc:
             raise APIKeyError("unknown key") from exc
 
+    def get(self, key_id: str) -> APIKeyRecord:
+        stored = self._store.get(key_id)
+        if stored is None:
+            raise APIKeyError("unknown key")
+        return APIKeyRecord.from_stored(stored)
+
+    def rotate(
+        self, key_id: str, principal_id: str, scopes: set[str] | frozenset[str], *,
+        expires_at: datetime | None = None, now: datetime | None = None,
+    ) -> tuple[APIKeyRecord, str]:
+        current = self._store.get(key_id)
+        if current is None or current.principal_id != principal_id:
+            raise APIKeyError("unknown key")
+        if current.revoked_at is not None:
+            raise APIKeyError("key is already revoked")
+        self._store.revoke(key_id, now or datetime.now(timezone.utc))
+        return self.create(principal_id, scopes, expires_at=expires_at)
     def list(self, principal_id: str | None = None) -> tuple[APIKeyRecord, ...]:
         return tuple(APIKeyRecord.from_stored(item) for item in self._store.list(principal_id))
