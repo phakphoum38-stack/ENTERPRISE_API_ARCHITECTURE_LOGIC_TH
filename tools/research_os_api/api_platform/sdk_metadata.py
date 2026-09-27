@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 def build_sdk_metadata() -> dict[str, Any]:
     source = ROOT / "tools/research_os_api/openapi.yaml"
