@@ -19,6 +19,7 @@ REQUIRED = (
     "tools/research_os_api/api_platform/management_service.py",
     "tools/research_os_api/api_platform/management_http.py",
     "tools/research_os_api/api_platform/test_management_service.py",
+    "tools/research_os_api/test_api_key_durable_store.py",
     "tools/research_os_api/server.py",
     "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
 )
@@ -73,7 +74,7 @@ def main() -> int:
         fail("API Management Platform is not bound to Unified Final Gate")
 
     result = subprocess.run(
-        [sys.executable, "-m", "unittest", "tools.research_os_api.api_platform.test_management_service", "-v"],
+        [sys.executable, "-m", "unittest", "tools.research_os_api.api_platform.test_management_service", "tools.research_os_api.test_api_key_durable_store", "-v"],
         cwd=ROOT, text=True, capture_output=True,
     )
     if result.returncode != 0:
