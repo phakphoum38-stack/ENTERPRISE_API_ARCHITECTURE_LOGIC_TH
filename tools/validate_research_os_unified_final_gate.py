@@ -43,6 +43,7 @@ REQUIRED_FILES = (
     "current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json",
     "current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json",
     "current/RESEARCH_OS_AUTHORIZATION_CONVERGENCE_CONTRACT.json",
     "current/RESEARCH_OS_IDENTITY_ACCESS_WAVE_1_MAP.json",
@@ -313,6 +314,10 @@ def main() -> None:
     if platform_one_pass.returncode != 0:
         fail("Platform one-pass validation failed: " + (platform_one_pass.stdout or platform_one_pass.stderr).strip())
     print("PLATFORM_ONE_PASS=BOUND_TO_FINAL_GATE")
+    evolution = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_research_os_platform_evolution.py")], cwd=ROOT, text=True, capture_output=True)
+    if evolution.returncode != 0:
+        fail("Platform evolution validation failed: " + (evolution.stdout or evolution.stderr).strip())
+    print("PLATFORM_EVOLUTION=BOUND_TO_FINAL_GATE")
     spine = subprocess.run([sys.executable, str(ROOT / "tools" / "platform_spine.py"), "--validate"], cwd=ROOT, text=True, capture_output=True)
     if spine.returncode != 0:
         fail("Platform Spine engine validation failed: " + (spine.stdout or spine.stderr).strip())
