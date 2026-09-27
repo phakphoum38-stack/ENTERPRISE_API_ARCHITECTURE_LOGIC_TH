@@ -13,6 +13,7 @@ function Write-Diagnostic([string]$Message) {
 }
 
 try { Set-Content -LiteralPath $DiagnosticLogPath -Value '' -Encoding utf8 } catch { }
+# Diagnostic preflight is intentionally explicit so installer failures remain observable.
 Write-Diagnostic "START ZipPath=$ZipPath TargetRoot=$TargetRoot ExpectedZipSha256=$ExpectedZipSha256 ExpectedSourceSha=$ExpectedSourceSha"
 
 function Normalize-Hash([string]$Value) { return $Value.Trim().ToLowerInvariant() }
