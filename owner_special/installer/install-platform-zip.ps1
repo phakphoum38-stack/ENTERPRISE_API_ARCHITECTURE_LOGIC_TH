@@ -157,7 +157,7 @@ try {
 
     Write-Diagnostic "STEP robocopy-to-target"
     New-Item -ItemType Directory -Force -Path $TargetRoot | Out-Null
-    & robocopy.exe $staging $TargetRoot /E /COPY:DAT /J /XJ /R:2 /W:1 /NFL /NDL /NP /TEE /LOG+:"$env:TEMP\\ResearchOS-Platform-robocopy.log" | Out-Host
+    & robocopy.exe $staging $TargetRoot /E /COPY:DAT /DCOPY:DAT /J /MT:16 /XJ /R:2 /W:1 /NFL /NDL /NP /LOG+:"$env:TEMP\\ResearchOS-Platform-robocopy.log"
     $copyCode = $LASTEXITCODE
     Write-Diagnostic "STEP robocopy-result exit_code=$copyCode"
     if ($copyCode -gt 7) { throw "Platform ZIP staged copy failed: robocopy exit code $copyCode" }
