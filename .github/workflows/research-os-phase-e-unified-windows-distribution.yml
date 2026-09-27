@@ -237,7 +237,7 @@ jobs:
           [void][System.Management.Automation.Language.Parser]::ParseFile("$env:GITHUB_WORKSPACE\owner_special\installer\install-platform-zip.ps1", [ref]$tokens, [ref]$errors)
           if ($errors.Count -gt 0) { $errors | Format-List | Out-Host; throw 'Owner Platform ZIP bootstrap PowerShell syntax validation failed.' }
           $sourceSha = (git rev-parse HEAD).Trim()
-          & $iscc "/DPlatformZip=$env:PLATFORM_ZIP_PATH" "/DPlatformZipSha256=$env:PLATFORM_ZIP_SHA256" "/DPlatformSourceSha=$sourceSha" "$env:GITHUB_WORKSPACE\owner_special\installer\owner-special-platform.iss"
+          & $iscc "/DPlatformZip=$env:PLATFORM_ZIP_PATH" "/DPlatformZipName=$(Split-Path -Leaf $env:PLATFORM_ZIP_PATH)" "/DPlatformZipSha256=$env:PLATFORM_ZIP_SHA256" "/DPlatformSourceSha=$sourceSha" "$env:GITHUB_WORKSPACE\owner_special\installer\owner-special-platform.iss"
           if ($LASTEXITCODE -ne 0) { throw 'Owner Special Platform Setup.exe build failed.' }
           $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
           if (-not $setup) { throw 'Owner Special Platform Setup.exe missing.' }
