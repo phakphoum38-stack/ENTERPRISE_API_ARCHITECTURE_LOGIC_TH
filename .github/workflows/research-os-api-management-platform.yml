@@ -1,0 +1,26 @@
+name: Research OS API Management Platform
+on:
+  pull_request:
+    paths:
+      - 'tools/research_os_api/api_platform/**'
+      - 'tools/research_os_api/api_management_models.py'
+      - 'tools/research_os_api/api_key_store.py'
+      - 'tools/research_os_api/api_keys.py'
+      - 'tools/research_os_api/server.py'
+      - 'tools/validate_research_os_api_management_platform.py'
+      - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
+      - 'current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json'
+      - 'tools/validate_research_os_platform_production_certification.py'
+      - '.github/workflows/research-os-api-management-platform.yml'
+  workflow_dispatch:
+jobs:
+  management:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python tools/validate_research_os_api_management_platform.py
+      - run: python -m unittest tools.research_os_api.api_platform.test_management_service -v
+      - run: python tools/validate_research_os_unified_final_gate.py
