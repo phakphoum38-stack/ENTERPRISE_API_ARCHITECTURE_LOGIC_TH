@@ -16,6 +16,9 @@ REQUIRED = [
     "current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json",
     "current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json",
+    "tools/platform_continuity_workflow.py",
+    "tools/test_platform_continuity_workflow.py",
     "tools/validate_research_os_platform_runtime_completion.py",
     "tools/validate_research_os_laravel_platform.py",
     "tools/platform_spine.py",
@@ -106,6 +109,7 @@ def main() -> int:
         ["tools/platform_spine.py", "--validate"],
         ["tools/validate_platform_self_reconciliation.py"],
         ["tools/validate_research_os_api_management_platform.py"],
+        ["-m", "unittest", "tools.test_platform_continuity_workflow", "-v"],
     ]
     for cmd in checks:
         result = run(*cmd)
@@ -121,6 +125,7 @@ def main() -> int:
     print("FAILURE_RECOVERY=QUALIFIED")
     print("OBSERVABILITY=QUALIFIED")
     print("AI_CODE_WRITER=RECON_BOUND")
+    print("CONTINUITY_WORKFLOW=QUALIFIED")
     print("SURFACES=11_REQUIRED")
     print("INVARIANTS=5_REQUIRED")
     print("EVIDENCE=6_REQUIRED")
