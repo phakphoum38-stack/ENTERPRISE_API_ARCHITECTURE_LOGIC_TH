@@ -12,6 +12,7 @@ REQUIRED=[
 "current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json",
 "current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json",
 "tools/validate_research_os_platform_runtime_completion.py",
+"tools/validate_research_os_laravel_platform.py",
 "tools/platform_spine.py",
 "tools/platform_self_reconciliation.py",
 "apps/research_os_laravel/README.md",
@@ -33,6 +34,7 @@ def main():
         print("PRODUCTION_CERTIFICATION=STOP"); return 1
     checks=[
       ["tools/validate_research_os_platform_runtime_completion.py"],
+      ["tools/validate_research_os_laravel_platform.py"],
       ["tools/platform_spine.py","--validate"],
       ["tools/validate_platform_self_reconciliation.py"],
       ["tools/validate_research_os_api_management_platform.py"],

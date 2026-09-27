@@ -22,7 +22,9 @@
     "self_reconciliation": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
     "self_reconciliation_engine": "tools/platform_self_reconciliation.py",
     "platform_spine_engine": "tools/platform_spine.py",
-    "platform_spine_engine_contract": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json"
+    "platform_spine_engine_contract": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+    "laravel_platform_contract": "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json",
+    "laravel_platform_validator": "tools/validate_research_os_laravel_platform.py"
   },
   "authority": {
     "governance_mode": "DESCRIPTIVE_AND_VALIDATING",
@@ -372,6 +374,19 @@
       "gates": [
         "assurance",
         "unified_final_gate"
+      ]
+    },
+    {
+      "match": "apps/research_os_laravel/",
+      "components": [
+        "laravel_platform",
+        "platform_runtime_completion",
+        "api_management_platform"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate",
+        "release_spine"
       ]
     }
   ]

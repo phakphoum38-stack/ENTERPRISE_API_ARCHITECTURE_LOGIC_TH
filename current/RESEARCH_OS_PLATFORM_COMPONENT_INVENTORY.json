@@ -22,7 +22,9 @@
     "tools/validate_research_os_platform_production_certification.py",
     "tools/validate_research_os_api_management_platform.py",
     "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml",
-    "tools/research_os_api/api_platform/management_service.py"
+    "tools/research_os_api/api_platform/management_service.py",
+    "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json",
+    "tools/validate_research_os_laravel_platform.py"
   ],
   "components": [
     {
@@ -1071,6 +1073,56 @@
         "credential_lifecycle",
         "management_http",
         "sdk_metadata"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "laravel_platform",
+      "canonical": "apps/research_os_laravel/README.md",
+      "kind": "PLATFORM_INTEGRATION_CONTROL_PLANE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_runtime_completion",
+        "api_management_platform",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_validate_research_os_laravel_platform.py",
+        "apps/research_os_laravel/tests/Unit/PlatformBoundaryTest.php",
+        "apps/research_os_laravel/tests/Unit/CanonicalPlatformAdapterTest.php",
+        "apps/research_os_laravel/tests/Unit/PlatformRuntimeTest.php"
+      ],
+      "evidence": [
+        "apps/research_os_laravel/README.md",
+        "docs/research-os/LARAVEL_PLATFORM_FOUNDATION_V1.md",
+        "docs/research-os/LARAVEL_PLATFORM_INTEGRATION_WAVE1_V1.md",
+        "tools/validate_research_os_laravel_platform.py"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "assurance",
+        "release_spine"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "http_api_boundary",
+        "canonical_identity_adapter",
+        "canonical_authorization_adapter",
+        "workflow_messaging_adaptation",
+        "tool_control_operations_adapters",
+        "health_readiness",
+        "platform_context_propagation"
       ],
       "authority": {
         "mode": "NONE"

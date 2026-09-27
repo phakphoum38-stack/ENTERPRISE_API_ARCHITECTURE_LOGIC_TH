@@ -88,6 +88,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json
+  - current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
