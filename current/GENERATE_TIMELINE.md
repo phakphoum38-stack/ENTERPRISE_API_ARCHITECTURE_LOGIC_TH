@@ -31,8 +31,10 @@ STOP
 
 ## Current workflow roles
 
-### Canonical build/release path
-- `owner-special-friend.yml` — Master pipeline. It contains Friend validation, Desktop build, Installer build, Installer validation, and Owner Bundle composition.
+### Canonical build/release paths
+- `owner-special-friend.yml` — canonical Owner Special pipeline. It contains Friend validation, Desktop build, Installer build, Installer validation, and Owner Bundle composition.
+- `continuous-generated-release.yml` — canonical Research OS Platform Windows release dispatcher. It captures the exact `main` SHA and dispatches the Unified Windows Distribution workflow; it must not build a competing Windows artifact itself.
+- `research-os-phase-e-unified-windows-distribution.yml` — canonical Research OS Platform Windows distribution and installer pipeline. It builds the unified package, `Research-OS-Unified-Setup-*-x64.exe`, install/run/uninstall E2E evidence, and SHA-bound release evidence.
 - `release.yml` — release/publishing stage; must consume an already validated final result rather than create a parallel build.
 
 ### V3 / execution stages
@@ -49,7 +51,7 @@ These are supporting V3 stages. They must not create a competing Final artifact.
 - `research-os-build-ready-source.yml`
 - `artifacts-build.yml`
 
-These are build/support artifacts. Prefer consumption by the canonical path; do not duplicate Final output.
+These are raw/build-support artifacts. `research-os-windows-artifact.yml` produces the diagnostic Flutter ZIP and is not the canonical Windows installer release. The canonical installer is produced only by `research-os-phase-e-unified-windows-distribution.yml`.
 
 ### Gates / evidence
 - `research-os-performance-gate.yml` — secondary performance gate; triggered from Windows Desktop completion and does not become a second Final pipeline.
