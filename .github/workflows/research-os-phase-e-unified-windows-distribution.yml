@@ -281,9 +281,21 @@ jobs:
           if ($installedManifestHash -ne $manifestHashValue) { throw 'Installed manifest SHA256 mismatch.' }
           $checks['manifest_provenance'] = $true
 
-          $mainService = Get-Service -Name 'ResearchOSService' -ErrorAction SilentlyContinue
-          $ownerService = Get-Service -Name 'ResearchOSOwnerFriendService' -ErrorAction SilentlyContinue
-          if (-not $mainService -or $mainService.Status -ne 'Running') {
+          # Windows service state is mutable and Get-Service returns a snapshot.
+          # The installer may return before the SCM transitions the service to Running,
+          # so poll the authoritative service state instead of evaluating a stale object.
+          $mainServiceReady = $false
+          $ownerServiceReady = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            $mainState = (Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'" -ErrorAction SilentlyContinue)
+            $ownerState = (Get-CimInstance Win32_Service -Filter "Name='ResearchOSOwnerFriendService'" -ErrorAction SilentlyContinue)
+            if ($mainState -and $mainState.State -eq 'Running') { $mainServiceReady = $true }
+            if ($ownerState -and $ownerState.State -eq 'Running') { $ownerServiceReady = $true }
+            if ($mainServiceReady -and $ownerServiceReady) { break }
+            Start-Sleep -Milliseconds 500
+          }
+
+          if (-not $mainServiceReady) {
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installRoot\scripts\research-os-service.ps1" -Action status 2>&1 | Out-Host
             $svcInfo = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'" -ErrorAction SilentlyContinue
             if ($svcInfo) {
@@ -293,9 +305,17 @@ jobs:
             $outLog = Join-Path $dataRoot 'logs\service-api.out.log'
             if (Test-Path $errLog) { Write-Host '--- Research OS service stderr ---'; Get-Content $errLog -Tail 100 | Out-Host }
             if (Test-Path $outLog) { Write-Host '--- Research OS service stdout ---'; Get-Content $outLog -Tail 100 | Out-Host }
-            throw 'Research OS service is not running after install.'
+            throw 'Research OS service did not reach Running state after install.'
           }
-          if (-not $ownerService -or $ownerService.Status -ne 'Running') { throw 'Owner Friend service is not running after install.' }
+
+          if (-not $ownerServiceReady) {
+            $ownerState = Get-CimInstance Win32_Service -Filter "Name='ResearchOSOwnerFriendService'" -ErrorAction SilentlyContinue
+            if ($ownerState) {
+              Write-Host "ResearchOSOwnerFriendService State=$($ownerState.State) StartMode=$($ownerState.StartMode) Path=$($ownerState.PathName) ExitCode=$($ownerState.ExitCode)"
+            }
+            throw 'Owner Friend service did not reach Running state after install.'
+          }
+
           $checks['services_running'] = $true
 
           $ownerReady = $false
