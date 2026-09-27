@@ -1,0 +1,9 @@
+{
+  "contract_id":"research-os-platform-recon-repair-v1",
+  "version":"1.0.0",
+  "status":"ACTIVE",
+  "mode":"BOUNDED_DETERMINISTIC",
+  "pipeline":["RECON","LOCALIZE","BOUNDARY","PLAN","SANDBOX","PATCH","VALIDATE","POST_RECON","EVIDENCE"],
+  "rules":{"ambiguous":"STOP","protected_core":"STOP","unknown":"HOLD","evidence_before_patch":true,"minimal_patch":true,"snapshot_before_apply":true,"rollback_required":true,"main_direct_write":false},
+  "authority":{"may_authorize":false,"may_release":false,"release_authority":"FINAL_GATE"}
+}
