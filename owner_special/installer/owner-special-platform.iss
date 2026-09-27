@@ -75,6 +75,25 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPo
 Type: filesandordirs; Name: "{app}\*"
 
 [Code]
+procedure LogDiagnosticFile(const FileName: String);
+var
+  Contents: String;
+begin
+  if not FileExists(FileName) then
+  begin
+    Log('Platform bootstrap diagnostic file not found: ' + FileName);
+    Exit;
+  end;
+  if LoadStringFromFile(FileName, Contents) then
+  begin
+    Log('--- Research OS Platform bootstrap diagnostics ---');
+    Log(Contents);
+    Log('--- End Research OS Platform bootstrap diagnostics ---');
+  end
+  else
+    Log('Unable to read platform bootstrap diagnostic file: ' + FileName);
+end;
+
 function RunPowerShellChecked(const Description, Parameters: String): Boolean;
 var
   ResultCode: Integer;
@@ -92,10 +111,11 @@ end;
 
 function InstallCanonicalPlatform(): Boolean;
 var
-  ZipPath, TargetRoot, Parameters: String;
+  ZipPath, TargetRoot, Parameters, DiagnosticLogPath: String;
 begin
   Result := False;
   TargetRoot := ExpandConstant('{app}');
+  DiagnosticLogPath := ExpandConstant('{tmp}\ResearchOS-Platform-install.log');
   ZipPath := AddBackslash(TargetRoot) + '{#PlatformZipName}';
   if not FileExists(ZipPath) then
   begin
@@ -108,8 +128,13 @@ begin
     '-ZipPath "' + ZipPath + '" ' +
     '-TargetRoot "' + TargetRoot + '" ' +
     '-ExpectedZipSha256 "{#PlatformZipSha256}" ' +
-    '-ExpectedSourceSha "{#PlatformSourceSha}"';
-  if not RunPowerShellChecked('Installing Research OS Platform from canonical ZIP', Parameters) then Exit;
+    '-ExpectedSourceSha "{#PlatformSourceSha}" ' +
+    '-DiagnosticLogPath "' + DiagnosticLogPath + '"';
+  if not RunPowerShellChecked('Installing Research OS Platform from canonical ZIP', Parameters) then
+  begin
+    LogDiagnosticFile(DiagnosticLogPath);
+    Exit;
+  end;
   Result := True;
 end;
 
