@@ -87,6 +87,7 @@ required_contracts:
   - current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json
   - current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json
 
 required_workflows:
   - .github/workflows/research-os-gate.yml
@@ -102,6 +103,7 @@ required_workflows:
   - .github/workflows/research-os-platform-one-pass-completion.yml
   - .github/workflows/research-os-platform-evolution.yml
   - .github/workflows/research-os-platform-runtime-completion.yml
+  - .github/workflows/research-os-platform-production-certification.yml
 
 required_surface_contracts:
   - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
