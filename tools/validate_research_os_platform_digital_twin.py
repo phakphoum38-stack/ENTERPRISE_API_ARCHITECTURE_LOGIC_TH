@@ -43,7 +43,7 @@ def main() -> int:
     ):
         if anchor not in gate:
             fail("Final Gate anchor missing:" + anchor)
-    spine = subprocess.run([sys.executable, "tools/platform_spigital_twin.py"], cwd=ROOT, text=True, capture_output=True)
+    spine = subprocess.run([sys.executable, "tools/platform_digital_twin.py"], cwd=ROOT, text=True, capture_output=True)
     if spine.returncode != 0:
         fail("digital twin execution failed:" + (spine.stdout or spine.stderr).strip())
     print("PLATFORM_NORTH_STAR=BOUND")
