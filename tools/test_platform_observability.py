@@ -1,5 +1,5 @@
 import unittest
-from platform_observability import validate
+from tools.platform_observability import validate
 class ObservabilityTest(unittest.TestCase):
     def test_complete_lineage(self):
         c={k:k for k in ("request_id","correlation_id","actor","contract_version")}
