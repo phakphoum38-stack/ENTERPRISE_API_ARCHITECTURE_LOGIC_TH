@@ -1,6 +1,6 @@
 {
   "registry_id": "research-os-platform-component-inventory-v1",
-  "version": 2,
+  "version": 3,
   "status": "ACTIVE",
   "purpose": "Derived governance inventory over existing canonical platform components; descriptive only and never an authority.",
   "source_of_truths": [
@@ -24,7 +24,10 @@
     "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml",
     "tools/research_os_api/api_platform/management_service.py",
     "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json",
-    "tools/validate_research_os_laravel_platform.py"
+    "tools/validate_research_os_laravel_platform.py",
+    "current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json",
+    "tools/platform_digital_twin.py"
   ],
   "components": [
     {
@@ -1123,6 +1126,46 @@
         "tool_control_operations_adapters",
         "health_readiness",
         "platform_context_propagation"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "digital_twin",
+      "canonical": "tools/platform_digital_twin.py",
+      "kind": "READ_ONLY_SIMULATION_PROJECTION",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_graph",
+        "platform_failure_simulation",
+        "change_impact_control",
+        "evidence"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_digital_twin.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_LONG_TERM_CAPABILITY_MAP.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "snapshot",
+        "impact_analysis",
+        "simulation"
       ],
       "authority": {
         "mode": "NONE"
