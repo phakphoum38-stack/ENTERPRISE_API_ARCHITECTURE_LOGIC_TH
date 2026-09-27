@@ -1,5 +1,5 @@
 import unittest
-from platform_failure_simulator import simulate
+from tools.platform_failure_simulator import simulate
 class FailureSimulatorTest(unittest.TestCase):
     def test_resource_conflict_releases(self): self.assertEqual(simulate("resource_conflict")["expected_action"],"REJECT_AND_RELEASE")
     def test_stale_delivery_rejects(self): self.assertEqual(simulate("stale_delivery")["expected_action"],"REJECT")
