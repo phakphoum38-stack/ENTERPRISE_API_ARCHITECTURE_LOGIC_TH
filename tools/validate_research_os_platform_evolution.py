@@ -67,8 +67,9 @@ def main() -> int:
     if cert.get("unknown_is_not_pass") is not True or cert.get("release_authority_remains") != "FINAL_GATE":
         fail("certification fail-closed policy drifted")
 
+    schema_version = schema.get("properties", {}).get("schema_version", {}).get("const")
     schema_count = schema.get("properties", {}).get("count_is_informational", {}).get("const")
-    if schema.get("schema_version") != 1 or schema_count is not True or registry.get("count_is_informational") is not True:
+    if schema_version != 1 or schema_count is not True or registry.get("count_is_informational") is not True:
         fail("schema-driven registry contract drifted")
     components = registry.get("components", [])
     ids = {c.get("id") for c in components}
