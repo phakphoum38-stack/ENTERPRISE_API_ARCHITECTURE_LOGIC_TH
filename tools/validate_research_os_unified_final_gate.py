@@ -128,6 +128,14 @@ REQUIRED_FILES = (
     "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
     "apps/research_os_flutter/test/platform_surface_parity_test.dart",
     "apps/research_os_flutter/test/desktop_shell_test.dart",
+    "tools/validate_research_os_api_management_platform.py",
+    "tools/research_os_api_platform/README.md",
+    "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml",
+    "tools/research_os_api/api_platform/API_PLATFORM_CAPABILITY_MATRIX.yaml",
+    "tools/research_os_api/api_platform/management_service.py",
+    "tools/research_os_api/api_platform/management_http.py",
+    "tools/research_os_api/api_platform/sdk_metadata.py",
+    "tools/research_os_api/api_platform/test_management_service.py",
 )
 
 EXPECTED_SPINE = (
@@ -337,6 +345,10 @@ def main() -> None:
     if production.returncode != 0:
         fail("Platform production certification failed: " + (production.stdout or production.stderr).strip())
     print("PRODUCTION_CERTIFICATION=BOUND_TO_FINAL_GATE")
+    api_management = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_research_os_api_management_platform.py")], cwd=ROOT, text=True, capture_output=True)
+    if api_management.returncode != 0:
+        fail("API Management Platform validation failed: " + (api_management.stdout or api_management.stderr).strip())
+    print("API_MANAGEMENT_PLATFORM=BOUND_TO_FINAL_GATE")
 
 if __name__ == "__main__":
     main()
