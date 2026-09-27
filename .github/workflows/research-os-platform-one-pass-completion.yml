@@ -13,6 +13,9 @@ on:
       - 'tools/test_platform_spine.py'
       - 'tools/platform_spine.py'
       - 'current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json'
+      - 'current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json'
+      - 'tools/validate_research_os_platform_evolution.py'
+      - 'tools/test_validate_research_os_platform_evolution.py'
   push:
     branches: [main]
     paths:
@@ -21,6 +24,9 @@ on:
       - 'tools/validate_research_os_platform_one_pass.py'
       - 'tools/test_research_os_platform_one_pass.py'
       - 'current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml'
+      - 'current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json'
+      - 'tools/validate_research_os_platform_evolution.py'
+      - 'tools/test_validate_research_os_platform_evolution.py'
 
 jobs:
   platform-one-pass:
@@ -36,5 +42,9 @@ jobs:
         run: python tools/test_platform_spine.py
       - name: Validate one-pass Platform spine
         run: python tools/validate_research_os_platform_one_pass.py
+      - name: Validate Platform Evolution
+        run: python tools/validate_research_os_platform_evolution.py
+      - name: Test Platform Evolution
+        run: python tools/test_validate_research_os_platform_evolution.py
       - name: Test one-pass Platform spine
         run: python tools/test_research_os_platform_one_pass.py
