@@ -360,9 +360,24 @@ jobs:
             if (-not (Test-Path $installRoot)) { break }
             Start-Sleep -Milliseconds 500
           }
-          if (Test-Path $installRoot) { throw 'Installation root remained after uninstall.' }
-          if (Get-Service -Name 'ResearchOSService' -ErrorAction SilentlyContinue) { throw 'Research OS service remained after uninstall.' }
-          if (Get-Service -Name 'ResearchOSOwnerFriendService' -ErrorAction SilentlyContinue) { throw 'Owner Friend service remained after uninstall.' }
+          if (Test-Path $installRoot) {
+            Write-Host '--- Remaining installation root entries ---'
+            Get-ChildItem -LiteralPath $installRoot -Force -Recurse -ErrorAction SilentlyContinue |
+              Select-Object FullName,Length,Mode | Format-Table -AutoSize | Out-Host
+            Write-Host '--- Processes referencing installation root ---'
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+              Where-Object { $_.ExecutablePath -like "$installRoot*" -or $_.CommandLine -like "*$installRoot*" } |
+              Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
+            Write-Host '--- Services referencing installation root ---'
+            Get-CimInstance Win32_Service -ErrorAction SilentlyContinue |
+              Where-Object { $_.PathName -like "*$installRoot*" } |
+              Select-Object Name,State,StartMode,PathName,ExitCode | Format-List | Out-Host
+            throw 'Installation root remained after uninstall.'
+          }
+          $remainingMainService = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'" -ErrorAction SilentlyContinue
+          if ($remainingMainService) { throw 'Research OS service remained after uninstall.' }
+          $remainingOwnerService = Get-CimInstance Win32_Service -Filter "Name='ResearchOSOwnerFriendService'" -ErrorAction SilentlyContinue
+          if ($remainingOwnerService) { throw 'Owner Friend service remained after uninstall.' }
           if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw 'Research OS API port remained bound after uninstall.' }
           if (Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction SilentlyContinue) { throw 'Owner Friend port remained bound after uninstall.' }
           $checks['uninstall_clean'] = $true
