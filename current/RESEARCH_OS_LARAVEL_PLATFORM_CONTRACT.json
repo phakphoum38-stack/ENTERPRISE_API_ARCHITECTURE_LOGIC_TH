@@ -1,0 +1,56 @@
+{
+  "document_id": "ROS-LARAVEL-PLATFORM-CONTRACT",
+  "version": "1.0.0",
+  "status": "proposed",
+  "platform": "research-os-laravel",
+  "baseline_platform": "research-os-main",
+  "authority": {
+    "security_decisions": "canonical_research_os_platform",
+    "release": "research_os_unified_final_gate"
+  },
+  "modules": [
+    "core",
+    "identity",
+    "authorization",
+    "workflow",
+    "messaging",
+    "tools",
+    "evidence",
+    "audit",
+    "operations",
+    "configuration",
+    "versioning",
+    "control"
+  ],
+  "interfaces": {
+    "http_api": "/api/v1",
+    "health": "/health",
+    "readiness": "/ready"
+  },
+  "required_context": [
+    "request_id",
+    "correlation_id",
+    "actor",
+    "contract_version"
+  ],
+  "security_chain": [
+    "identity",
+    "capability",
+    "policy",
+    "authorization",
+    "entitlement",
+    "execution",
+    "evidence"
+  ],
+  "delivery": {
+    "pattern": "event_queue_stateless_worker",
+    "direct_engine_to_runner": false,
+    "idempotency_required": true,
+    "resource_conflict_fail_closed": true
+  },
+  "compatibility": {
+    "breaking_change_requires_new_version": true,
+    "existing_capabilities_must_be_reused": true,
+    "main_is_not_modified_directly": true
+  }
+}
