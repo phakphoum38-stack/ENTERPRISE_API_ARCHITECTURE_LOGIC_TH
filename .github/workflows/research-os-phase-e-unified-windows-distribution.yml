@@ -246,8 +246,10 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $package = "$env:GITHUB_WORKSPACE\phase-e\package"
-          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\installer\output\Research-OS-Unified-Setup-*-x64.exe" | Select-Object -First 1
-          if (-not $setup) { throw 'Unified installer missing for E2E.' }
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw 'Owner Special Platform Setup.exe missing for E2E.' }
+          $platformZip = Get-ChildItem "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Platform-Windows-x64-*.zip" | Select-Object -First 1
+          if (-not $platformZip) { throw 'Canonical Research OS Platform ZIP missing for E2E.' }
 
           $targetSha = (git rev-parse HEAD).Trim()
           $installRoot = Join-Path $env:ProgramFiles 'Research OS'
@@ -257,6 +259,9 @@ jobs:
           $manifestHash = Join-Path $package 'DISTRIBUTION_MANIFEST.sha256'
           $manifestHashValue = (Get-FileHash $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
           $setupHash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $platformZipHash = (Get-FileHash $platformZip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expectedPlatformZipHash = (Get-Content "$($platformZip.FullName).sha256" -Raw).Trim().Split()[0].ToLowerInvariant()
+          if ($platformZipHash -ne $expectedPlatformZipHash) { throw 'Canonical Platform ZIP SHA256 sidecar mismatch.' }
           $checks = [ordered]@{}
 
           $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /TASKS="desktopicon"'
@@ -280,7 +285,8 @@ jobs:
             'service_host\ResearchOS.Owner.ServiceHost.exe',
             'scripts\research-os-service.ps1',
             'DISTRIBUTION_MANIFEST.json',
-            'DISTRIBUTION_MANIFEST.sha256'
+            'DISTRIBUTION_MANIFEST.sha256',
+            'OWNER_SPECIAL_PLATFORM_INSTALL_PROVENANCE.json'
           )) {
             if (-not (Test-Path (Join-Path $installRoot $relative))) {
               throw "Installed distribution component missing: $relative"
@@ -295,6 +301,15 @@ jobs:
           $installedManifestHash = (Get-FileHash (Join-Path $installRoot 'DISTRIBUTION_MANIFEST.json') -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($installedManifestHash -ne $manifestHashValue) { throw 'Installed manifest SHA256 mismatch.' }
           $checks['manifest_provenance'] = $true
+          $checks['platform_zip_integrity'] = $true
+
+          $installedProvenance = Join-Path $installRoot 'OWNER_SPECIAL_PLATFORM_INSTALL_PROVENANCE.json'
+          $provenance = Get-Content $installedProvenance -Raw | ConvertFrom-Json
+          if ($provenance.source_sha -ne $targetSha) { throw 'Installed Platform provenance source SHA mismatch.' }
+          if ($provenance.platform_zip_sha256 -ne $platformZipHash) { throw 'Installed Platform provenance ZIP SHA mismatch.' }
+          if ($provenance.distribution_manifest_sha256 -ne $manifestHashValue) { throw 'Installed Platform provenance manifest SHA mismatch.' }
+          if ($provenance.release_authority -ne 'FINAL_GATE' -or $provenance.installer_role -ne 'OWNER_SPECIAL') { throw 'Installed Platform provenance authority mismatch.' }
+          $checks['owner_special_platform_binding'] = $true
 
           # Windows service state is mutable and Get-Service returns a snapshot.
           # The installer may return before the SCM transitions the service to Running,
@@ -401,7 +416,10 @@ jobs:
             schema = 'research-os.windows-installer-e2e.v1'
             source_sha = $targetSha
             installer = $setup.Name
+            installer_role = 'OWNER_SPECIAL'
             installer_sha256 = $setupHash
+            platform_zip = $platformZip.Name
+            platform_zip_sha256 = $platformZipHash
             manifest_sha256 = $manifestHashValue
             manifest_hash_file = (Get-Content $manifestHash -Raw).Trim()
             install_root = $installRoot
