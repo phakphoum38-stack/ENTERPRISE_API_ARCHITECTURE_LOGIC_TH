@@ -54,6 +54,8 @@ from tools.platform_work_checkpoint import (
 )
 
 from tools.project_registry import ProjectRegistry
+from tools.research_os_api.api_platform.management_http import ManagementHTTP
+from tools.research_os_api.api_platform.management_service import ManagementService
 from tools.project_scale_readiness import PROJECT_COUNT, build_project_definitions
 import copilot_service
 
@@ -64,6 +66,19 @@ ARTIFACT_DIR = ROOT / "research" / "artifacts"
 WEB_DIR = ROOT / "apps" / "research_os_web"
 STATIC_ROUTES = {"/": "index.html", "/index.html": "index.html", "/app.css": "app.css", "/app.js": "app.js"}
 DEFAULT_GITHUB_REPOSITORY = "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH"
+
+_MANAGEMENT_SERVICE: ManagementService | None = None
+
+def _management_http() -> ManagementHTTP:
+    global _MANAGEMENT_SERVICE
+    if _MANAGEMENT_SERVICE is None:
+        _MANAGEMENT_SERVICE = ManagementService.from_env()
+    def authenticate(headers: Any) -> dict[str, Any] | None:
+        try:
+            return require_session(headers)
+        except ValueError:
+            return None
+    return ManagementHTTP(_MANAGEMENT_SERVICE, authenticate)
 
 
 def _load_module(name: str, path: Path):
@@ -241,6 +256,10 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         path = parsed.path
         try:
+            if path.startswith("/platform/v1"):
+                status, payload = _management_http().dispatch("GET", self.path, self.headers)
+                self._send(status, payload)
+                return
             if path in STATIC_ROUTES:
                 self._send_static(STATIC_ROUTES[path])
                 return
@@ -379,6 +398,10 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = self._read_json()
+            if path.startswith("/platform/v1"):
+                status, payload = _management_http().dispatch("POST", self.path, self.headers, body)
+                self._send(status, payload)
+                return
             if path == "/v1/platform/work-checkpoints":
                 principal = require_session(self.headers)
                 user_id = str(principal.get("user_id") or "").strip()
