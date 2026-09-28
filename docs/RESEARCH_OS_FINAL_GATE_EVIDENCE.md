@@ -16,6 +16,6 @@ The evidence identity is:
 - Identity mismatch fails closed.
 - The governed runtime exposes the evidence builder without introducing another queue, event bus, or evidence store.
 
-## Deferred failures
+## Flutter validation
 
-Known Flutter failures in `apps/research_os_flutter/test/developer_access_page_test.dart` and `apps/research_os_flutter/test/flutter_code_tool_page_test.dart` remain deferred by project decision and are not modified by this integration.
+The previously deferred Developer Access / Flutter Code Tool validation is now part of the normal Flutter quality gate. Windows release builds also bind the Research OS Flutter client to the packaged local API at `http://127.0.0.1:8787`; public iOS/web builds may continue to supply their own `RESEARCH_OS_API_BASE_URL`.
