@@ -60,8 +60,12 @@ class EventDeliveryTests(unittest.TestCase):
             ledger.register_delivery(event_id="evt-1", consumer="consumer-a", delivery_id="delivery-1", idempotency_key="idem-1")
             first = ledger.claim("delivery-1")
             self.assertIsNotNone(first.lease_id)
-            with sqlite3.connect(ledger.path) as db:
+            db = sqlite3.connect(ledger.path)
+            try:
                 db.execute("UPDATE deliveries SET lease_until=? WHERE delivery_id=?", ("2000-01-01T00:00:00+00:00", "delivery-1"))
+                db.commit()
+            finally:
+                db.close()
             self.assertEqual(1, ledger.recover_expired())
             second = ledger.claim("delivery-1")
             self.assertIsNotNone(second)
