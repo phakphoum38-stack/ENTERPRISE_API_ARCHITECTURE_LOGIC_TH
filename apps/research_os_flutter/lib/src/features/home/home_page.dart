@@ -226,7 +226,7 @@ class _HomePageState extends State<HomePage> {
                   spacing: 12,
                   runSpacing: 12,
                   children: <Widget>[
-                    _WorkspaceCard(Icons.auto_awesome_outlined, 'AI & Agents', 'Chat, specialist agents and task runtime', onTap: () => widget.onNavigate?.call(1)),
+                    _WorkspaceCard(Icons.auto_awesome_outlined, 'AI & Agents', 'Chat, specialist agents and task runtime', onTap: () => widget.onNavigate?.call(2)),
                     _WorkspaceCard(Icons.local_library_outlined, 'Knowledge', 'Library, memory and knowledge graph', onTap: () => widget.onNavigate?.call(3)),
                     _WorkspaceCard(Icons.link_outlined, 'Connections', 'GitHub and Google Workspace integrations', onTap: () => widget.onNavigate?.call(5)),
                     _WorkspaceCard(Icons.security_outlined, 'Local System', 'Windows Service, API, storage and backup', onTap: () => widget.onNavigate?.call(7)),
