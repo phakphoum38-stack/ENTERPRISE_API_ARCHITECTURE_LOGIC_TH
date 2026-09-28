@@ -18,6 +18,12 @@ on:
       - 'scripts/apply-research-os-branding.py'
       - '.github/workflows/research-os-ios-ipa.yml'
   workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: 'Research OS API base URL embedded in the iOS IPA (for example Tailscale Serve HTTPS URL)'
+        required: false
+        default: 'https://research-os-api-phakphoum.onrender.com'
+        type: string
 
 permissions:
   contents: read
@@ -108,7 +114,7 @@ jobs:
         working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
         run: >-
           flutter build ios --release --no-codesign
-          --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
+          --dart-define=RESEARCH_OS_API_BASE_URL=${{ inputs.api_base_url || 'https://research-os-api-phakphoum.onrender.com' }}
 
       - name: Verify iOS app and branding
         working-directory: ${{ env.RESEARCH_OS_IOS_WORKSPACE }}
