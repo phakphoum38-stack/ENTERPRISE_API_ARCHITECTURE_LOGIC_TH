@@ -1,5 +1,5 @@
 #define MyAppName "Research OS"
-#define MyAppVersion "2.0.0-rc.1"
+#define MyAppVersion "3.0.0"
 #define MyAppPublisher "Research OS"
 #define MyAppExeName "research_os_flutter.exe"
 
