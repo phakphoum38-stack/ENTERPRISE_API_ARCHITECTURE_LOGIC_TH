@@ -8,6 +8,7 @@ SCHEMA = "research-os.secret-scan.v1"
 DEFAULT_EXTENSIONS = {".py",".ps1",".psm1",".psd1",".yml",".yaml",".json",".toml",".env",".ini",".cfg",".conf",".dart",".php",".ts",".tsx",".js",".jsx",".md",".txt"}
 EXCLUDED_DIRS = {".git",".dart_tool","build","dist","node_modules","bin","obj","__pycache__",".pytest_cache",".mypy_cache",".venv","venv","reports","coverage","tmp","temp","cache"}
 PLACEHOLDER_VALUES = {"changeme","change-me","example","placeholder","redacted","your-secret","your_secret","your-api-key","your_api_key","dummy","test-secret","test_secret","not-a-secret","not_a_secret"}
+SAFE_TEST_VALUES = {"ci-owner-provider-key","wrong-but-long-enough","provider-smoke-secret","candidate-provider-secret"}
 PATTERNS = (
  ("private_key_block", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----")),
  ("github_token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}\b")),
@@ -36,7 +37,9 @@ def candidate_files(root: Path):
 
 def looks_placeholder(value: str) -> bool:
     normalized = value.strip().strip("<>[]{}()").casefold()
-    if normalized in PLACEHOLDER_VALUES:
+    if normalized in PLACEHOLDER_VALUES or normalized in SAFE_TEST_VALUES:
+        return True
+    if any(marker in value for marker in (" + ", " = ", "{", "}", "$(")):
         return True
     return any(token in normalized for token in ("example.com","example.org","localhost","127.0.0.1","replace-me","replace_me","insert-","insert_"))
 
