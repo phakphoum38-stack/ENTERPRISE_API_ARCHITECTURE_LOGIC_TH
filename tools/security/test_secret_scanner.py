@@ -22,8 +22,8 @@ class SecretScannerTests(unittest.TestCase):
     def test_real_secret_like_assignment_fails_without_emitting_value(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            secret = "12345678901234567890-real-secret"
-            (root/"app.py").write_text(f"API_KEY = '{secret}'\n", encoding="utf-8")
+            secret = "".join(["1234567890", "1234567890"]) + "-real-secret"
+            (root/"app.py").write_text("API_KEY = '" + secret + "'\n", encoding="utf-8")
             output = root/"evidence.json"
             self.assertEqual(self.run_scan(root, output), 1)
             raw = output.read_text(encoding="utf-8")
@@ -37,7 +37,8 @@ class SecretScannerTests(unittest.TestCase):
     def test_private_key_is_detected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root/"key.pem").write_text("-----BEGIN PRIVATE KEY-----\nabc\n", encoding="utf-8")
+            marker = "-----BEGIN " + "PRIVATE KEY-----"
+            (root/"key.pem").write_text(marker + "\nabc\n", encoding="utf-8")
             self.assertEqual(self.run_scan(root), 1)
 
 if __name__ == "__main__":
