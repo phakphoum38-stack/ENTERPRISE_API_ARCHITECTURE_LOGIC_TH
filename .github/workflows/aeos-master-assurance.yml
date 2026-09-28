@@ -1,4 +1,4 @@
-name: AEOS Master Assurance
+﻿name: AEOS Master Assurance
 
 on:
   pull_request:
@@ -135,14 +135,14 @@ jobs:
           git diff --name-status "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA"
 
       - name: Record pre-control source identity
-        shell: bash
+        if: always()`r`n        shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$AEOS_EXPECTED_SHA"
           echo "PRE_CONTROL_SHA=$(git rev-parse HEAD)"
 
       - name: Run AEOS master assurance controls
-        env:
+        if: always()`r`n        env:
           AEOS_PREVIOUS_MANIFEST: ${{ inputs.previous_manifest || '' }}
         shell: bash
         run: |
@@ -289,3 +289,4 @@ jobs:
             aeos_master_assurance_manifest.json.sha256
           if-no-files-found: error
           retention-days: 30
+
