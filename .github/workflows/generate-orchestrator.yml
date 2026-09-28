@@ -48,7 +48,7 @@ jobs:
       - name: Checkout requested source
         uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.ref || github.head_ref || github.ref_name }}
+          ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.sha }}
 
       - name: Resolve exact target SHA
         id: target
