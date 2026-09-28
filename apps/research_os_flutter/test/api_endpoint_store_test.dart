@@ -2,17 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_flutter/src/api/api_endpoint_store.dart';
 
 void main() {
-  test('build default is supplied by the build contract', () {
-    expect(
-      ApiEndpointStore.buildDefault,
-      'http://127.0.0.1:8787',
+  test('build default follows the compile-time API contract', () {
+    const expected = String.fromEnvironment(
+      'RESEARCH_OS_API_BASE_URL',
+      defaultValue: ApiEndpointStore.renderDefault,
     );
+    expect(ApiEndpointStore.buildDefault, expected);
   });
 
-  test('local endpoint is a stable profile', () {
+  test('local endpoint remains a valid explicit profile value', () {
     expect(
-      ApiEndpointStore.profileUrl(ApiEndpointStore.connectionResearchOs),
-      'http://127.0.0.1:8787',
+      ApiEndpointStore.normalize(ApiEndpointStore.localDefault),
+      ApiEndpointStore.localDefault,
     );
   });
 }
