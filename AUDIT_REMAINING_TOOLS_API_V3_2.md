@@ -65,16 +65,27 @@ Action: map every application surface to the canonical V3 API and workflow-runti
 
 ## Proposed next audit passes
 
-- [ ] OpenAPI endpoint ↔ implementation matrix
-- [ ] Tool registry with lifecycle state
-- [ ] Workflow/GitHub Actions deduplication matrix
-- [ ] V1/V2 compatibility map
-- [ ] V3 API contract draft
-- [ ] Durable queue / lease / heartbeat implementation gap analysis
-- [ ] Authentication and secret boundary audit
-- [ ] Observability / metrics / tracing coverage
-- [ ] Release artifact and installer contract alignment
-- [ ] Delete/retire candidates list with evidence
+- [x] OpenAPI endpoint ↔ implementation matrix — see `docs/API_IMPLEMENTATION_MATRIX.md`; added route groups remain draft-level pending release evidence.
+- [x] Tool registry with lifecycle state — see `docs/TOOL_REGISTRY.md`; platform/deployment evidence remains open for `verify` tools.
+- [x] Workflow/GitHub Actions deduplication matrix — see `docs/WORKFLOW_DEDUPLICATION_MATRIX.md`; consolidation candidates require equivalent-coverage proof.
+- [x] V1/V2 compatibility map — see `docs/V1_V2_COMPATIBILITY_MAP.md`; retirement remains blocked until replacement, migration and release evidence exist.
+- [x] V3 API contract draft — see `docs/V3_API_CONTRACT_DRAFT.md`; promotion still requires client migration, schema completion and exact-SHA evidence.
+- [x] Durable queue / lease / heartbeat implementation gap analysis — see `docs/DURABLE_RUNTIME_GAP_ANALYSIS.md`; durable event store and queue-to-engine projection remain implementation gaps.
+- [x] Authentication and secret boundary audit — see `docs/AUTH_SECRET_BOUNDARY_AUDIT.md`; production secret-store and deployment evidence remain open.
+- [x] Observability / metrics / tracing coverage — see `docs/OBSERVABILITY_COVERAGE.md`; production metrics, tracing export and alert evidence remain open.
+- [x] Release artifact and installer contract alignment — see `docs/RELEASE_ARTIFACT_INSTALLER_ALIGNMENT.md`; Windows candidate, installer and exact-SHA evidence remain open.
+- [x] Delete/retire candidates list with evidence — see `docs/DELETE_RETIRE_CANDIDATES.md`; zero deletion candidates are approved until replacement and release evidence exist.
+
+## Validation snapshot
+
+Validated on `main` @ `a06f0b7`:
+
+- V3 runtime and hardening tests: `144 tests OK` (`1 skipped`)
+- Research OS API tests: `114 tests OK`
+- Worker crash recovery evidence confirmed lease reclaim and stale-ack rejection.
+- Generated runtime test artifacts were removed after validation; intentional source/document changes remain uncommitted.
+
+This snapshot confirms the current testable implementation baseline. It does not close the remaining audit passes or replace exact-SHA release-gate evidence.
 
 ## Rule
 

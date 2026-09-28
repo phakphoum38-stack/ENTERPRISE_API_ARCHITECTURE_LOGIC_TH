@@ -4,7 +4,8 @@
 
 | Version | Status | Part | Latest Document | Path |
 |---|---|---|---|---|
-| v1.0.0-draft | Active Development | Part 1 — Foundation | ANEF-011 — Repository Structure | `versions/v1.0.0-draft/` |
+| v3.2.0 | Active Development | Workflow Runtime Foundation | Workflow Runtime Foundation | `current/workflow-runtime/` |
+| v1.0.0-draft | Historical Draft | Part 1 — Foundation | ANEF-011 — Repository Structure | `versions/v1.0.0-draft/` |
 
 ## Version Preservation Policy
 
