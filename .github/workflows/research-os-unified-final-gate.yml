@@ -1,0 +1,397 @@
+name: Research OS Unified Final Gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Exact commit SHA to validate"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-os-unified-final-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+env:
+  TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha || github.sha }}
+
+jobs:
+  contract:
+    name: Unified contract and navigation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Verify checked-out SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "CHECKED_OUT_SHA=$actual"
+      - name: Validate unified final gate contract
+        run: python tools/validate_research_os_unified_final_gate.py
+      - name: Validate canonical platform contract
+        run: python tools/validate_canonical_platform_contract.py
+      - name: Validate platform core completion
+        run: python tools/platform_core_completion.py
+      - name: Validate complete platform architecture
+        run: python tools/validate_research_os_platform_architecture.py
+      - name: Validate Laravel Platform boundary
+        run: |
+          python tools/validate_research_os_laravel_platform.py
+          python -m unittest tools.test_validate_research_os_laravel_platform -v
+      - name: Validate Flutter convergence map
+        run: |
+          python tools/validate_research_os_flutter_convergence_map.py
+          python -m unittest tools.test_validate_research_os_flutter_convergence_map -v
+      - name: Validate capability convergence
+        run: |
+          python tools/validate_research_os_capability_convergence.py
+          python -m unittest tools.test_validate_research_os_capability_convergence -v
+
+      - name: Validate identity and access convergence wave 1
+        run: |
+          python tools/validate_research_os_identity_access_wave1.py
+          python -m unittest tools.test_validate_research_os_identity_access_wave1 -v
+
+      - name: Validate unified UX and light-beam contract
+        run: |
+          python tools/validate_research_os_unified_ux.py
+          python -m unittest tools.test_validate_research_os_unified_ux -v
+      - name: Audit legacy UX palette
+        run: |
+          python tools/audit_research_os_ux_legacy.py
+          python -m unittest tools.test_audit_research_os_ux_legacy -v
+      - name: Validate platform phases 1-12 completion
+        run: python tools/validate_research_os_platform_complete_1_12.py
+      - name: Validate exact source identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          echo "SOURCE_IDENTITY=PASS"
+
+  aeos_recheck:
+    name: AEOS assurance recheck for exact target
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Verify exact target SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "AEOS_TARGET_SHA=$actual"
+      - name: Execute existing AEOS Master Assurance
+        env:
+          AEOS_EXPECTED_SHA: ${{ env.TARGET_SHA }}
+          AEOS_ASSURANCE_RUN_ID: unified-final-gate-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          python tools/aeos_master_assurance.py --output aeos_master_assurance_manifest.json
+      - name: Bind existing AEOS evidence to Unified Final Gate
+        if: always()
+        run: |
+          set -euo pipefail
+          python tools/validate_aeos_final_gate_binding.py \
+            --manifest aeos_master_assurance_manifest.json \
+            --expected-sha "$TARGET_SHA"
+      - name: Upload AEOS recheck evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: research-os-unified-final-gate-aeos-${{ env.TARGET_SHA }}
+          path: aeos_master_assurance_manifest.json
+          if-no-files-found: error
+          retention-days: 30
+  m2_audit:
+    name: M.2 whole-system audit index
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Verify exact target SHA
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+      - name: Build M.2 index
+        run: python tools/research_os_m2_audit.py --output m2_audit_index.json --summary m2_audit_index_summary.txt
+      - name: Test M.2 index
+        run: python -m unittest tools.test_research_os_m2_audit -v
+      - name: Verify M.2 source identity
+        run: |
+          set -euo pipefail
+          grep -F "SOURCE_SHA=$TARGET_SHA" m2_audit_index_summary.txt
+          grep -F "M2_AUDIT_INDEX=PASS" m2_audit_index_summary.txt
+      - name: Upload M.2 evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: research-os-m2-audit-${{ env.TARGET_SHA }}
+          path: |
+            m2_audit_index.json
+            m2_audit_index_summary.txt
+          if-no-files-found: error
+          retention-days: 30
+  flutter_surface:
+    name: Shared Flutter application surface
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Shared dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+      - name: Shared analysis
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+      - name: Navigation surface parity
+        working-directory: apps/research_os_flutter
+        run: flutter test test/platform_surface_parity_test.dart
+      - name: Capability to navigation binding
+        working-directory: apps/research_os_flutter
+        run: flutter test test/navigation_capability_binding_test.dart
+      - name: Page mapping contract
+        working-directory: apps/research_os_flutter
+        run: flutter test test/desktop_shell_test.dart
+
+  python_surface:
+    name: Research OS Python surface
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Compile source
+        run: python -m compileall -q v3/research_os_v3 v3/tests
+      - name: Unified validator test
+        run: python -m unittest tools.test_validate_research_os_unified_final_gate -v
+      - name: Research OS tests
+        env:
+          PYTHONPATH: .:v3
+        run: python -m unittest discover -s v3/tests -p 'test_*.py' -v
+      - name: Phase C capability E2E binding
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest \
+            tools.test_capability_delegation \
+            tools.test_lifecycle_evidence \
+            tools.test_capability_e2e_binding \
+            -v
+      - name: Phase D cross-surface parity
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_phase_d_cross_surface_parity.py
+          python -m unittest tools.test_phase_d_cross_surface_parity -v
+      - name: Phase E unified Windows distribution contract
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_phase_e_unified_windows_distribution.py
+          python -m unittest tools.test_phase_e_unified_windows_distribution -v
+      - name: Platform core and 100-project readiness
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/platform_core_completion.py
+          python -m unittest tools.test_platform_core_completion -v
+      - name: Project lifecycle and runtime evidence
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest \
+            tools.test_project_registry \
+            tools.test_project_execution \
+            tools.test_runtime_evidence \
+            -v
+      - name: Project scale execution and conflict proof
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest tools.test_project_scale_execution -v
+      - name: Platform production hardening
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest tools.test_platform_production_hardening -v
+      - name: Owner Experience Platform reconciliation
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_owner_experience_platform.py
+          python -m unittest tools.test_owner_experience_platform -v
+
+      - name: Schedule completion reconciliation
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_platform_completion_schedule.py
+          python -m unittest tools.test_platform_completion_schedule tools.test_platform_operating_control -v
+
+      - name: Platform production completion
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/platform_production_completion.py
+          python -m unittest tools.test_platform_production_completion -v
+      - name: Platform composition and continuity validation
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_platform_service.py
+          python -m unittest tools.test_platform_service tools.test_validate_platform_service -v
+          python -m unittest tools.test_platform_continuity_workflow -v
+      - name: Platform runtime resolution boundary
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_platform_runtime_resolution.py
+          python -m unittest tools.test_validate_platform_runtime_resolution -v
+
+      - name: Platform runtime readiness boundary
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest tools.test_platform_runtime_readiness -v
+
+      - name: AI provider connection boundary validation
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest tools.test_research_os_ai_provider_connection -v
+          python tools/research_os_ai_provider_connection.py
+
+      - name: Platform operationalization validation
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_platform_operationalization.py
+          python -m unittest tools.test_platform_operationalization -v
+          python tools/platform_operationalization.py --lifecycle UNKNOWN
+
+      - name: Complete platform architecture audit
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/validate_research_os_platform_architecture.py
+          python -m unittest tools.test_validate_research_os_platform_architecture -v
+          python tools/validate_research_os_platform_complete_1_12.py
+          python -m unittest tools.test_validate_research_os_platform_complete_1_12 -v
+
+  laravel_surface:
+    name: Laravel Platform surface
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/research_os_laravel
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, dom, fileinfo, openssl, pdo
+          coverage: none
+      - name: Validate Laravel Platform source boundary
+        run: |
+          set -euo pipefail
+          test -f composer.json
+          test -f artisan
+          test -f bootstrap/app.php
+          test -f routes/api.php
+          test -d src/Platform
+          grep -q 'direct_engine_to_runner.*false' ../../current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Contract command
+        run: php artisan research-os:contract
+      - name: Framework smoke
+        run: php artisan about
+      - name: Route smoke
+        run: php artisan route:list --path=api/v1
+      - name: Platform tests
+        run: vendor/bin/phpunit --testsuite='Research OS Laravel Platform'
+
+  decision:
+    name: Unified release decision
+    needs: [contract, aeos_recheck, m2_audit, flutter_surface, python_surface, laravel_surface]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate required results
+        env:
+          CONTRACT: ${{ needs.contract.result }}
+          FLUTTER_SURFACE: ${{ needs.flutter_surface.result }}
+          PYTHON_SURFACE: ${{ needs.python_surface.result }}
+          AEOS_RECHECK: ${{ needs.aeos_recheck.result }}
+          M2_AUDIT: ${{ needs.m2_audit.result }}
+          LARAVEL_SURFACE: ${{ needs.laravel_surface.result }}
+        run: |
+          set -euo pipefail
+          printf 'contract=%s\n' "$CONTRACT"
+          printf 'flutter_surface=%s\n' "$FLUTTER_SURFACE"
+          printf 'python_surface=%s\n' "$PYTHON_SURFACE"
+          printf 'aeos_recheck=%s\n' "$AEOS_RECHECK"
+          printf 'm2_audit=%s\n' "$M2_AUDIT"
+          printf 'laravel_surface=%s\n' "$LARAVEL_SURFACE"
+          test "$CONTRACT" = success
+          test "$FLUTTER_SURFACE" = success
+          test "$PYTHON_SURFACE" = success
+          test "$AEOS_RECHECK" = success
+          test "$M2_AUDIT" = success
+          test "$LARAVEL_SURFACE" = success
+          echo "RESEARCH_OS_UNIFIED_FINAL_GATE=PASS"
+          echo "RELEASE_AUTHORITY=FINAL_GATE"

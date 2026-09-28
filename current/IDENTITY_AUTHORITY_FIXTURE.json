@@ -1,0 +1,27 @@
+{
+  "contract_version": "1.0.0",
+  "identities": [
+    {"id":"H-OWNER","type":"human","status":"active","created_at":"2026-09-09T00:00:00Z","issuer":"system"},
+    {"id":"A-RESEARCH","type":"agent","status":"active","created_at":"2026-09-09T00:01:00Z","issuer":"H-OWNER"},
+    {"id":"S-RUNTIME","type":"service","status":"active","created_at":"2026-09-09T00:02:00Z","issuer":"H-OWNER"},
+    {"id":"A-REVOKED","type":"agent","status":"revoked","created_at":"2026-09-09T00:03:00Z","issuer":"H-OWNER"}
+  ],
+  "capabilities": [
+    {"id":"CAP-READ-RESEARCH","action":"read","resource":"research","scope":{"repository":"current"},"risk_class":"low"},
+    {"id":"CAP-PROD-MUTATE","action":"mutate","resource":"production","scope":{"environment":"production","service":"target"},"risk_class":"high"}
+  ],
+  "grants": [
+    {"id":"G-001","subject_id":"A-RESEARCH","capability_id":"CAP-READ-RESEARCH","scope":{"repository":"current"},"granted_by":"H-OWNER","valid_from":"2026-09-09T00:10:00Z","status":"active"},
+    {"id":"G-002","subject_id":"S-RUNTIME","capability_id":"CAP-PROD-MUTATE","scope":{"environment":"production","service":"target"},"granted_by":"H-OWNER","valid_from":"2026-09-09T00:10:00Z","status":"active"}
+  ],
+  "delegations": [
+    {"id":"D-001","delegator_id":"H-OWNER","delegatee_id":"A-RESEARCH","capability_id":"CAP-READ-RESEARCH","scope":{"repository":"current"},"valid_from":"2026-09-09T00:20:00Z","valid_until":"2026-09-09T01:20:00Z","status":"active"}
+  ],
+  "revocations": [
+    {"id":"R-001","subject_id":"A-REVOKED","reason":"credential_compromise","revoked_by":"H-OWNER","revoked_at":"2026-09-09T00:30:00Z"}
+  ],
+  "authorization_proofs": [
+    {"proof_id":"P-001","request_id":"REQ-READ-001","subject_id":"A-RESEARCH","capability_id":"CAP-READ-RESEARCH","resource":"research","action":"read","scope":{"repository":"current"},"decision":"ALLOW","checked_at":"2026-09-09T00:40:00Z","policy_version":"1.0.0"},
+    {"proof_id":"P-002","request_id":"REQ-PROD-001","subject_id":"S-RUNTIME","capability_id":"CAP-PROD-MUTATE","resource":"production","action":"mutate","scope":{"environment":"production","service":"target"},"decision":"ALLOW","checked_at":"2026-09-09T00:41:00Z","policy_version":"1.0.0"}
+  ]
+}

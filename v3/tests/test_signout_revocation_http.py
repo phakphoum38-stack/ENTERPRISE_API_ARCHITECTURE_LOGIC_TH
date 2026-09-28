@@ -5,6 +5,9 @@ import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
+_TEST_DATA_DIR = tempfile.mkdtemp(prefix="research-os-agent-test-")
+os.environ["RESEARCH_OS_DATA_DIR"] = _TEST_DATA_DIR
+
 from tools.research_os_api import agent_server, server
 from tools.research_os_api.auth_session import issue_session
 
@@ -14,6 +17,7 @@ class SignoutRevocationHttpTests(unittest.TestCase):
         self._env = {
             "RESEARCH_OS_SESSION_SECRET": "test-signout-revocation-secret",
             "RESEARCH_OS_V3_DATA_DIR": tempfile.mkdtemp(prefix="research-os-session-test-"),
+            "RESEARCH_OS_DATA_DIR": _TEST_DATA_DIR,
         }
         self._old_env = {key: os.environ.get(key) for key in self._env}
         os.environ.update(self._env)

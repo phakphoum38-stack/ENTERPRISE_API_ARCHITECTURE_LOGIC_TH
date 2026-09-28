@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
+from enum import Enum
 from queue import Full, Queue
-from threading import Lock
+from threading import Condition, Lock
 from typing import Any, Callable, Generic, TypeVar
 
 T = TypeVar("T")
@@ -23,6 +24,13 @@ class TaskTimeoutError(TimeoutError):
     """Raised when a task does not finish before its deadline."""
 
 
+class WorkerPoolLifecycle(str, Enum):
+    ONLINE = "online"
+    DRAINING = "draining"
+    DRAINED = "drained"
+    SHUTDOWN = "shutdown"
+
+
 @dataclass(frozen=True)
 class WorkerPoolStats:
     capacity: int
@@ -30,39 +38,23 @@ class WorkerPoolStats:
     active: int
     timed_out: int
     closed: bool
+    lifecycle: WorkerPoolLifecycle
 
 
 class BoundedWorkerPool(Generic[T, R]):
-    """Bounded worker pool with backpressure and per-task timeout observation.
+    """Single bounded execution primitive with explicit graceful drain."""
 
-    ``max_queue`` is the total in-flight capacity: running + executor-pending
-    tasks. The bookkeeping queue is deliberately separate from the executor so
-    ThreadPoolExecutor's unbounded internal queue cannot create hidden backlog.
-
-    A timeout never force-kills a Python thread. It marks the Future as timed
-    out to the caller while the underlying callable must cooperate with
-    cancellation if it needs to stop execution early.
-
-    ``event_sink`` is an optional integration hook. It keeps the pool decoupled
-    from a specific runtime while allowing the owning runtime to publish the
-    lifecycle events into its existing observability bus.
-    """
-
-    def __init__(
-        self,
-        max_workers: int,
-        max_queue: int,
-        event_sink: EventSink | None = None,
-    ) -> None:
+    def __init__(self, max_workers: int, max_queue: int, event_sink: EventSink | None = None) -> None:
         if max_workers < 1 or max_queue < 1:
             raise ValueError("max_workers and max_queue must be >= 1")
         self._capacity = max_queue
         self._queue: Queue[object] = Queue(maxsize=max_queue)
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._lock = Lock()
+        self._drain_condition = Condition(self._lock)
         self._active = 0
         self._timed_out = 0
-        self._closed = False
+        self._lifecycle = WorkerPoolLifecycle.ONLINE
         self._event_sink = event_sink
 
     def __enter__(self) -> "BoundedWorkerPool[T, R]":
@@ -72,18 +64,16 @@ class BoundedWorkerPool(Generic[T, R]):
         self.shutdown()
 
     def submit(self, task: T, fn: Callable[[T], R]) -> Future[R]:
-        """Submit one task without allowing the in-flight limit to be exceeded."""
         with self._lock:
-            if self._closed:
-                self._emit("worker.submit_rejected", task, reason="closed")
-                raise WorkerPoolClosedError("worker pool is shut down")
+            if self._lifecycle is not WorkerPoolLifecycle.ONLINE:
+                self._emit("worker.submit_rejected", task, reason=self._lifecycle.value)
+                raise WorkerPoolClosedError("worker pool is not accepting new work")
             try:
                 self._queue.put_nowait(task)
             except Full as exc:
                 self._emit("worker.saturated", task, capacity=self._capacity)
                 raise QueueSaturatedError("worker pool in-flight capacity is full") from exc
             self._active += 1
-
         self._emit("worker.submitted", task)
         try:
             future = self._executor.submit(self._run, task, fn)
@@ -91,7 +81,6 @@ class BoundedWorkerPool(Generic[T, R]):
             self._release()
             self._emit("worker.submit_failed", task)
             raise
-
         future.add_done_callback(lambda _: self._release())
         return future
 
@@ -108,6 +97,32 @@ class BoundedWorkerPool(Generic[T, R]):
             self._emit("worker.timeout", task, timeout=timeout)
             raise TaskTimeoutError(f"task timed out after {timeout:.3f}s") from exc
 
+    def begin_drain(self) -> WorkerPoolLifecycle:
+        """Transition ONLINE -> DRAINING and close admission."""
+        with self._lock:
+            if self._lifecycle is WorkerPoolLifecycle.ONLINE:
+                self._lifecycle = WorkerPoolLifecycle.DRAINING
+                self._emit("worker.draining", "__pool__")
+            return self._lifecycle
+
+    def wait_for_drain(self, timeout: float | None = None) -> bool:
+        """Wait for accepted work to reach zero, then transition to DRAINED."""
+        with self._drain_condition:
+            if self._lifecycle is WorkerPoolLifecycle.ONLINE:
+                self._lifecycle = WorkerPoolLifecycle.DRAINING
+                self._emit("worker.draining", "__pool__")
+            if self._lifecycle is WorkerPoolLifecycle.SHUTDOWN:
+                return True
+            if self._active == 0:
+                self._lifecycle = WorkerPoolLifecycle.DRAINED
+                self._emit("worker.drained", "__pool__")
+                return True
+            drained = self._drain_condition.wait_for(lambda: self._active == 0, timeout=timeout)
+            if drained:
+                self._lifecycle = WorkerPoolLifecycle.DRAINED
+                self._emit("worker.drained", "__pool__")
+            return drained
+
     def _run(self, task: T, fn: Callable[[T], R]) -> R:
         self._emit("worker.started", task)
         try:
@@ -119,10 +134,11 @@ class BoundedWorkerPool(Generic[T, R]):
         return result
 
     def _release(self) -> None:
-        with self._lock:
+        with self._drain_condition:
             self._queue.get_nowait()
             self._queue.task_done()
             self._active -= 1
+            self._drain_condition.notify_all()
 
     def stats(self) -> WorkerPoolStats:
         with self._lock:
@@ -131,15 +147,19 @@ class BoundedWorkerPool(Generic[T, R]):
                 queued=self._queue.qsize(),
                 active=self._active,
                 timed_out=self._timed_out,
-                closed=self._closed,
+                closed=self._lifecycle is WorkerPoolLifecycle.SHUTDOWN,
+                lifecycle=self._lifecycle,
             )
 
     def shutdown(self, wait: bool = True, cancel_pending: bool = False) -> None:
-        """Stop accepting work and optionally cancel executor-pending tasks."""
-        with self._lock:
-            self._closed = True
+        """Drain accepted work, then terminate the existing executor."""
+        self.begin_drain()
+        if wait:
+            self.wait_for_drain()
         self._emit("worker.shutdown", "__pool__", cancel_pending=cancel_pending)
         self._executor.shutdown(wait=wait, cancel_futures=cancel_pending)
+        with self._lock:
+            self._lifecycle = WorkerPoolLifecycle.SHUTDOWN
 
     def _emit(self, event_type: str, task: object, **detail: Any) -> None:
         if self._event_sink is None:
@@ -147,5 +167,4 @@ class BoundedWorkerPool(Generic[T, R]):
         try:
             self._event_sink(event_type, str(task), detail)
         except Exception:
-            # Observability must never break task execution or pool lifecycle.
             return

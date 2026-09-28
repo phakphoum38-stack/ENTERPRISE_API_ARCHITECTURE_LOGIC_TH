@@ -1,0 +1,19 @@
+{
+  "phase": "4G",
+  "name": "Mission Control Release Readiness Projection",
+  "schema": "research-os-mission-control-release-readiness/v1",
+  "scope": "read-only projection of authoritative CI gate evidence",
+  "required_gates": [
+    "architecture",
+    "security_boundary",
+    "generation",
+    "external_tool",
+    "api_contract",
+    "e2e",
+    "release"
+  ],
+  "statuses": ["PASSED", "FAILED", "PENDING"],
+  "identity_dependency": "VERIFIED",
+  "authority_boundary": "projection-only; no release authority",
+  "verification": "PENDING_CI"
+}

@@ -1,0 +1,95 @@
+{
+  "contract_id": "research-os-platform-runtime-resolution-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical Platform boundary for resolving a validated Surface Matrix capability into a local execution context without moving runtime authority into Flutter or creating a second executor.",
+  "authority": {
+    "kind": "DESCRIPTIVE_RUNTIME_BOUNDARY",
+    "may_authorize": false,
+    "may_entitle": false,
+    "may_execute": false,
+    "may_schedule": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "flow": [
+    "SURFACE",
+    "SURFACE_MATRIX",
+    "CAPABILITY",
+    "PATH_RESOLUTION",
+    "RUNTIME_SELECTION",
+    "RESOURCE_DISCOVERY",
+    "EXECUTION_PLAN",
+    "QUEUE",
+    "STATELESS_RUNNER",
+    "EVIDENCE"
+  ],
+  "surface_matrix": {
+    "source": "docs/RESEARCH_OS_SYSTEM_PLATFORM_MATRIX.md",
+    "required_before_resolution": true,
+    "unknown_surface": "STOP",
+    "unsupported_platform": "STOP",
+    "flutter_is_consumer": true,
+    "flutter_is_not_source_of_truth": true
+  },
+  "path_resolution": {
+    "owner": "PLATFORM",
+    "must_be_contract_backed": true,
+    "must_be_workspace_scoped": true,
+    "must_reject_path_traversal": true,
+    "must_reject_unknown_paths": true,
+    "must_not_bypass_authorization": true,
+    "must_not_execute": true
+  },
+  "runtime_selection": {
+    "owner": "PLATFORM_EXECUTION_BOUNDARY",
+    "canonical_runner": "v3/research_os_v3/runner.py",
+    "queue": "v3/research_os_v3/queue.py",
+    "worker_pool": "v3/worker_pool.py",
+    "engine_to_runner_direct_call_forbidden": true,
+    "capability_compatibility_required": true,
+    "resource_compatibility_required": true,
+    "stale_capability_evidence_is_not_ready": true
+  },
+  "local_compute": {
+    "cpu": "HOST_COMPUTE",
+    "ram": "HOST_DRAM",
+    "nvme": "MEMORY_FABRIC_T2_STORAGE_BACKED",
+    "m2_role": "DESCRIPTIVE_DISCOVERY_AND_AUDIT",
+    "m2_is_authorization": false,
+    "m2_is_release_authority": false,
+    "local_compute_preferred_before_remote": true,
+    "remote_execution_requires_explicit_capability": true
+  },
+  "resource_conflict": {
+    "policy": "REJECT",
+    "stop_execution": true,
+    "release_resources": true,
+    "ack_or_reconcile_delivery": true,
+    "same_version_overwrite": false,
+    "alternate_version_branching_allowed": true
+  },
+  "provenance": {
+    "source_sha_required": true,
+    "contract_version_required": true,
+    "surface_matrix_version_required": true,
+    "runtime_profile_required": true,
+    "resource_snapshot_required": true,
+    "evidence_required_before_release": true
+  },
+  "fail_closed": [
+    "missing_surface_contract",
+    "unknown_surface",
+    "unknown_capability",
+    "unknown_path",
+    "path_traversal",
+    "runtime_incompatible",
+    "resource_incompatible",
+    "stale_evidence",
+    "sha_mismatch",
+    "contract_mismatch",
+    "resource_conflict",
+    "unresolved_delivery",
+    "duplicate_authority"
+  ]
+}

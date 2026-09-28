@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../api/research_os_api_client.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({required this.apiClient, super.key});
+  const HomePage({required this.apiClient, this.onNavigate, super.key});
 
   final ResearchOSApiClient apiClient;
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -70,8 +71,8 @@ class _HomePageState extends State<HomePage> {
         onRefresh: _refresh,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 18, 24, 32),
-          children: <Widget>[
-            Container(
+            children: <Widget>[
+              Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -120,7 +121,12 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  _HealthBadge(ready: apiReady),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _HealthBadge(ready: apiReady),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -219,13 +225,13 @@ class _HomePageState extends State<HomePage> {
                 return Wrap(
                   spacing: 12,
                   runSpacing: 12,
-                  children: const <Widget>[
-                    _WorkspaceCard(Icons.auto_awesome_outlined, 'AI & Agents', 'Chat, specialist agents and task runtime'),
-                    _WorkspaceCard(Icons.local_library_outlined, 'Knowledge', 'Library, memory and knowledge graph'),
-                    _WorkspaceCard(Icons.link_outlined, 'Connections', 'GitHub and Google Workspace integrations'),
-                    _WorkspaceCard(Icons.security_outlined, 'Local System', 'Windows Service, API, storage and backup'),
-                    _WorkspaceCard(Icons.monitor_heart_outlined, 'Monitoring', 'Health, runtime and system visibility'),
-                    _WorkspaceCard(Icons.tune_outlined, 'Configuration', 'Providers, endpoints and application settings'),
+                  children: <Widget>[
+                    _WorkspaceCard(Icons.auto_awesome_outlined, 'AI & Agents', 'Chat, specialist agents and task runtime', onTap: () => widget.onNavigate?.call(2)),
+                    _WorkspaceCard(Icons.local_library_outlined, 'Knowledge', 'Library, memory and knowledge graph', onTap: () => widget.onNavigate?.call(3)),
+                    _WorkspaceCard(Icons.link_outlined, 'Connections', 'GitHub and Google Workspace integrations', onTap: () => widget.onNavigate?.call(5)),
+                    _WorkspaceCard(Icons.security_outlined, 'Local System', 'Windows Service, API, storage and backup', onTap: () => widget.onNavigate?.call(7)),
+                    _WorkspaceCard(Icons.monitor_heart_outlined, 'Monitoring', 'Health, runtime and system visibility', onTap: () => widget.onNavigate?.call(8)),
+                    _WorkspaceCard(Icons.tune_outlined, 'Configuration', 'Providers, endpoints and application settings', onTap: () => widget.onNavigate?.call(9)),
                   ].map((card) => SizedBox(width: width, child: card)).toList(),
                 );
               },
@@ -273,7 +279,14 @@ class _HealthBadge extends StatelessWidget {
         children: <Widget>[
           Icon(Icons.circle, size: 9, color: ready ? Colors.green : scheme.error),
           const SizedBox(width: 7),
-          Text(ready ? 'System ready' : 'API offline', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          Flexible(
+            child: Text(
+              ready ? 'System ready' : 'API offline',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
         ],
       ),
     );
@@ -322,38 +335,57 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _WorkspaceCard extends StatelessWidget {
-  const _WorkspaceCard(this.icon, this.title, this.subtitle);
+  const _WorkspaceCard(this.icon, this.title, this.subtitle, {this.onTap});
+
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final slug = title
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-|-\$'), '');
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(13)),
-              child: Icon(icon, color: scheme.primary),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 4),
-                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
-                ],
+      child: InkWell(
+        key: Key('home-workspace-$slug'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, color: scheme.primary),
               ),
-            ),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

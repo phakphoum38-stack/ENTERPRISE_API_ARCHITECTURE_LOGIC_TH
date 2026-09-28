@@ -1,0 +1,47 @@
+{
+  "schema": "research-os-aeos-mission-bootstrap/v1",
+  "mission_id": "AEOS-100X",
+  "objective": "Establish a governed autonomous engineering system that can execute a project-level mission continuously until certified completion.",
+  "execution_mode": "AUTO_GUARDED",
+  "required_artifacts": [
+    "mission_contract",
+    "work_graph",
+    "durable_queue",
+    "recovery_queue",
+    "state_machine",
+    "exact_sha_fence",
+    "lease_lock",
+    "semantic_diff",
+    "dependency_impact",
+    "independent_verifier",
+    "adversarial_verifier",
+    "evidence_provenance",
+    "decision_replay",
+    "recovery_checkpoint",
+    "rollback_certificate",
+    "security_firewall",
+    "model_tool_firewall",
+    "knowledge_graph",
+    "certificate_chain",
+    "stop_proof"
+  ],
+  "phases": [
+    {"id": "A", "name": "Foundation", "depends_on": []},
+    {"id": "B", "name": "Verification", "depends_on": ["A"]},
+    {"id": "C", "name": "Recovery", "depends_on": ["A", "B"]},
+    {"id": "D", "name": "Continuous Operation", "depends_on": ["A", "B", "C"]},
+    {"id": "E", "name": "Trust and Security", "depends_on": ["A", "B"]},
+    {"id": "F", "name": "Proof and Completion", "depends_on": ["A", "B", "C", "D", "E"]},
+    {"id": "G", "name": "Scale and Evolution", "depends_on": ["F"]}
+  ],
+  "failure_policy": "FAIL_CLOSED_PRESERVE_EVIDENCE_ROOT_CAUSE_FIX_REVERIFY",
+  "scope_policy": "USER_INTENT_BOUND_WITH_DISCOVERED_WORK_CLASSIFICATION",
+  "stop_policy": "CERTIFIED_IDLE_ONLY_AFTER_FINAL_DRAIN_AND_RESCAN",
+  "reanchor_policy": "MAIN_SHA_CHANGE_INVALIDATES_DEPENDENT_WORK_EVIDENCE",
+  "authority_policy": "AGENTS_CANNOT_GRANT_OR_ESCALATE_THEIR_OWN_AUTHORITY",
+  "merge_policy": "MERGE_REQUIRES_SEPARATE_GOVERNED_CERTIFICATION",
+  "protected_refs": [
+    "#344",
+    "P0-06 #345"
+  ]
+}

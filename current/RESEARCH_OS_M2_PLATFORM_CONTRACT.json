@@ -1,0 +1,45 @@
+{
+  "contract_id": "research-os-m2-platform-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Platform-level discovery, search, graph traversal, impact inspection and context recovery over canonical repository state.",
+  "role": "PLATFORM_SERVICE",
+  "source_of_truth": "Git repository and canonical platform contracts",
+  "descriptive_only": true,
+  "release_authority": "FINAL_GATE",
+  "execution_model": {
+    "logical_operations": ["INDEX", "VERTICAL_SEARCH", "HORIZONTAL_SEARCH", "TRACE", "IMPACT", "RESUME"],
+    "reuse_existing": [
+      "tools/research_os_m2_audit.py",
+      "tools/platform_graph.py",
+      "v3/worker_pool.py",
+      "v3/research_os_v3/queue.py",
+      "v3/research_os_v3/runner.py"
+    ],
+    "duplicate_runtime_forbidden": true
+  },
+  "vertical_search": {
+    "definition": "Follow explicit M.2 relationships from a matching node through contract, test, workflow, evidence and final-gate bindings.",
+    "max_depth": 32
+  },
+  "horizontal_search": {
+    "definition": "Find related nodes across capabilities and graph relations without assuming platform-specific navigation or ownership.",
+    "max_results": 256
+  },
+  "resume": {
+    "required_state": ["source_sha", "active_work", "deferred_work", "decisions", "evidence"],
+    "chat_is_not_source_of_truth": true,
+    "sha_mismatch": "HOLD"
+  },
+  "impact": {
+    "checks": ["contracts", "workflows", "tests", "final_gate", "invariants", "product_surfaces"],
+    "unknown": "HOLD"
+  },
+  "rules": {
+    "unknown_is_not_pass": true,
+    "deferred_is_not_done": true,
+    "external_tools_are_not_authority": true,
+    "m2_is_not_release_authority": true,
+    "no_runtime_mutation": true
+  }
+}

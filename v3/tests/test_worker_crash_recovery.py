@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -23,11 +24,12 @@ class WorkerCrashRecoveryTests(unittest.TestCase):
 
             # Simulate a worker/process crash by expiring its persisted lease.
             expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute(
                     "UPDATE research_queue SET lease_until=? WHERE task_id=?",
                     (expired, "task-1"),
                 )
+                db.commit()
 
             self.assertEqual(1, queue.recover_expired_leases())
 
@@ -53,11 +55,12 @@ class WorkerCrashRecoveryTests(unittest.TestCase):
             assert first.lease_id is not None
 
             expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute(
                     "UPDATE research_queue SET lease_until=? WHERE task_id=?",
                     (expired, "task-1"),
                 )
+                db.commit()
 
             queue.recover_expired_leases()
             second = queue.claim(worker_id="worker-b", lease_seconds=30)
@@ -73,7 +76,7 @@ class WorkerCrashRecoveryTests(unittest.TestCase):
 
     @staticmethod
     def _status(path: Path, task_id: str) -> str:
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db:
             row = db.execute(
                 "SELECT status FROM research_queue WHERE task_id=?",
                 (task_id,),
@@ -83,7 +86,7 @@ class WorkerCrashRecoveryTests(unittest.TestCase):
 
     @staticmethod
     def _worker_id(path: Path, task_id: str) -> str:
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db:
             row = db.execute(
                 "SELECT worker_id FROM research_queue WHERE task_id=?",
                 (task_id,),

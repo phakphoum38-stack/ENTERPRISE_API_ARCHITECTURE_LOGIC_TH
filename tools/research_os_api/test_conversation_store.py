@@ -72,6 +72,16 @@ class ConversationStoreTests(unittest.TestCase):
         self.assertEqual([], conversation_store.list_sessions("alice"))
         self.assertEqual(["bob-chat"], [item["id"] for item in conversation_store.list_sessions("bob")])
 
+    def test_canonical_provider_identity_is_supported_as_json_scope_key(self):
+        user_id = "google:123"
+        conversation_store.upsert_session(
+            {"id": "google-chat", "title": "Google", "updated_at": 30, "messages": []},
+            user_id=user_id,
+        )
+        sessions = conversation_store.list_sessions(user_id)
+        self.assertEqual(["google-chat"], [item["id"] for item in sessions])
+        self.assertTrue(conversation_store.delete_session("google-chat", user_id=user_id))
+
     def test_user_scope_rejects_path_traversal(self):
         with self.assertRaises(ValueError):
             conversation_store.list_sessions("../alice")

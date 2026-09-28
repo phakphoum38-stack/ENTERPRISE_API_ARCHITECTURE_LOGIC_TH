@@ -1,0 +1,29 @@
+{
+  "schema": "aeos.squash-reconciliation.forensic.v1",
+  "status": "PASS_PENDING_INDEPENDENT_REVIEW",
+  "pr_number": 366,
+  "base_sha": "0ea2b391f91ee4878a1bc21d2c5563adfd5bc5b9",
+  "head_sha": "bafeaaf22ad2cc15199fc353af27ac3d2935a586",
+  "merge_sha": "14750f63b0c1871b768874f36f6b7ee32e48cc99",
+  "merge_parent_sha": "0ea2b391f91ee4878a1bc21d2c5563adfd5bc5b9",
+  "findings": {
+    "merge_parent_exact_base": true,
+    "accepted_payload_paths": [
+      "current/AEOS_HOLD_RECOVERY_CONTRACT.json",
+      "owner_special/research_os_friend/hold_recovery_engine.py",
+      "owner_special/tests/test_hold_recovery_engine.py"
+    ],
+    "divergent_paths": [
+      "owner_special/flutter_app/test/team_acl_test.dart",
+      "owner_special/team_center_contract.json",
+      "owner_special/tests/test_port_topology_contract.py"
+    ],
+    "canonical_acl": "BASE and MERGE contain the #367 8787/8788/8790-only ACL; #366 HEAD contains stale 8789 ACL content.",
+    "canonical_team_center": "BASE and MERGE contain the #367 8787/8788/8790 topology; #366 HEAD contains stale 8789 topology content.",
+    "canonical_topology_test": "BASE and MERGE contain the #367 topology contract test; #366 HEAD diverges on this path, so the test is not part of the accepted #366 payload."
+  },
+  "conclusion": "The #366 squash merge is an intentional reconciliation of stale historical paths after canonical #367 rebaseline. Exact squash equivalence must remain false. The explicit reconciliation mode is justified structurally, but independent forensic verification is still required.",
+  "merge_authority": false,
+  "self_certification": false,
+  "independent_forensic_status": "PENDING"
+}

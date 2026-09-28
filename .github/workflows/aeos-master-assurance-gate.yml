@@ -1,0 +1,101 @@
+name: AEOS Master Assurance Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to prove
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  master-assurance:
+    name: AEOS Master Assurance — exact SHA
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: owner_special:v3
+    steps:
+      - name: Checkout exact target SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || inputs.target_sha }}
+          fetch-depth: 0
+
+      - name: Enforce exact target SHA
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          test -n "$EXPECTED_SHA"
+          test "$actual_sha" = "$EXPECTED_SHA" || {
+            echo "TARGET_SHA_MISMATCH expected=$EXPECTED_SHA actual=$actual_sha"
+            exit 1
+          }
+          echo "TARGET_SHA=$actual_sha"
+
+      - name: Execute AEOS Master platform
+        shell: bash
+        run: |
+          set +e
+          : > aeos_master_platform.log
+          python tools/aeos_autobot_platform.py \
+            --canonical-registry current/AEOS_AUTOBOT_ASSURANCE_SET_REGISTRY.json \
+            --registry current/AEOS_AUTOBOT_SET_REGISTRY.json \
+            2>&1 | tee aeos_master_platform.log
+          rc=${PIPESTATUS[0]}
+          echo "AEOS_PLATFORM_EXIT_CODE=$rc" | tee -a aeos_master_platform.log
+          if [ -f aeos_autobot_manifest.json ]; then
+            echo "=== AEOS MANIFEST ===" | tee -a aeos_master_platform.log
+            cat aeos_autobot_manifest.json | tee -a aeos_master_platform.log
+          fi
+          if [ -f aeos_autobot_manifest.json.sha256 ]; then
+            echo "=== AEOS MANIFEST SHA256 ===" | tee -a aeos_master_platform.log
+            cat aeos_autobot_manifest.json.sha256 | tee -a aeos_master_platform.log
+          fi
+          exit "$rc"
+
+      - name: Validate Master manifest contract
+        if: success()
+        shell: bash
+        env:
+          TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test -s aeos_autobot_manifest.json
+          test -s aeos_autobot_manifest.json.sha256
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          manifest = Path('aeos_autobot_manifest.json')
+          digest_file = Path('aeos_autobot_manifest.json.sha256')
+          data = json.loads(manifest.read_text(encoding='utf-8'))
+          if data.get('decision') != 'READY_FOR_OWNER_AUTHORITY':
+              raise SystemExit(f"MASTER_DECISION_NOT_READY:{data.get('decision')}")
+          if data.get('source_sha') != os.environ['TARGET_SHA']:
+              raise SystemExit('MANIFEST_SOURCE_SHA_MISMATCH')
+          actual = hashlib.sha256(manifest.read_bytes()).hexdigest()
+          declared = digest_file.read_text(encoding='utf-8').strip().split()[0]
+          if actual != declared:
+              raise SystemExit(f'MANIFEST_SHA256_MISMATCH:{actual}!={declared}')
+          print(f'MASTER_MANIFEST_SHA256={actual}')
+          PY
+
+      - name: Upload single Master evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeos-master-evidence-${{ github.event.pull_request.head.sha || inputs.target_sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            aeos_master_platform.log
+            aeos_autobot_manifest.json
+            aeos_autobot_manifest.json.sha256

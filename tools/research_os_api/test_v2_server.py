@@ -24,7 +24,7 @@ class V2CompatibilityTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         os.environ["RESEARCH_OS_DATA_DIR"] = self.temp.name
         os.environ["RESEARCH_OS_SESSION_SECRET"] = "test-only-v2-server-session-secret"
-        self.session = issue_session({"sub": "v2-test-user", "email": "v2-test@example.test", "role": "user"})
+        self.session = issue_session({"sub": "v2-test-owner", "email": "v2-owner@example.test", "role": "owner"})
         agent_server.ORCHESTRATOR = AgentOrchestrator(
             storage_path=Path(self.temp.name) / "agents" / "orchestrations.json"
         )

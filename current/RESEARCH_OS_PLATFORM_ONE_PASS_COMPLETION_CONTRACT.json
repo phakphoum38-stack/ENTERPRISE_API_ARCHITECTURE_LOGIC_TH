@@ -1,0 +1,229 @@
+{
+  "contract_id": "research-os-platform-one-pass-completion-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical one-pass composition contract for completing the Research OS Platform Spine from the existing main baseline without creating duplicate runtime, authorization, evidence, queue, registry, or release authorities.",
+  "delivery_mode": "ONE_PASS_PLATFORM_COMPLETION",
+  "authority": {
+    "mode": "DESCRIPTIVE_VALIDATING",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "spine": [
+    "constitution",
+    "registry",
+    "dependency_graph",
+    "contracts",
+    "compatibility",
+    "lifecycle",
+    "change_impact",
+    "recon",
+    "repair_boundary",
+    "sandbox_rollback",
+    "evidence_audit",
+    "health_readiness",
+    "drift_detection",
+    "ownership",
+    "security",
+    "workflow_runtime",
+    "tool_platform",
+    "ai_code_writer",
+    "laravel_integration",
+    "migration",
+    "simulation",
+    "failure_verification",
+    "control_plane",
+    "experience",
+    "assurance",
+    "final_gate"
+  ],
+  "canonical_existing_capabilities": {
+    "registry": "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json",
+    "registry_schema": "current/RESEARCH_OS_PLATFORM_COMPONENT_REGISTRY_SCHEMA.json",
+    "graph": "tools/platform_graph.py",
+    "service": "tools/platform_service.py",
+    "change_impact": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+    "self_reconciliation": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+    "runtime_readiness": "current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json",
+    "operationalization": "current/PLATFORM_OPERATIONALIZATION_CONTRACT.json",
+    "final_gate": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+    "platform_spine_engine": "tools/platform_spine.py",
+    "platform_spine_engine_contract": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json"
+  },
+  "lifecycle": {
+    "states": [
+      "PROPOSED",
+      "EXPERIMENTAL",
+      "ACTIVE",
+      "DEPRECATED",
+      "RETIRED"
+    ],
+    "allowed_transitions": [
+      [
+        "PROPOSED",
+        "EXPERIMENTAL"
+      ],
+      [
+        "EXPERIMENTAL",
+        "ACTIVE"
+      ],
+      [
+        "ACTIVE",
+        "DEPRECATED"
+      ],
+      [
+        "DEPRECATED",
+        "RETIRED"
+      ]
+    ],
+    "backward_transition": "FORBIDDEN",
+    "required_component_retirement": "REQUIRES_REGISTRY_GOVERNANCE_CHANGE"
+  },
+  "compatibility": {
+    "registry_schema": "1.x",
+    "platform_contract": "1.x",
+    "breaking_change": "NEW_CONTRACT_VERSION_AND_MIGRATION",
+    "unknown_compatibility": "HOLD"
+  },
+  "dependency_graph": {
+    "missing_dependency": "FAIL",
+    "cycle": "FAIL",
+    "unknown_plane_edge": "FAIL",
+    "authority_edge": "FAIL",
+    "graph_is_descriptive": true
+  },
+  "change_impact": {
+    "required_categories": [
+      "contracts",
+      "workflows",
+      "tests",
+      "final_gate",
+      "invariants",
+      "product_surfaces"
+    ],
+    "unknown_impact": "HOLD",
+    "blast_radius": [
+      "LOCAL",
+      "COMPONENT",
+      "PROJECT",
+      "CROSS_PROJECT",
+      "PLATFORM"
+    ]
+  },
+  "health": {
+    "states": [
+      "READY",
+      "DEGRADED",
+      "BLOCKED",
+      "RETIRED"
+    ],
+    "unknown": "HOLD",
+    "health_is_not_authorization": true
+  },
+  "drift": {
+    "domains": [
+      "architecture",
+      "registry",
+      "dependency",
+      "contract",
+      "workflow",
+      "configuration",
+      "documentation"
+    ],
+    "unknown": "HOLD"
+  },
+  "migration": {
+    "required_for_breaking_contracts": true,
+    "sequence": [
+      "PLAN",
+      "COMPATIBILITY",
+      "MIGRATE",
+      "VALIDATE",
+      "EVIDENCE",
+      "RETIRE_OLD"
+    ],
+    "rollback_required": true
+  },
+  "simulation": {
+    "required_before_high_impact_change": true,
+    "checks": [
+      "dependency",
+      "impact",
+      "contract",
+      "failure",
+      "rollback"
+    ],
+    "simulation_has_no_release_authority": true
+  },
+  "repair": {
+    "evidence_before_patch": true,
+    "minimal_patch": true,
+    "ambiguous_target": "STOP",
+    "protected_core": "STOP",
+    "snapshot_before_apply": true,
+    "sandbox_before_apply": true,
+    "post_recon_required": true,
+    "rollback_required": true
+  },
+  "security": {
+    "chain": [
+      "Identity",
+      "Capability",
+      "Policy",
+      "Authorization",
+      "Entitlement",
+      "Execution",
+      "Evidence"
+    ],
+    "bypass": "FORBIDDEN",
+    "resource_conflict": "REJECT_AND_RELEASE"
+  },
+  "runtime": {
+    "execution_pattern": "Engine -> Event/Queue -> Stateless Worker",
+    "direct_engine_to_runner": false,
+    "idempotency_required": true
+  },
+  "experience": {
+    "layers": [
+      "Windows",
+      "Web",
+      "iOS"
+    ],
+    "direct_runtime_mutation": false,
+    "architecture_must_be_registry_derived": true
+  },
+  "release": {
+    "authority": "FINAL_GATE",
+    "unknown": "STOP",
+    "deferred_unresolved": "BLOCK_RELEASE"
+  },
+  "rules": [
+    "reuse_existing_capabilities",
+    "no_duplicate_runtime",
+    "no_duplicate_authorization",
+    "no_duplicate_evidence",
+    "no_duplicate_queue",
+    "no_duplicate_registry_authority",
+    "no_duplicate_release_authority",
+    "main_is_release_baseline",
+    "platform_is_composition_layer",
+    "platform_spine_engine_is_shared_validation_layer",
+    "high_impact_changes_require_simulation",
+    "health_never_grants_authorization"
+  ],
+  "spine_engine": {
+    "registry": "SCHEMA_DRIVEN",
+    "dependency_graph": "CANONICAL",
+    "lifecycle": "FORWARD_ONLY",
+    "compatibility": "BREAKING_REQUIRES_MIGRATION",
+    "impact": "TRANSITIVE",
+    "health": "NON_AUTHORIZING",
+    "drift": "FAIL_CLOSED",
+    "simulation": "REQUIRED_FOR_HIGH_IMPACT",
+    "release_authority": "FINAL_GATE"
+  }
+}

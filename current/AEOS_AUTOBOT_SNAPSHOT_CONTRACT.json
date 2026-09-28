@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "contract": "AEOS_AUTOBOT_SNAPSHOT",
+  "purpose": "Bind every execution result to one immutable assurance iteration and reject stale or cross-iteration evidence.",
+  "required_fields": [
+    "iteration_id",
+    "source_sha",
+    "set_id",
+    "wave_id",
+    "command",
+    "cwd",
+    "started_at",
+    "completed_at",
+    "result_state",
+    "evidence_id",
+    "manifest_sha256"
+  ],
+  "result_states": [
+    "QUEUED",
+    "RUNNING",
+    "PASSED",
+    "FAILED",
+    "TIMED_OUT",
+    "INFRA_FAILED",
+    "CANCELLED",
+    "STALE",
+    "UNKNOWN",
+    "HOLD"
+  ],
+  "identity_rule": "iteration_id + source_sha + set_id + wave_id + command + cwd",
+  "evidence_rule": "Evidence is valid only when its identity exactly matches the active snapshot and its manifest digest verifies.",
+  "fail_closed": true,
+  "stale_evidence_action": "HOLD",
+  "cross_iteration_evidence_action": "REJECT",
+  "running_is_not_pass": true,
+  "running_is_not_fail": true,
+  "merge_authority": "OWNER_ONLY"
+}

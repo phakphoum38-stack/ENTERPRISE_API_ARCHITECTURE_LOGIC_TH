@@ -1,0 +1,344 @@
+version: 1
+name: Research OS Unified Final Gate
+
+purpose: >
+  One release-gate contract that evaluates the existing Research OS
+  application surface and platform/release invariants without creating a
+  second executor, authorization system, navigation registry, or release
+  authority.
+
+authority:
+  release_authority: final_gate
+  merge_authority: external
+  external_tools_are_security_authority: false
+
+spine:
+  - identity
+  - capability
+  - authorization
+  - navigation
+  - page_feature
+  - workflow
+  - event_queue
+  - stateless_runner
+  - evidence_provenance
+  - aeos_recheck
+  - final_gate
+  - release
+
+required_contracts:
+  - current/CANONICAL_PLATFORM_CONTRACT.yml
+  - current/GOLDEN_RELEASE_CONTRACT.yml
+  - current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml
+  - current/RESEARCH_OS_PHASE_B_LIFECYCLE_EVIDENCE_CONTRACT.json
+  - current/RESEARCH_OS_PHASE_C_CAPABILITY_E2E_BINDING_CONTRACT.json
+  - current/RESEARCH_OS_PHASE_D_CROSS_SURFACE_PARITY_CONTRACT.json
+  - current/RESEARCH_OS_PHASE_E_UNIFIED_WINDOWS_DISTRIBUTION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_CORE_COMPLETION_CONTRACT.json
+  - current/RESEARCH_OS_100_PROJECT_READINESS_CONTRACT.json
+  - current/RESEARCH_OS_PROJECT_TEMPLATE_CONTRACT.json
+  - current/RESEARCH_OS_PROJECT_001.json
+  - current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json
+  - current/RESEARCH_OS_PROJECT_SCALE_EXECUTION_CONTRACT.json
+  - current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json
+  - current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json
+  - current/RESEARCH_OS_MAIN_FINAL_AUDIT_CONTROL_CENTER_CONTRACT.json
+  - current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json
+  - current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json
+  - current/RESEARCH_OS_PLATFORM_COMPONENT_REGISTRY_SCHEMA.json
+  - current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json
+  - current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json
+  - current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_PRODUCTION_HARDENING_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_PRODUCTION_COMPLETION_CONTRACT.json
+  - current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_COMPLETION_SCHEDULE_CONTRACT.json
+  - current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json
+  - current/RESEARCH_OS_M2_PLATFORM_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RUNTIME_RESOLUTION_CONTRACT.json
+  - current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json
+  - current/RESEARCH_OS_AUTHORIZATION_CONVERGENCE_CONTRACT.json
+  - current/RESEARCH_OS_IDENTITY_ACCESS_WAVE_1_MAP.json
+  - current/RESEARCH_OS_UNIFIED_UX_LIGHT_BEAM_CONTRACT.json
+  - current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json
+  - current/PLATFORM_OPERATIONALIZATION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_COMPLETE_1_12_CONTRACT.json
+  - current/RESEARCH_OS_SYSTEM_QUALIFICATION_CONTRACT.json
+  - current/RESEARCH_OS_TEST_CASE_INVENTORY_CONTRACT.json
+  - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_CONTRACT.json
+  - current/RESEARCH_OS_AI_PROVIDER_CONNECTION_EVIDENCE_CONTRACT.json
+  - current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_EVOLUTION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_RECON_REPAIR_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json
+  - current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json
+  - current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json
+
+required_workflows:
+  - .github/workflows/continuous-generated-release.yml
+  - .github/workflows/research-os-gate.yml
+  - .github/workflows/research-os-final-gate.yml
+  - .github/workflows/research-os-platform-surface-matrix.yml
+  - .github/workflows/research-os-ios-ipa.yml
+  - .github/workflows/research-os-phase-e-unified-windows-distribution.yml
+  - .github/workflows/research-os-release-spine-gate.yml
+  - .github/workflows/research-os-unified-final-gate.yml
+  - .github/workflows/owner-special-build-identity-gate.yml
+  - .github/workflows/owner-special-friend.yml
+  - .github/workflows/owner-special-ios-ipa.yml
+  - .github/workflows/research-os-platform-one-pass-completion.yml
+  - .github/workflows/research-os-platform-evolution.yml
+  - .github/workflows/research-os-platform-digital-twin.yml
+  - .github/workflows/research-os-platform-runtime-completion.yml
+  - .github/workflows/research-os-platform-production-certification.yml
+
+required_surface_contracts:
+  - apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
+  - apps/research_os_flutter/test/platform_surface_parity_test.dart
+  - apps/research_os_flutter/test/desktop_shell_test.dart
+  - tools/validate_research_os_capability_convergence.py
+  - tools/test_validate_research_os_capability_convergence.py
+  - tools/validate_research_os_identity_access_wave1.py
+  - tools/test_validate_research_os_identity_access_wave1.py
+  - tools/validate_research_os_platform_one_pass.py
+  - tools/test_research_os_platform_one_pass.py
+  - tools/platform_spine.py
+  - tools/test_platform_spine.py
+
+assurance_recheck:
+  authority: existing_aeos_master_assurance
+  execution_boundary: tools/aeos_master_assurance.py
+  evidence_validator: tools/validate_aeos_final_gate_binding.py
+  evidence_schema: AEOS_MASTER_ASSURANCE_V2
+  target_sha: exact_unified_final_gate_target_sha
+  required_decision: PASS
+  required_control_status: PASS
+  required_control_returncode: 0
+  missing_evidence: STOP
+  sha_mismatch: STOP
+  non_pass_decision: STOP
+  non_pass_control: STOP
+  forbidden_states:
+    - UNKNOWN
+    - STALE
+    - CONFLICT
+    - BLOCKED
+    - QUARANTINED
+    - SELF_ATTESTED
+    - REVOKED
+    - EXPIRED
+  release_authority_remains: final_gate
+
+m2_audit:
+  contract: current/RESEARCH_OS_M2_AUDIT_INDEX_CONTRACT.json
+  implementation: tools/research_os_m2_audit.py
+  test: tools/test_research_os_m2_audit.py
+  exact_source_sha: required
+  integrity_failure: STOP
+  release_authority_remains: final_gate
+
+navigation:
+  source_of_truth: apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart
+  capability_convergence_contract: current/RESEARCH_OS_CAPABILITY_CONVERGENCE_CONTRACT.json
+  capability_identity_is_not_authorization: true
+  cardinality: derived_from_registry
+  indexes: derived_from_registry
+  duplicate_registry_forbidden: true
+
+platform_surface:
+  required:
+    - windows
+    - web
+    - ios
+  shared_navigation_registry: required
+  platform_specific_navigation_registry: forbidden
+
+deferred:
+  explicit_state_required: true
+  deferred_is_not_pass: true
+  deferred_is_not_fail: true
+  deferred_must_not_be_silently_promoted: true
+  release_blocked_by_unresolved_deferred: true
+
+fail_closed:
+  missing_contract: STOP
+  missing_workflow: STOP
+  navigation_drift: STOP
+  unknown_gate_state: STOP
+  sha_mismatch: STOP
+  evidence_mismatch: STOP
+  provenance_mismatch: STOP
+  unauthorized_release: STOP
+  m2_audit_integrity_failure: STOP
+  missing_aeos_recheck: STOP
+  aeos_non_pass: STOP
+
+platform_service:
+  contract: current/RESEARCH_OS_PLATFORM_SERVICE_CONTRACT.json
+  implementation: tools/platform_service.py
+  test: tools/test_platform_service.py
+  exact_source_sha: required
+  read_only_composition: required
+  duplicate_runtime_forbidden: true
+  release_authority_remains: final_gate
+  unknown_state: HOLD
+  sha_mismatch: STOP
+
+owner_special:
+  release_role: evidence_and_reconciliation_only
+  workflows:
+    - .github/workflows/owner-special-build-identity-gate.yml
+    - .github/workflows/owner-special-friend.yml
+    - .github/workflows/owner-special-ios-ipa.yml
+  canonical_ios_surface: apps/research_os_flutter
+  duplicate_platform_forbidden: true
+  duplicate_runtime_forbidden: true
+  duplicate_release_authority_forbidden: true
+  release_authority_remains: final_gate
+  exact_source_sha: required
+  unknown_state: HOLD
+  sha_mismatch: STOP
+
+runtime_readiness:
+  contract: current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json
+  implementation: tools/platform_runtime_readiness.py
+  test: tools/test_platform_runtime_readiness.py
+  unknown_state: STOP
+  invalid_transition: STOP
+  health_required_before_ready: true
+  source_sha_required: true
+  correlation_id_required: true
+  evidence_is_projection_only: true
+  release_authority_remains: final_gate
+
+continuity:
+  contract: current/PLATFORM_PROJECT_SNAPSHOT_CONTRACT.json
+  work_checkpoint_contract: current/PLATFORM_WORK_CHECKPOINT_CONTRACT.json
+  work_checkpoint_implementation: tools/platform_work_checkpoint.py
+  work_checkpoint_test: tools/test_platform_work_checkpoint.py
+  continuity_workflow_contract: current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json
+  continuity_workflow_implementation: tools/platform_continuity_workflow.py
+  continuity_workflow_test: tools/test_platform_continuity_workflow.py
+  chat_transcript_not_required_for_resume: true
+  compact_state_only: true
+  source_sha_mismatch: HOLD
+  unknown_or_conflict: HOLD
+  checkpoint_storage_does_not_grant_authority: true
+  snapshot_source: tools/platform_service.py
+  chat_is_not_source_of_truth: true
+  source_sha_mismatch: HOLD
+  deferred_work_must_be_preserved: true
+
+self_reconciliation:
+  contract: current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json
+  implementation: tools/platform_self_reconciliation.py
+  validator: tools/validate_platform_self_reconciliation.py
+  test: tools/test_platform_self_reconciliation.py
+  exact_source_sha: required
+  deterministic_repair_only: true
+  protected_core_fail_closed: true
+  sandbox_before_apply: true
+  snapshot_before_apply: true
+  post_recon_required: true
+  rollback_required: true
+  release_authority_remains: final_gate
+
+operationalization:
+  contract: current/PLATFORM_OPERATIONALIZATION_CONTRACT.json
+  implementation: tools/platform_operationalization.py
+  validator: tools/validate_platform_operationalization.py
+  test: tools/test_platform_operationalization.py
+  source_sha_required: true
+  chat_is_not_source_of_truth: true
+  unknown_state: HOLD
+  sha_mismatch: HOLD
+  release_authority_remains: final_gate
+
+platform_one_pass_completion:
+  contract: current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json
+  implementation: tools/validate_research_os_platform_one_pass.py
+  test: tools/test_research_os_platform_one_pass.py
+  descriptive_validating_only: true
+  duplicate_runtime_forbidden: true
+  duplicate_authorization_forbidden: true
+  duplicate_evidence_forbidden: true
+  duplicate_queue_forbidden: true
+  duplicate_registry_authority_forbidden: true
+  release_authority_remains: final_gate
+
+platform_spine_engine:
+  contract: current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json
+  implementation: tools/platform_spine.py
+  test: tools/test_platform_spine.py
+  descriptive_validating_only: true
+  dependency_cycles: STOP
+  forbidden_plane_edges: STOP
+  unknown_impact: HOLD
+  breaking_change_without_migration: STOP
+  health_is_not_authorization: true
+  high_impact_requires_simulation: true
+  release_authority_remains: final_gate
+
+  runtime_completion:
+    contract: current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json
+      validator: tools/validate_research_os_platform_runtime_completion.py
+      test: tools/test_validate_research_os_platform_runtime_completion.py
+      laravel_runtime: required
+      recon_repair: required
+      failure_simulation: required
+      observability: required
+      ai_code_writer: recon_bound
+      unknown_state: STOP
+      release_authority_remains: final_gate
+
+production_certification:
+  contract: current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json
+  implementation: tools/validate_research_os_platform_production_certification.py
+  test: tools/test_validate_research_os_platform_production_certification.py
+  unknown_state: STOP
+  deferred_is_not_pass: true
+  release_authority_remains: final_gate
+
+api_management_platform:
+  contract: tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml
+  capability_matrix: tools/research_os_api/api_platform/API_PLATFORM_CAPABILITY_MATRIX.yaml
+  implementation: tools/research_os_api/api_platform/management_service.py
+  http: tools/research_os_api/api_platform/management_http.py
+  sdk_metadata: tools/research_os_api/api_platform/sdk_metadata.py
+  validator: tools/validate_research_os_api_management_platform.py
+  test: tools/research_os_api/api_platform/test_management_service.py
+  metadata_only: true
+  runtime_authority_remains: resource_control_plane
+  unknown_state: STOP
+  release_authority_remains: final_gate
+
+platform_digital_twin:
+  north_star_contract: current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json
+  contract: current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json
+  implementation: tools/platform_digital_twin.py
+  validator: tools/validate_research_os_platform_digital_twin.py
+  test: tools/test_platform_digital_twin.py
+  mode: read_only_projection
+  mutation: forbidden
+  authorization: forbidden
+  unknown_target: hold
+  simulation_has_no_release_authority: true
+  release_authority_remains: final_gate

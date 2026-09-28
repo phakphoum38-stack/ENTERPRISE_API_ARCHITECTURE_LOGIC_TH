@@ -1,0 +1,32 @@
+{
+  "contract": "research-os-h3-mission-control-automation/v1",
+  "base_sha": "c04d60b36d51eb8529a4c65a61c7d5a411e5fe85",
+  "head_sha": "EXACT_PR_HEAD_REQUIRED",
+  "status": "CAPTURED_PENDING_CI",
+  "mode": "AUTO_GUARDED",
+  "authority": {
+    "execute": false,
+    "approve": false,
+    "release": false,
+    "merge": false,
+    "workflow_dispatch": false
+  },
+  "evidence_sources": [
+    "H2 Evidence / Provenance",
+    "4H Unified Snapshot",
+    "4I UI Projection",
+    "5A Desktop Surface"
+  ],
+  "negative_test_classes": [
+    "stale_sha",
+    "owner_mismatch",
+    "authority_drift",
+    "missing_h2_binding",
+    "action_like_fields",
+    "nested_action_like_fields",
+    "excessive_depth",
+    "non_deterministic_output"
+  ],
+  "self_inclusion": false,
+  "note": "CAPTURED is not PASSED; exact PR head and authoritative CI must replace pending state before certification."
+}

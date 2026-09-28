@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "contract": "AEOS_AUTOBOT_EVIDENCE_MANIFEST",
+  "purpose": "Bind wave evidence to one immutable iteration and source snapshot with deterministic integrity verification.",
+  "required_manifest_fields": [
+    "schema_version",
+    "contract",
+    "iteration_id",
+    "source_sha",
+    "test_batch_id",
+    "workflow_run_id",
+    "wave_id",
+    "started_at",
+    "completed_at",
+    "decision",
+    "evidence",
+    "manifest_sha256"
+  ],
+  "required_evidence_fields": [
+    "iteration_id",
+    "source_sha",
+    "set_id",
+    "wave_id",
+    "command",
+    "cwd",
+    "result_state",
+    "evidence_id"
+  ],
+  "identity_rule": "iteration_id + source_sha + set_id + wave_id + command + cwd",
+  "manifest_digest_rule": "manifest_sha256 is SHA256 of canonical JSON with manifest_sha256 set to an empty string; the sidecar SHA256 covers the final serialized manifest bytes.",
+  "deterministic_serialization": "UTF-8 JSON, sorted keys, compact separators, trailing newline",
+  "stale_evidence_action": "HOLD",
+  "cross_iteration_evidence_action": "REJECT",
+  "duplicate_set_action": "REJECT",
+  "incomplete_wave_action": "HOLD",
+  "running_evidence_action": "HOLD",
+  "merge_authority": "OWNER_ONLY",
+  "fail_closed": true
+}

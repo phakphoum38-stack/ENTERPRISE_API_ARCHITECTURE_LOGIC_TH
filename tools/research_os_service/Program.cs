@@ -205,21 +205,31 @@ sealed class ResearchOsApiWorker : BackgroundService
 
     private static string ResolveRepoRoot()
     {
-        var configured = Environment.GetEnvironmentVariable("RESEARCH_OS_REPO_ROOT");
-        if (!string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured))
-        {
-            return Path.GetFullPath(configured);
-        }
-
-        var packagedRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
+        // The canonical installer layout is:
+        //   <install-root>\\service_host\\ResearchOS.ServiceHost.exe
+        // Prefer the packaged layout over inherited machine/service environment
+        // so the self-contained service never resolves to the Windows Program
+        // Files parent or another stale development path.
+        var packagedRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
         var packagedEntrypoint = Path.Combine(packagedRoot, "tools", "research_os_api", "render_server.py");
         if (File.Exists(packagedEntrypoint))
         {
             return packagedRoot;
         }
 
+        var configured = Environment.GetEnvironmentVariable("RESEARCH_OS_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            var configuredRoot = Path.GetFullPath(configured);
+            var configuredEntrypoint = Path.Combine(configuredRoot, "tools", "research_os_api", "render_server.py");
+            if (Directory.Exists(configuredRoot) && File.Exists(configuredEntrypoint))
+            {
+                return configuredRoot;
+            }
+        }
+
         throw new InvalidOperationException(
-            $"RESEARCH_OS_REPO_ROOT is not configured and packaged root could not be resolved from {AppContext.BaseDirectory}.");
+            $"Research OS packaged root could not be resolved from {AppContext.BaseDirectory} and RESEARCH_OS_REPO_ROOT does not contain the API entrypoint.");
     }
 
     private static string ResolvePython(string repoRoot)

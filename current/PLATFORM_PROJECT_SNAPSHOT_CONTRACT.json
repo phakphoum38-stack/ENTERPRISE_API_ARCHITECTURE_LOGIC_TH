@@ -1,0 +1,42 @@
+{
+  "contract_id": "platform-project-snapshot-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Portable source-pinned continuity snapshot for replacing chat, AI, tool or workspace context without replacing Git, contracts or evidence as sources of truth.",
+  "authority": {
+    "descriptive_only": true,
+    "chat_is_not_source_of_truth": true,
+    "release_authority": "FINAL_GATE"
+  },
+  "required_fields": [
+    "repository",
+    "source_sha",
+    "protected_baseline_sha",
+    "active_work",
+    "deferred_work",
+    "decisions",
+    "verified_truths",
+    "evidence_refs",
+    "open_risks",
+    "unknowns",
+    "authority_boundaries",
+    "next_action"
+  ],
+  "validation": {
+    "source_sha_must_be_40_hex": true,
+    "protected_baseline_sha_must_be_40_hex": true,
+    "source_sha_mismatch": "HOLD",
+    "unknown": "HOLD",
+    "stale_evidence": "HOLD",
+    "missing_required_field": "HOLD"
+  },
+  "rules": [
+    "snapshot_does_not_authorize_actions",
+    "snapshot_does_not_grant_permissions",
+    "snapshot_does_not_merge",
+    "snapshot_does_not_release",
+    "snapshot_does_not_replace_git",
+    "snapshot_does_not_replace_evidence",
+    "snapshot_must_preserve_deferred_work"
+  ]
+}

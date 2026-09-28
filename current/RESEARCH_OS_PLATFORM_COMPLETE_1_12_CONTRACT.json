@@ -1,0 +1,44 @@
+{
+  "contract_id": "research-os-platform-complete-1-12-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Single certification contract for completing the Research OS Platform phases 1 through 12 against existing canonical authorities without creating duplicate runtime, queue, scheduler, authorization, evidence, navigation, or release authority.",
+  "release_authority": "FINAL_GATE",
+  "phases": [
+    {"phase":1,"id":"baseline_lock","authority":"current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"},
+    {"phase":2,"id":"whole_platform_gap_closure","authority":"current/RESEARCH_OS_PLATFORM_ARCHITECTURE_AUDIT_CONTRACT.json"},
+    {"phase":3,"id":"platform_core_completion","authority":"current/RESEARCH_OS_PLATFORM_CORE_COMPLETION_CONTRACT.json"},
+    {"phase":4,"id":"execution_plane","authority":"current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json"},
+    {"phase":5,"id":"control_plane","authority":"current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json"},
+    {"phase":6,"id":"multi_project_scale","authority":"current/RESEARCH_OS_100_PROJECT_READINESS_CONTRACT.json"},
+    {"phase":7,"id":"owner_experience","authority":"current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json"},
+    {"phase":8,"id":"governance","authority":"current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json"},
+    {"phase":9,"id":"product_surfaces","authority":"current/RESEARCH_OS_PHASE_D_CROSS_SURFACE_PARITY_CONTRACT.json"},
+    {"phase":10,"id":"unified_windows_distribution","authority":"current/RESEARCH_OS_PHASE_E_UNIFIED_WINDOWS_DISTRIBUTION_CONTRACT.json"},
+    {"phase":11,"id":"deferred_flutter_closure","authority":"current/RESEARCH_OS_PLATFORM_PRODUCTION_HARDENING_CONTRACT.json"},
+    {"phase":12,"id":"final_platform_certification","authority":"current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"}
+  ],
+  "required_invariants": {
+    "shared_execution_plane": true,
+    "shared_evidence_plane": true,
+    "no_per_project_runtime": true,
+    "no_per_project_queue": true,
+    "no_per_project_evidence_ledger": true,
+    "owner_is_unbounded_privilege_boundary": true,
+    "resource_conflict_is_reject_and_release": true,
+    "same_version_overwrite_forbidden": true,
+    "alternate_version_branching_preserved": true,
+    "m2_is_descriptive_only": true,
+    "final_gate_is_single_release_authority": true,
+    "unknown_is_not_pass": true,
+    "deferred_is_not_done": true
+  },
+  "completion_rule": "Every phase must resolve to PASS through its canonical authority and required proof. UNKNOWN, SKIPPED, BLOCKED, STALE, CONFLICT, or unresolved DEFERRED is not certification.",
+  "authority": {
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false
+  }
+}

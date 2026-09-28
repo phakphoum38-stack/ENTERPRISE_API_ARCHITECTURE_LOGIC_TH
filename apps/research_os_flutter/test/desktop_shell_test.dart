@@ -1,10 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_flutter/src/api/research_os_api_client.dart';
 import 'package:research_os_flutter/src/app_shell.dart';
+import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 
 class DesktopShellApiClient extends ResearchOSApiClient {
-  DesktopShellApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
+  DesktopShellApiClient()
+      : super(
+          baseUrl: 'http://127.0.0.1:8787',
+        );
 
   @override
   Future<Map<String, dynamic>> getHealth() async => <String, dynamic>{
@@ -22,7 +26,9 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 
   @override
   Future<Map<String, dynamic>> getKnowledgeArtifacts() async =>
-      <String, dynamic>{'artifacts': <Map<String, dynamic>>[]};
+      <String, dynamic>{
+        'artifacts': <Map<String, dynamic>>[],
+      };
 
   @override
   Future<Map<String, dynamic>> getKnowledgeGraph() async =>
@@ -32,7 +38,9 @@ class DesktopShellApiClient extends ResearchOSApiClient {
       };
 
   @override
-  Future<Map<String, dynamic>> getGitHubDashboard({String? repository}) async =>
+  Future<Map<String, dynamic>> getGitHubDashboard({
+    String? repository,
+  }) async =>
       <String, dynamic>{
         'repository': repository,
         'workflow_runs': <Map<String, dynamic>>[],
@@ -45,69 +53,199 @@ class DesktopShellApiClient extends ResearchOSApiClient {
 }
 
 void main() {
-  testWidgets('desktop shell shows organized enterprise sidebar', (tester) async {
-    tester.view.physicalSize = const Size(1440, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'narrow iOS host still renders the canonical shared product UI',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: DesktopShellApiClient()),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ResearchOSAppShell(
+            apiClient: DesktopShellApiClient(),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.byKey(const Key('enterprise-sidebar')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-navigation-list')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-content-pane')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-status-bar')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
+      expect(find.byKey(const Key('research-os-sidebar-v2')), findsOneWidget);
+      expect(find.byKey(const Key('desktop-content-pane')), findsOneWidget);
+      expect(find.byType(Drawer), findsNothing);
+      expect(find.byKey(const Key('desktop-status-bar')), findsOneWidget);
+    },
+  );
 
-    final compactWidth =
-        tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
-    final contentWidth =
-        tester.getSize(find.byKey(const Key('desktop-content-pane'))).width;
+  testWidgets(
+    'desktop shell shows the futuristic Research OS sidebar',
+    (tester) async {
+      tester.view.physicalSize = const Size(1440, 1000);
+      tester.view.devicePixelRatio = 1;
 
-    expect(compactWidth, 76);
-    expect(find.byKey(const Key('desktop-shell-title')), findsNothing);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.tap(find.byKey(const Key('toggle-desktop-sidebar')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ResearchOSAppShell(
+            apiClient: DesktopShellApiClient(),
+          ),
+        ),
+      );
 
-    final expandedWidth =
-        tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width;
-    final contentWidthWhileExpanded =
-        tester.getSize(find.byKey(const Key('desktop-content-pane'))).width;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
 
-    expect(expandedWidth, 244);
-    expect(expandedWidth, greaterThan(compactWidth));
-    expect(contentWidthWhileExpanded, contentWidth);
-    expect(find.byKey(const Key('desktop-shell-title')), findsOneWidget);
-    expect(find.text('WORKSPACE'), findsWidgets);
-    expect(find.text('KNOWLEDGE'), findsWidgets);
-    expect(find.text('CONNECTIONS'), findsWidgets);
-    expect(find.text('SYSTEM'), findsWidgets);
-    expect(find.byKey(const Key('desktop-sidebar-dismiss')), findsOneWidget);
+      // Desktop shell.
+      expect(
+        find.byKey(const Key('research-os-sidebar-v2')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('desktop-content-pane')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('desktop-status-bar')),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const Key('desktop-sidebar-dismiss')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+      // Sidebar navigation.
+      expect(
+        find.byKey(const Key('v2-nav-0')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('v2-nav-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('v2-nav-13')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('v2-nav-9')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('v2-nav-12')),
+        findsOneWidget,
+      );
 
-    expect(
-      tester.getSize(find.byKey(const Key('enterprise-sidebar'))).width,
-      compactWidth,
-    );
-    expect(
-      tester.getSize(find.byKey(const Key('desktop-content-pane'))).width,
-      contentWidth,
-    );
-    expect(find.byKey(const Key('desktop-sidebar-dismiss')), findsNothing);
-    expect(find.byKey(const Key('desktop-nav-1')), findsOneWidget);
-    expect(find.byKey(const Key('desktop-nav-9')), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      // Initial compact state.
+      final sidebar = find.byKey(
+        const Key('research-os-sidebar-v2'),
+      );
+
+      final compactWidth = tester.getSize(sidebar).width;
+
+      expect(compactWidth, 76);
+
+      // Expand sidebar.
+      await tester.tap(
+        find.byKey(
+          const Key('toggle-desktop-sidebar-v2'),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(
+        const Duration(milliseconds: 250),
+      );
+
+      final expandedWidth = tester.getSize(sidebar).width;
+
+      expect(expandedWidth, 264);
+      expect(expandedWidth, greaterThan(compactWidth));
+
+      // Expanded sidebar labels.
+      expect(find.text('WORKSPACE'), findsOneWidget);
+      expect(find.text('ACCOUNT'), findsOneWidget);
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('AI Chat'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('AI Operating Workspace'), findsOneWidget);
+      expect(find.text('Friend Connect'), findsAtLeastNWidgets(1));
+
+      // Friend Connect workspace.
+      await tester.tap(
+        find.byKey(
+          const Key('v2-nav-13'),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(
+        const Duration(milliseconds: 250),
+      );
+
+      expect(find.text('Friend Connect'), findsAtLeastNWidgets(1));
+      expect(
+        find.text('Architecture Advisor'),
+        findsAtLeastNWidgets(1),
+      );
+      expect(find.text('Code Advisor'), findsOneWidget);
+      expect(find.text('Research Advisor'), findsOneWidget);
+      expect(find.text('Security Advisor'), findsOneWidget);
+      expect(find.text('System Advisor'), findsOneWidget);
+      expect(
+        find.byKey(const Key('friend-connect-send')),
+        findsOneWidget,
+      );
+      expect(find.text('พร้อมให้คำปรึกษา'), findsOneWidget);
+
+      // Open Conversation.
+      await tester.tap(
+        find.byKey(
+          const Key('v2-nav-1'),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(
+        const Duration(milliseconds: 250),
+      );
+
+      // Conversation contract.
+      expect(
+        find.byKey(
+          const Key('voice-conversation-empty-state-title'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const Key('voice-conversation-empty-state-description'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const Key('voice-conversation-mic-button'),
+        ),
+        findsOneWidget,
+      );
+
+      // Every registry destination must resolve to a real page slot.
+      for (final item in researchNavigationItems) {
+        await tester.tap(
+          find.byKey(Key('v2-nav-${item.index}')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'Navigation index ${item.index} (${item.label}) must map to a page.',
+        );
+      }
+      // No Flutter exception.
+      expect(
+        tester.takeException(),
+        isNull,
+      );
+    },
+  );
 }

@@ -1,0 +1,40 @@
+{
+  "contract_id": "research-os-plane-boundary-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "purpose": "Canonical structural boundary contract for the Research OS Platform plane.",
+  "plane": "PLATFORM",
+  "canonical_role": "STRUCTURAL_BOUNDARY",
+  "authority": {
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "allowed_dependency_direction": [
+    "PLATFORM->CORE",
+    "PLATFORM->ASSURANCE",
+    "EXPERIENCE->PLATFORM"
+  ],
+  "forbidden_dependency_direction": [
+    "PLATFORM->EXPERIENCE",
+    "ASSURANCE->PLATFORM_AUTHORITY",
+    "EXPERIENCE->DIRECT_RUNTIME_MUTATION"
+  ],
+  "canonical_sources": [
+    "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json",
+    "current/ARCHITECTURE_INVARIANTS.md",
+    "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+  ],
+  "invariants": [
+    "platform_is_composition_layer",
+    "no_duplicate_runtime",
+    "no_duplicate_authorization_authority",
+    "no_duplicate_release_authority",
+    "unknown_is_not_pass",
+    "final_gate_is_single_release_authority"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "contract_id": "research-os-platform-final-baseline-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "purpose": "Final baseline qualification contract over the existing canonical Research OS Platform. Assurance only; no new runtime, queue, authorization, evidence, registry, or release authority.",
+  "authority": {"mode":"DESCRIPTIVE_VALIDATING","may_execute":false,"may_authorize":false,"may_approve":false,"may_merge":false,"may_release":false,"release_authority":"FINAL_GATE"},
+  "baseline": {"exact_source_sha_required":true,"registry_required":true,"dependency_graph_required":true,"contract_validation_required":true,"runtime_qualification_required":true,"provenance_required":true,"ci_evidence_required":true},
+  "required_contracts": [
+    "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RUNTIME_READINESS_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_CONTINUITY_WORKFLOW_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RECON_REPAIR_CONTRACT.json",
+    "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json"
+  ],
+  "required_implementation_anchors": [
+    "tools/platform_spine.py",
+    "tools/platform_graph.py",
+    "tools/platform_continuity_workflow.py",
+    "tools/validate_research_os_platform_production_certification.py",
+    "tools/validate_research_os_laravel_platform.py",
+    "tools/validate_platform_self_reconciliation.py",
+    "current/RESEARCH_OS_PLATFORM_COMPONENT_INVENTORY.json"
+  ],
+  "runtime_matrix": ["normal_execution","retry","duplicate_delivery","idempotency","retry_exhaustion","dlq","replay","worker_crash","restart_recovery","stale_ack","stale_sha","resource_conflict","version_branching","unknown_hold"],
+  "required_invariants": ["identity_capability_policy_authorization_entitlement_execution_evidence","engine_event_queue_stateless_worker","resource_conflict_reject_stop_release_ack_reconcile","unknown_not_pass","deferred_not_pass","main_is_release_baseline","final_gate_is_single_release_authority","no_duplicate_runtime","no_duplicate_queue","no_duplicate_authorization","no_duplicate_evidence"],
+  "provenance_chain": ["source_sha","build","artifact","installer","installed_platform"],
+  "migration_sequence": ["PLAN","COMPATIBILITY","MIGRATE","VALIDATE","EVIDENCE","RETIRE_OLD"],
+  "release_rules": {"unknown":"HOLD","missing_evidence":"STOP","sha_mismatch":"STOP","unresolved_deferred":"BLOCK_RELEASE","release_authority":"FINAL_GATE"}
+}

@@ -1,0 +1,43 @@
+name: Baseline Truth Gate
+
+on:
+  pull_request:
+    paths:
+      - "current/BASELINE_TRUTH_CONTRACT.json"
+      - "tools/verify_baseline_truth.py"
+      - "tools/test_verify_baseline_truth.py"
+      - ".github/workflows/baseline-truth-gate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "current/BASELINE_TRUTH_CONTRACT.json"
+      - "tools/verify_baseline_truth.py"
+      - "tools/test_verify_baseline_truth.py"
+      - ".github/workflows/baseline-truth-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify immutable baseline truth
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify baseline truth contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/verify_baseline_truth.py --head "$GITHUB_SHA"
+
+      - name: Run baseline verifier regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tools.test_verify_baseline_truth -v

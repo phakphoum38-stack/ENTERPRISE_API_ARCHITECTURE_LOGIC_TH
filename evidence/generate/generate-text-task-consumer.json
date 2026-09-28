@@ -1,0 +1,24 @@
+{
+  "schema": "research-os-generate-text-task-consumer-evidence/v1",
+  "task": "generate-text-task-consumer",
+  "base_sha": "c6f4fcd9ca4061b0a8381f6d7ec4284ea0c0c158",
+  "branch": "feat/generate-text-task-consumer-final",
+  "scope": "read-only intake and normalization",
+  "implementation": "tools/generate_text_task_consumer.py",
+  "tests": "tools/test_generate_text_task_consumer.py",
+  "contract": "current/GENERATE_TEXT_TASK_CONSUMER.md",
+  "registry_entry": "text-task-consumer",
+  "execution": "not-run",
+  "workflow_dispatch": "not-run",
+  "main_mutation": false,
+  "authority_added": false,
+  "owner_isolation": true,
+  "deterministic_ordering": true,
+  "bounded_input": true,
+  "source_sha256_bound": true,
+  "notes": [
+    "The repository did not contain an existing stored-text consumer or dispatcher boundary in the inspected Generate files.",
+    "Generate Orchestrator remains the orchestration authority.",
+    "The consumer returns a deferred intent envelope and does not call GitHub or execute workflows."
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "schema": "proof-carrying-change/v1",
+  "status": "proposed",
+  "purpose": "Machine-readable preconditions for certified engineering changes.",
+  "canonical_history": {
+    "p0_05_evidence": "#344",
+    "mutation": "forbidden"
+  },
+  "states": [
+    "PROPOSED",
+    "ANALYZING",
+    "IMPLEMENTING",
+    "VERIFYING",
+    "CERTIFIED",
+    "MERGED",
+    "BASELINED",
+    "MONITORED",
+    "HOLD",
+    "REJECTED",
+    "REVOKED"
+  ],
+  "risk_classes": ["LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"],
+  "blocking_states": [
+    "FAIL",
+    "ERROR",
+    "UNKNOWN",
+    "MISSING",
+    "CONFLICT",
+    "UNVERIFIED"
+  ],
+  "required_bindings": [
+    "base_revision",
+    "head_revision",
+    "contract_version",
+    "policy_version",
+    "test_evidence",
+    "ci_evidence",
+    "provenance",
+    "change_fingerprint"
+  ],
+  "invariants": {
+    "exact_head_binding": true,
+    "contract_version_binding": true,
+    "policy_version_binding": true,
+    "evidence_integrity": true,
+    "provenance_integrity": true,
+    "exception_non_escalation": true,
+    "unknown_never_implicitly_verified": true,
+    "canonical_evidence_immutable": true,
+    "merge_requires_certified_state": true,
+    "downstream_must_inherit_certified_baseline": true
+  },
+  "risk_assurance": {
+    "LOW": ["contract", "regression", "ci"],
+    "MEDIUM": ["contract", "regression", "ci", "compatibility", "boundary_tests"],
+    "HIGH": ["contract", "regression", "ci", "compatibility", "boundary_tests", "adversarial", "independent_verification"],
+    "CRITICAL": ["contract", "regression", "ci", "compatibility", "boundary_tests", "adversarial", "independent_verification", "human_approval", "complete_provenance"],
+    "UNKNOWN": ["hold_or_review"]
+  },
+  "merge_preconditions": [
+    "root_cause_closed_or_explicitly_not_applicable",
+    "source_fix_verified",
+    "contract_alignment_verified",
+    "regression_verified",
+    "required_ci_passed",
+    "adversarial_assurance_satisfied_for_risk",
+    "evidence_resolves",
+    "evidence_matches_head_revision",
+    "provenance_verified",
+    "branch_ancestry_verified",
+    "no_unresolved_conflict",
+    "compatibility_verified",
+    "authority_boundary_preserved",
+    "canonical_history_preserved",
+    "final_assurance_passed"
+  ],
+  "forbidden_shortcuts": [
+    "merge_to_fix",
+    "weaken_test_to_pass",
+    "unknown_to_verified",
+    "caller_claim_to_proof",
+    "exception_to_authority_escalation",
+    "rewrite_historical_evidence",
+    "ci_green_equals_root_cause_closed"
+  ],
+  "decision_rule": "CERTIFIED is the only state eligible for merge."
+}

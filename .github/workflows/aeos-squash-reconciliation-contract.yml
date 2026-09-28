@@ -1,0 +1,27 @@
+name: AEOS Squash Reconciliation Contract
+
+on:
+  pull_request:
+    paths:
+      - current/AEOS_SQUASH_RECONCILIATION_CONTRACT.json
+      - current/AEOS_SQUASH_RECONCILIATIONS.json
+      - tools/aeos/validate_squash_reconciliation.py
+      - .github/workflows/aeos-squash-reconciliation-contract.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate squash reconciliation contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate #366 reconciliation evidence structure
+        run: |
+          set -euo pipefail
+          python3 tools/aeos/validate_squash_reconciliation.py \
+            current/AEOS_SQUASH_RECONCILIATIONS.json source

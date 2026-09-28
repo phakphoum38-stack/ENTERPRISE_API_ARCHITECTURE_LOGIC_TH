@@ -1,0 +1,265 @@
+import 'package:flutter/material.dart';
+
+import 'enterprise_navigation.dart';
+
+/// Shared desktop navigation for the Research OS application surface.
+/// All destinations are sourced from the same registry used by the mobile drawer.
+class ResearchOSSidebarV2 extends StatelessWidget {
+  const ResearchOSSidebarV2({
+    required this.expanded,
+    required this.selectedIndex,
+    required this.onToggle,
+    required this.onSelected,
+    super.key,
+  });
+
+  final bool expanded;
+  final int selectedIndex;
+  final VoidCallback onToggle;
+  final ValueChanged<int> onSelected;
+
+  static const compactWidth = 76.0;
+  static const expandedWidth = 264.0;
+
+  Widget _section(BuildContext context, String title) {
+    if (!expanded) return const SizedBox(height: 8);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+      child: Text(
+        title.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .8,
+            ),
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final canShowExpandedHeader = constraints.maxWidth >= 180;
+
+        if (!canShowExpandedHeader) {
+          return SizedBox(
+            height: 70,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                const _ResearchMark(size: 30),
+                Positioned(
+                  right: 1,
+                  child: IconButton(
+                    key: const Key('toggle-desktop-sidebar-v2'),
+                    constraints:
+                        const BoxConstraints.tightFor(width: 30, height: 30),
+                    padding: EdgeInsets.zero,
+                    tooltip: 'ขยาย Sidebar',
+                    onPressed: onToggle,
+                    icon: const Icon(Icons.chevron_right, size: 19),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return SizedBox(
+          height: 70,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: <Widget>[
+                const _ResearchMark(),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text('Research OS',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      Text('AI Operating Workspace',
+                          style: TextStyle(fontSize: 10.5)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  key: const Key('toggle-desktop-sidebar-v2'),
+                  tooltip: 'ย่อ Sidebar',
+                  onPressed: onToggle,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _securityStatus(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final canShowLabel = expanded && constraints.maxWidth >= 180;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+          child: Container(
+            height: 42,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            alignment: Alignment.center,
+            child: canShowLabel
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Icon(Icons.shield_outlined,
+                          size: 17, color: scheme.primary),
+                      const SizedBox(width: 8),
+                      const Flexible(
+                        child: Text(
+                          'Local-first • secure',
+                          style: TextStyle(fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  )
+                : Icon(Icons.shield_outlined,
+                    size: 17, color: scheme.primary),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    List<Widget> entries() {
+      final widgets = <Widget>[];
+      String? section;
+      for (final item in researchNavigationItems) {
+        if (expanded && section != item.section) {
+          section = item.section;
+          widgets.add(_section(context, item.section));
+        }
+        widgets.add(
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: expanded ? 10 : 8,
+              vertical: 2,
+            ),
+            child: Material(
+              color: selectedIndex == item.index
+                  ? scheme.secondaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(13),
+              child: InkWell(
+                key: Key('v2-nav-${item.index}'),
+                borderRadius: BorderRadius.circular(13),
+                onTap: () => onSelected(item.index),
+                child: SizedBox(
+                  height: 43,
+                  child: Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: expanded ? 44 : 58,
+                        child: Icon(
+                          item.icon,
+                          color: selectedIndex == item.index
+                              ? scheme.onSecondaryContainer
+                              : scheme.onSurfaceVariant,
+                          size: 21,
+                        ),
+                      ),
+                      if (expanded)
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            key: Key('desktop-nav-label-${item.index}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: selectedIndex == item.index
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      return widgets;
+    }
+
+    return AnimatedContainer(
+      key: const Key('research-os-sidebar-v2'),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      width: expanded ? expandedWidth : compactWidth,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(right: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Column(
+        children: <Widget>[
+          _header(context),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              key: const Key('desktop-navigation-list-v2'),
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              children: entries(),
+            ),
+          ),
+          _securityStatus(context),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResearchMark extends StatelessWidget {
+  const _ResearchMark({this.size = 36});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: <Color>[
+            scheme.primaryContainer,
+            scheme.secondaryContainer,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(size * .33),
+      ),
+      child: Text(
+        'R',
+        style: TextStyle(
+          color: scheme.onPrimaryContainer,
+          fontSize: size * .5,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}

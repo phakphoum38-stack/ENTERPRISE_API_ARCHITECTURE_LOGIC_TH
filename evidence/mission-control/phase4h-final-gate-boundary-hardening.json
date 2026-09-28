@@ -1,0 +1,16 @@
+{
+  "phase": "4H",
+  "name": "Final Gate readiness boundary hardening",
+  "schema": "research-os-mission-control-final-gate-contract/v1",
+  "hardening": [
+    "canonical CI source authority required",
+    "recursive action-authority rejection",
+    "recursive secret-like value rejection",
+    "bounded input",
+    "input immutable",
+    "read-only output"
+  ],
+  "output_authority": "contract-only; Final Gate remains authoritative",
+  "release_actions": [],
+  "ci_verification": "PENDING_CI"
+}

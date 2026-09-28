@@ -1,0 +1,77 @@
+{
+  "contract_id": "research-os-experience-native-design-studio-v1",
+  "version": 1,
+  "purpose": "Native design and interaction model for the Research OS Control Center.",
+  "root_ref": "current/MATHEMATICAL_ROOT_CONTRACT.json",
+  "control_plane_ref": "tools/native_control_plane.py",
+  "authority": "descriptive_only",
+  "logical_coverage": "10^1000",
+  "materialization": "bounded_only",
+  "states": [
+    "PROPOSED",
+    "DESIGNED",
+    "IMPLEMENTED",
+    "FUNCTIONALLY_VERIFIED",
+    "VISUALLY_VERIFIED",
+    "ACCESSIBILITY_VERIFIED",
+    "EVIDENCED",
+    "RELEASED",
+    "MONITORED"
+  ],
+  "required_capabilities": [
+    "canvas",
+    "tokens",
+    "colors",
+    "typography",
+    "layout",
+    "components",
+    "component_states",
+    "interaction",
+    "motion",
+    "accessibility",
+    "responsive",
+    "prototype",
+    "audit",
+    "evidence",
+    "deterministic_render_model"
+  ],
+  "required_component_states": [
+    "default",
+    "loading",
+    "empty",
+    "error",
+    "offline",
+    "recovery"
+  ],
+  "motion_rules": [
+    "state_driven",
+    "reversible_when_possible",
+    "reduced_motion_supported",
+    "no_motion_as_authority"
+  ],
+  "evidence_requirements": [
+    "exact_source_revision",
+    "component_identity",
+    "design_requirement_ref",
+    "functional_evidence",
+    "visual_evidence",
+    "accessibility_evidence",
+    "provenance"
+  ],
+  "forbidden": [
+    "merge_authority",
+    "authority_mutation",
+    "runtime_scheduler_duplication",
+    "memory_duplication",
+    "assurance_duplication",
+    "automatic_truth_promotion"
+  ],
+  "invariants": [
+    "unknown_is_not_known",
+    "design_is_not_execution",
+    "motion_is_not_authority",
+    "evidence_precedes_release",
+    "reduced_motion_is_supported",
+    "history_is_preserved"
+  ]
+}

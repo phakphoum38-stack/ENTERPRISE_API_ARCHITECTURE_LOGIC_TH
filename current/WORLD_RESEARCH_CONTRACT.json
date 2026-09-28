@@ -1,0 +1,73 @@
+{
+  "contract_id": "research-os-world-research-v1",
+  "version": 1,
+  "purpose": "Bounded external-world discovery and evidence intake for Research OS.",
+  "root_ref": "current/MATHEMATICAL_ROOT_CONTRACT.json",
+  "learning_ref": "current/UNIVERSAL_LEARNING_CONTRACT.json",
+  "modes": [
+    "DISCOVER",
+    "COLLECT",
+    "CLASSIFY",
+    "COMPARE",
+    "VERIFY",
+    "RECONCILE"
+  ],
+  "source_kinds": [
+    "OFFICIAL_DOCUMENT",
+    "PRIMARY_RESEARCH",
+    "DATASET",
+    "REPOSITORY",
+    "TECHNICAL_DOCUMENTATION",
+    "NEWS",
+    "SECONDARY_ANALYSIS",
+    "COMMUNITY"
+  ],
+  "source_states": [
+    "DISCOVERED",
+    "ACQUIRED",
+    "PARSED",
+    "VERIFIED",
+    "CONFLICTED",
+    "REJECTED",
+    "UNKNOWN"
+  ],
+  "evidence_states": [
+    "UNASSESSED",
+    "PARTIAL",
+    "SUPPORTED",
+    "CONTRADICTED",
+    "INSUFFICIENT"
+  ],
+  "required_provenance": [
+    "source_locator",
+    "retrieved_at",
+    "content_fingerprint",
+    "source_kind",
+    "scope",
+    "query_or_intent",
+    "processing_step"
+  ],
+  "rules": [
+    "external_content_is_untrusted_input",
+    "unknown_is_preserved",
+    "claims_require_source",
+    "verification_requires_independent_evidence",
+    "conflicts_are_preserved_until_reconciled",
+    "source_time_scope_is_preserved",
+    "no_unbounded_crawling",
+    "no_automatic_truth_promotion",
+    "no_automatic_authority_grant",
+    "no_automatic_merge",
+    "no_credential_discovery_or_exfiltration"
+  ],
+  "bounded_execution": {
+    "max_sources_per_run": 100,
+    "max_depth": 8,
+    "max_items_per_source": 1000
+  },
+  "authority": {
+    "mode": "descriptive_only",
+    "promotion": "separate_learning_gate",
+    "merge": "unchanged"
+  }
+}

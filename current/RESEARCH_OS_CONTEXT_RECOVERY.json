@@ -1,0 +1,58 @@
+{
+  "schema": "research-os-context-recovery/v1",
+  "recovery_status": "FAIL_CLOSED_UNTIL_RECONSTRUCTED",
+  "required_inputs": [
+    "repository_identity",
+    "canonical_main_sha",
+    "protected_baseline_sha",
+    "constitution",
+    "generation_state",
+    "mission_state",
+    "verified_truths",
+    "evidence_roots",
+    "open_risks",
+    "assumptions",
+    "unknowns",
+    "active_failures",
+    "authority_boundaries",
+    "tooling_registry",
+    "successor_handoff"
+  ],
+  "ordered_steps": [
+    "IDENTIFY_REPOSITORY",
+    "IDENTIFY_CANONICAL_SHA",
+    "VERIFY_PROTECTED_BASELINE",
+    "LOAD_CONSTITUTION",
+    "LOAD_GENERATION_STATE",
+    "LOAD_MISSION_STATE",
+    "LOAD_VERIFIED_TRUTHS",
+    "LOAD_EVIDENCE_ROOTS",
+    "LOAD_RISKS_ASSUMPTIONS_UNKNOWNS",
+    "LOAD_FAILURE_KNOWLEDGE",
+    "LOAD_AUTHORITY_BOUNDARIES",
+    "LOAD_TOOLING_REGISTRY",
+    "LOAD_SUCCESSOR_HANDOFF",
+    "DERIVE_NEXT_PERMITTED_ACTION"
+  ],
+  "fail_closed_conditions": [
+    "MISSING_REQUIRED_INPUT",
+    "CONTRADICTORY_INPUT",
+    "STALE_INPUT",
+    "REVOKED_INPUT",
+    "UNVERIFIED_CANONICAL_SHA",
+    "PROTECTED_BASELINE_MISMATCH",
+    "AUTHORITY_AMBIGUITY"
+  ],
+  "output": {
+    "canonical_sha": null,
+    "protected_baseline_sha": null,
+    "generation": null,
+    "mission": null,
+    "certification": null,
+    "last_verified_gate": null,
+    "open_risks": [],
+    "blocked_actions": [],
+    "next_permitted_action": null,
+    "evidence_refs": []
+  }
+}

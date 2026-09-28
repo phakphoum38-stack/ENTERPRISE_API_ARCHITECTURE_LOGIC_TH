@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "contract": "AEOS_AUTOBOT_HOLD_RECOVERY_ENGINE",
+  "states": ["HOLD_CREATED", "HOLD_CLASSIFIED", "RECOVERY_PLANNED", "RECOVERY_AUTHORIZED", "RECOVERY_EXECUTED", "RE_VERIFIED", "RELEASE_HOLD", "PROTECTED_HOLD"],
+  "reasons": ["ROOT_CAUSE_UNPROVEN", "EVIDENCE_STALE", "EVIDENCE_CONFLICTED", "PROVENANCE_MISMATCH", "NEW_REGRESSION", "CONTROL_MISSING", "ASSURANCE_SELF_MODIFICATION", "AUTOBOT_EXHAUSTED", "INDEPENDENT_REVIEW_REQUIRED"],
+  "required_fields": ["hold_id", "iteration_id", "source_sha", "reason", "blocker", "evidence_ids", "recovery_action", "attempt", "max_attempts", "authorized_by", "result"],
+  "identity_binding": ["hold_id", "iteration_id", "source_sha"],
+  "terminal_rules": {"PASS": "RELEASE_HOLD", "FAIL": "RECLASSIFY", "CONFLICT": "PROTECTED_HOLD", "EXHAUSTED": "PROTECTED_HOLD"},
+  "missing_evidence_policy": "PROTECTED_HOLD",
+  "stale_identity_policy": "PROTECTED_HOLD",
+  "unauthorized_policy": "PROTECTED_HOLD",
+  "source_mutation": false,
+  "merge_authority": "OWNER_ONLY",
+  "self_certification": false,
+  "fail_closed": true
+}

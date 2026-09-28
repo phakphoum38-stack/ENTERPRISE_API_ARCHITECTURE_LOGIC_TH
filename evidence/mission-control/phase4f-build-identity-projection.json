@@ -1,0 +1,36 @@
+{
+  "schema": "research-os-mission-control-build-identity/v1",
+  "phase": "4F",
+  "title": "Build Identity Projection",
+  "base_sha": "23112170cab4f8de113326a03d7cc84d255b48eb",
+  "head_sha": "702a259ec5d505fe881824e177b5765906ccb74a",
+  "read_only": true,
+  "source_authority": "canonical-build-identity-and-installed-provenance-gates",
+  "status": "PENDING_CI",
+  "projection_statuses": ["VERIFIED", "PENDING", "STALE", "CONFLICT", "INVALID"],
+  "test_file": "owner_special/tests/test_mission_control_build_identity.py",
+  "source_file": "owner_special/research_os_friend/mission_control_build_identity.py",
+  "contract_invariants": [
+    "presentation_only",
+    "no_filename_only_identity_inference",
+    "fail_closed_for_missing_conflicting_or_stale_evidence",
+    "owner_scoped",
+    "deterministic_output",
+    "bounded_output",
+    "secret_redaction",
+    "input_immutability"
+  ],
+  "test_matrix": [
+    "valid_identity",
+    "missing_provenance",
+    "conflicting_sha",
+    "stale_commit",
+    "deterministic_output",
+    "input_immutability",
+    "secret_like_source_value",
+    "filename_only_identity_rejection",
+    "bounded_owner_id",
+    "read_only_authority_boundary"
+  ],
+  "verification": "PENDING_CI"
+}

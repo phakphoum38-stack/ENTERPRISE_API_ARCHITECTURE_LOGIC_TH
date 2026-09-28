@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "contract": "RESEARCH_OS_REBASELINE",
+  "state": "REBASELINE_RECORDED",
+  "lineage": {
+    "parent_generation_sha": "897e07a9960b3310b44fa5b359f5e144e4ec2ea8",
+    "successor_generation_sha": "6db7a939c3a2c93c04660e6eb93c7fcde34e3998"
+  },
+  "evidence_root": "70ef4b1a4e731d85c30777c1b45531ad8df8c46911dd57228c3ee42158862579",
+  "provenance_root": "938339749f7ea301a1a046d5e3a5da19d74bf914744f1aef0bc0fdf8e9343bda",
+  "assurance_state": "VERIFIED",
+  "known_risks": [
+    "canonical evidence artifact naming reflects the pre-merge PR head while its content is bound to the post-merge generation SHA"
+  ],
+  "lessons_learned": [
+    "rebaseline records must bind to immutable generation SHAs and externally produced evidence/provenance roots",
+    "rebaseline metadata must not be committed onto the generation it describes, to avoid changing the successor SHA after verification",
+    "test fixtures must never be used as production evidence or provenance roots"
+  ],
+  "history_policy": {
+    "parent_is_immutable": true,
+    "prior_evidence_is_preserved": true,
+    "certification_is_not_inherited": true
+  },
+  "authority_boundary": {
+    "prepares_record": true,
+    "grants_authority": false,
+    "approves_certification": false,
+    "mutates_git_refs": false
+  }
+}

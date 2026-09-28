@@ -1,0 +1,36 @@
+{
+  "schema": "research-os-aeos-mission-certificate/v1",
+  "required": [
+    "mission_id",
+    "objective",
+    "final_main_sha",
+    "contract_sha256",
+    "policy_sha256",
+    "evidence_root",
+    "provenance_root",
+    "test_manifest_sha256",
+    "ci_run_ids",
+    "forensic_status",
+    "security_status",
+    "dependency_status",
+    "open_required_work",
+    "unknown_count",
+    "stale_count",
+    "unverified_count",
+    "blocked_required_count",
+    "final_gate",
+    "stop_proof",
+    "verifier",
+    "timestamp"
+  ],
+  "required_values": {
+    "open_required_work": 0,
+    "unknown_count": 0,
+    "stale_count": 0,
+    "unverified_count": 0,
+    "blocked_required_count": 0,
+    "final_gate": "PASS",
+    "stop_proof": "PASS"
+  },
+  "rule": "A merge is not a mission completion certificate. Main must be independently verified before completion can be certified."
+}

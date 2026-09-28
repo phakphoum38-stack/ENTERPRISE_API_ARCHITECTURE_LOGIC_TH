@@ -1,0 +1,550 @@
+name: Research OS Unified Windows Distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact immutable source SHA to build and validate
+        required: true
+        type: string
+  push:
+    branches:
+      - feat/research-os-phase-e-unified-windows-distribution
+    paths:
+      - ".github/workflows/research-os-phase-e-unified-windows-distribution.yml"
+      - "apps/research_os_flutter/**"
+      - "apps/research_os_web/**"
+      - "owner_special/**"
+      - "tools/**"
+      - "v3/**"
+      - "current/**"
+      - "owner_special/installer/owner-special-platform.iss"
+      - "scripts/**"
+
+permissions:
+  contents: read
+
+env:
+  TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - name: Verify exact target SHA
+        env:
+          TARGET_SHA: ${{ env.TARGET_SHA }}
+        run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+      - run: python tools/validate_phase_e_unified_windows_distribution.py
+      - env:
+          PYTHONPATH: .
+        run: python -m unittest tools.test_phase_e_unified_windows_distribution -v
+
+  build:
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Exact SHA
+        shell: pwsh
+        env:
+          TARGET_SHA: ${{ env.TARGET_SHA }}
+        run: |
+          if ((git rev-parse HEAD).Trim() -ne $env:TARGET_SHA) { throw 'Source SHA mismatch.' }
+
+      - name: Python compile
+        shell: pwsh
+        run: |
+          python -m compileall -q tools owner_special v3
+          if ($LASTEXITCODE -ne 0) { throw 'Python compile failed.' }
+
+      - name: Build Research OS Flutter
+        shell: pwsh
+        run: |
+          $repoWorkspace = Join-Path $env:RUNNER_TEMP 'research-os-phase-e-windows'
+          & "$env:GITHUB_WORKSPACE\tools\ci\prepare_flutter_isolated_workspace.ps1" -RepositoryRoot $env:GITHUB_WORKSPACE -AppRelativePath 'apps/research_os_flutter' -WorkspaceRoot $repoWorkspace
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated Flutter workspace preparation failed.' }
+          $w = Join-Path $repoWorkspace 'apps\research_os_flutter'
+          Set-Location $w
+          flutter config --enable-windows-desktop
+          flutter create --platforms=windows --project-name=research_os_flutter .
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows bootstrap failed.' }
+
+          # flutter create regenerates Windows runner metadata, so apply the
+          # canonical Research OS identity before the release build.
+          $mainCpp = 'windows\runner\main.cpp'
+          $mainText = Get-Content $mainCpp -Raw
+          $mainText = $mainText -replace 'Create\(L"research_os_flutter"', 'Create(L"Research OS"'
+          Set-Content -Path $mainCpp -Value $mainText -Encoding utf8
+
+          $runnerRc = 'windows\runner\Runner.rc'
+          $rc = Get-Content $runnerRc -Raw
+          $rc = $rc -replace 'VALUE "CompanyName", ".*?"', 'VALUE "CompanyName", "Research OS Team"'
+          $rc = $rc -replace 'VALUE "FileDescription", ".*?"', 'VALUE "FileDescription", "Research OS"'
+          $rc = $rc -replace 'VALUE "InternalName", ".*?"', 'VALUE "InternalName", "ResearchOS"'
+          $rc = $rc -replace 'VALUE "OriginalFilename", ".*?"', 'VALUE "OriginalFilename", "research_os_flutter.exe"'
+          $rc = $rc -replace 'VALUE "ProductName", ".*?"', 'VALUE "ProductName", "Research OS"'
+          Set-Content -Path $runnerRc -Value $rc -Encoding utf8
+
+          $verifyRc = Get-Content $runnerRc -Raw
+          if ($verifyRc -notmatch 'VALUE "ProductName", "Research OS"') { throw 'Research OS ProductName branding was not applied.' }
+          if ($verifyRc -notmatch 'VALUE "CompanyName", "Research OS Team"') { throw 'Research OS CompanyName branding was not applied.' }
+          if ($verifyRc -match 'research_os_owner_special') { throw 'Owner Special identity leaked into Research OS Runner.rc.' }
+
+          flutter pub get
+          flutter analyze
+          flutter test --dart-define=RESEARCH_OS_API_BASE_URL=http://127.0.0.1:8787
+          flutter build windows --release --dart-define=RESEARCH_OS_API_BASE_URL=http://127.0.0.1:8787
+          if ($LASTEXITCODE -ne 0) { throw 'Research OS Windows build failed.' }
+          $exe = "$w\build\windows\x64\runner\Release\research_os_flutter.exe"
+          if (-not (Test-Path $exe)) { throw 'Research OS executable missing.' }
+          $v = (Get-Item $exe).VersionInfo
+          if ($v.ProductName -ne 'Research OS') { throw 'Research OS ProductName mismatch.' }
+          if ($v.CompanyName -ne 'Research OS Team') { throw 'Research OS CompanyName mismatch.' }
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\phase-e\package\app" | Out-Null
+          Copy-Item "$w\build\windows\x64\runner\Release\*" "$env:GITHUB_WORKSPACE\phase-e\package\app" -Recurse -Force
+
+      - name: Build Owner Special
+        shell: pwsh
+        working-directory: owner_special/flutter_app
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Special Windows build failed.' }
+          if (-not (Test-Path 'build\windows\x64\runner\Release\research_os_owner_special.exe')) { throw 'Owner Special executable missing.' }
+
+      - name: Build services
+        shell: pwsh
+        run: |
+          dotnet publish tools/research_os_service/ResearchOS.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o phase-e/service
+          dotnet publish owner_special/windows_service/ResearchOS.Owner.ServiceHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o phase-e/owner-service
+          if ($LASTEXITCODE -ne 0) { throw 'Service publish failed.' }
+
+      - name: Stage unified package
+        shell: pwsh
+        run: |
+          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
+          New-Item -ItemType Directory -Force "$p\owner_special\app","$p\owner_special\research_os_friend","$p\owner_special\scripts","$p\tools","$p\v3","$p\current","$p\workflow","$p\platform\research_os_web","$p\assurance\aeos","$p\runtime\python","$p\service_host","$p\scripts" | Out-Null
+          Copy-Item "owner_special\flutter_app\build\windows\x64\runner\Release\*" "$p\owner_special\app" -Recurse -Force
+          Copy-Item "owner_special\research_os_friend\*" "$p\owner_special\research_os_friend" -Recurse -Force
+          Copy-Item "owner_special\scripts\*" "$p\owner_special\scripts" -Recurse -Force
+          Copy-Item "owner_special\OWNER_MANIFEST.json" "$p\owner_special\OWNER_MANIFEST.json" -Force
+          $env:GITHUB_SHA = (git rev-parse HEAD).Trim()
+          & "$env:GITHUB_WORKSPACE\owner_special\scripts\verify-owner-build-identity.ps1" -ExePath "$p\owner_special\app\research_os_owner_special.exe" -ExpectedManifestPath "$p\owner_special\OWNER_MANIFEST.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner identity gate failed.' }
+          Copy-Item "tools\*" "$p\tools" -Recurse -Force
+          Copy-Item "v3\*" "$p\v3" -Recurse -Force
+          Copy-Item "current\*" "$p\current" -Recurse -Force
+          Copy-Item "current\GENERATE_WORKFLOW_REGISTRY.yml","tools\validate_generate_orchestrator.py","tools\validate_v35_contract.py",".github\workflows\research-os-unified-final-gate.yml" "$p\workflow" -Force
+          Copy-Item "apps\research_os_web\*" "$p\platform\research_os_web" -Recurse -Force
+          Copy-Item "current\RESEARCH_OS_UNIFIED_FINAL_GATE.yml",".github\workflows\research-os-platform-surface-matrix.yml" "$p\platform" -Force
+          Copy-Item "tools\aeos\*" "$p\assurance\aeos" -Recurse -Force
+          Copy-Item "tools\lifecycle_evidence.py","tools\capability_e2e_binding.py" "$p\assurance" -Force
+          Copy-Item "scripts\research-os-service.ps1","scripts\start-research-os-local.ps1" "$p\scripts" -Force
+          Copy-Item "phase-e\service\*" "$p\service_host" -Recurse -Force
+          Copy-Item "phase-e\owner-service\*" "$p\service_host" -Recurse -Force
+          python -m pip install --disable-pip-version-check --quiet "openai-agents>=0.21.0,<1.0"
+          if ($LASTEXITCODE -ne 0) { throw 'OpenAI Agents SDK installation failed.' }
+          $py = (python -c "import sys; print(sys.base_prefix)").Trim()
+          Copy-Item "$py\*" "$p\runtime\python" -Recurse -Force
+          if (-not (Test-Path "$p\runtime\python\python.exe")) { throw 'Bundled Python missing.' }
+
+      - name: Manifest and package validation
+        shell: pwsh
+        run: |
+          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
+          $required = @(
+            "$p\app\research_os_flutter.exe",
+            "$p\owner_special\app\research_os_owner_special.exe",
+            "$p\owner_special\OWNER_MANIFEST.json",
+            "$p\owner_special\research_os_friend",
+            "$p\owner_special\scripts",
+            "$p\tools",
+            "$p\v3",
+            "$p\current",
+            "$p\workflow",
+            "$p\platform\research_os_web",
+            "$p\assurance\aeos",
+            "$p\runtime\python\python.exe",
+            "$p\service_host\ResearchOS.ServiceHost.exe",
+            "$p\service_host\ResearchOS.Owner.ServiceHost.exe",
+            "$p\scripts\research-os-service.ps1"
+          )
+          foreach ($x in $required) { if (-not (Test-Path $x)) { throw "Missing distribution component: $x" } }
+          $entries = foreach ($f in Get-ChildItem $p -Recurse -File | Sort-Object FullName) {
+            [ordered]@{
+              path = $f.FullName.Substring($p.Length + 1).Replace('\','/')
+              sha256 = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              bytes = $f.Length
+            }
+          }
+          [ordered]@{
+            schema_version = 1
+            distribution = 'Research OS Unified Windows'
+            source_sha = (git rev-parse HEAD).Trim()
+            product_name = 'Research OS'
+            company_name = 'Research OS Team'
+            main_executable = 'app/research_os_flutter.exe'
+            owner_executable = 'owner_special/app/research_os_owner_special.exe'
+            file_count = @($entries).Count
+            files = @($entries)
+          } | ConvertTo-Json -Depth 8 | Set-Content "$p\DISTRIBUTION_MANIFEST.json" -Encoding utf8
+          $mh = (Get-FileHash "$p\DISTRIBUTION_MANIFEST.json" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$mh  DISTRIBUTION_MANIFEST.json" | Set-Content "$p\DISTRIBUTION_MANIFEST.sha256" -Encoding ascii
+          Write-Host 'RESEARCH_OS_UNIFIED_WINDOWS_DISTRIBUTION=PASS'
+
+      - name: Package canonical Research OS Platform ZIP
+        shell: pwsh
+        run: |
+          $p = "$env:GITHUB_WORKSPACE\phase-e\package"
+          $sha = (git rev-parse HEAD).Trim()
+          $zip = "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Platform-Windows-x64-$sha.zip"
+          Compress-Archive -Path "$p\*" -DestinationPath $zip -CompressionLevel Optimal
+          $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$zipHash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256" -Encoding ascii
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\\','/') })
+            foreach ($requiredZipEntry in @(
+              'app/research_os_flutter.exe',
+              'owner_special/app/research_os_owner_special.exe',
+              'DISTRIBUTION_MANIFEST.json',
+              'DISTRIBUTION_MANIFEST.sha256'
+            )) {
+              if ($requiredZipEntry -notin $names) { throw "Canonical Platform ZIP is missing required entry: $requiredZipEntry" }
+            }
+            Write-Host "PLATFORM_ZIP_ENTRY_GATE=PASS entries=$($names.Count)"
+          } finally {
+            $archive.Dispose()
+          }
+          "PLATFORM_ZIP_PATH=$zip" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "PLATFORM_ZIP_SHA256=$zipHash" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "RESEARCH_OS_PLATFORM_ZIP=PASS sha256=$zipHash"
+
+      - name: Generate canonical Platform installer branding
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pillow
+          if ($LASTEXITCODE -ne 0) { throw 'Pillow installation failed.' }
+          python "$env:GITHUB_WORKSPACE\\scripts\\apply-research-os-branding.py" --app-root "$env:GITHUB_WORKSPACE" --master "$env:GITHUB_WORKSPACE\\apps\\research_os_flutter\\assets\\branding\\research_os_master.webp"
+          if ($LASTEXITCODE -ne 0) { throw 'Canonical Platform installer branding generation failed.' }
+          if (-not (Test-Path "$env:GITHUB_WORKSPACE\\assets\\branding\\research_os.ico" -PathType Leaf)) { throw 'Canonical Research OS installer icon generation failed.' }
+
+      - name: Verify canonical Platform UI binding for Owner Special Setup
+        shell: pwsh
+        run: |
+          $installer = "$env:GITHUB_WORKSPACE\\owner_special\\installer\\owner-special-platform.iss"
+          $canonicalUiRoot = "$env:GITHUB_WORKSPACE\\apps\\research_os_flutter"
+          $master = "$env:GITHUB_WORKSPACE\\apps\\research_os_flutter\\assets\\branding\\research_os_master.webp"
+          $icon = "$env:GITHUB_WORKSPACE\\assets\\branding\\research_os.ico"
+          if (-not (Test-Path $canonicalUiRoot -PathType Container)) { throw 'Canonical Platform UI root missing: apps/research_os_flutter' }
+          if (-not (Test-Path $icon -PathType Leaf)) { throw 'Canonical Research OS branding icon missing.' }
+          $text = Get-Content $installer -Raw
+          foreach ($marker in @(
+            'AppName={#MyAppName}',
+            'AppPublisher={#MyAppPublisher}',
+            'SetupIconFile=..\..\assets\branding\research_os.ico',
+            'research_os_flutter.exe',
+            'Research OS Platform installer',
+            'Installation payload: canonical Research OS Platform ZIP.'
+          )) {
+            if ($text -notlike "*$marker*") { throw "Owner Special Platform Setup is not bound to canonical Platform UI marker: $marker" }
+          }
+          if ($text -match 'Research OS Owner Special') { throw 'Legacy Owner Special UI identity remains in canonical Platform Setup.' }
+          Write-Host 'OWNER_SPECIAL_PLATFORM_UI=PASS'
+
+      - name: Build Owner Special Setup.exe around canonical Platform ZIP
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          $tokens = $null; $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$env:GITHUB_WORKSPACE\owner_special\installer\install-platform-zip.ps1", [ref]$tokens, [ref]$errors)
+          if ($errors.Count -gt 0) { $errors | Format-List | Out-Host; throw 'Owner Platform ZIP bootstrap PowerShell syntax validation failed.' }
+          $sourceSha = (git rev-parse HEAD).Trim()
+          & $iscc "/DPlatformZip=$env:PLATFORM_ZIP_PATH" "/DPlatformZipName=$(Split-Path -Leaf $env:PLATFORM_ZIP_PATH)" "/DPlatformZipSha256=$env:PLATFORM_ZIP_SHA256" "/DPlatformSourceSha=$sourceSha" "$env:GITHUB_WORKSPACE\owner_special\installer\owner-special-platform.iss"
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Special Platform Setup.exe build failed.' }
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw 'Owner Special Platform Setup.exe missing.' }
+          Write-Host "OWNER_SPECIAL_PLATFORM_SETUP=PASS setup=$($setup.Name)"
+
+      - name: Installer install run uninstall E2E
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = "$env:GITHUB_WORKSPACE\phase-e\package"
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw 'Owner Special Platform Setup.exe missing for E2E.' }
+          $platformZip = Get-ChildItem "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Platform-Windows-x64-*.zip" | Select-Object -First 1
+          if (-not $platformZip) { throw 'Canonical Research OS Platform ZIP missing for E2E.' }
+
+          $targetSha = (git rev-parse HEAD).Trim()
+          $installRoot = Join-Path $env:ProgramFiles 'Research OS'
+          $dataRoot = Join-Path $env:ProgramData 'ResearchOS'
+          $ownerDataRoot = Join-Path $env:ProgramData 'ResearchOSOwnerSpecial'
+          $manifest = Join-Path $package 'DISTRIBUTION_MANIFEST.json'
+          $manifestHash = Join-Path $package 'DISTRIBUTION_MANIFEST.sha256'
+          $manifestHashValue = (Get-FileHash $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $platformZipHash = (Get-FileHash $platformZip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expectedPlatformZipHash = (Get-Content "$($platformZip.FullName).sha256" -Raw).Trim().Split()[0].ToLowerInvariant()
+          if ($platformZipHash -ne $expectedPlatformZipHash) { throw 'Canonical Platform ZIP SHA256 sidecar mismatch.' }
+          $checks = [ordered]@{}
+
+          $setupLog = Join-Path $env:RUNNER_TEMP 'research-os-owner-platform-setup.log'
+          $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /TASKS="desktopicon" /LOG="' + $setupLog + '"'
+          $process = Start-Process -FilePath $setup.FullName -ArgumentList $arguments -PassThru
+          $deadline = (Get-Date).AddMinutes(12)
+          while (-not $process.HasExited -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 10
+            $process.Refresh()
+            if (Test-Path $setupLog) { Get-Content $setupLog -Tail 40 | Out-Host }
+          }
+          if (-not $process.HasExited) {
+            Write-Host '--- Owner Special Setup timeout diagnostics ---'
+            if (Test-Path $setupLog) { Get-Content $setupLog -Tail 200 | Out-Host }
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+              Where-Object { $_.ExecutablePath -like "$installRoot*" -or $_.CommandLine -like "*$installRoot*" -or $_.Name -in @('Setup.tmp','powershell.exe','ResearchOS.ServiceHost.exe','ResearchOS.Owner.ServiceHost.exe') } |
+              Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw 'Owner Special Setup exceeded 12 minute E2E timeout.'
+          }
+          if ($process.ExitCode -ne 0) {
+            if (Test-Path $setupLog) { Get-Content $setupLog -Tail 200 | Out-Host }
+            throw "Installer exited with code $($process.ExitCode)."
+          }
+
+          foreach ($relative in @(
+            'app\research_os_flutter.exe',
+            'owner_special\app\research_os_owner_special.exe',
+            'owner_special\OWNER_MANIFEST.json',
+            'owner_special\research_os_friend',
+            'owner_special\scripts',
+            'tools',
+            'v3',
+            'current',
+            'workflow',
+            'platform\research_os_web',
+            'assurance\aeos',
+            'runtime\python\python.exe',
+            'service_host\ResearchOS.ServiceHost.exe',
+            'service_host\ResearchOS.Owner.ServiceHost.exe',
+            'scripts\research-os-service.ps1',
+            'DISTRIBUTION_MANIFEST.json',
+            'DISTRIBUTION_MANIFEST.sha256',
+            'OWNER_SPECIAL_PLATFORM_INSTALL_PROVENANCE.json'
+          )) {
+            if (-not (Test-Path (Join-Path $installRoot $relative))) {
+              if (Test-Path $setupLog) { Write-Host '--- Owner Special Setup log ---'; Get-Content $setupLog -Tail 200 | Out-Host }
+              $bootstrapLog = Join-Path $env:TEMP 'ResearchOS-Platform-robocopy.log'
+              if (Test-Path $bootstrapLog) { Write-Host '--- Platform ZIP robocopy log ---'; Get-Content $bootstrapLog -Tail 200 | Out-Host }
+              throw "Installed distribution component missing: $relative"
+            }
+          }
+          $checks['installed_components'] = $true
+
+          $installedManifest = Get-Content (Join-Path $installRoot 'DISTRIBUTION_MANIFEST.json') -Raw | ConvertFrom-Json
+          if ($installedManifest.source_sha -ne $targetSha) { throw 'Installed manifest source SHA mismatch.' }
+          if ($installedManifest.product_name -ne 'Research OS') { throw 'Installed manifest product identity mismatch.' }
+          if ($installedManifest.company_name -ne 'Research OS Team') { throw 'Installed manifest company identity mismatch.' }
+          $installedManifestHash = (Get-FileHash (Join-Path $installRoot 'DISTRIBUTION_MANIFEST.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($installedManifestHash -ne $manifestHashValue) { throw 'Installed manifest SHA256 mismatch.' }
+          $checks['manifest_provenance'] = $true
+          $checks['platform_zip_integrity'] = $true
+
+          $installedProvenance = Join-Path $installRoot 'OWNER_SPECIAL_PLATFORM_INSTALL_PROVENANCE.json'
+          $provenance = Get-Content $installedProvenance -Raw | ConvertFrom-Json
+          if ($provenance.source_sha -ne $targetSha) { throw 'Installed Platform provenance source SHA mismatch.' }
+          if ($provenance.platform_zip_sha256 -ne $platformZipHash) { throw 'Installed Platform provenance ZIP SHA mismatch.' }
+          if ($provenance.distribution_manifest_sha256 -ne $manifestHashValue) { throw 'Installed Platform provenance manifest SHA mismatch.' }
+          if ($provenance.release_authority -ne 'FINAL_GATE' -or $provenance.installer_role -ne 'OWNER_SPECIAL') { throw 'Installed Platform provenance authority mismatch.' }
+          $checks['owner_special_platform_binding'] = $true
+
+          # Windows service state is mutable and Get-Service returns a snapshot.
+          # The installer may return before the SCM transitions the service to Running,
+          # so poll the authoritative service state instead of evaluating a stale object.
+          $mainServiceReady = $false
+          $ownerServiceReady = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            $mainState = (Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'" -ErrorAction SilentlyContinue)
+            $ownerState = (Get-CimInstance Win32_Service -Filter "Name='ResearchOSOwnerFriendService'" -ErrorAction SilentlyContinue)
+            if ($mainState -and $mainState.State -eq 'Running') { $mainServiceReady = $true }
+            if ($ownerState -and $ownerState.State -eq 'Running') { $ownerServiceReady = $true }
+            if ($mainServiceReady -and $ownerServiceReady) { break }
+            Start-Sleep -Milliseconds 500
+          }
+
+          if (-not $mainServiceReady) {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installRoot\scripts\research-os-service.ps1" -Action status 2>&1 | Out-Host
+            $svcInfo = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'" -ErrorAction SilentlyContinue
+            if ($svcInfo) {
+              Write-Host "ResearchOSService State=$($svcInfo.State) StartMode=$($svcInfo.StartMode) Path=$($svcInfo.PathName) ExitCode=$($svcInfo.ExitCode)"
+            }
+            $errLog = Join-Path $dataRoot 'logs\service-api.err.log'
+            $outLog = Join-Path $dataRoot 'logs\service-api.out.log'
+            if (Test-Path $errLog) { Write-Host '--- Research OS service stderr ---'; Get-Content $errLog -Tail 100 | Out-Host }
+            if (Test-Path $outLog) { Write-Host '--- Research OS service stdout ---'; Get-Content $outLog -Tail 100 | Out-Host }
+            throw 'Research OS service did not reach Running state after install.'
+          }
+
+          if (-not $ownerServiceReady) {
+            $ownerState = Get-CimInstance Win32_Service -Filter "Name='ResearchOSOwnerFriendService'" -ErrorAction SilentlyContinue
+            if ($ownerState) {
+              Write-Host "ResearchOSOwnerFriendService State=$($ownerState.State) StartMode=$($ownerState.StartMode) Path=$($ownerState.PathName) ExitCode=$($ownerState.ExitCode)"
+            }
+            throw 'Owner Friend service did not reach Running state after install.'
+          }
+
+          $checks['services_running'] = $true
+
+          $ownerReady = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $ownerHealth = Invoke-RestMethod -Uri 'http://127.0.0.1:8790/owner/health' -TimeoutSec 2
+              if ($ownerHealth.status -eq 'ok') { $ownerReady = $true; break }
+            } catch {}
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ownerReady) { throw 'Owner Friend HTTP health check failed.' }
+          $checks['owner_http_ready'] = $true
+
+          $apiReady = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $apiResponse = Invoke-WebRequest -Uri 'http://127.0.0.1:8787/' -TimeoutSec 2 -UseBasicParsing
+              if ($apiResponse.StatusCode -ge 200 -and $apiResponse.StatusCode -lt 500) { $apiReady = $true; break }
+            } catch {
+              if ($_.Exception.Response) { $apiReady = $true; break }
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $apiReady) { throw 'Research OS API HTTP readiness check failed.' }
+          $checks['research_os_api_ready'] = $true
+
+          $appPath = Join-Path $installRoot 'app\research_os_flutter.exe'
+          $app = Start-Process -FilePath $appPath -WorkingDirectory (Split-Path $appPath) -PassThru
+          Start-Sleep -Seconds 5
+          $app.Refresh()
+          if ($app.HasExited) { throw "Research OS desktop application exited during smoke test with code $($app.ExitCode)." }
+          $checks['desktop_app_launch'] = $true
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          Wait-Process -Id $app.Id -Timeout 10 -ErrorAction SilentlyContinue
+
+          $uninstaller = Join-Path $installRoot 'unins000.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'Inno Setup uninstaller missing.' }
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -PassThru
+          $uninstallDeadline = (Get-Date).AddMinutes(5)
+          while (-not $uninstall.HasExited -and (Get-Date) -lt $uninstallDeadline) {
+            Start-Sleep -Seconds 5
+            $uninstall.Refresh()
+          }
+          if (-not $uninstall.HasExited) {
+            Write-Host '--- Uninstaller timeout diagnostics ---'
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+              Where-Object { $_.ExecutablePath -like "$installRoot*" -or $_.CommandLine -like "*$installRoot*" -or $_.Name -in @('powershell.exe','ResearchOS.ServiceHost.exe','ResearchOS.Owner.ServiceHost.exe') } |
+              Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
+            Stop-Process -Id $uninstall.Id -Force -ErrorAction SilentlyContinue
+            throw 'Research OS uninstaller exceeded 5 minute E2E timeout.'
+          }
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstall.ExitCode)." }
+
+          for ($i = 0; $i -lt 30; $i++) {
+            if (-not (Test-Path $installRoot)) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (Test-Path $installRoot) {
+            Write-Host '--- Remaining installation root entries ---'
+            Get-ChildItem -LiteralPath $installRoot -Force -Recurse -ErrorAction SilentlyContinue |
+              Select-Object FullName,Length,Mode | Format-Table -AutoSize | Out-Host
+            Write-Host '--- Processes referencing installation root ---'
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+              Where-Object { $_.ExecutablePath -like "$installRoot*" -or $_.CommandLine -like "*$installRoot*" } |
+              Select-Object ProcessId,Name,ExecutablePath,CommandLine | Format-List | Out-Host
+            Write-Host '--- Services referencing installation root ---'
+            Get-CimInstance Win32_Service -ErrorAction SilentlyContinue |
+              Where-Object { $_.PathName -like "*$installRoot*" } |
+              Select-Object Name,State,StartMode,PathName,ExitCode | Format-List | Out-Host
+            throw 'Installation root remained after uninstall.'
+          }
+          $remainingMainService = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'" -ErrorAction SilentlyContinue
+          if ($remainingMainService) { throw 'Research OS service remained after uninstall.' }
+          $remainingOwnerService = Get-CimInstance Win32_Service -Filter "Name='ResearchOSOwnerFriendService'" -ErrorAction SilentlyContinue
+          if ($remainingOwnerService) { throw 'Owner Friend service remained after uninstall.' }
+          if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { throw 'Research OS API port remained bound after uninstall.' }
+          if (Get-NetTCPConnection -LocalPort 8790 -State Listen -ErrorAction SilentlyContinue) { throw 'Owner Friend port remained bound after uninstall.' }
+          $checks['uninstall_clean'] = $true
+
+          [ordered]@{
+            schema = 'research-os.windows-installer-e2e.v1'
+            source_sha = $targetSha
+            installer = $setup.Name
+            installer_role = 'OWNER_SPECIAL'
+            installer_sha256 = $setupHash
+            platform_zip = $platformZip.Name
+            platform_zip_sha256 = $platformZipHash
+            manifest_sha256 = $manifestHashValue
+            manifest_hash_file = (Get-Content $manifestHash -Raw).Trim()
+            install_root = $installRoot
+            checks = $checks
+            release_authority = 'FINAL_GATE'
+          } | ConvertTo-Json -Depth 8 | Set-Content "$env:GITHUB_WORKSPACE\phase-e\WINDOWS_INSTALL_E2E_EVIDENCE.json" -Encoding utf8
+          Write-Host 'WINDOWS_INSTALL_E2E=PASS'
+
+      - name: Publish Platform + Owner Special release evidence
+        shell: pwsh
+        run: |
+          $sha = (git rev-parse HEAD).Trim()
+          $platformZip = Get-ChildItem "$env:GITHUB_WORKSPACE\phase-e\Research-OS-Platform-Windows-x64-*.zip" | Select-Object -First 1
+          $setup = Get-ChildItem "$env:GITHUB_WORKSPACE\owner_special\installer\output\Research-OS-Owner-Special-Setup-*-x64.exe" | Select-Object -First 1
+          if (-not $platformZip -or -not $setup) { throw 'Canonical Platform ZIP or Owner Special Setup.exe missing.' }
+          $platformHash = (Get-FileHash $platformZip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          [ordered]@{
+            schema = 'research-os.windows-release-evidence.v2'
+            source_sha = $sha
+            platform_zip = $platformZip.Name
+            platform_zip_sha256 = $platformHash
+            owner_special_setup = $setup.Name
+            owner_special_setup_sha256 = $setupHash
+            release_authority = 'FINAL_GATE'
+            installer_role = 'OWNER_SPECIAL'
+            installation_payload = 'RESEARCH_OS_PLATFORM_ZIP'
+          } | ConvertTo-Json -Depth 5 | Set-Content "$env:GITHUB_WORKSPACE\phase-e\RELEASE_EVIDENCE.json" -Encoding utf8
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Research-OS-Unified-Windows-x64-${{ env.TARGET_SHA }}
+          path: |
+            phase-e/Research-OS-Platform-Windows-x64-*.zip
+            phase-e/Research-OS-Platform-Windows-x64-*.zip.sha256
+            phase-e/RELEASE_EVIDENCE.json
+            phase-e/WINDOWS_INSTALL_E2E_EVIDENCE.json
+            phase-e/package/DISTRIBUTION_MANIFEST.json
+            phase-e/package/DISTRIBUTION_MANIFEST.sha256
+            owner_special/installer/output/Research-OS-Owner-Special-Setup-*-x64.exe
+          if-no-files-found: error
+          retention-days: 30

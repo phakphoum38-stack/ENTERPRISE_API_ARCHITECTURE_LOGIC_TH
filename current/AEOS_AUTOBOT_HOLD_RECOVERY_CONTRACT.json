@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "contract": "AEOS_AUTOBOT_HOLD_RECOVERY",
+  "purpose": "Define deterministic recovery and protected escalation without allowing the Autobot to bypass assurance gates.",
+  "hold_reasons": [
+    "ROOT_CAUSE_UNPROVEN",
+    "EVIDENCE_STALE",
+    "EVIDENCE_CONFLICTED",
+    "PROVENANCE_MISMATCH",
+    "NEW_REGRESSION",
+    "CONTROL_MISSING",
+    "ASSURANCE_SELF_MODIFICATION",
+    "AUTOBOT_EXHAUSTED",
+    "INDEPENDENT_REVIEW_REQUIRED"
+  ],
+  "states": [
+    "HOLD_CREATED",
+    "HOLD_CLASSIFIED",
+    "RECOVERY_PLANNED",
+    "RECOVERY_AUTHORIZED",
+    "RECOVERY_EXECUTED",
+    "RE_VERIFIED",
+    "RELEASE_HOLD",
+    "PROTECTED_HOLD"
+  ],
+  "terminal_rules": {
+    "pass": "RELEASE_HOLD",
+    "fail": "RECLASSIFY",
+    "conflict": "PROTECTED_HOLD",
+    "exhausted": "PROTECTED_HOLD"
+  },
+  "required_recovery_fields": [
+    "hold_id",
+    "iteration_id",
+    "source_sha",
+    "reason",
+    "blocker",
+    "evidence_ids",
+    "recovery_action",
+    "attempt",
+    "max_attempts",
+    "authorized_by",
+    "result"
+  ],
+  "autobot_merge_authority": false,
+  "fail_closed": true
+}

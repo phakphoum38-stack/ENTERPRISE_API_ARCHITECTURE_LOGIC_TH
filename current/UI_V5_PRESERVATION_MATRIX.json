@@ -1,0 +1,52 @@
+{
+  "schema": "research-os-ui-v5-preservation/v1",
+  "canonical_source_sha": "a72020dfaa512a79acb6d876c74172b433cfea4e",
+  "protected_production_code_baseline": "565ab068d5a1540ea799b594ff031ba003e068af",
+  "migration_policy": "additive-first; legacy-compatible until replacement is validated",
+  "user_levels": [
+    {"id":"user","inherits":[],"scope":"Friend, voice, text, research, memory, library"},
+    {"id":"power_user","inherits":["user"],"scope":"Advanced research, Brain, agents, graph, automation, factory"},
+    {"id":"developer","inherits":["power_user"],"scope":"GitHub, Codespaces, files, terminal, tests, build, CI/CD, Copilot"},
+    {"id":"owner","inherits":["developer"],"scope":"Identity, evidence, provenance, authority, release, governance"},
+    {"id":"owner_special","inherits":["owner"],"scope":"Friend Complete, runtime, deployment, release and privileged owner operations"}
+  ],
+  "features": [
+    {"id":"friend","current":"Friend Connect + Friend runtime","v5":"Conversation Core / Friend Workspace","preserve":true},
+    {"id":"voice","current":"Voice Conversation page","v5":"Conversation modality","preserve":true},
+    {"id":"text","current":"AI chat/composer","v5":"Conversation modality","preserve":true},
+    {"id":"sessions","current":"Conversation/session state","v5":"Persistent Conversation Core","preserve":true},
+    {"id":"memory","current":"Memory-enabled chat/context","v5":"Knowledge layer / Memory","preserve":true},
+    {"id":"cloud_sync","current":"Conversation cloud sync infrastructure","v5":"Conversation infrastructure","preserve":true},
+    {"id":"copilot","current":"Copilot chat capability","v5":"Developer Workspace + Friend capability","preserve":true},
+    {"id":"research","current":"Home/research surfaces","v5":"Research Workspace","preserve":true},
+    {"id":"agents","current":"Agent Center","v5":"Brain Workspace / task layer","preserve":true},
+    {"id":"brain_skills","current":"Brain Skills page","v5":"Brain Workspace","preserve":true},
+    {"id":"orchestrator","current":"Runtime/orchestration capability","v5":"Brain + Factory operational state","preserve":true},
+    {"id":"factory","current":"Factory capability","v5":"Factory Workspace","preserve":true},
+    {"id":"library","current":"Library page","v5":"Knowledge Workspace / Library","preserve":true},
+    {"id":"knowledge_graph","current":"Knowledge Graph page","v5":"Knowledge Workspace / Graph","preserve":true},
+    {"id":"evidence","current":"Evidence/runtime surfaces","v5":"Evidence Workspace","preserve":true},
+    {"id":"provenance","current":"Provenance/evidence lineage","v5":"Evidence detail + audit","preserve":true},
+    {"id":"github","current":"GitHub page","v5":"Developer Workspace / repository context","preserve":true},
+    {"id":"codespaces","current":"Developer/Codespaces capability","v5":"Developer Workspace","preserve":true},
+    {"id":"google_workspace","current":"Google Workspace page","v5":"Research/Work context integration","preserve":true},
+    {"id":"identity","current":"Identity/developer access/login","v5":"System / Owner workspace","preserve":true},
+    {"id":"local_api","current":"Local API & Service","v5":"System workspace / service context","preserve":true},
+    {"id":"monitor","current":"System Monitor","v5":"System workspace / status rail","preserve":true},
+    {"id":"settings","current":"Settings","v5":"System workspace / settings","preserve":true},
+    {"id":"owner","current":"Owner controls","v5":"Owner Workspace","preserve":true},
+    {"id":"owner_special","current":"Owner Special / Friend Complete","v5":"Owner Special capability layer","preserve":true},
+    {"id":"ci_cd","current":"GitHub Actions / engineering gates","v5":"Developer Workspace / CI status","preserve":true},
+    {"id":"release","current":"Release/governance flow","v5":"Owner Workspace / Release","preserve":true}
+  ],
+  "forbidden_changes": [
+    "delete a capability because it is not visible in the first V5 screen",
+    "replace authorization with a cosmetic user-level selector",
+    "merge Memory and Evidence into one concept",
+    "turn Copilot into a separate chatbot",
+    "isolate Codespaces from repository/developer context",
+    "bypass Owner authority for privileged actions",
+    "modify protected production/code baseline",
+    "rewrite canonical history"
+  ]
+}

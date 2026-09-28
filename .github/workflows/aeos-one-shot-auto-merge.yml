@@ -1,0 +1,169 @@
+name: AEOS One-Shot Comprehensive Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+      expected_head_sha:
+        description: Exact PR HEAD SHA to review
+        required: true
+        type: string
+  workflow_run:
+    workflows:
+      - Owner Special Friend Complete
+      - Research OS Gate
+      - Research OS Final Gate
+      - AEOS Master Assurance Gate
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+  actions: read
+
+jobs:
+  comprehensive-review:
+    # A workflow_run emitted from main is a post-merge completion event, not an open PR target.
+    # Keep real PR workflow_run events fail-closed while skipping the normal post-merge main event.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.head_branch != 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target identity
+        id: target
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ inputs.pr_number }}
+          INPUT_HEAD: ${{ inputs.expected_head_sha }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW_HEAD: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR="$INPUT_PR"
+            HEAD="$INPUT_HEAD"
+          else
+            HEAD="$WORKFLOW_HEAD"
+            test -n "$HEAD"
+            PR=""
+            echo "trigger_workflow=$WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
+          fi
+          test -n "$HEAD"
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve pull request for workflow completion
+        if: ${{ github.event_name == 'workflow_run' }}
+        id: workflow-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD: ${{ steps.target.outputs.head }}
+        run: |
+          set -euo pipefail
+          # --paginate emits one JSON document per page; --slurp wraps all
+          # pages into a single JSON array so Python receives valid JSON.
+          prs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/pulls?state=all" --paginate --slurp)"
+          pr="$(python3 -c 'import json,sys; pages=json.load(sys.stdin); rows=[p for page in pages for p in page]; matches=[p for p in rows if p.get("state") in {"open","closed"}]; print(matches[0]["number"] if len(matches)==1 else "")' <<< "$prs")"
+          test -n "$pr"
+
+          # workflow_run can refer to an earlier commit after the PR was synchronized.
+          # Resolve the PR from that commit, then pin the review to the PR current HEAD.
+          current="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr")"
+          current_head="$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("head",{}).get("sha",""))' <<< "$current")"
+          test -n "$current_head"
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "head=$current_head" >> "$GITHUB_OUTPUT"
+
+      - name: Finalize target identity
+        id: identity
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PR: ${{ steps.target.outputs.pr }}
+          WORKFLOW_PR: ${{ steps.workflow-pr.outputs.pr }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR="$DISPATCH_PR"
+          else
+            PR="$WORKFLOW_PR"
+          fi
+          test -n "$PR"
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          echo "head=${{ steps.workflow-pr.outputs.head || steps.target.outputs.head }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch exact PR HEAD without executing PR workflow code
+        env:
+          PR_NUMBER: ${{ steps.identity.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/aeos-target"
+          ACTUAL_HEAD="$(git rev-parse refs/remotes/origin/aeos-target)"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+          git cat-file -e "$EXPECTED_HEAD^{commit}"
+
+      - name: Verify PR checks are green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.identity.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
+          INITIAL_POLL_SECONDS: 5
+          MAX_POLL_SECONDS: 30
+          MAX_WAIT_SECONDS: 900
+        run: |
+          set -euo pipefail
+          python3 tools/aeos/verify_pr_checks.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$PR_NUMBER" \
+            --head-sha "$EXPECTED_HEAD" \
+            --initial-poll-seconds "$INITIAL_POLL_SECONDS" \
+            --max-poll-seconds "$MAX_POLL_SECONDS" \
+            --max-wait-seconds "$MAX_WAIT_SECONDS" \
+            --current-run-id "$GITHUB_RUN_ID"
+
+      - name: Run one-shot comprehensive review
+        env:
+          PR_NUMBER: ${{ steps.identity.outputs.pr }}
+          EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
+        run: |
+          set -euo pipefail
+          python3 tools/aeos/comprehensive_review.py \
+            --pr-number "$PR_NUMBER" \
+            --head-sha "$EXPECTED_HEAD" \
+            --ci-passed
+
+      - name: Verify review certificate is non-authorizing
+        env:
+          EXPECTED_HEAD: ${{ steps.identity.outputs.head }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          d = json.loads(Path("aeos-comprehensive-review.json").read_text())
+          assert d["status"] == "VERIFIED"
+          assert d["reviewed_head_sha"] == os.environ["EXPECTED_HEAD"]
+          assert d["merge_allowed"] is False
+          assert d["merge_authority"] is False
+          assert d["self_certification"] is False
+          PY
+
+      - name: Publish immutable review certificate
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeos-one-shot-review
+          path: aeos-comprehensive-review.json
+          if-no-files-found: error
+          retention-days: 90

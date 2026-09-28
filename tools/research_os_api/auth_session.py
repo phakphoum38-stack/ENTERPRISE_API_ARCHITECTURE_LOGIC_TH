@@ -1,6 +1,6 @@
 """Per-user Research OS session primitives.
 
-This module deliberately contains no Google OAuth exchange logic.  Google
+This module deliberately contains no Google OAuth exchange logic. Google
 Identity establishes the principal; this module binds that principal to a
 short-lived, signed Research OS session that API handlers can verify.
 """
@@ -17,9 +17,13 @@ import time
 from pathlib import Path
 from typing import Any
 
+try:
+    from .identity_storage import storage_key
+except ImportError:  # pragma: no cover - supports direct script/test imports
+    from identity_storage import storage_key
+
 SESSION_COOKIE = "research_os_session"
 DEFAULT_TTL_SECONDS = 8 * 60 * 60
-_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def _secret() -> bytes:
@@ -42,10 +46,27 @@ def _data_root() -> Path:
 
 
 def _user_scope(user_id: str) -> Path:
-    value = str(user_id or "").strip()
-    if not value or not _SAFE_USER_ID.fullmatch(value) or value in {".", ".."}:
-        raise ValueError("invalid user id for session state")
-    return _data_root() / "users" / value / "profiles" / "default" / "sessions"
+    return _data_root() / "users" / storage_key(user_id) / "profiles" / "default" / "sessions"
+
+
+_LEGACY_SAFE_USER_ID = re.compile(r"^[A-Za-z0-9._:-]+$")
+
+
+def _legacy_user_scope(user_id: str) -> Path | None:
+    """Return the pre-storage-key revocation scope for backward-compatible reads."""
+    value = str(user_id or "")
+    if not value or not _LEGACY_SAFE_USER_ID.fullmatch(value):
+        return None
+
+    return (
+        _data_root()
+        / "users"
+        / value
+        / "profiles"
+        / "default"
+        / "sessions"
+        / "revocation"
+    )
 
 
 def _encode(payload: dict[str, Any]) -> str:
@@ -103,15 +124,42 @@ class SessionRevocationStore:
         marker = directory / "all.revoked"
         marker.write_text(str(int(time.time())), encoding="utf-8")
 
-    def is_revoked(self, session_id_value: str, user_id: str, issued_at: int | None = None) -> bool:
+    def is_revoked(
+        self,
+        session_id_value: str,
+        user_id: str,
+        issued_at: int | None = None,
+    ) -> bool:
         marker = self._marker(user_id, session_id_value)
         if marker.exists():
             return True
+
         all_marker = marker.parent / "all.revoked"
-        if not all_marker.exists() or issued_at is None:
+        if all_marker.exists() and issued_at is not None:
+            try:
+                if int(issued_at) <= int(
+                    all_marker.read_text(encoding="utf-8").strip()
+                ):
+                    return True
+            except (OSError, ValueError):
+                pass
+
+        legacy_scope = _legacy_user_scope(user_id)
+        if legacy_scope is None:
             return False
+
+        legacy_marker = legacy_scope / f"{session_id_value}.revoked"
+        if legacy_marker.exists():
+            return True
+
+        legacy_all_marker = legacy_scope / "all.revoked"
+        if not legacy_all_marker.exists() or issued_at is None:
+            return False
+
         try:
-            return int(issued_at) <= int(all_marker.read_text(encoding="utf-8").strip())
+            return int(issued_at) <= int(
+                legacy_all_marker.read_text(encoding="utf-8").strip()
+            )
         except (OSError, ValueError):
             return False
 
@@ -123,8 +171,10 @@ def session_id(token: str) -> str:
 def issue_session(account: dict[str, Any], *, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> str:
     email = str(account.get("email") or "").strip().lower()
     if not email:
-        raise ValueError("Google identity email is required")
-    user_id = str(account.get("sub") or account.get("id") or email).strip()
+        raise ValueError("identity email is required")
+    user_id = str(account.get("user_id") or account.get("sub") or account.get("id") or "").strip()
+    if not user_id:
+        user_id = "email:" + hashlib.sha256(email.encode("utf-8")).hexdigest()[:32]
     role = str(account.get("role") or "user").strip().lower()
     now = int(time.time())
     payload = {

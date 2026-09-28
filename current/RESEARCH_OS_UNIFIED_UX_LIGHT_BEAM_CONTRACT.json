@@ -1,0 +1,83 @@
+{
+  "contract_id": "research-os-unified-ux-light-beam-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "authority": "PLATFORM",
+  "purpose": "Single visual language for Research OS across Windows, Web, and iOS.",
+  "source_of_truth": "PLATFORM_UX_CONTRACT",
+  "visual_language": {
+    "mode": "DARK_FIRST",
+    "palette_family": "ANALOGOUS_BLUE_CYAN_INDIGO",
+    "effect": "UPWARD_LIGHT_BEAM",
+    "principle": "Dark surfaces remain dominant; light is reserved for focus, activity, capability and state."
+  },
+  "colors": {
+    "background": "#080C16",
+    "surface": "#101725",
+    "surface_low": "#0D1420",
+    "surface_high": "#1A2434",
+    "text_primary": "#E7EDF7",
+    "text_secondary": "#9AA8BB",
+    "outline": "#506176",
+    "primary": "#7DD3FC",
+    "secondary": "#A78BFA",
+    "blue": "#60A5FA",
+    "success": "#34D399",
+    "warning": "#FBBF24",
+    "error": "#F87171",
+    "info": "#60A5FA"
+  },
+  "light_beam": {
+    "primary": "#7DD3FC",
+    "runtime": "#60A5FA",
+    "intelligence": "#A78BFA",
+    "opacity_range": [0.08, 0.55],
+    "direction": "UPWARD",
+    "persistent_background_beam": false,
+    "allowed_states": ["FOCUS", "ACTIVE", "PROCESSING", "SUCCESS", "WARNING", "ERROR"]
+  },
+  "states": {
+    "IDLE": "NO_BEAM",
+    "FOCUS": "SUBTLE_GLOW",
+    "ACTIVE": "UPWARD_BEAM",
+    "PROCESSING": "ANIMATED_UPWARD_BEAM",
+    "SUCCESS": "SUCCESS_ACCENT",
+    "WARNING": "WARNING_ACCENT",
+    "ERROR": "ERROR_ACCENT"
+  },
+  "tokens": {
+    "page_padding": 20,
+    "section_gap": 16,
+    "panel_gap": 12,
+    "compact_radius": 14,
+    "panel_radius": 20,
+    "large_radius": 28,
+    "motion_fast_ms": 140,
+    "motion_standard_ms": 220
+  },
+  "surfaces": ["WINDOWS", "WEB", "IOS"],
+  "rules": [
+    "Platform owns the UX contract and design tokens.",
+    "Product surfaces consume the contract; they do not redefine primary colors.",
+    "Semantic state colors are reserved for their declared state.",
+    "Light-beam effects must not reduce text or control readability.",
+    "Legacy production UX that conflicts with this contract must be migrated or explicitly marked compatibility.",
+    "Visual regression is evidence, not release authority.",
+    "Accessibility verification is required before release."
+  ],
+  "legacy_policy": {
+    "ACTIVE": "MUST_CONFORM",
+    "MIGRATE": "MUST_CONFORM_BEFORE_RELEASE",
+    "DEPRECATED": "MUST_NOT_BE_NEW_PRODUCTION_SURFACE",
+    "COMPATIBILITY": "ALLOWED_ONLY_WITH_EXPLICIT_DECLARATION",
+    "UNKNOWN": "HOLD"
+  },
+  "release_requirements": [
+    "exact_target_revision",
+    "contract_binding",
+    "surface_matrix_binding",
+    "visual_evidence",
+    "accessibility_evidence",
+    "legacy_audit_evidence"
+  ]
+}

@@ -4,6 +4,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+try:
+    from provider_measurement import ProviderMeasurement
+except ModuleNotFoundError:
+    from tools.research_os_api.provider_measurement import ProviderMeasurement
+
 
 class ScaleProfile(str, Enum):
     ONE_CUBED = "1^3"
@@ -59,4 +64,5 @@ class FriendResponse:
     provider: str
     memory_items: int
     evidence_id: str
+    measurement: ProviderMeasurement | None = None
     metadata: dict[str, Any] = field(default_factory=dict)

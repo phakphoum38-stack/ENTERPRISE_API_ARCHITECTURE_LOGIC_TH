@@ -1,0 +1,393 @@
+{
+  "contract_id": "research-os-platform-governance-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Govern the growing Research OS platform by composing existing registries, contracts, dependency graph, architecture invariants, evidence lineage, and Final Gate without creating a second control plane.",
+  "canonical_sources": {
+    "virtual_workspace_contract": "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json",
+    "virtual_workspace_registry": "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+    "architecture_invariants": "current/ARCHITECTURE_INVARIANTS.md",
+    "platform_graph": "tools/platform_graph.py",
+    "product_surface_contract": "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json",
+    "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+    "unified_final_gate": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+    "final_gate_validator": "tools/validate_research_os_unified_final_gate.py",
+    "defect_control": "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+    "schedule_control": "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+    "risk_control": "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+    "change_impact_control": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+    "control_center_contract": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+    "universal_runner": "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
+    "runner_installation": "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
+    "self_reconciliation": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+    "self_reconciliation_engine": "tools/platform_self_reconciliation.py",
+    "platform_spine_engine": "tools/platform_spine.py",
+    "platform_spine_engine_contract": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+    "laravel_platform_contract": "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json",
+    "laravel_platform_validator": "tools/validate_research_os_laravel_platform.py"
+  },
+  "authority": {
+    "governance_mode": "DESCRIPTIVE_AND_VALIDATING",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE",
+    "must_not_create_duplicate_authority": true
+  },
+  "authority_domains": [
+    {
+      "domain": "navigation",
+      "canonical": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+      "role": "CANONICAL_REGISTRY"
+    },
+    {
+      "domain": "project_identity",
+      "canonical": "tools/project_registry.py",
+      "role": "CANONICAL_REGISTRY"
+    },
+    {
+      "domain": "workflow",
+      "canonical": "current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json",
+      "role": "EXPERIENCE_CONTRACT_OVER_EXISTING_ENGINE"
+    },
+    {
+      "domain": "evidence",
+      "canonical": "tools/lifecycle_evidence.py",
+      "role": "CANONICAL_EVIDENCE_PLANE"
+    },
+    {
+      "domain": "release",
+      "canonical": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+      "role": "SINGLE_RELEASE_AUTHORITY"
+    },
+    {
+      "domain": "control_center",
+      "canonical": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+      "role": "DESCRIPTIVE_READ_ONLY_PROJECTION"
+    },
+    {
+      "domain": "universal_runner",
+      "canonical": "tools/research_os_api/universal_runner.py",
+      "role": "CAPABILITY_AND_LIFECYCLE_COMPATIBILITY_ADAPTER"
+    },
+    {
+      "domain": "runner_installation",
+      "canonical": "tools/research_os_api/runner_installer.py",
+      "role": "VERIFIED_INSTALLATION_AND_BOOTSTRAP_ADAPTER"
+    },
+    {
+      "domain": "self_reconciliation",
+      "canonical": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+      "role": "BOUNDED_RECONCILIATION_AND_VALIDATION"
+    }
+  ],
+  "component_lifecycle": [
+    "PLANNED",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "HOLD",
+    "UNKNOWN",
+    "ACTIVE",
+    "DEPRECATED",
+    "RETIRED"
+  ],
+  "resolutions": [
+    "FOUND",
+    "PARTIAL",
+    "GAP",
+    "UNKNOWN",
+    "DRIFT"
+  ],
+  "risk_classes": [
+    "LOW",
+    "MEDIUM",
+    "HIGH",
+    "CRITICAL"
+  ],
+  "change_control": {
+    "required_fields": [
+      "change_id",
+      "target_components",
+      "affected_contracts",
+      "risk_class",
+      "blast_radius",
+      "required_gates"
+    ],
+    "hard_stop": [
+      "authority_escalation",
+      "duplicate_authority",
+      "dependency_cycle",
+      "contract_drift",
+      "navigation_drift",
+      "unknown_done",
+      "missing_evidence",
+      "stale_evidence",
+      "exact_sha_mismatch"
+    ],
+    "merge_rule": "Governance validation is evidence for review; FINAL_GATE remains the release authority."
+  },
+  "evidence_coverage": {
+    "required_dimensions": [
+      "identity",
+      "contract",
+      "dependency",
+      "implementation",
+      "test",
+      "evidence",
+      "provenance",
+      "gate"
+    ],
+    "unknown_is_not_pass": true,
+    "missing_is_not_pass": true,
+    "stale_is_not_pass": true
+  },
+  "invariants": [
+    "one_canonical_navigation_registry",
+    "one_release_authority",
+    "no_duplicate_runtime_or_queue_authority",
+    "observation_is_not_authorization",
+    "evidence_is_not_authority",
+    "unknown_is_not_done",
+    "exact_sha_identity",
+    "cross_project_isolation",
+    "conflict_stop_release_reconcile",
+    "history_is_immutable",
+    "self_reconciliation_is_bounded",
+    "deterministic_repair_only",
+    "protected_core_is_fail_closed",
+    "platform_spine_is_composition_only",
+    "lifecycle_transitions_are_forward_only",
+    "breaking_contracts_require_migration",
+    "health_is_not_authorization",
+    "high_impact_change_requires_simulation"
+  ],
+  "change_impact_rules": [
+    {
+      "match": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+      "components": [
+        "navigation",
+        "cross_platform_surface"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "apps/research_os_flutter/lib/src/features/",
+      "components": [
+        "product_surface"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix"
+      ]
+    },
+    {
+      "match": "tools/project_registry.py",
+      "components": [
+        "project_identity",
+        "project_scale",
+        "evidence"
+      ],
+      "gates": [
+        "project_scale",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/lifecycle_evidence.py",
+      "components": [
+        "evidence",
+        "provenance"
+      ],
+      "gates": [
+        "evidence_lineage",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/ARCHITECTURE_INVARIANTS.md",
+      "components": [
+        "architecture_governance"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+      "components": [
+        "release_governance"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "release_spine"
+      ]
+    },
+    {
+      "match": ".github/workflows/",
+      "components": [
+        "ci_governance"
+      ],
+      "gates": [
+        "workflow_integrity",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+      "components": [
+        "platform_governance"
+      ],
+      "gates": [
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+      "components": [
+        "defect_control"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+      "components": [
+        "schedule_control"
+      ],
+      "gates": [
+        "project_scale",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+      "components": [
+        "risk_control"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+      "components": [
+        "change_impact_control"
+      ],
+      "gates": [
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/platform_change_impact.py",
+      "components": [
+        "change_impact_control",
+        "platform_governance"
+      ],
+      "gates": [
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+      "components": [
+        "control_center",
+        "platform_controls"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "flutter_surface"
+      ]
+    },
+    {
+      "match": "tools/research_os_api/universal_runner.py",
+      "components": [
+        "universal_runner",
+        "memory_fabric"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/research_os_api/runner_installer.py",
+      "components": [
+        "runner_installation",
+        "universal_runner"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+      "components": [
+        "platform_governance",
+        "reconciliation",
+        "architecture_integrity"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/platform_self_reconciliation.py",
+      "components": [
+        "reconciliation",
+        "architecture_integrity",
+        "repair_safety"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "tools/platform_spine.py",
+      "components": [
+        "platform_spine_engine",
+        "platform_governance"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+      "components": [
+        "platform_spine_engine",
+        "platform_governance"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ]
+    },
+    {
+      "match": "apps/research_os_laravel/",
+      "components": [
+        "laravel_platform",
+        "platform_runtime_completion",
+        "api_management_platform"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate",
+        "release_spine"
+      ]
+    }
+  ]
+}

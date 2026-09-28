@@ -1,0 +1,72 @@
+{
+  "contract": "research-os-aeos-assurance-fabric/v1",
+  "status": "IMPLEMENTATION_DRAFT",
+  "purpose": "Open-ended assurance universe without a fixed maximum number of domains or controls.",
+  "model": {
+    "universes": "extensible",
+    "planes": "extensible",
+    "domains": "extensible",
+    "controls": "extensible",
+    "dimensions": "extensible",
+    "cells": "derived",
+    "failure_algebra": "actor x object x boundary x state x time x evidence x authority x dependency x environment x action x consequence",
+    "assurance_address_space": "domain x assurance_family x dimension x lifecycle"
+  },
+  "cell_formula": "universe x plane x domain x control x dimension x lifecycle",
+  "assurance_states": ["NOT_OBSERVED", "UNKNOWN", "VALID", "INVALID", "STALE", "CONFLICT", "QUARANTINED", "VERIFIED", "CERTIFIED"],
+  "hard_rules": [
+    "UNKNOWN never becomes PASS by coercion",
+    "NOT_OBSERVED never becomes PASS",
+    "STALE evidence never certifies current state",
+    "CONFLICT never certifies current state",
+    "UNCLASSIFIED never certifies current state",
+    "self_attestation is not independent evidence",
+    "evidence does not grant authority",
+    "verification does not equal certification",
+    "certification does not equal merge",
+    "merge does not equal completion",
+    "discovery does not equal authorization",
+    "main SHA change invalidates dependent evidence until rebound and reverified",
+    "new domains require contract and verification requirements",
+    "novel conditions require quarantine and forensic classification",
+    "independent evidence must not share an undisclosed common failure source",
+    "retries without new evidence cannot manufacture confidence",
+    "core trust anchors cannot be extended by autonomous execution",
+    "assurance controls cannot silently weaken the constitution",
+    "generated assurance addresses do not imply applicability or verification",
+    "generated assurance addresses cannot manufacture evidence or authority",
+    "unknown budget exhaustion blocks certification",
+    "mutation escape blocks certification",
+    "canary failure blocks certification",
+    "ungoverned bypass surfaces block certification"
+  ],
+  "required_control_fields": ["control_id", "domain", "risk", "scope", "evidence_requirements", "verification_modes", "failure_state", "recovery_strategy"],
+  "required_proof_chain": ["intent", "identity", "authority", "policy", "observation", "evidence", "provenance", "verification", "certification"],
+  "extension_policy": {
+    "backward_compatible_by_default": true,
+    "breaking_change_requires_governance": true,
+    "unknown_extension_quarantine": true,
+    "self_certification_forbidden": true,
+    "constitution_self_modification_forbidden": true,
+    "assurance_of_assurance_required": true
+  },
+  "artifacts": {
+    "global_universe": "current/AEOS_GLOBAL_ASSURANCE_UNIVERSE.json",
+    "universe_100x_contract": "current/AEOS_ASSURANCE_UNIVERSE_100X_CONTRACT.json",
+    "universe_100x_compiler": "tools/aeos_assurance_universe_compiler.py",
+    "failure_algebra": "tools/aeos_failure_algebra.py",
+    "novelty_firewall": "tools/aeos_novelty_firewall.py",
+    "assurance_of_assurance": "current/AEOS_ASSURANCE_OF_ASSURANCE_CONTRACT.json"
+  },
+  "coverage": {
+    "target": "open_ended",
+    "blind_spots_are_first_class": true,
+    "unknowns_are_first_class": true,
+    "assurance_debt_is_tracked": true,
+    "evidence_debt_is_tracked": true,
+    "risk_debt_is_tracked": true,
+    "verification_debt_is_tracked": true,
+    "governance_debt_is_tracked": true,
+    "novelty_debt_is_tracked": true
+  }
+}

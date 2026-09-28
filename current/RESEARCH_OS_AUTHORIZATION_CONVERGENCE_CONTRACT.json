@@ -1,0 +1,58 @@
+{
+  "contract_id": "research-os-auth-authorization-convergence-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Converge the existing Research OS identity and access authority chain without creating a new runtime, authorization authority, or navigation registry.",
+  "authority": {
+    "identity": "tools/research_os_api/api_auth.py",
+    "session": "tools/research_os_api/auth_session.py",
+    "identity_context": "tools/research_os_api/identity_context.py",
+    "authorization": "owner_special/research_os_friend/policy.py:OwnerPolicy",
+    "owner_experience": "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json",
+    "navigation": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+    "api_client": "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
+  },
+  "identity": {
+    "source": "/v1/auth/status",
+    "server_derived": true,
+    "client_may_override": false,
+    "missing_or_invalid_session": "DENY"
+  },
+  "authorization": {
+    "authority": "owner_special/research_os_friend/policy.py:OwnerPolicy",
+    "client_may_grant": false,
+    "client_may_override": false,
+    "ui_may_authorize": false,
+    "ui_may_execute": false,
+    "ui_may_approve": false,
+    "unknown_authorization": "DENY"
+  },
+  "owner": {
+    "role": "OWNER",
+    "highest_privilege": true,
+    "resource_or_scope_bound": false,
+    "authority_is_server_derived": true
+  },
+  "capability_convergence": {
+    "registry": "tools/control_center_capability_registry.py",
+    "navigation_metadata_only": true,
+    "google_sign_in": "HOLD",
+    "auth_capability_promotion_requires_proof": true,
+    "must_not_infer_permission": true
+  },
+  "execution": {
+    "existing_runtime_only": true,
+    "new_runtime_forbidden": true,
+    "authorization_inside_flutter_forbidden": true
+  },
+  "fail_closed": {
+    "unknown_identity": "DENY",
+    "invalid_session": "DENY",
+    "unknown_authorization": "DENY",
+    "unproven_capability": "HOLD"
+  },
+  "verification": {
+    "validator": "tools/validate_research_os_identity_access_wave1.py",
+    "test": "tools/test_validate_research_os_identity_access_wave1.py"
+  }
+}

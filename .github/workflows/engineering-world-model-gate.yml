@@ -1,0 +1,37 @@
+name: Engineering World Model Gate
+
+on:
+  pull_request:
+    paths:
+      - "current/ENGINEERING_WORLD_MODEL_SCHEMA.json"
+      - "current/ENGINEERING_WORLD_MODEL_FIXTURE.json"
+      - "tools/validate_engineering_world_model.py"
+      - "tools/test_validate_engineering_world_model.py"
+      - "docs/ENGINEERING_WORLD_MODEL.md"
+      - ".github/workflows/engineering-world-model-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "current/ENGINEERING_WORLD_MODEL_SCHEMA.json"
+      - "current/ENGINEERING_WORLD_MODEL_FIXTURE.json"
+      - "tools/validate_engineering_world_model.py"
+      - "tools/test_validate_engineering_world_model.py"
+      - "docs/ENGINEERING_WORLD_MODEL.md"
+      - ".github/workflows/engineering-world-model-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Validate canonical world model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate schema and fixture
+        run: python tools/validate_engineering_world_model.py
+      - name: Run regression tests
+        run: python -m unittest tools.test_validate_engineering_world_model -v

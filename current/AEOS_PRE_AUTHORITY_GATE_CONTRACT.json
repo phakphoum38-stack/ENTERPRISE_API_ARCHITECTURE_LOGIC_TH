@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0",
+  "contract": "AEOS_PRE_AUTHORITY_GATE",
+  "purpose": "Fail-closed gate between recovery/forensic assurance and owner authority.",
+  "required_fields": [
+    "gate_id",
+    "iteration_id",
+    "source_sha",
+    "required_waves",
+    "wave_results",
+    "holds",
+    "evidence_ids",
+    "provenance_verified",
+    "evidence_integrity_verified",
+    "scope_verified",
+    "root_cause_verified",
+    "independent_review_verified",
+    "assurance_self_check_verified",
+    "remaining_risks",
+    "remaining_assumptions",
+    "assurance_debt",
+    "decision"
+  ],
+  "decisions": ["BLOCKED", "HOLD", "READY_FOR_AUTHORITY"],
+  "ready_for_authority_requires": [
+    "all_required_waves_pass",
+    "no_open_hold",
+    "provenance_verified",
+    "evidence_integrity_verified",
+    "scope_verified",
+    "root_cause_verified",
+    "independent_review_verified",
+    "assurance_self_check_verified"
+  ],
+  "forbidden_decisions": {
+    "owner_approval": true,
+    "merge": true,
+    "self_certification": true
+  },
+  "fail_closed": true
+}

@@ -55,9 +55,46 @@ jobs:
         run: |
           $data="$env:RUNNER_TEMP\ResearchOSData"
           New-Item -ItemType Directory -Force -Path $data | Out-Null
+          $python=(Get-Command python -ErrorAction Stop).Source
+          Write-Host "PYTHON_EXE=$python"
+          $env:PYTHONPATH="$PWD"
+          & $python -m unittest tools.test_research_os_api_import_boundary -v
+          if($LASTEXITCODE -ne 0){throw "Research OS API import-boundary regression failed with exit code $LASTEXITCODE"}
+          Push-Location "$PWD\\tools\\research_os_api"
+          try {
+            & $python -u -c "import render_server; print('RENDER_SERVER_IMPORT=PASS')"
+            if($LASTEXITCODE -ne 0){throw "Research OS render_server import failed with exit code $LASTEXITCODE"}
+          } finally { Pop-Location }
+          $env:PYTHONUNBUFFERED='1'
           .\scripts\start-research-os-local.ps1 -DataDir $data -Provider mock -Port 8787 -Background
-          for($i=0;$i-lt 40;$i++){try{$h=Invoke-RestMethod 'http://127.0.0.1:8787/health' -TimeoutSec 2;if($h.status -eq 'ok'){Write-Host 'PORT_8787=PASS';return}}catch{};Start-Sleep -Milliseconds 500}
-          throw '8787 did not become ready'
+          $pidFile=Join-Path $data 'run\\research-os-api.pid'
+          $errLog=Join-Path $data 'logs\\research-os-api.err.log'
+          $outLog=Join-Path $data 'logs\\research-os-api.out.log'
+          if(-not (Test-Path $pidFile)){throw "API PID file was not created: $pidFile"}
+          $pidText=(Get-Content $pidFile -Raw).Trim()
+          $apiPid=0
+          if(-not [int]::TryParse($pidText,[ref]$apiPid)){throw "Invalid API PID file content: $pidText"}
+          Write-Host "API_PID=$apiPid"
+          for($i=0;$i-lt 40;$i++){
+            $process=Get-Process -Id $apiPid -ErrorAction SilentlyContinue
+            if(-not $process){
+              Write-Host '--- API STDOUT ---'
+              if(Test-Path $outLog){Get-Content $outLog -Tail 120}
+              Write-Host '--- API STDERR ---'
+              if(Test-Path $errLog){Get-Content $errLog -Tail 120}
+              throw "Research OS Local API exited before readiness. PID=$apiPid"
+            }
+            try{
+              $h=Invoke-RestMethod 'http://127.0.0.1:8787/health' -TimeoutSec 2
+              if($h.status -eq 'ok'){Write-Host 'PORT_8787=PASS';return}
+            }catch{}
+            Start-Sleep -Milliseconds 500
+          }
+          Write-Host '--- API STDOUT ---'
+          if(Test-Path $outLog){Get-Content $outLog -Tail 120}
+          Write-Host '--- API STDERR ---'
+          if(Test-Path $errLog){Get-Content $errLog -Tail 120}
+          throw '8787 did not become ready; captured API logs above.'
 
       - name: Start and execute actual V3 Master 8788 + 10x10
         shell: pwsh
@@ -68,17 +105,31 @@ jobs:
           $env:RESEARCH_OS_V3_HOST='127.0.0.1'
           $env:RESEARCH_OS_V3_PORT='8788'
           $env:PYTHONPATH="$PWD\v3"
-          python -c 'import research_os_v3.service as svc; print("V3_IMPORT=PASS"); print("V3_SERVICE=" + str(svc.__file__))'
-          if($LASTEXITCODE -ne 0){throw 'V3 service import failed'}
+          $python=Join-Path $env:pythonLocation 'python.exe'
+          if(-not (Test-Path $python)){throw "Python executable not found: $python"}
+          $pythonInfo=& $python -c 'import sys,platform; print("PYTHON_EXE=" + sys.executable); print("PYTHON_VERSION=" + platform.python_version()); print("PYTHON_ARCH=" + platform.machine())'
+          if($LASTEXITCODE -ne 0){throw "Exact Python runtime validation failed with exit code $LASTEXITCODE"}
+          $pythonInfo | ForEach-Object {Write-Host $_}
+          $importInfo=& $python -c 'import research_os_v3.service as svc; print("V3_IMPORT=PASS"); print("V3_SERVICE=" + str(svc.__file__))'
+          if($LASTEXITCODE -ne 0){throw "V3 service import failed with exit code $LASTEXITCODE"}
+          $importInfo | ForEach-Object {Write-Host $_}
           $out="$data\v3.out.log";$err="$data\v3.err.log"
           $launcher="$data\start-v3-master.py"
           @'
           import os
-          from pathlib import Path
           from v3.scripts.run_service import main
           raise SystemExit(main())
           '@ | Set-Content $launcher -Encoding utf8
-          $p=Start-Process python -ArgumentList @('v3/scripts/run_service.py') -WorkingDirectory $PWD -Environment @{PYTHONPATH="$PWD\v3";RESEARCH_OS_DATA_DIR=$data;RESEARCH_OS_V3_HOST='127.0.0.1';RESEARCH_OS_V3_PORT='8788'} -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          # Preserve the hosted runner environment. Supplying a partial -Environment map can
+          # replace the child environment and cause Windows DLL initialization failure (0xC0000142).
+          $childEnv=@{}
+          Get-ChildItem Env: | ForEach-Object { $childEnv[$_.Name]=$_.Value }
+          $childEnv['PYTHONPATH']="$PWD\v3"
+          $childEnv['RESEARCH_OS_DATA_DIR']=$data
+          $childEnv['RESEARCH_OS_V3_HOST']='127.0.0.1'
+          $childEnv['RESEARCH_OS_V3_PORT']='8788'
+          $childEnv['PYTHON_EXE']=$python
+          $p=Start-Process $python -ArgumentList @('-u','v3/scripts/run_service.py') -WorkingDirectory $PWD -Environment $childEnv -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
           $p.Id | Out-File "$env:RUNNER_TEMP\v3.pid" -Encoding ascii
           $ready=$false
           for($i=0;$i-lt 40;$i++){

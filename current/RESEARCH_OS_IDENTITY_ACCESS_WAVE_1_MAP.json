@@ -1,0 +1,41 @@
+{
+  "map_id": "research-os-identity-access-wave-1",
+  "version": 1,
+  "status": "ACTIVE",
+  "base_sha": "79b2a2f22ffdc11e97a29912a48b854bd1add37d",
+  "canonical_chain": [
+    "Identity",
+    "Capability",
+    "Policy",
+    "Authorization",
+    "Entitlement",
+    "Execution",
+    "Evidence"
+  ],
+  "existing_sources": {
+    "identity": "tools/research_os_api/api_auth.py",
+    "session": "tools/research_os_api/auth_session.py",
+    "identity_context": "tools/research_os_api/identity_context.py",
+    "policy": "owner_special/research_os_friend/policy.py",
+    "capability_registry": "tools/control_center_capability_registry.py",
+    "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+    "api_client": "apps/research_os_flutter/lib/src/api/research_os_api_client.dart"
+  },
+  "wave_1": {
+    "identity": "CONVERGED",
+    "session": "CONVERGED",
+    "authorization_boundary": "CONVERGED",
+    "owner_semantics": "CONVERGED",
+    "navigation_auth_capability": "HOLD",
+    "execution": "DELEGATED_TO_EXISTING_RUNTIME",
+    "evidence": "EXISTING_BOUNDARY"
+  },
+  "forbidden_changes": [
+    "create_new_authorization_authority",
+    "create_new_runtime",
+    "grant_permission_from_flutter",
+    "infer_permission_from_navigation",
+    "promote_google_sign_in_to_auth_capability_without_proof"
+  ],
+  "release_rule": "Only verified convergence evidence may be promoted from HOLD."
+}

@@ -1,0 +1,42 @@
+{
+  "policy_id": "P06-FIXTURE",
+  "policy_version": "1.0.0",
+  "policy_fingerprint": "3582e14a83e92b47245bda19d62f725d717da509fc7411f4c785cc5ee51e2e0b",
+  "lineage": {
+    "parent_contracts": ["EC-001", "IAC-001", "PEC-001"],
+    "purpose": "p0-06"
+  },
+  "rules": [
+    {
+      "rule_id": "R-AUTH-PROOF",
+      "risk_class": "high",
+      "required_evidence": ["identity_verified", "capability_verified", "authorization_proof"],
+      "approval_mode": "REQUIRED",
+      "on_unknown": "BLOCK",
+      "on_failure": "BLOCK"
+    },
+    {
+      "rule_id": "R-PROVENANCE",
+      "risk_class": "high",
+      "required_evidence": ["provenance_verified"],
+      "approval_mode": "REQUIRED",
+      "on_unknown": "BLOCK",
+      "on_failure": "BLOCK"
+    },
+    {
+      "rule_id": "R-NO-ESCALATION",
+      "risk_class": "high",
+      "required_evidence": ["scope_verified", "revocation_verified", "delegation_verified"],
+      "approval_mode": "REQUIRED",
+      "on_unknown": "BLOCK",
+      "on_failure": "BLOCK"
+    }
+  ],
+  "gates": [
+    {
+      "gate_id": "G-SENSITIVE-ACTION",
+      "rule_ids": ["R-AUTH-PROOF", "R-PROVENANCE", "R-NO-ESCALATION"],
+      "mode": "ALL"
+    }
+  ]
+}

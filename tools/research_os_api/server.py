@@ -6,8 +6,6 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import hashlib
-import hmac
 import mimetypes
 import os
 import sys
@@ -20,7 +18,9 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from api_auth import extract_session_token, require_session
-from auth_session import cookie_header, issue_session, verify_session
+from developer_identity import IdentityAssertionError
+from developer_identity_gateway import mint_developer_assertion
+from auth_session import clear_cookie_header, revoke_session, verify_session
 from conversation_store import (
     authorize as authorize_sync,
     delete_session as delete_cloud_session,
@@ -32,24 +32,53 @@ from github_status import GitHubStatusError, dashboard as github_dashboard
 from google_identity import GoogleIdentityBroker
 from google_oauth import GoogleOAuthBroker, GoogleOAuthError
 from google_workspace import GoogleWorkspaceConfig, get_google_workspace_dashboard
+from server_auth_routes import auth_provider_handoff
+from identity_providers import provider_catalog
+from identity_context import resolve_identity_context
 from memory import build_context, search_memory
+from multi_login import MultiLoginError, begin_login
+from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
+from oauth_handoff import consume_handoff
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# The API supports both repository-root module execution and direct execution
+# from tools/research_os_api (the latter is used by the Windows/local launcher).
+# Bootstrap the repository import boundary before importing Platform modules.
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+from tools.research_os_api.api_platform.management_http import ManagementHTTP
+from tools.research_os_api.api_platform.management_service import ManagementService
 from providers import ProviderError, build_provider
+from tools.platform_work_checkpoint import (
+    create_checkpoint,
+    list_checkpoints,
+    resume_checkpoint,
+)
+
+from tools.project_registry import ProjectRegistry
+from tools.project_scale_readiness import PROJECT_COUNT, build_project_definitions
+import copilot_service
 
 ROOT = Path(__file__).resolve().parents[2]
 CURATOR_PATH = ROOT / "tools" / "research_curator" / "curator.py"
 KNOWLEDGE_OPS_PATH = ROOT / "tools" / "research_curator" / "knowledge_ops.py"
 ARTIFACT_DIR = ROOT / "research" / "artifacts"
 WEB_DIR = ROOT / "apps" / "research_os_web"
-STATIC_ROUTES = {
-    "/": "index.html",
-    "/index.html": "index.html",
-    "/login": "login.html",
-    "/login.html": "login.html",
-    "/app.css": "app.css",
-    "/app.js": "app.js",
-    "/login.css": "login.css",
-}
+STATIC_ROUTES = {"/": "index.html", "/index.html": "index.html", "/app.css": "app.css", "/app.js": "app.js"}
 DEFAULT_GITHUB_REPOSITORY = "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH"
+
+_MANAGEMENT_SERVICE: ManagementService | None = None
+
+def _management_http() -> ManagementHTTP:
+    global _MANAGEMENT_SERVICE
+    if _MANAGEMENT_SERVICE is None:
+        _MANAGEMENT_SERVICE = ManagementService.from_env()
+    def authenticate(headers: Any) -> dict[str, Any] | None:
+        try:
+            return require_session(headers)
+        except ValueError:
+            return None
+    return ManagementHTTP(_MANAGEMENT_SERVICE, authenticate)
 
 
 def _load_module(name: str, path: Path):
@@ -68,17 +97,7 @@ FRIEND_OWNER_ID = os.getenv("RESEARCH_OS_FRIEND_OWNER", "owner")
 
 def _friend_chat(text: str, *, session_id: str | None = None, complexity: int = 3, risk: int = 1, parallelism: int = 2, helper_budget: int = 0) -> dict[str, Any]:
     payload = {"text": text, "complexity": max(1, int(complexity)), "risk": max(1, int(risk)), "parallelism": max(1, int(parallelism)), "helper_budget": max(0, int(helper_budget))}
-    request = urllib.request.Request(
-        f"{FRIEND_BASE_URL}/owner/chat",
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json; charset=utf-8",
-            "X-Research-OS-Owner": FRIEND_OWNER_ID,
-            "X-Research-OS-Profile": "default",
-            "X-Research-OS-Session": session_id or "main-api",
-        },
-        method="POST",
-    )
+    request = urllib.request.Request(f"{FRIEND_BASE_URL}/owner/chat", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers={"Content-Type": "application/json; charset=utf-8", "X-Research-OS-Owner": FRIEND_OWNER_ID, "X-Research-OS-Profile": "default", "X-Research-OS-Session": session_id or "main-api"}, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             value = json.loads(response.read().decode("utf-8"))
@@ -96,22 +115,43 @@ def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
 
 
-def _password_matches(username: str, password: str) -> bool:
-    configured_user = (os.getenv("RESEARCH_OS_LOGIN_USERNAME") or "").strip()
-    configured_hash = (os.getenv("RESEARCH_OS_LOGIN_PASSWORD_HASH") or "").strip()
-    salt = (os.getenv("RESEARCH_OS_LOGIN_PASSWORD_SALT") or "").strip()
-    if not configured_user or not configured_hash or not salt:
-        return False
-    derived = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), salt.encode("utf-8"), 210_000
-    ).hex()
-    return hmac.compare_digest(username, configured_user) and hmac.compare_digest(
-        derived, configured_hash
-    )
+def _project_registry_snapshot() -> dict[str, Any]:
+    registry = ProjectRegistry(build_project_definitions(1))
+    projects = [
+        {
+            "project_id": project.project_id,
+            "display_name": project.display_name,
+            "version": project.version,
+            "capabilities": list(project.capabilities),
+            "authorization_policy": project.authorization_policy,
+            "workflow_profile": project.workflow_profile,
+            "evidence_namespace": project.evidence_namespace,
+            "resource_policy": project.resource_policy,
+            "capability_namespace": project.capability_namespace,
+            "queue_namespace": project.queue_namespace,
+            "evidence_ledger": project.evidence_ledger,
+            "release_authority": project.release_authority,
+        }
+        for project in registry.all()
+    ]
+    return {
+        "projects": projects,
+        "configured_count": len(projects),
+        "supported_project_contexts": PROJECT_COUNT,
+        "scale_levels": [10, 20, 50, 100],
+        "shared_planes": {
+            "capability_registry": "SHARED_CAPABILITY_REGISTRY",
+            "queue": "SHARED_QUEUE",
+            "evidence_ledger": "SHARED_EVIDENCE_LEDGER",
+        },
+        "source": "ProjectRegistry",
+        "release_authority": "FINAL_GATE",
+        "execution_authority": "EXISTING_SHARED_EXECUTION_PLANE",
+    }
 
 
 class ResearchOSHandler(BaseHTTPRequestHandler):
-    server_version = "ResearchOSAPI/0.6"
+    server_version = "ResearchOSAPI/0.8"
 
     def _send(self, status: int, payload: Any) -> None:
         body = _json_bytes(payload)
@@ -131,16 +171,14 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_session(self, account: dict[str, Any]) -> None:
-        token = issue_session(account)
-        body = _json_bytes({"authenticated": True, "account": account})
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Set-Cookie", cookie_header(token, secure=False))
-        self.send_header("Content-Length", str(len(body)))
+    def _redirect(self, location: str, cookie: str | None = None) -> None:
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", location)
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
         self.end_headers()
-        self.wfile.write(body)
 
     def _send_static(self, filename: str) -> None:
         path = (WEB_DIR / filename).resolve()
@@ -172,10 +210,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
 
     def _authorize_sync_key(self) -> bool:
         if not sync_configured():
-            self._send(HTTPStatus.SERVICE_UNAVAILABLE, {
-                "error": "cloud_sync_not_configured",
-                "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using protected cloud operations.",
-            })
+            self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "cloud_sync_not_configured", "detail": "Set RESEARCH_OS_SYNC_KEY on the server before using protected cloud operations."})
             return False
         candidate = self.headers.get("X-Research-OS-Sync-Key")
         if not authorize_sync(candidate):
@@ -184,7 +219,6 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         return True
 
     def _authorize_cloud_sync(self) -> dict[str, Any] | None:
-        """Require both the server capability and the verified per-user session."""
         if not self._authorize_sync_key():
             return None
         try:
@@ -198,10 +232,34 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             return None
         return principal
 
+    def _multi_login_redirect(self, provider: str) -> str:
+        explicit = (os.getenv("RESEARCH_OS_LOGIN_REDIRECT_URI") or "").strip()
+        if explicit:
+            return explicit.rstrip("/") + f"/v1/auth/{provider}/callback"
+        public_base = (os.getenv("RESEARCH_OS_PUBLIC_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+        if public_base:
+            return f"{public_base}/v1/auth/{provider}/callback"
+        port = int(os.getenv("RESEARCH_OS_API_PORT", "8787"))
+        return f"http://127.0.0.1:{port}/v1/auth/{provider}/callback"
+
+    def _auth_status(self) -> dict[str, Any]:
+        token = extract_session_token(self.headers)
+        if not token:
+            return {"connected": False, "account": None}
+        try:
+            session = verify_session(token)
+        except ValueError:
+            return {"connected": False, "account": None}
+        return {"connected": True, "account": {"user_id": session["user_id"], "email": session["email"], "role": session["role"]}}
+
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
         path = parsed.path
         try:
+            if path.startswith("/platform/v1"):
+                status, payload = _management_http().dispatch("GET", self.path, self.headers)
+                self._send(status, payload)
+                return
             if path in STATIC_ROUTES:
                 self._send_static(STATIC_ROUTES[path])
                 return
@@ -212,29 +270,23 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     google_workspace_connected = bool(workspace.get("connected"))
                 except Exception:
                     pass
-                self._send(HTTPStatus.OK, {
-                    "status": "ok", "service": "research-os-api", "version": "0.6.0",
-                    "ui": WEB_DIR.is_dir(), "memory": True, "memory_commit": sync_configured(),
-                    "github": True, "cloud_sync": sync_configured(), "google_workspace": True,
-                    "google_workspace_connected": google_workspace_connected,
-                })
+                self._send(HTTPStatus.OK, {"status": "ok", "service": "research-os-api", "version": "0.8.0", "ui": WEB_DIR.is_dir(), "memory": True, "memory_commit": sync_configured(), "github": True, "cloud_sync": sync_configured(), "google_workspace": True, "google_workspace_connected": google_workspace_connected})
+                return
+            if path == "/v1/projects":
+                self._send(HTTPStatus.OK, _project_registry_snapshot())
                 return
             if path == "/v1/providers":
                 self._send(HTTPStatus.OK, {"providers": ["mock", "openai-compatible", "local", "anthropic", "gemini"], "active": os.getenv("RESEARCH_OS_PROVIDER", "mock")})
                 return
-            if path == "/v1/auth/google/status":
-                try:
-                    session = verify_session(extract_session_token(self.headers))
-                except (ValueError, RuntimeError):
-                    self._send(HTTPStatus.OK, GoogleIdentityBroker().status())
-                else:
-                    self._send(HTTPStatus.OK, {
-                        "connected": True,
-                        "account": {
-                            "email": session["email"],
-                            "role": str(session.get("role") or "user").upper(),
-                        },
-                    })
+            if path == "/v1/ai/connections":
+                from tools.research_os_ai_provider_connection import inspect
+                self._send(HTTPStatus.OK, inspect())
+                return
+            if path == "/v1/auth/providers":
+                self._send(HTTPStatus.OK, {"providers": provider_catalog()})
+                return
+            if path in {"/v1/auth/status", "/v1/auth/google/status"}:
+                self._send(HTTPStatus.OK, self._auth_status())
                 return
             if path == "/v1/auth/google/callback":
                 params = parse_qs(parsed.query)
@@ -248,8 +300,13 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                     raise ValueError("Google sign-in callback requires code and state")
                 result = GoogleIdentityBroker().complete(code=code, state=state)
                 email = ((result.get("account") or {}).get("email") or "Google account")
-                self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
+                self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window.</p></body></html>")
                 return
+            for provider in ("microsoft", "github"):
+                if path == f"/v1/auth/{provider}/callback":
+                    result, cookie = __import__("server_auth_routes").auth_callback(provider, parsed.query)
+                    self._redirect("/", cookie)
+                    return
             if path == "/v1/google-workspace/dashboard":
                 self._send(HTTPStatus.OK, get_google_workspace_dashboard())
                 return
@@ -270,6 +327,21 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 email = ((result.get("account") or {}).get("email") or "Google account")
                 self._send_html(HTTPStatus.OK, f"<html><body><h2>Research OS connected to Google Workspace</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
                 return
+            if path == "/v1/platform/work-checkpoints":
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                if not user_id:
+                    raise ValueError("verified session identity is incomplete")
+                params = parse_qs(parsed.query)
+                task_id = str(params.get("task_id", [""])[0]).strip() or None
+                records = list_checkpoints(user_id, task_id)
+                self._send(HTTPStatus.OK, {
+                    "checkpoints": records,
+                    "count": len(records),
+                    "source": "platform-work-checkpoint",
+                    "chat_is_not_source_of_truth": True,
+                })
+                return
             if path == "/v1/conversations/cloud":
                 principal = self._authorize_cloud_sync()
                 if principal is None:
@@ -282,10 +354,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 query = str(params.get("q", [""])[0]).strip()
                 if not query:
                     raise ValueError("q is required")
-                try:
-                    limit = int(params.get("limit", ["5"])[0])
-                except ValueError as exc:
-                    raise ValueError("limit must be an integer") from exc
+                limit = int(params.get("limit", ["5"])[0])
                 hits = search_memory(ARTIFACT_DIR, query, limit)
                 self._send(HTTPStatus.OK, {"query": query, "count": len(hits), "hits": hits, "source": "research/artifacts"})
                 return
@@ -297,16 +366,45 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 artifacts = knowledge_ops.load_all(ARTIFACT_DIR)
                 self._send(HTTPStatus.OK, knowledge_ops.graph_payload(artifacts))
                 return
+            if path == "/v1/copilot/context":
+                identity = resolve_identity_context(self.headers)
+                params = parse_qs(parsed.query)
+                query = str(params.get("query", [""])[0]).strip()
+                paths = params.get("path", [])
+                self._send(
+                    HTTPStatus.OK,
+                    copilot_service.build_copilot_context(
+                        identity,
+                        query=query,
+                        paths=paths,
+                        memory_limit=copilot_service.normalize_memory_limit(params.get("memory_limit", ["5"])[0]),
+                    ),
+                )
+                return
             if path == "/v1/github/dashboard":
                 params = parse_qs(parsed.query)
                 repository = str(params.get("repository", [os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY)])[0]).strip()
                 self._send(HTTPStatus.OK, github_dashboard(repository))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (ValueError, GoogleOAuthError) as exc:
+        except (ValueError, KeyError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except GitHubStatusError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
+        except Exception as exc:
+            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        path = urlsplit(self.path).path
+        try:
+            body = self._read_json()
+            if path.startswith("/platform/v1"):
+                status, payload = _management_http().dispatch("PATCH", self.path, self.headers, body)
+                self._send(status, payload)
+                return
+            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+        except (ValueError, KeyError) as exc:
+            self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
@@ -314,19 +412,112 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = self._read_json()
-            if path == "/v1/auth/login":
-                username = str(body.get("username") or "").strip()
-                password = str(body.get("password") or "")
-                if not username or not password or not _password_matches(username, password):
-                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "invalid_credentials", "detail": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"})
+            if path.startswith("/platform/v1"):
+                status, payload = _management_http().dispatch("POST", self.path, self.headers, body)
+                self._send(status, payload)
+                return
+            if path == "/v1/platform/work-checkpoints":
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                if not user_id:
+                    raise ValueError("verified session identity is incomplete")
+                payload = dict(body)
+                payload.pop("owner_id", None)
+                record = create_checkpoint(
+                    owner_id=user_id,
+                    task_id=str(payload.get("task_id", "")),
+                    workflow_state=str(payload.get("workflow_state", "")),
+                    current_step=str(payload.get("current_step", "")),
+                    completed_steps=payload.get("completed_steps"),
+                    pending_steps=payload.get("pending_steps"),
+                    evidence_refs=payload.get("evidence_refs"),
+                    deferred_work=payload.get("deferred_work"),
+                    context_refs=payload.get("context_refs"),
+                    next_action=str(payload.get("next_action", "recon")),
+                    source_sha=payload.get("source_sha"),
+                    supersedes=payload.get("supersedes"),
+                )
+                self._send(HTTPStatus.CREATED, {"checkpoint": record, "persisted": True, "chat_is_not_source_of_truth": True})
+                return
+            if path == "/v1/platform/work-checkpoints/resume":
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                if not user_id:
+                    raise ValueError("verified session identity is incomplete")
+                checkpoint_id = str(body.get("checkpoint_id", "")).strip()
+                if not checkpoint_id:
+                    raise ValueError("checkpoint_id is required")
+                self._send(HTTPStatus.OK, resume_checkpoint(user_id, checkpoint_id))
+                return
+            if path == "/v1/auth/providers/login":
+                provider = str(body.get("provider", "")).strip().lower()
+                if provider == "google":
+                    self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
                     return
-                self._send_session({"sub": username, "email": username, "role": "user"})
+                redirect_uri = self._multi_login_redirect(provider)
+                state, authorization_url = begin_runtime_login(provider, redirect_uri)
+                self._send(HTTPStatus.OK, {"provider": provider, "state": state, "authorization_url": authorization_url, "redirect_uri": redirect_uri, "token_storage": "backend_only"})
                 return
             if path == "/v1/auth/google/start":
                 self._send(HTTPStatus.OK, GoogleIdentityBroker().begin())
                 return
-            if path == "/v1/auth/google/signout":
-                self._send(HTTPStatus.OK, GoogleIdentityBroker().disconnect())
+            if path == "/v1/auth/providers/handoff":
+                handoff_state = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()
+                self._send(HTTPStatus.OK, auth_provider_handoff(handoff_state))
+                return
+            if path == "/v1/auth/developer/assertion":
+                token = extract_session_token(self.headers)
+                try:
+                    principal = verify_session(token)
+                except ValueError as exc:
+                    self._send(
+                        HTTPStatus.UNAUTHORIZED,
+                        {"error": "invalid_session", "detail": str(exc)},
+                    )
+                    return
+                try:
+                    assertion = mint_developer_assertion(principal)
+                except IdentityAssertionError as exc:
+                    message = str(exc)
+                    status = (
+                        HTTPStatus.SERVICE_UNAVAILABLE
+                        if "not configured" in message
+                        else HTTPStatus.UNAUTHORIZED
+                    )
+                    self._send(
+                        status,
+                        {"error": "developer_identity_unavailable", "detail": message},
+                    )
+                    return
+                self._send(HTTPStatus.OK, assertion)
+                return
+            if path == "/v1/auth/google/handoff":
+                handoff_code = str(self.headers.get("X-Research-OS-OAuth-State") or "").strip()
+                if not handoff_code:
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "oauth_handoff_required", "detail": "A one-time Google OAuth handoff state is required."})
+                    return
+                session = consume_handoff(GoogleIdentityBroker().root, handoff_code)
+                if not session:
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "oauth_handoff_invalid", "detail": "The Google OAuth handoff is missing, expired, or already consumed."})
+                    return
+                principal = verify_session(session)
+                self._send(HTTPStatus.OK, {"connected": True, "session": session, "account": {"user_id": principal["user_id"], "email": principal["email"], "role": principal["role"]}, "token_type": "research_os_session"})
+                return
+            if path in {"/v1/auth/signout", "/v1/auth/google/signout"}:
+                token = extract_session_token(self.headers)
+                if token:
+                    try:
+                        revoke_session(token)
+                    except ValueError:
+                        pass
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Set-Cookie", clear_cookie_header())
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                body_bytes = _json_bytes({"signed_out": True})
+                self.send_header("Content-Length", str(len(body_bytes)))
+                self.end_headers()
+                self.wfile.write(body_bytes)
                 return
             if path == "/v1/google-workspace/oauth/start":
                 self._send(HTTPStatus.OK, GoogleOAuthBroker().begin())
@@ -356,9 +547,9 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 principal = self._authorize_cloud_sync()
                 if principal is None:
                     return
-                session_id = str(body.get("session_id", "")).strip()
-                deleted = delete_cloud_session(session_id, user_id=str(principal["user_id"]))
-                self._send(HTTPStatus.OK, {"session_id": session_id, "deleted": deleted})
+                session_id_value = str(body.get("session_id", "")).strip()
+                deleted = delete_cloud_session(session_id_value, user_id=str(principal["user_id"]))
+                self._send(HTTPStatus.OK, {"session_id": session_id_value, "deleted": deleted})
                 return
             if path == "/v1/ai/generate":
                 prompt = str(body.get("prompt", "")).strip()
@@ -389,6 +580,10 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 friend = _friend_chat(f"{system}\n\n{prompt}", session_id=str(body.get("session_id") or "main-api-memory"), complexity=int(body.get("complexity", 3)), risk=int(body.get("risk", 1)), parallelism=int(body.get("parallelism", 2)), helper_budget=int(body.get("helper_budget", 0)))
                 self._send(HTTPStatus.OK, {"provider": friend.get("provider"), "model": "friend-unified-master", "text": friend.get("text", ""), "memory_hits": hits, "memory_count": len(hits), "session_id": body.get("session_id"), "route": "friend", "decision": friend.get("decision"), "factory": friend.get("factory"), "helpers": friend.get("helpers")})
                 return
+            if path == "/v1/copilot/chat":
+                identity = resolve_identity_context(self.headers)
+                self._send(HTTPStatus.OK, copilot_service.chat_with_copilot(identity, body))
+                return
             if path == "/v1/conversations/analyze":
                 self._send(HTTPStatus.OK, self._analyze_conversation(body))
                 return
@@ -398,10 +593,14 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, self._commit_memory(body))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (TypeError, ValueError, GoogleOAuthError) as exc:
+        except (TypeError, ValueError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except ProviderError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "provider_error", "detail": str(exc)})
+        except copilot_service.CopilotChatConfigError as exc:
+            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "copilot_config_error", "detail": str(exc)})
+        except copilot_service.CopilotChatError as exc:
+            self._send(HTTPStatus.BAD_GATEWAY, {"error": "copilot_error", "detail": str(exc)})
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
@@ -468,10 +667,9 @@ def main() -> int:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        pass
+        return 0
     finally:
         server.server_close()
-    return 0
 
 
 if __name__ == "__main__":

@@ -1,0 +1,91 @@
+{
+  "contract_id": "research-os-universal-runner-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical contract for the existing stateless Runner execution boundary as a universal host for platform-specific capabilities, resources, boot profiles, and runtime lifecycles.",
+  "authority": {
+    "type": "DESCRIPTIVE_AND_COMPATIBILITY",
+    "creates_runtime_authority": false,
+    "creates_scheduler": false,
+    "creates_queue": false,
+    "creates_authorization_authority": false,
+    "creates_evidence_authority": false,
+    "creates_release_authority": false,
+    "unified_final_gate_remains_release_authority": true
+  },
+  "existing_execution_boundary": {
+    "runner": "v3/research_os_v3/runner.py",
+    "worker_pool": "v3/worker_pool.py",
+    "queue": "v3/research_os_v3/queue.py",
+    "rule": "Workflow Engine and Queue deliver work to the existing stateless Runner; this contract does not create a direct Engine-to-Runner invocation path."
+  },
+  "runner_model": {
+    "kind": "UNIVERSAL_EXECUTION_HOST",
+    "stateless_execution": true,
+    "platform_specific_implementation_allowed": true,
+    "profile_driven_boot": true,
+    "capability_discovery_required": true,
+    "resource_discovery_required": true,
+    "unknown_capability_is_not_available": true
+  },
+  "lifecycle": {
+    "canonical_states": ["CREATED","BOOTING","DISCOVERING","INITIALIZING","PROVISIONING","READY","EXECUTING","RECOVERING","DRAINING","DRAINED","STOPPING","STOPPED","FAILED"],
+    "optional_states": ["DISCOVERING","INITIALIZING","PROVISIONING","RECOVERING"],
+    "rules": [
+      "a profile may skip optional lifecycle phases",
+      "boot completion does not imply execution entitlement",
+      "draining rejects new work while accepted work may finish",
+      "shutdown preserves existing queue lease and recovery semantics",
+      "failed boot must not advertise READY"
+    ]
+  },
+  "boot_profiles": {
+    "required_fields": ["profile_id","platform","required_capabilities","phases"],
+    "phase_vocabulary": ["BOOT","DISCOVER","INITIALIZE","PROVISION","READY"],
+    "examples": ["native-host","windows-toolchain","linux-container","flutter-toolchain","research-python"],
+    "rule": "profiles describe environment preparation; they do not grant authorization"
+  },
+  "execution_profiles": {
+    "required_fields": ["profile_id","platform","capabilities","resource_requirements"],
+    "resource_families": ["CPU","RAM","NVME","GPU","VRAM","NETWORK","FILESYSTEM","PROCESS","TOOLCHAIN"],
+    "future_resource_families": ["NUMA","CXL_MEMORY","REMOTE_MEMORY"]
+  },
+  "host_resources": {
+    "cpu": {
+      "kind": "COMPUTE",
+      "detectable_fields": ["architecture","logical_cpus","physical_cores","frequency_hz","utilization"],
+      "unknown_allowed": true
+    },
+    "ram": {
+      "kind": "MEMORY_T1_DRAM",
+      "detectable_fields": ["total_bytes","available_bytes","used_bytes","utilization","pressure"],
+      "unknown_allowed": true
+    },
+    "nvme": {
+      "kind": "MEMORY_T2_STORAGE_BACKED",
+      "canonical_contract": "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json",
+      "must_not_be_described_as_dram": true
+    }
+  },
+  "isolation": {
+    "project_scoped_execution_context": true,
+    "cross_project_resource_claims_forbidden": true,
+    "cross_project_cache_forbidden": true,
+    "cross_project_evidence_forbidden": true,
+    "resource_conflict_policy": "REJECT_ON_CONFLICT"
+  },
+  "security": {
+    "runner_does_not_authorize": true,
+    "runner_does_not_grant_capability": true,
+    "runner_does_not_change_entitlement": true,
+    "runner_does_not_merge": true,
+    "runner_does_not_release": true
+  },
+  "observability": ["runner_identity","platform","architecture","lifecycle_state","boot_profile","execution_profile","capabilities","resource_snapshot","lease_identity","health"],
+  "compatibility": {
+    "contract_version_must_be_pinned": true,
+    "unknown_profile_is_not_compatible": true,
+    "unknown_resource_capability_is_not_available": true,
+    "stale_evidence_must_not_certify_runner_readiness": true
+  }
+}

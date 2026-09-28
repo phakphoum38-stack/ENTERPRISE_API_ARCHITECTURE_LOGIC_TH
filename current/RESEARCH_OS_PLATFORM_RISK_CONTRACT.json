@@ -1,0 +1,31 @@
+{
+  "contract_id": "research-os-platform-risk-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical risk and exception metadata contract for platform and project governance without creating a second assurance authority.",
+  "authority": {
+    "descriptive_only": true,
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "risk_classes": ["LOW","MEDIUM","HIGH","CRITICAL"],
+  "lifecycle": ["IDENTIFIED","ASSESSED","MITIGATING","MONITORED","ACCEPTED","ESCALATED","CLOSED","DEFERRED"],
+  "required_fields": ["risk_id","scope","risk_class","status","description","affected_components","mitigation","evidence_refs","owner"],
+  "rules": [
+    "risk_is_not_a_defect",
+    "accepted_risk_requires_explicit_evidence",
+    "unknown_risk_is_not_low",
+    "risk_does_not_grant_release_authority",
+    "reuse_existing_assurance_and_evidence_planes",
+    "final_gate_remains_single_release_authority"
+  ],
+  "integration": {
+    "governance": "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "evidence": "existing canonical evidence plane",
+    "release": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+  }
+}

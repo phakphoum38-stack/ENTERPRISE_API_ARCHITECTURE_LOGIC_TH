@@ -1,0 +1,18 @@
+diff --git a/owner_special/research_os_friend/mission_control_final_gate_contract.py b/owner_special/research_os_friend/mission_control_final_gate_contract.py
+new file mode 100644
+---
++Read-only contract checker between Mission Control 4G readiness and the authoritative Final Gate.
++Requires the canonical readiness schema, VERIFIED build identity, READY_FOR_FINAL_GATE status,
++complete PASSED required gates, and projection-only authority boundaries. Fails closed on unsafe,
++oversized, malformed, or action-bearing input. Produces no release/approve/dispatch authority.
++
++diff --git a/owner_special/tests/test_mission_control_final_gate_contract.py b/owner_special/tests/test_mission_control_final_gate_contract.py
++new file mode 100644
++---
+++Covers valid contract input, non-ready status, identity conflicts, missing/failed gates, action
+++authority leakage, secret-like values, immutability, determinism, and schema rejection.
++
++diff --git a/evidence/mission-control/phase4h-final-gate-readiness-contract.json b/evidence/mission-control/phase4h-final-gate-readiness-contract.json
++new file mode 100644
++---
+++Bound Phase 4H evidence declaring CI verification pending and Final Gate as authoritative.

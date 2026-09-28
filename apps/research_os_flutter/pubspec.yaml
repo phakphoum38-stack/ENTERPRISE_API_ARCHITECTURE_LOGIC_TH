@@ -1,7 +1,7 @@
 name: research_os_flutter
 description: Cross-platform Flutter home for Research OS.
 publish_to: "none"
-version: 2.0.0-rc.1+1
+version: 3.0.0
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -9,9 +9,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  research_os_contracts:
+    path: ../../packages/research_os_contracts
   flutter_markdown: ^0.7.3
+  flutter_tts: ^4.2.5
   http: ^1.2.2
   shared_preferences: ^2.5.3
+  speech_to_text: ^7.4.0
   url_launcher: ^6.3.1
 
 dev_dependencies:

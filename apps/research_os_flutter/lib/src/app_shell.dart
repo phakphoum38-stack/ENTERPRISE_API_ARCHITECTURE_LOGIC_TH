@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'api/research_os_api_client.dart';
 import 'features/agents/agent_center_page.dart';
+import 'features/auth/google_login_page.dart';
 import 'features/brain_skills/brain_skills_page.dart';
-import 'features/chat/chat_page.dart';
+import 'features/chat/voice_conversation_page.dart';
+import 'features/control_center/native_control_center_page.dart';
 import 'features/developer_access/developer_access_page.dart';
+import 'features/friend/friend_connect_page.dart';
 import 'features/github/github_dashboard_page.dart';
 import 'features/google_workspace/google_workspace_page.dart';
 import 'features/graph/knowledge_graph_page.dart';
@@ -12,8 +15,12 @@ import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
 import 'features/local_api/local_api_control_page.dart';
 import 'features/monitor/system_monitor_page.dart';
+import 'features/owner/owner_experience_page.dart';
+import 'features/workflows/workflow_experience_page.dart';
+import 'features/projects/project_experience_page.dart';
 import 'features/settings/settings_page.dart';
 import 'ui/enterprise_navigation.dart';
+import 'ui/research_os_sidebar_v2.dart';
 
 class ResearchOSAppShell extends StatefulWidget {
   const ResearchOSAppShell({
@@ -38,8 +45,8 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
   bool _sidebarExpanded = false;
 
   List<Widget> get _pages => <Widget>[
-        HomePage(apiClient: widget.apiClient),
-        ChatPage(apiClient: widget.apiClient),
+        HomePage(apiClient: widget.apiClient, onNavigate: _select),
+        VoiceConversationPage(apiClient: widget.apiClient),
         AgentCenterPage(apiClient: widget.apiClient),
         LibraryPage(apiClient: widget.apiClient),
         KnowledgeGraphPage(apiClient: widget.apiClient),
@@ -56,6 +63,15 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
         ),
         DeveloperAccessPage(),
         BrainSkillsPage(apiClient: widget.apiClient),
+        GoogleLoginPage(apiClient: widget.apiClient),
+        FriendConnectPage(apiClient: widget.apiClient),
+        ProjectExperiencePage(apiClient: widget.apiClient),
+        WorkflowExperiencePage(apiClient: widget.apiClient),
+        NativeControlCenterPage(
+          apiClient: widget.apiClient,
+          onNavigate: _select,
+        ),
+        OwnerExperiencePage(apiClient: widget.apiClient),
       ];
 
   void _select(int index) => setState(() => _selectedIndex = index);
@@ -73,96 +89,36 @@ class _ResearchOSAppShellState extends State<ResearchOSAppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final current = researchNavigationItems
-        .firstWhere((item) => item.index == _selectedIndex);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth >= 920) {
-          return Scaffold(
-            body: SafeArea(
-              child: Stack(
+    // The product UI is canonical and shared across Windows, Web and iOS.
+    // Platform runners/shells provide the host boundary; they do not own a
+    // second product UI or navigation surface.
+    return Scaffold(
+      body: SafeArea(
+        child: Row(
+          children: <Widget>[
+            ResearchOSSidebarV2(
+              expanded: _sidebarExpanded,
+              selectedIndex: _selectedIndex,
+              onToggle: _toggleSidebar,
+              onSelected: _selectFromSidebar,
+            ),
+            Expanded(
+              child: Column(
+                key: const Key('desktop-content-pane'),
                 children: <Widget>[
-                  Positioned.fill(
-                    left: ResearchSidebar.compactWidth,
-                    child: SizedBox.expand(
-                      key: const Key('desktop-content-pane'),
-                      child: Column(
-                        children: <Widget>[
-                          Expanded(
-                            child: IndexedStack(
-                              index: _selectedIndex,
-                              children: _pages,
-                            ),
-                          ),
-                          const ResearchStatusBar(),
-                        ],
-                      ),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: _pages,
                     ),
                   ),
-                  if (_sidebarExpanded)
-                    Positioned.fill(
-                      left: ResearchSidebar.expandedWidth,
-                      child: GestureDetector(
-                        key: const Key('desktop-sidebar-dismiss'),
-                        behavior: HitTestBehavior.translucent,
-                        onTap: _toggleSidebar,
-                      ),
-                    ),
-                  Positioned(
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    child: Material(
-                      elevation: _sidebarExpanded ? 12 : 0,
-                      shadowColor: Theme.of(context).shadowColor,
-                      shape: Border(
-                        right: BorderSide(color: Theme.of(context).dividerColor),
-                      ),
-                      child: ResearchSidebar(
-                        expanded: _sidebarExpanded,
-                        selectedIndex: _selectedIndex,
-                        onToggle: _toggleSidebar,
-                        onSelected: _selectFromSidebar,
-                      ),
-                    ),
-                  ),
+                  const ResearchStatusBar(),
                 ],
               ),
             ),
-          );
-        }
-
-        return Scaffold(
-          drawer: ResearchMobileDrawer(
-            selectedIndex: _selectedIndex,
-            onSelected: (index) {
-              Navigator.of(context).pop();
-              _select(index);
-            },
-          ),
-          appBar: AppBar(
-            titleSpacing: 0,
-            title: Row(
-              children: <Widget>[
-                const ResearchBrandMark(compact: true),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(current.label, overflow: TextOverflow.ellipsis),
-                ),
-              ],
-            ),
-            actions: <Widget>[
-              IconButton(
-                tooltip: 'System Monitor',
-                onPressed: () => _select(8),
-                icon: const Icon(Icons.monitor_heart_outlined),
-              ),
-            ],
-          ),
-          body: IndexedStack(index: _selectedIndex, children: _pages),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

@@ -27,7 +27,7 @@ services:
     runtime: python
     plan: free
     autoDeploy: false
-    buildCommand: python -m unittest tools.research_os_api.test_developer_identity tools.research_os_api.test_developer_access -v
+    buildCommand: python -m unittest tools.research_os_api.test_developer_identity tools.research_os_api.test_developer_identity_gateway tools.research_os_api.test_developer_access -v
     startCommand: cd tools/research_os_api && python developer_server.py
     healthCheckPath: /health
     envVars:

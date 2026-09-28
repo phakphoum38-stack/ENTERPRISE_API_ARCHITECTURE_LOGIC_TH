@@ -1,0 +1,71 @@
+{
+  "contract_id": "research-os-capability-convergence-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Bind only proven capability identities to the single canonical Research OS navigation registry while keeping authorization and execution outside Flutter.",
+  "authority": {
+    "platform_matrix": "docs/RESEARCH_OS_SYSTEM_PLATFORM_MATRIX.md",
+    "product_surface_inventory": "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json",
+    "owner_experience": "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json",
+    "backend_capability_registry": "tools/control_center_capability_registry.py",
+    "navigation_registry": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart"
+  },
+  "rules": [
+    "navigation_registry_remains_single_source_of_truth",
+    "capability_id_is_identity_metadata_only",
+    "authorization_remains_outside_flutter",
+    "execution_remains_delegated_to_existing_runtime_or_executor",
+    "unknown_capability_binding_is_hold",
+    "owner_identity_is_server_derived_and_unbounded_by_resource_or_scope",
+    "no_new_runtime",
+    "no_new_authorization_authority",
+    "no_new_navigation_registry"
+  ],
+  "bindings": [
+    {
+      "destination_id": "agent_center",
+      "capability_id": "agent",
+      "authority": "backend_capability_registry",
+      "status": "BOUND"
+    },
+    {
+      "destination_id": "github",
+      "capability_id": "github",
+      "authority": "backend_capability_registry",
+      "status": "BOUND"
+    },
+    {
+      "destination_id": "friend_connect",
+      "capability_id": "friend",
+      "authority": "backend_capability_registry",
+      "status": "BOUND"
+    },
+    {
+      "destination_id": "workflows",
+      "capability_id": "factory_v3",
+      "authority": "backend_capability_registry",
+      "status": "BOUND"
+    },
+    {
+      "destination_id": "control_center",
+      "capability_id": "control_center",
+      "authority": "backend_capability_registry",
+      "status": "BOUND"
+    },
+    {
+      "destination_id": "owner",
+      "capability_id": "owner",
+      "authority": "owner_experience_contract",
+      "status": "BOUND"
+    }
+  ],
+  "unbound_policy": {
+    "status": "HOLD",
+    "reason": "No canonical capability identity and complete authorization/evidence binding has been proven for the destination yet.",
+    "must_not_infer_permission": true
+  },
+  "verification": {
+    "validator": "tools/validate_research_os_capability_convergence.py",
+    "test": "tools/test_validate_research_os_capability_convergence.py"
+  }
+}

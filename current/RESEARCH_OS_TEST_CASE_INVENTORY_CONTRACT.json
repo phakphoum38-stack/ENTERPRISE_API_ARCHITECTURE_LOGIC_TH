@@ -1,0 +1,9 @@
+{
+  "contract_id":"research-os-test-case-inventory-v1",
+  "version":1,
+  "status":"ACTIVE",
+  "purpose":"Discover the real repository test-case population using a flexible 13,000-14,000 target band without fabricating a count or replacing existing test runners.",
+  "target_band":{"min":13000,"max":14000},
+  "required_properties":{"exact_source_sha":true,"test_file_inventory":true,"test_case_discovery":true,"python_ast_discovery":true,"dart_test_invocation_discovery":true,"execution_is_separate_evidence":true,"unknown_is_not_pass":true,"deferred_is_not_done":true,"no_duplicate_test_runner":true,"no_new_release_authority":true},
+  "authority":{"inventory_is_descriptive_only":true,"release_authority":"FINAL_GATE"}
+}

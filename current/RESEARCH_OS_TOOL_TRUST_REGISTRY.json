@@ -1,0 +1,38 @@
+{
+  "schema": "research-os-tool-trust-registry/v1",
+  "purpose": "Describe consequential tooling without granting authority",
+  "trust_fields": [
+    "tool_id",
+    "tool_name",
+    "version_or_ref",
+    "purpose",
+    "authority_boundary",
+    "invocation_contract",
+    "expected_outputs",
+    "evidence_outputs",
+    "known_failure_modes",
+    "verification_method",
+    "status"
+  ],
+  "registered_tool_classes": [
+    "git",
+    "github",
+    "github_actions",
+    "gh_cli",
+    "flutter",
+    "dart",
+    "python",
+    "dotnet",
+    "powershell",
+    "aeos_validators",
+    "evidence_artifacts",
+    "forensic_verifiers",
+    "release_tooling"
+  ],
+  "rules": {
+    "tool_metadata_does_not_grant_authority": true,
+    "unknown_tool_state_is_untrusted": true,
+    "tool_version_drift_requires_reverification": true,
+    "tool_failure_must_preserve_evidence": true
+  }
+}

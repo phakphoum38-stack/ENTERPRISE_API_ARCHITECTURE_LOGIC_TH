@@ -1,0 +1,18 @@
+{
+  "schema": "research-os-authority-packet/v1",
+  "change": "PR-403",
+  "exact_sha": "a18fd8266e6de83c9dc0206c828ec65b7e33533b",
+  "base_sha": "836229ed5337eca3a675ce1824e9386571a8bd01",
+  "protected_baseline": "565ab068d5a1540ea799b594ff031ba003e068af",
+  "changed_files": 6,
+  "deletions": 0,
+  "independent_review": {"status":"PASS","review_id":"5193240120"},
+  "ci_evidence": {"status":"PASS","workflow_runs":[34797290633,34796918257,34796918260,34796918252,34796918240,34796918241,34796918250,34796918221,34796918242,34796918234]},
+  "provenance": {"protected_baseline_touched":false,"history_rewrite":false},
+  "forensic_result":"PASS_FOR_ARCHITECTURE_CONTRACT_SCOPE_OPERATIONAL_CERTIFICATION_DEFERRED",
+  "remaining_risks":["Continuity execution evidence is future work","This packet does not itself grant Owner approval or merge authorization"],
+  "recommended_decision":"APPROVE",
+  "authority_boundary":{"autobot_may_prepare":true,"autobot_may_recommend":true,"autobot_may_approve":false,"autobot_may_merge":false},
+  "owner_authority_required":true,
+  "fail_closed":true
+}

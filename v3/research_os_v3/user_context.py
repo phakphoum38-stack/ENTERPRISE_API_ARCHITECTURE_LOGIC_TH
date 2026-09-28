@@ -20,7 +20,14 @@ def _validate_identifier(value: str, *, field: str) -> str:
 
 
 def safe_local_user_id(raw: str) -> str:
-    """Return a deterministic storage-safe ID for a local OS account name."""
+    """Return a deterministic storage-safe ID for a local OS account name.
+
+    This is intentionally local-only. OAuth/provider canonical identities such as
+    ``google:123`` belong to the Research OS identity boundary and must use the
+    canonical filesystem mapping in ``tools.research_os_api.identity_storage``
+    when they cross into filesystem-backed API persistence. Do not reuse this
+    helper as a second provider-identity storage-key implementation.
+    """
     candidate = raw.strip()
     if _ID_PATTERN.fullmatch(candidate) and candidate not in {".", ".."}:
         return candidate

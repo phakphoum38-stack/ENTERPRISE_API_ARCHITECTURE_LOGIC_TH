@@ -1,0 +1,53 @@
+{
+  "contract_id": "research-os-platform-runtime-readiness-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical fail-closed readiness state machine for the shared Research OS runtime boundary.",
+  "authority": {
+    "may_start_process": false,
+    "may_schedule": false,
+    "may_authorize": false,
+    "may_execute": false,
+    "may_release": false,
+    "may_reconcile_delivery": false,
+    "release_authority": "FINAL_GATE",
+    "evidence_is_authority": false
+  },
+  "states": [
+    "PROCESS_START",
+    "DEPENDENCY_READY",
+    "IMPORT_READY",
+    "LISTENER_READY",
+    "HEALTH_OK",
+    "READY"
+  ],
+  "transitions": [
+    ["PROCESS_START", "DEPENDENCY_READY"],
+    ["DEPENDENCY_READY", "IMPORT_READY"],
+    ["IMPORT_READY", "LISTENER_READY"],
+    ["LISTENER_READY", "HEALTH_OK"],
+    ["HEALTH_OK", "READY"]
+  ],
+  "rules": {
+    "must_start_at_process_start": true,
+    "must_end_at_ready": true,
+    "unknown_state": "STOP",
+    "invalid_transition": "STOP",
+    "health_required_before_ready": true,
+    "source_sha_required": true,
+    "correlation_id_required": true,
+    "evidence_is_projection_only": true,
+    "existing_shared_runtime_remains_authoritative": true,
+    "queue_remains_execution_boundary": true,
+    "stateless_runner_remains_execution_boundary": true
+  },
+  "failure_capture": {
+    "required_before_retry": true,
+    "capture_stdout": true,
+    "capture_stderr": true,
+    "capture_exit_code": true,
+    "capture_process_identity": true,
+    "retry_requires_reverification": true,
+    "recovery_requires_evidence": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "contract_id": "research-os-native-command-routing-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Provide one canonical, bounded command-routing boundary from the Native Control Center to existing capability executors without creating a second runtime or authority system.",
+  "root_ref": "current/MATHEMATICAL_ROOT_CONTRACT.json",
+  "control_ref": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+  "capability_registry_ref": "tools/control_center_capability_registry.py",
+  "lifecycle": ["INTENT", "VALIDATE", "PREPARE", "AUTHORIZE", "EXECUTE", "OBSERVE", "EVIDENCE", "COMPLETE", "RECOVER"],
+  "modes": ["LIVE", "SIMULATION", "DRY_RUN", "REPLAY"],
+  "initial_action_class": "READ_ONLY",
+  "rules": ["command_is_not_execution", "router_is_not_authority", "router_is_not_scheduler", "router_is_not_runtime", "existing_executor_remains_authoritative", "human_authorization_is_required_for_mutation", "unknown_capability_is_rejected", "unknown_executor_is_rejected", "simulation_never_executes", "history_is_preserved", "provenance_is_preserved"],
+  "bounds": {"max_arguments": 32, "max_command_length": 512, "max_result_items": 100}
+}

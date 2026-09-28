@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "status": "CANONICAL",
+  "contract_id": "IAC-001",
+  "version": "1.0.0",
+  "constitution_dependency": "current/ENGINEERING_CONSTITUTION.json",
+  "principles": [
+    "stable_identity",
+    "explicit_capability",
+    "least_privilege",
+    "explicit_delegation",
+    "fail_closed_revocation",
+    "separation_of_duties",
+    "sandbox_boundary",
+    "proof_before_sensitive_action"
+  ],
+  "identity_types": ["human", "agent", "service", "workflow"],
+  "identity_requirements": {
+    "required_fields": ["id", "type", "status", "created_at", "issuer"],
+    "statuses": ["active", "suspended", "revoked", "retired"],
+    "id_must_be_stable": true,
+    "revoked_identity_must_fail_closed": true
+  },
+  "capability_schema": {
+    "required_fields": ["id", "action", "resource", "scope", "risk_class"],
+    "risk_classes": ["low", "medium", "high"],
+    "scope_must_be_explicit": true,
+    "wildcard_scope_allowed": false
+  },
+  "grant_schema": {
+    "required_fields": ["id", "subject_id", "capability_id", "scope", "granted_by", "valid_from", "status"],
+    "statuses": ["active", "suspended", "revoked", "expired"],
+    "subject_must_not_grant_to_self": true,
+    "grantor_must_be_authorized": true,
+    "scope_must_not_exceed_capability": true
+  },
+  "delegation_schema": {
+    "required_fields": ["id", "delegator_id", "delegatee_id", "capability_id", "scope", "valid_from", "valid_until", "status"],
+    "status_values": ["active", "revoked", "expired"],
+    "delegation_must_be_explicit": true,
+    "delegation_must_be_time_bounded": true,
+    "delegation_cannot_escalate": true,
+    "revoked_delegator_cannot_delegate": true
+  },
+  "revocation_schema": {
+    "required_fields": ["id", "subject_id", "reason", "revoked_by", "revoked_at"],
+    "revocation_is_fail_closed": true,
+    "revoked_subject_has_no_effective_grants": true
+  },
+  "separation_of_duties": {
+    "enabled": true,
+    "rules": [
+      {"id":"SOD-001","action_class":"high_risk","proposer_must_differ_from_approver":true},
+      {"id":"SOD-002","action_class":"authority_change","grantor_must_differ_from_subject":true}
+    ]
+  },
+  "sandbox": {
+    "agent_execution_requires_granted_capability": true,
+    "resource_scope_required": true,
+    "network_scope_required_for_network_actions": true,
+    "filesystem_scope_required_for_filesystem_actions": true,
+    "denied_by_default": true
+  },
+  "authorization_proof": {
+    "required_fields": ["proof_id", "request_id", "subject_id", "capability_id", "resource", "action", "scope", "decision", "checked_at", "policy_version"],
+    "decisions": ["ALLOW", "DENY"],
+    "sensitive_action_requires_allow": true,
+    "proof_must_reference_active_identity": true,
+    "proof_must_reference_active_grant": true,
+    "proof_must_be_reproducible": true
+  },
+  "fail_closed_rules": [
+    "unknown_identity_denied",
+    "unknown_capability_denied",
+    "unknown_grant_denied",
+    "revoked_identity_denied",
+    "revoked_grant_denied",
+    "expired_delegation_denied",
+    "missing_scope_denied",
+    "scope_escalation_denied",
+    "missing_authorization_proof_denied",
+    "conflicting_authority_denied"
+  ],
+  "enforcement": {
+    "contract_is_machine_readable": true,
+    "validator_is_fail_closed": true,
+    "negative_tests_required": true,
+    "ci_gate_required": true,
+    "sensitive_action_requires_proof": true
+  }
+}

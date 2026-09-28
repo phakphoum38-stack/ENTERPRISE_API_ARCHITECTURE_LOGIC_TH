@@ -38,6 +38,57 @@ class DeveloperAccessApiClient {
     return _request(() => _client.get(uri));
   }
 
+  Future<Map<String, dynamic>> getCodeProjects() => _get('/v2/developer/code/projects');
+
+  Future<Map<String, dynamic>> getCodeFiles({
+    String project = 'research_os_flutter',
+    String query = '',
+  }) async {
+    final uri = _uri('/v2/developer/code/files').replace(
+      queryParameters: <String, String>{
+        'project': project,
+        if (query.trim().isNotEmpty) 'q': query.trim(),
+      },
+    );
+    return _request(() => _client.get(uri));
+  }
+
+  Future<Map<String, dynamic>> readCodeFile(
+    String path, {
+    String project = 'research_os_flutter',
+  }) async {
+    final uri = _uri('/v2/developer/code/file/${Uri.encodeComponent(path)}').replace(
+      queryParameters: <String, String>{'project': project},
+    );
+    return _request(() => _client.get(uri));
+  }
+
+  Future<Map<String, dynamic>> previewCodeChange({
+    required String project,
+    required String path,
+    required String originalSha256,
+    required String content,
+  }) =>
+      _post('/v2/developer/code/preview', <String, Object?>{
+        'project': project,
+        'path': path,
+        'original_sha256': originalSha256,
+        'content': content,
+      });
+
+  Future<Map<String, dynamic>> applyCodeChange({
+    required String project,
+    required String path,
+    required String originalSha256,
+    required String content,
+  }) =>
+      _post('/v2/developer/code/apply', <String, Object?>{
+        'project': project,
+        'path': path,
+        'original_sha256': originalSha256,
+        'content': content,
+      });
+
   Future<Map<String, dynamic>> getOwnerGrants() async {
     final uri = _uri('/v2/developer/grants').replace(
       queryParameters: const <String, String>{'view': 'owner'},

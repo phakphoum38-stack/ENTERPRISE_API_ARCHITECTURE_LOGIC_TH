@@ -1,0 +1,37 @@
+name: Engineering Constitution Gate
+
+on:
+  pull_request:
+    paths:
+      - 'current/ENGINEERING_CONSTITUTION.json'
+      - 'current/ENGINEERING_CONSTITUTION_FIXTURE.json'
+      - 'tools/validate_engineering_constitution.py'
+      - 'tools/test_validate_engineering_constitution.py'
+      - 'docs/ENGINEERING_CONSTITUTION.md'
+      - '.github/workflows/engineering-constitution-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'current/ENGINEERING_CONSTITUTION.json'
+      - 'current/ENGINEERING_CONSTITUTION_FIXTURE.json'
+      - 'tools/validate_engineering_constitution.py'
+      - 'tools/test_validate_engineering_constitution.py'
+      - 'docs/ENGINEERING_CONSTITUTION.md'
+      - '.github/workflows/engineering-constitution-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  constitution-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate canonical constitution
+        run: python tools/validate_engineering_constitution.py --constitution current/ENGINEERING_CONSTITUTION.json --fixture current/ENGINEERING_CONSTITUTION_FIXTURE.json
+      - name: Run constitution regression tests
+        run: python -m unittest tools/test_validate_engineering_constitution.py -v

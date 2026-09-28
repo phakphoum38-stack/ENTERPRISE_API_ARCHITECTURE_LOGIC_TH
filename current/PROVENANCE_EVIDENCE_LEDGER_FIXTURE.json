@@ -1,0 +1,72 @@
+{
+  "contract_version": "1.1.0",
+  "entries": [
+    {
+      "action": "change",
+      "actor_id": "H-OWNER",
+      "entry_hash": "32921c9ab44cb027f505caea217a0af656284008bc16a2445ccb799ceeb52328",
+      "entry_id": "EV-001",
+      "evidence": {
+        "attestation_id": "ATT-001",
+        "evidence_ids": ["EV-001"],
+        "reason": "Establish canonical provenance evidence chain",
+        "source_commit": "0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10",
+        "target_commit": "a34557a13e4afaafc2b2575be28ca79b74406a79"
+      },
+      "evidence_type": "change",
+      "input_hashes": {
+        "source_commit": {
+          "algorithm": "git-sha1",
+          "digest": "0dc30f54f2205aa1f56ce881b3b8a2ba113d0a10",
+          "subject": "git-commit"
+        }
+      },
+      "output_hashes": {
+        "contract": {
+          "algorithm": "sha256",
+          "digest": "59fcb3941950ccd9caaf6a3e8d8bef71004fdf417215f9c07aa4025399a85ce1",
+          "subject": "artifact:current/PROVENANCE_EVIDENCE_CONTRACT.json"
+        }
+      },
+      "previous_entry_hash": null,
+      "recorded_at": "2026-09-09T00:00:00Z",
+      "sequence": 1,
+      "subject_id": "CHG-001",
+      "subject_type": "change"
+    },
+    {
+      "action": "attest",
+      "actor_id": "H-OWNER",
+      "entry_hash": "69dc76014f1b4dbe21c4ec1fecea01877b67ea1e16c55dce68ccc0d8b5823e57",
+      "entry_id": "EV-002",
+      "evidence": {
+        "attestation_id": "ATT-001",
+        "attester_id": "H-OWNER",
+        "evidence_ids": ["EV-001"],
+        "issued_at": "2026-09-09T00:05:00Z",
+        "statement": "Change evidence is reproducible and hash-verified.",
+        "subject_id": "CHG-001"
+      },
+      "evidence_type": "attestation",
+      "input_hashes": {
+        "prior_entry": {
+          "algorithm": "sha256",
+          "digest": "32921c9ab44cb027f505caea217a0af656284008bc16a2445ccb799ceeb52328",
+          "subject": "ledger:EV-001"
+        }
+      },
+      "output_hashes": {
+        "attestation": {
+          "algorithm": "sha256",
+          "digest": "47f4a45784e11bbc22b9cfae7c18a598519bce6eb5d9837a650b0782071ca07b",
+          "subject": "attestation:ATT-001"
+        }
+      },
+      "previous_entry_hash": "32921c9ab44cb027f505caea217a0af656284008bc16a2445ccb799ceeb52328",
+      "recorded_at": "2026-09-09T00:05:00Z",
+      "sequence": 2,
+      "subject_id": "CHG-001",
+      "subject_type": "change"
+    }
+  ]
+}

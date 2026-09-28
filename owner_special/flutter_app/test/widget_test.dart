@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_owner_special/src/friend_app.dart';
 import 'package:research_os_owner_special/src/owner_api.dart';
 
-class FakeOwnerFriendApi implements OwnerFriendApi {
+class FakeOwnerFriendApi extends OwnerFriendApi {
   @override
   Future<Map<String, dynamic>> health() async => <String, dynamic>{'status': 'ok'};
 
@@ -69,6 +69,11 @@ void main() {
 
     await tester.pumpWidget(OwnerFriendApp(api: FakeOwnerFriendApi()));
     await tester.pump();
+
+    // Control Center is the default surface; explicitly open Friend before
+    // asserting Friend-specific controls.
+    await tester.tap(find.text('Friend Runtime').first);
+    await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('turbo-million')), findsOneWidget);
     expect(find.byKey(const Key('friend-input')), findsOneWidget);

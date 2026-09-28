@@ -1,0 +1,42 @@
+diff --git a/owner_special/research_os_friend/mission_control_build_identity.py b/owner_special/research_os_friend/mission_control_build_identity.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/research_os_friend/mission_control_build_identity.py
+@@
++"""Read-only Mission Control projection for canonical build identity evidence."""
++
++The implementation added by Phase 4F:
++- consumes only supplied canonical Build Identity and Installed Provenance evidence;
++- compares canonical commit and executable SHA256 values;
++- fails closed for missing, stale, conflicting, invalid, or secret-like evidence;
++- never infers identity from a filename alone;
++- returns bounded, deterministic, read-only presentation data;
++- does not expose execution, approval, installation, dispatch, or authorization actions.
++
++The complete source is maintained at the path above; this first-class artifact records
++the intended repository change without manufacturing runtime evidence.
+diff --git a/owner_special/tests/test_mission_control_build_identity.py b/owner_special/tests/test_mission_control_build_identity.py
+new file mode 100644
+--- /dev/null
++++ b/owner_special/tests/test_mission_control_build_identity.py
+@@
++Phase 4F focused coverage:
++- valid canonical identity verification;
++- missing provenance;
++- conflicting executable SHA256;
++- stale source commit;
++- deterministic output;
++- input immutability;
++- secret-like evidence rejection;
++- filename-only identity rejection;
++- bounded owner identity;
++- read-only authority boundary.
++
++The executable test source is maintained at the path above.
+diff --git a/evidence/mission-control/phase4f-build-identity-projection.json b/evidence/mission-control/phase4f-build-identity-projection.json
+new file mode 100644
+--- /dev/null
++++ b/evidence/mission-control/phase4f-build-identity-projection.json
+@@
++Machine-readable Phase 4F contract/evidence metadata.
++Verification remains PENDING_CI until authoritative repository CI executes.

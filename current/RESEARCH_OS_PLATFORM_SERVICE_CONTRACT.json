@@ -1,0 +1,70 @@
+{
+  "contract_id": "research-os-platform-service-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Unified reusable Platform service boundary that composes canonical discovery, graph, project, execution, evidence, governance and continuity capabilities without creating duplicate authorities.",
+  "role": "PLATFORM_COMPOSITION_SERVICE",
+  "source_of_truth": "Git repository and canonical platform contracts",
+  "authority": {
+    "mode": "DESCRIPTIVE_COMPOSITION",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "compose": {
+    "discovery": "tools/research_os_m2_platform.py",
+    "graph": "tools/platform_graph.py",
+    "projects": "tools/project_registry.py",
+    "execution": [
+      "v3/research_os_v3/queue.py",
+      "v3/worker_pool.py",
+      "v3/research_os_v3/runner.py"
+    ],
+    "evidence": [
+      "tools/lifecycle_evidence.py",
+      "tools/runtime_evidence.py"
+    ],
+    "governance": "tools/validate_platform_governance.py",
+    "release": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+  },
+  "operations": [
+    "RECON",
+    "SEARCH",
+    "VERTICAL",
+    "HORIZONTAL",
+    "IMPACT",
+    "PROJECT_VALIDATE",
+    "CONTEXT_SNAPSHOT",
+    "RESUME",
+    "GOVERNANCE_VALIDATE"
+  ],
+  "invariants": {
+    "single_registry_per_domain": true,
+    "shared_execution_plane": true,
+    "shared_evidence_plane": true,
+    "no_per_project_runtime": true,
+    "no_per_project_queue": true,
+    "no_per_project_evidence_ledger": true,
+    "external_tools_are_not_authority": true,
+    "unknown_is_not_pass": true,
+    "deferred_is_not_done": true,
+    "resource_conflict_is_reject_and_release": true,
+    "same_version_overwrite_forbidden": true,
+    "alternate_version_branching_preserved": true,
+    "chat_is_not_source_of_truth": true
+  },
+  "fail_closed": [
+    "missing_contract",
+    "missing_component",
+    "unknown_state",
+    "stale_sha",
+    "dependency_cycle",
+    "duplicate_authority",
+    "missing_evidence",
+    "unresolved_deferred",
+    "navigation_drift"
+  ]
+}

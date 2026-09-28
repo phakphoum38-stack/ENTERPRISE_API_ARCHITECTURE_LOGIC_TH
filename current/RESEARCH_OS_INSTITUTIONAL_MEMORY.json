@@ -1,0 +1,55 @@
+{
+  "schema": "research-os-institutional-memory/v1",
+  "generation": {
+    "canonical_sha": "836229ed5337eca3a675ce1824e9386571a8bd01",
+    "protected_baseline_sha": "565ab068d5a1540ea799b594ff031ba003e068af",
+    "status": "KNOWN_GOOD"
+  },
+  "state_order": ["DECLARED", "OBSERVED", "EVIDENCE_BOUND", "VERIFIED", "ASSURED", "CERTIFIED"],
+  "domains": [
+    "constitution",
+    "protocol",
+    "verified_truth",
+    "decision",
+    "assumption",
+    "unknown",
+    "failure",
+    "root_cause",
+    "lesson",
+    "evidence",
+    "flight_recorder",
+    "tool_trust",
+    "agent_model_drift",
+    "authority",
+    "revocation",
+    "mission",
+    "context_recovery",
+    "successor_handoff",
+    "certification"
+  ],
+  "rules": {
+    "history_immutable": true,
+    "chat_memory_is_non_authoritative": true,
+    "fail_closed_on_missing_context": true,
+    "fail_closed_on_stale_evidence": true,
+    "fail_closed_on_conflict": true,
+    "owner_authority_is_human": true,
+    "autobot_may_approve": false,
+    "autobot_may_merge": false,
+    "canonical_sha_change_invalidates_dependent_evidence": true,
+    "material_failures_must_be_promoted_to_knowledge": true,
+    "generation_requires_successor_reverification": true
+  },
+  "required_record_fields": [
+    "id",
+    "type",
+    "state",
+    "source",
+    "canonical_sha",
+    "evidence_refs",
+    "decision",
+    "reason",
+    "supersedes",
+    "created_at"
+  ]
+}

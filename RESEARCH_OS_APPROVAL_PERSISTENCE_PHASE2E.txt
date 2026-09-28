@@ -1,0 +1,42 @@
+Research OS Friend — Durable Approval Persistence Phase 2E
+
+Purpose
+=======
+Persist explicit approval decisions per owner so a Friend restart cannot silently lose an already recorded approval state.
+
+Storage
+=======
+For a persistent runtime:
+  <data_root>/owners/<owner_id>/agent/approvals.json
+
+The store uses atomic temporary-file replacement and contains only approval metadata:
+- approval id
+- owner/profile/session identity
+- tool name
+- exact request fingerprint
+- state
+- timestamps
+- human-readable decision reason
+
+Safety
+======
+- approvals remain owner-scoped
+- approval is bound to an exact request fingerprint
+- DENIED remains terminal for that exact request
+- Tool Search never executes tools
+- FriendOrchestrator remains execution authority
+- OwnerPolicy remains authorization authority
+- ApprovalGate remains approval authority
+- no credentials, hidden reasoning, or tool outputs are stored
+- no release / installer / provenance behavior is changed
+
+Recovery
+========
+A restarted FriendRuntime reconstructs the ApprovalGate from the owner-scoped approval store. A pending approval remains pending; an approved approval remains approved; a denied approval remains denied.
+
+Future candidates
+=================
+- approval expiry and explicit revocation
+- Mission Control approval UX
+- auditable approval/evidence linkage
+- richer side-effect classification on ToolDescriptor

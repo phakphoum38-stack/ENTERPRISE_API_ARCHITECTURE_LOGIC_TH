@@ -1,0 +1,1218 @@
+{
+  "registry_id": "research-os-platform-component-inventory-v1",
+  "version": 3,
+  "status": "ACTIVE",
+  "purpose": "Derived governance inventory over existing canonical platform components; descriptive only and never an authority.",
+  "source_of_truths": [
+    "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+    "tools/platform_graph.py",
+    "current/ARCHITECTURE_INVARIANTS.md",
+    "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json",
+    "tools/platform_spine.py",
+    "current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_RECON_REPAIR_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json",
+    "tools/validate_research_os_platform_runtime_completion.py",
+    "current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json",
+    "tools/validate_research_os_platform_production_certification.py",
+    "tools/validate_research_os_api_management_platform.py",
+    "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml",
+    "tools/research_os_api/api_platform/management_service.py",
+    "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json",
+    "tools/validate_research_os_laravel_platform.py",
+    "current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json",
+    "current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json",
+    "tools/platform_digital_twin.py"
+  ],
+  "components": [
+    {
+      "id": "platform_workspace",
+      "canonical": "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+      "kind": "REGISTRY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [],
+      "contracts": [
+        "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json"
+      ],
+      "tests": [
+        "owner_special/tests/test_platform_virtual_workspace.py"
+      ],
+      "evidence": [
+        "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json"
+      ],
+      "gates": [
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "CORE",
+      "capabilities": [
+        "discover",
+        "register"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_graph",
+      "canonical": "tools/platform_graph.py",
+      "kind": "ENGINE_READ_ONLY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace"
+      ],
+      "contracts": [
+        "current/PLATFORM_VIRTUAL_WORKSPACE_CONTRACT.json"
+      ],
+      "tests": [
+        "owner_special/tests/test_platform_virtual_workspace.py"
+      ],
+      "evidence": [
+        "tools/platform_graph.py"
+      ],
+      "gates": [
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "CORE",
+      "capabilities": [
+        "inspect",
+        "dependency_graph"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "navigation",
+      "canonical": "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart",
+      "kind": "CANONICAL_REGISTRY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "product_surface"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/platform_surface_parity_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/ui/enterprise_navigation.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "navigate"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "product_surface",
+      "canonical": "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json",
+      "kind": "SURFACE_INVENTORY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/platform_surface_parity_test.dart"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PRODUCT_SURFACE_INVENTORY_CONTRACT.json"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "surface_inventory"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "project_identity",
+      "canonical": "tools/project_registry.py",
+      "kind": "CANONICAL_REGISTRY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PROJECT_EXPERIENCE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_project_registry.py"
+      ],
+      "evidence": [
+        "tools/project_registry.py"
+      ],
+      "gates": [
+        "project_scale",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "identify_project"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "workflow",
+      "canonical": "current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json",
+      "kind": "EXPERIENCE_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_WORKFLOW_EXPERIENCE_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/workflow_experience_page_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/features/workflows/workflow_experience_page.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "describe_workflow"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "evidence",
+      "canonical": "tools/lifecycle_evidence.py",
+      "kind": "EVIDENCE_PLANE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "workflow"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PROJECT_LIFECYCLE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_runtime_evidence.py"
+      ],
+      "evidence": [
+        "tools/lifecycle_evidence.py"
+      ],
+      "gates": [
+        "evidence_lineage",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "record_evidence",
+        "verify_lineage"
+      ],
+      "authority": {
+        "mode": "CANONICAL",
+        "scope": [
+          "evidence"
+        ]
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "control_center",
+      "canonical": "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
+      "kind": "EXPERIENCE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "navigation",
+        "evidence",
+        "defect_control",
+        "schedule_control",
+        "risk_control",
+        "change_impact_control"
+      ],
+      "contracts": [
+        "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/features/control_center/native_control_center_page_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "operate_control_plane"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "release",
+      "canonical": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+      "kind": "RELEASE_AUTHORITY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "evidence",
+        "navigation"
+      ],
+      "contracts": [
+        "current/GOLDEN_RELEASE_CONTRACT.yml"
+      ],
+      "tests": [
+        "tools/validate_research_os_unified_final_gate.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "release_spine"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "release_gate"
+      ],
+      "authority": {
+        "mode": "CANONICAL",
+        "scope": [
+          "release"
+        ]
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "owner",
+      "canonical": "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json",
+      "kind": "EXPERIENCE_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "control_center",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json"
+      ],
+      "tests": [
+        "apps/research_os_flutter/test/owner_experience_page_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart"
+      ],
+      "gates": [
+        "flutter_surface",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "owner_experience"
+      ],
+      "authority": {
+        "mode": "UNBOUNDED_PRIVILEGE",
+        "scope": [
+          "owner"
+        ]
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "defect_control",
+      "canonical": "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+      "kind": "CONTROL_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "evidence"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_operating_control.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate",
+        "flutter_surface"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "defect_control"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "schedule_control",
+      "canonical": "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+      "kind": "PLANNING_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "workflow"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_operating_control.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
+      ],
+      "gates": [
+        "project_scale",
+        "unified_final_gate",
+        "flutter_surface"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "schedule_control"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "risk_control",
+      "canonical": "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+      "kind": "GOVERNANCE_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "evidence",
+        "platform_graph"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_operating_control.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate",
+        "flutter_surface"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "risk_assessment"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "change_impact_control",
+      "canonical": "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+      "kind": "ANALYSIS_CONTRACT",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_graph",
+        "project_identity"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_operating_control.py",
+        "tools/test_platform_change_impact.py"
+      ],
+      "evidence": [
+        "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json",
+        "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "flutter_surface"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "impact_analysis"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "memory_fabric",
+      "canonical": "tools/research_os_api/memory_fabric.py",
+      "kind": "STORAGE_BACKED_MEMORY_ABSTRACTION",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "workflow",
+        "evidence"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_memory_fabric.py"
+      ],
+      "evidence": [
+        "tools/research_os_api/memory_fabric.py",
+        "docs/RESEARCH_OS_MEMORY_FABRIC_ARCHITECTURE.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "memory"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "universal_runner",
+      "canonical": "tools/research_os_api/universal_runner.py",
+      "kind": "RUNNER_CAPABILITY_AND_LIFECYCLE_ADAPTER",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "project_identity",
+        "workflow",
+        "memory_fabric"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json",
+        "current/RESEARCH_OS_MEMORY_FABRIC_CONTRACT.json"
+      ],
+      "tests": [
+        "v3/tests/test_universal_runner.py"
+      ],
+      "evidence": [
+        "tools/research_os_api/universal_runner.py",
+        "docs/RESEARCH_OS_UNIVERSAL_RUNNER.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "runner_lifecycle"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "runner_installation",
+      "canonical": "tools/research_os_api/runner_installer.py",
+      "kind": "INSTALLATION_AND_BOOTSTRAP_ADAPTER",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "universal_runner",
+        "memory_fabric"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_RUNNER_INSTALLATION_CONTRACT.json",
+        "current/RESEARCH_OS_UNIVERSAL_RUNNER_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_runner_installer.py"
+      ],
+      "evidence": [
+        "tools/research_os_api/runner_installer.py",
+        "docs/RESEARCH_OS_RUNNER_INSTALLATION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "runner_installation"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "owner_experience_platform",
+      "canonical": "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json",
+      "kind": "EXPERIENCE_PLATFORM",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "navigation",
+        "control_center",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_OWNER_EXPERIENCE_CONTRACT.json",
+        "current/RESEARCH_OS_OWNER_EXPERIENCE_PLATFORM_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_owner_experience_platform.py",
+        "apps/research_os_flutter/test/owner_experience_page_test.dart",
+        "apps/research_os_flutter/test/platform_surface_parity_test.dart"
+      ],
+      "evidence": [
+        "apps/research_os_flutter/lib/src/features/owner/owner_experience_page.dart",
+        "owner_special/OWNER_MANIFEST.json"
+      ],
+      "gates": [
+        "flutter_surface",
+        "platform_surface_matrix",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "EXPERIENCE",
+      "capabilities": [
+        "owner_platform"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "self_reconciliation",
+      "canonical": "tools/platform_self_reconciliation.py",
+      "kind": "RECONCILIATION_ENGINE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_workspace",
+        "platform_graph",
+        "change_impact_control",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_self_reconciliation.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_SELF_RECONCILIATION.md",
+        "tools/validate_platform_self_reconciliation.py"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "reconcile",
+        "validate"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_one_pass_completion",
+      "canonical": "tools/validate_research_os_platform_one_pass.py",
+      "kind": "PLATFORM_SPINE_COMPLETION_VALIDATOR",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_spine_engine",
+        "platform_workspace",
+        "platform_graph",
+        "change_impact_control",
+        "self_reconciliation",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_research_os_platform_one_pass.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION.md",
+        "tools/validate_research_os_platform_one_pass.py"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "platform_spine_completion",
+        "lifecycle_validation",
+        "compatibility_validation",
+        "dependency_validation",
+        "impact_binding",
+        "health_binding",
+        "drift_binding",
+        "migration_boundary",
+        "simulation_boundary"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_spine_engine",
+      "canonical": "tools/platform_spine.py",
+      "kind": "PLATFORM_SPINE_ENGINE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_graph",
+        "change_impact_control",
+        "self_reconciliation",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_SPINE_ENGINE_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_spine.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_ONE_PASS_COMPLETION.md",
+        "tools/platform_spine.py"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "registry_validation",
+        "dependency_validation",
+        "impact_analysis",
+        "lifecycle_validation",
+        "compatibility_validation",
+        "health_validation",
+        "drift_detection",
+        "migration_validation",
+        "simulation"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_runtime_completion",
+      "canonical": "tools/validate_research_os_platform_runtime_completion.py",
+      "kind": "RUNTIME_COMPLETION_VALIDATOR",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_spine_engine",
+        "self_reconciliation",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_validate_research_os_platform_runtime_completion.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "runtime_completion",
+        "qualification"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_recon_repair",
+      "canonical": "tools/platform_repair_engine.py",
+      "kind": "BOUNDED_REPAIR_ENGINE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "self_reconciliation",
+        "change_impact_control"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_RECON_REPAIR_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_repair_engine.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "repair_planning",
+        "change_boundary",
+        "rollback"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_failure_simulation",
+      "canonical": "tools/platform_failure_simulator.py",
+      "kind": "FAILURE_SIMULATION_ENGINE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "workflow",
+        "self_reconciliation"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_FAILURE_SIMULATION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_failure_simulator.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "failure_simulation",
+        "recovery_qualification"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_observability",
+      "canonical": "tools/platform_observability.py",
+      "kind": "OBSERVABILITY_VALIDATOR",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "evidence",
+        "workflow",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_OBSERVABILITY_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_observability.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "lineage",
+        "observability"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_ai_code_writer",
+      "canonical": "tools/platform_code_writer.py",
+      "kind": "AI_CODE_WRITER_BOUNDARY",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "self_reconciliation",
+        "change_impact_control"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_AI_CODE_WRITER_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_code_writer.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "ai_code_writer_boundary",
+        "recon_binding"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "platform_production_certification",
+      "canonical": "tools/validate_research_os_platform_production_certification.py",
+      "kind": "PRODUCTION_CERTIFICATION_VALIDATOR",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_runtime_completion",
+        "platform_spine_engine",
+        "self_reconciliation",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_validate_research_os_platform_production_certification.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_PRODUCTION_CERTIFICATION.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "production_certification",
+        "runtime_qualification"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "api_management_platform",
+      "canonical": "tools/validate_research_os_api_management_platform.py",
+      "kind": "API_MANAGEMENT_PLATFORM",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_runtime_completion",
+        "release"
+      ],
+      "contracts": [
+        "tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml"
+      ],
+      "tests": [
+        "tools/research_os_api/api_platform/test_management_service.py",
+        "tools/research_os_api/test_api_key_durable_store.py"
+      ],
+      "evidence": [
+        "docs/API_MANAGEMENT_PLATFORM_CONTRACT.md",
+        "tools/research_os_api/api_platform/API_PLATFORM_CAPABILITY_MATRIX.yaml"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "api_management",
+        "durable_metadata",
+        "credential_lifecycle",
+        "management_http",
+        "sdk_metadata"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "laravel_platform",
+      "canonical": "apps/research_os_laravel/README.md",
+      "kind": "PLATFORM_INTEGRATION_CONTROL_PLANE",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_runtime_completion",
+        "api_management_platform",
+        "release"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_LARAVEL_PLATFORM_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_RUNTIME_COMPLETION_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_validate_research_os_laravel_platform.py",
+        "apps/research_os_laravel/tests/Unit/PlatformBoundaryTest.php",
+        "apps/research_os_laravel/tests/Unit/CanonicalPlatformAdapterTest.php",
+        "apps/research_os_laravel/tests/Unit/PlatformRuntimeTest.php"
+      ],
+      "evidence": [
+        "apps/research_os_laravel/README.md",
+        "docs/research-os/LARAVEL_PLATFORM_FOUNDATION_V1.md",
+        "docs/research-os/LARAVEL_PLATFORM_INTEGRATION_WAVE1_V1.md",
+        "tools/validate_research_os_laravel_platform.py"
+      ],
+      "gates": [
+        "unified_final_gate",
+        "assurance",
+        "release_spine"
+      ],
+      "required": true,
+      "class": "PLATFORM",
+      "capabilities": [
+        "http_api_boundary",
+        "canonical_identity_adapter",
+        "canonical_authorization_adapter",
+        "workflow_messaging_adaptation",
+        "tool_control_operations_adapters",
+        "health_readiness",
+        "platform_context_propagation"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    },
+    {
+      "id": "digital_twin",
+      "canonical": "tools/platform_digital_twin.py",
+      "kind": "READ_ONLY_SIMULATION_PROJECTION",
+      "lifecycle": "ACTIVE",
+      "dependencies": [
+        "platform_graph",
+        "platform_failure_simulation",
+        "change_impact_control",
+        "evidence"
+      ],
+      "contracts": [
+        "current/RESEARCH_OS_PLATFORM_DIGITAL_TWIN_CONTRACT.json",
+        "current/RESEARCH_OS_PLATFORM_NORTH_STAR_CONTRACT.json"
+      ],
+      "tests": [
+        "tools/test_platform_digital_twin.py"
+      ],
+      "evidence": [
+        "docs/RESEARCH_OS_PLATFORM_LONG_TERM_CAPABILITY_MAP.md"
+      ],
+      "gates": [
+        "assurance",
+        "unified_final_gate"
+      ],
+      "required": true,
+      "class": "ASSURANCE",
+      "capabilities": [
+        "snapshot",
+        "impact_analysis",
+        "simulation"
+      ],
+      "authority": {
+        "mode": "NONE"
+      },
+      "compatibility": {
+        "registry_schema": "1.x",
+        "platform_contract": "1.x"
+      }
+    }
+  ],
+  "rules": [
+    "metadata_only",
+    "canonical_sources_remain_authoritative",
+    "unknown_is_not_done",
+    "missing_evidence_is_not_pass",
+    "final_gate_is_single_release_authority",
+    "nvme_is_storage_backed_memory_not_dram",
+    "unknown_hardware_capability_is_not_available",
+    "unknown_runner_capability_is_not_available",
+    "cloud_drive_is_distribution_not_runtime",
+    "verified_package_required_before_install"
+  ],
+  "schema_version": 1,
+  "component_model_version": 1,
+  "count_is_informational": true,
+  "required_component_selection": "component.required == true",
+  "lifecycle_model": [
+    "PROPOSED",
+    "EXPERIMENTAL",
+    "ACTIVE",
+    "DEPRECATED",
+    "RETIRED"
+  ],
+  "classes": [
+    "CORE",
+    "PLATFORM",
+    "ASSURANCE",
+    "EXPERIENCE",
+    "EXTENSION"
+  ],
+  "registry_semantics": {
+    "single_source_of_truth": true,
+    "registry_is_descriptive_metadata": true,
+    "count_is_not_a_contract": true,
+    "required_components_are_explicit": true,
+    "optional_components_may_be_added_without_validator_changes": true,
+    "dependency_references_must_resolve": true,
+    "authority_is_explicit": true
+  }
+}

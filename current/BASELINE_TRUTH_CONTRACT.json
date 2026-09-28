@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "status": "CANONICAL",
+  "repository": "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH",
+  "truth_hierarchy": [
+    "production_code_truth",
+    "canonical_main_history_truth",
+    "working_change_truth"
+  ],
+  "production_code_truth": {
+    "commit": "565ab068d5a1540ea799b594ff031ba003e068af",
+    "role": "verified production/code truth"
+  },
+  "canonical_main_history_truth": {
+    "commit": "fab39afc15739c3dc9952f6f21db46d26f54b683",
+    "role": "canonical main/history truth anchor"
+  },
+  "rules": {
+    "production_commit_must_exist": true,
+    "canonical_commit_must_exist": true,
+    "production_and_canonical_commits_are_immutable_anchors": true,
+    "canonical_history_must_not_be_rewritten": true,
+    "working_head_must_not_be_silently_treated_as_production_truth": true
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "contract_id": "research-os-platform-self-reconciliation-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "purpose": "Platform-wide structural reconciliation and bounded deterministic repair without creating a second authority or runtime.",
+  "release_authority": "FINAL_GATE",
+  "canonical_sources": {
+    "governance": "current/RESEARCH_OS_PLATFORM_GOVERNANCE_CONTRACT.json",
+    "workspace_registry": "current/PLATFORM_VIRTUAL_WORKSPACE_REGISTRY.json",
+    "architecture_invariants": "current/ARCHITECTURE_INVARIANTS.md",
+    "unified_final_gate": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml",
+    "existing_repair_pipeline": "tools/repair_diff_pipeline.py",
+    "existing_change_impact": "tools/platform_change_impact.py",
+    "existing_discovery": "tools/platform_discovery.py",
+    "existing_graph": "tools/platform_graph.py",
+    "plane_boundary": "current/PLANE_BOUNDARY_CONTRACT.json"
+  },
+  "authority": {
+    "mode": "RECONCILIATION_AND_VALIDATION",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "may_modify_protected_core": false,
+    "release_authority_remains": "FINAL_GATE"
+  },
+  "pipeline": [
+    "ROOT_DISCOVERY",
+    "STRUCTURE_INDEX",
+    "REFERENCE_RESOLUTION",
+    "FAILURE_LOCALIZATION",
+    "BLAST_RADIUS",
+    "REPAIR_PLAN",
+    "SANDBOX_REPAIR",
+    "RECON_AFTER_REPAIR",
+    "VALIDATION",
+    "EVIDENCE",
+    "FINAL_GATE"
+  ],
+  "resolution_states": [
+    "FOUND",
+    "RELOCATABLE",
+    "AMBIGUOUS",
+    "MISSING",
+    "DRIFT",
+    "PROTECTED",
+    "UNSAFE"
+  ],
+  "repair_classes": {
+    "AUTO": [
+      "MISSING_PATH",
+      "MISSING_REFERENCE",
+      "CANONICAL_PATH_RELOCATION"
+    ],
+    "CONSTRAINED": [
+      "IMPORT_REFERENCE",
+      "REGISTRY_REFERENCE",
+      "CONTRACT_REFERENCE"
+    ],
+    "PROTECTED": [
+      "AUTHORIZATION_POLICY",
+      "OWNER_PRIVILEGE",
+      "EVIDENCE_INTEGRITY",
+      "AUDIT_INTEGRITY",
+      "RELEASE_GATE",
+      "SECURITY_BOUNDARY"
+    ]
+  },
+  "safety": {
+    "exact_unique_target_required": true,
+    "minimal_text_replacement_only": true,
+    "ambiguous_target_stops": true,
+    "protected_target_stops": true,
+    "sandbox_before_apply": true,
+    "snapshot_before_apply": true,
+    "recon_after_apply_required": true,
+    "rollback_required": true,
+    "main_direct_write_forbidden": true,
+    "auto_merge_forbidden": true,
+    "unknown_is_not_pass": true
+  },
+  "evidence": {
+    "required": [
+      "source_sha",
+      "reconciliation_id",
+      "finding",
+      "old_reference",
+      "resolved_reference",
+      "write_set",
+      "protected_set",
+      "validation",
+      "post_recon"
+    ]
+  }
+}

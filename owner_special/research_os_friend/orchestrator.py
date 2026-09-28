@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+
+from .approval import ApprovalGate
 from .brain import FriendBrain
 from .context import FriendContext
 from .evidence import EvidenceRecorder
@@ -9,12 +12,13 @@ from .models import FriendRequest, FriendResponse
 from .policy import OwnerPolicy
 from .providers import ProviderRouter
 from .reasoning import DecisionPlanner
+from .response import ResponseComposer
 from .skills import SkillRegistry
 from .tools import ToolRegistry
 
 
 class FriendOrchestrator:
-    def __init__(self, *, owner: OwnerIdentity, brain: FriendBrain, planner: DecisionPlanner, skills: SkillRegistry, tools: ToolRegistry, providers: ProviderRouter, memory: ScopedMemory, policy: OwnerPolicy, evidence: EvidenceRecorder) -> None:
+    def __init__(self, *, owner: OwnerIdentity, brain: FriendBrain, planner: DecisionPlanner, skills: SkillRegistry, tools: ToolRegistry, providers: ProviderRouter, memory: ScopedMemory, policy: OwnerPolicy, evidence: EvidenceRecorder, approval_gate: ApprovalGate | None = None) -> None:
         self.owner = owner
         self.brain = brain
         self.planner = planner
@@ -24,20 +28,54 @@ class FriendOrchestrator:
         self.memory = memory
         self.policy = policy
         self.evidence = evidence
+        self.approval_gate = approval_gate or ApprovalGate()
+        self.responses = ResponseComposer()
+
+    def _route_tools(self, request: FriendRequest) -> tuple[str, ...]:
+        """Infer safe read-only tools only when the caller did not select tools explicitly."""
+        if request.requested_tools:
+            return request.requested_tools
+        text = request.text.lower()
+        github_markers = ("github", "repository", "repo", "pull request", "workflow", "artifact")
+        if any(marker in text for marker in github_markers) and "github.repository_status" in self.tools.names():
+            return ("github.repository_status",)
+        if ("http://" in text or "https://" in text) and "web.fetch" in self.tools.names():
+            return ("web.fetch",)
+        return ()
+
+    def _authorize_tool_execution(self, request: FriendRequest, tool_name: str) -> None:
+        """Authorize every selected tool immediately before its handler can execute."""
+        if request.requested_tools:
+            self.policy.authorize_tool(self.owner, request, tool_name)
+            self.approval_gate.enforce(self.owner, request, tool_name)
+            return
+        if self.approval_gate.requires_approval(tool_name):
+            raise PermissionError(
+                f"side-effecting tool must be explicitly requested and approved: {tool_name}"
+            )
 
     def handle(self, request: FriendRequest) -> FriendResponse:
         self.policy.authorize_request(self.owner, request)
         selected_skills = self.skills.resolve(request.requested_skills)
-        selected_tools = self.tools.resolve(request.requested_tools)
+        selected_tool_names = self._route_tools(request)
+        selected_tools = self.tools.resolve(selected_tool_names)
         for tool in selected_tools:
-            self.policy.authorize_tool(self.owner, request, tool.name)
+            self._authorize_tool_execution(request, tool.name)
         context = FriendContext.build(self.owner, request, self.memory)
         scale = self.brain.select_scale(request)
         decision = self.planner.plan(request, scale=scale, skills=tuple(skill.name for skill in selected_skills), tools=tuple(tool.name for tool in selected_tools))
         skill_outputs = tuple(self.skills.run(skill, request.text) for skill in selected_skills)
         tool_outputs = tuple(tool.handler(request.text) for tool in selected_tools)
         provider_context = tuple(item.text for item in context.memories) + skill_outputs + tool_outputs
-        provider_name, answer = self.providers.complete(prompt=request.text, context=provider_context)
+
+        tool_results: dict[str, object] = {}
+        for tool, output in zip(selected_tools, tool_outputs):
+            try:
+                tool_results[tool.name] = json.loads(output)
+            except (TypeError, json.JSONDecodeError):
+                tool_results[tool.name] = output
+        provider_name, provider_result = self.providers.complete(prompt=request.text, context=provider_context)
+        answer = self.responses.compose(provider_name=provider_name, answer=provider_result.text, tool_results=tool_results)
         self.memory.remember(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id, kind="request", text=request.text)
         self.memory.remember(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id, kind="response", text=answer)
         evidence_id = self.evidence.record(
@@ -48,11 +86,24 @@ class FriendOrchestrator:
             data={"scale": decision.scale.value, "capacity": decision.maximum_leaf_capacity, "skills": list(decision.selected_skills), "tools": list(decision.selected_tools), "provider": provider_name, "summary": decision.summary},
         )
         memory_items = len(self.memory.recall(owner_id=request.owner_id, profile_id=request.profile_id, session_id=request.session_id))
+        resource_control = {
+            "usage": dict(provider_result.usage),
+            "actual_cost": str(provider_result.actual_cost) if provider_result.actual_cost is not None else None,
+            "currency": provider_result.currency,
+            "raw": dict(provider_result.raw),
+        }
         return FriendResponse(
             text=answer,
             decision=decision,
             provider=provider_name,
             memory_items=memory_items,
             evidence_id=evidence_id,
-            metadata={"edition": self.owner.edition, "owner": self.owner.owner_id, "capabilities": self.brain.capabilities_for(request)},
+            measurement=provider_result.measurement,
+            metadata={
+                "edition": self.owner.edition,
+                "owner": self.owner.owner_id,
+                "capabilities": self.brain.capabilities_for(request),
+                "tool_results": tool_results,
+                "resource_control": resource_control,
+            },
         )

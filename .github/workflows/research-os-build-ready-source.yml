@@ -53,6 +53,9 @@ jobs:
         working-directory: apps/research_os_flutter
         run: |
           set -euo pipefail
+          test -f windows/CMakeLists.txt
+          test -f windows/runner/main.cpp
+          test -f windows/runner/Runner.rc
           flutter pub get
           flutter analyze
           flutter test
@@ -138,12 +141,15 @@ jobs:
           flutter analyze
           flutter test
 
-          ## Windows
-          flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_flutter
+          ## Windows release
+          The canonical Windows runner is committed under apps/research_os_flutter/windows.
+          Do not run flutter create in the release pipeline because it may replace the canonical runner files.
           flutter build windows --release
+          The expected executable identity is project research_os_flutter / Research OS.
 
           ## iOS (macOS/Xcode required)
-          flutter create . --platforms=ios --org com.phakphoum38 --project-name research_os_flutter
+          The canonical iOS target must be present before release validation.
+          Do not regenerate the project in the release pipeline.
           flutter build ios --release --no-codesign --dart-define=RESEARCH_OS_API_BASE_URL=https://research-os-api-phakphoum.onrender.com
           EOF
 
@@ -157,13 +163,17 @@ jobs:
           python -m unittest discover -s owner_special/tests -p 'test_*.py' -v
           python owner_special/scripts/smoke.py
 
-          ## Friend Flutter desktop
+          ## Owner Special Flutter desktop
           cd owner_special/flutter_app
-          flutter create . --platforms=windows --org com.phakphoum38 --project-name research_os_owner_special
+          The canonical Owner Windows runner is committed under owner_special/flutter_app/windows.
+          Do not run flutter create in the Owner release pipeline.
           flutter pub get
           flutter analyze
           flutter test
           flutter build windows --release
+
+          Owner release is produced only by .github/workflows/owner-special-friend.yml and the Owner identity/installer gates.
+          The general Research OS Windows workflow must never build or package the Owner Special executable.
           EOF
 
           cat > "$COMPLETE/BUILD_READY.md" <<EOF
@@ -173,6 +183,7 @@ jobs:
           Friend/Core source: friend/ ($FRIEND_REF)
 
           The two roots are intentionally separated to avoid deep duplicate paths and to preserve the exact Friend commit used by the proven Windows package.
+          Owner Special desktop release remains governed by the dedicated Owner identity and installer pipeline.
           EOF
 
           python - <<'PY'

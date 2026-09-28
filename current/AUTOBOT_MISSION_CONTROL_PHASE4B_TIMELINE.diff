@@ -1,0 +1,153 @@
+diff --git a/RESEARCH_OS_MISSION_CONTROL_PHASE4A.md b/RESEARCH_OS_MISSION_CONTROL_PHASE4A.md
+index 4a8895f5..53a5331a 100644
+--- a/RESEARCH_OS_MISSION_CONTROL_PHASE4A.md
++++ b/RESEARCH_OS_MISSION_CONTROL_PHASE4A.md
+@@ -70,6 +70,29 @@ model hidden reasoning, credentials, or full provider response bodies.
+ `MissionControl.run(run_id)` returns one owner-validated run projection or
+ `None` when it cannot be safely projected.
+ 
++## Phase 4B timeline contract
++
++`MissionControl.timeline(run_id)` provides a separate, bounded presentation
++projection for a single owner-validated run. It maps the existing trace events
++to deterministic UI-neutral categories:
++
++| Trace event | Timeline category |
++| --- | --- |
++| `run-created` | `goal` |
++| `planning` | `plan` |
++| `executing` | `action` |
++| `verifying` | `result` |
++| `completed` | `evidence` |
++| `failed` | `decision` |
++
++The timeline preserves sequence, event name, status, timestamp, and existing
++trace data. Unknown event names are represented as `unknown` rather than being
++silently reclassified. The same 250-event bound applies and truncation is
++reported explicitly.
++
++The timeline is presentation-only and does not create execution, policy,
++approval, MCP, Computer Use, or persistence authority.
++
+ ## Explicit non-goals
+ 
+ This phase does not add:
+@@ -86,7 +109,6 @@ This phase does not add:
+ ## Next increments
+ 
+ 1. Connect this projection to the desktop shell as a read-only timeline.
+-2. Add structured step categories for goal/plan/tool/result/evidence/decision.
+-3. Add capability and tool-health panels using existing read-only catalog data.
+-4. Add safe UI-schema validation before dynamic panels are rendered.
+-5. Keep every action behind the existing orchestrator/policy/approval gates.
++2. Add capability and tool-health panels using existing read-only catalog data.
++3. Add safe UI-schema validation before dynamic panels are rendered.
++4. Keep every action behind the existing orchestrator/policy/approval gates.
+diff --git a/owner_special/research_os_friend/mission_control.py b/owner_special/research_os_friend/mission_control.py
+index 36ec5a2f..45b534c8 100644
+--- a/owner_special/research_os_friend/mission_control.py
++++ b/owner_special/research_os_friend/mission_control.py
+@@ -15,15 +15,24 @@ class MissionControl:
+     VERSION = 1
+     MAX_RUNS = 100
+     MAX_EVENTS_PER_RUN = 250
++    EVENT_CATEGORIES = {
++        "run-created": "goal",
++        "planning": "plan",
++        "executing": "action",
++        "verifying": "result",
++        "completed": "evidence",
++        "failed": "decision",
++    }
+ 
+     def __init__(self, agent_runtime: Any) -> None:
+         self.agent_runtime = agent_runtime
+ 
+-    @staticmethod
+-    def _event_view(event: Any) -> dict[str, object]:
++    @classmethod
++    def _event_view(cls, event: Any) -> dict[str, object]:
+         return {
+             "sequence": event.sequence,
+             "event": event.event,
++            "category": cls.EVENT_CATEGORIES.get(event.event, "unknown"),
+             "status": event.status.value if isinstance(event.status, AgentRunStatus) else str(event.status),
+             "timestamp": event.timestamp,
+             "data": dict(event.data),
+@@ -47,6 +56,30 @@ def _run_view(cls, run: AgentRun) -> dict[str, object]:
+             "error": run.error,
+         }
+ 
++    @classmethod
++    def _timeline_view(cls, run: AgentRun) -> dict[str, object]:
++        events = tuple(run.events[: cls.MAX_EVENTS_PER_RUN])
++        steps = [
++            {
++                "sequence": event.sequence,
++                "category": cls.EVENT_CATEGORIES.get(event.event, "unknown"),
++                "event": event.event,
++                "status": event.status.value,
++                "timestamp": event.timestamp,
++                "data": dict(event.data),
++            }
++            for event in events
++        ]
++        return {
++            "schema": "research-os-mission-control-timeline/v1",
++            "run_id": run.run_id,
++            "owner_id": run.owner_id,
++            "read_only": True,
++            "steps": steps,
++            "step_count": len(steps),
++            "truncated": len(run.events) > len(steps),
++        }
++
+     def snapshot(self, *, owner_id: str | None = None, limit: int = 25) -> dict[str, object]:
+         if limit < 1 or limit > self.MAX_RUNS:
+             raise ValueError(f"limit must be between 1 and {self.MAX_RUNS}")
+@@ -76,3 +109,11 @@ def run(self, run_id: str, *, owner_id: str | None = None) -> dict[str, object]
+         if run is None or run.owner_id != effective_owner:
+             return None
+         return self._run_view(run)
++
++    def timeline(self, run_id: str, *, owner_id: str | None = None) -> dict[str, object] | None:
++        """Return a bounded, owner-validated timeline projection for one run."""
++        effective_owner = owner_id or self.agent_runtime.orchestrator.owner.owner_id
++        run = self.agent_runtime.get(run_id)
++        if run is None or run.owner_id != effective_owner:
++            return None
++        return self._timeline_view(run)
+diff --git a/owner_special/tests/test_mission_control.py b/owner_special/tests/test_mission_control.py
+index ed058997..ddb40529 100644
+--- a/owner_special/tests/test_mission_control.py
++++ b/owner_special/tests/test_mission_control.py
+@@ -30,6 +30,29 @@ def test_snapshot_is_read_only_and_owner_scoped(self) -> None:
+         self.assertIsNotNone(self.control.run(run.run_id, owner_id="owner-mission"))
+         self.assertIsNone(self.control.run(run.run_id, owner_id="other-owner"))
+ 
++    def test_timeline_is_bounded_owner_scoped_and_deterministic(self) -> None:
++        request = self._request("owner-mission", "Inspect the workspace")
++        run = self.agent.run(request)
++
++        timeline = self.control.timeline(run.run_id)
++
++        assert timeline is not None
++        self.assertEqual(timeline["schema"], "research-os-mission-control-timeline/v1")
++        self.assertTrue(timeline["read_only"])
++        self.assertEqual(timeline["owner_id"], "owner-mission")
++        self.assertEqual(timeline["run_id"], run.run_id)
++        self.assertEqual(timeline["step_count"], 5)
++        self.assertFalse(timeline["truncated"])
++        self.assertEqual(
++            [step["category"] for step in timeline["steps"]],
++            ["goal", "plan", "action", "result", "evidence"],
++        )
++        self.assertEqual(
++            [step["sequence"] for step in timeline["steps"]],
++            [1, 2, 3, 4, 5],
++        )
++        self.assertIsNone(self.control.timeline(run.run_id, owner_id="other-owner"))
++
+     def test_limit_is_bounded(self) -> None:
+         with self.assertRaises(ValueError):
+             self.control.snapshot(limit=0)

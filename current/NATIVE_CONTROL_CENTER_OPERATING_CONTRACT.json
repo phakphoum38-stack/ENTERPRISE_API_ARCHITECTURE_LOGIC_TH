@@ -1,0 +1,122 @@
+{
+  "contract_id": "research-os-native-control-center-operating-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Provide one native control plane for navigation, command preparation, inspection, simulation, observation, evidence linkage, and human-controlled execution.",
+  "engines": [
+    "CONTROL",
+    "EXPERIENCE",
+    "KNOWLEDGE",
+    "ASSURANCE"
+  ],
+  "lifecycle": [
+    "INTENT",
+    "VALIDATE",
+    "AUTHORIZE",
+    "EXECUTE",
+    "OBSERVE",
+    "EVIDENCE",
+    "COMPLETE",
+    "RECOVER"
+  ],
+  "interaction_modes": [
+    "LIVE",
+    "SIMULATION",
+    "DRY_RUN",
+    "REPLAY"
+  ],
+  "capabilities": [
+    "COMMAND_CENTER",
+    "UNIVERSAL_SEARCH",
+    "UNIVERSAL_INSPECTOR",
+    "ACTIVITY_STREAM",
+    "SYSTEM_MAP",
+    "STATE_VIEWER",
+    "EVIDENCE_EXPLORER",
+    "FAILURE_CENTER",
+    "RESOURCE_VIEWER",
+    "HUMAN_CONTROL_BOUNDARY",
+    "PLATFORM_CONTROL_VIEWER"
+  ],
+  "authority": {
+    "descriptive_only": true,
+    "human_required_for": [
+      "APPROVE",
+      "AUTHORIZE",
+      "RELEASE",
+      "HIGH_RISK_ACTION"
+    ],
+    "must_not": [
+      "grant_authority_from_observation",
+      "grant_authority_from_confidence",
+      "rewrite_history",
+      "mutate_branch_protection",
+      "auto_merge"
+    ]
+  },
+  "invariants": [
+    "unknown_is_not_known",
+    "command_is_not_execution",
+    "simulation_is_not_execution",
+    "observation_is_not_authorization",
+    "evidence_is_not_authority",
+    "confidence_is_not_truth",
+    "history_is_preserved",
+    "every_execution_has_identity",
+    "every_execution_has_observation",
+    "recoverable_failure_is_preferred"
+  ],
+  "bounds": {
+    "max_activity_items": 1000,
+    "max_inspector_relations": 256,
+    "max_command_results": 100,
+    "max_recovery_attempts": 3
+  },
+  "dependencies": {
+    "root_ref": "current/MATHEMATICAL_ROOT_CONTRACT.json",
+    "platform_ref": "current/PLATFORM_INTEGRATION_CONTRACT.json",
+    "experience_ref": "current/EXPERIENCE_GUI_UX_UI_CONTRACT.json",
+    "learning_ref": "current/UNIVERSAL_LEARNING_CONTRACT.json"
+  },
+  "platform_controls": {
+    "mode": "READ_ONLY_PROJECTION",
+    "canonical_sources": [
+      "current/RESEARCH_OS_PLATFORM_DEFECT_CONTRACT.json",
+      "current/RESEARCH_OS_PLATFORM_SCHEDULE_CONTRACT.json",
+      "current/RESEARCH_OS_PLATFORM_RISK_CONTRACT.json",
+      "current/RESEARCH_OS_PLATFORM_CHANGE_IMPACT_CONTRACT.json"
+    ],
+    "controls": [
+      {
+        "id": "defect_control",
+        "label": "Defect Control",
+        "lifecycle": "OPEN → TRIAGED → IN_REMEDIATION → VERIFICATION → VERIFIED / DEFERRED / CLOSED / REJECTED"
+      },
+      {
+        "id": "schedule_control",
+        "label": "Schedule Control",
+        "lifecycle": "PLANNED → READY → IN_PROGRESS → WAITING_VERIFICATION → DONE / DEFERRED / CANCELLED"
+      },
+      {
+        "id": "risk_control",
+        "label": "Risk Control",
+        "lifecycle": "IDENTIFIED → ASSESSED → MITIGATING → MONITORED → ACCEPTED / ESCALATED / CLOSED / DEFERRED"
+      },
+      {
+        "id": "change_impact_control",
+        "label": "Change Impact Control",
+        "lifecycle": "ANALYZE → CLASSIFY → MAP_DEPENDENCIES → REQUIRE_GATES → VERIFY"
+      }
+    ],
+    "authority": "DESCRIPTIVE_ONLY",
+    "rules": [
+      "projection_does_not_execute",
+      "projection_does_not_authorize",
+      "projection_does_not_approve",
+      "projection_does_not_release",
+      "final_gate_remains_single_release_authority",
+      "unknown_is_not_pass",
+      "deferred_is_not_done"
+    ]
+  }
+}

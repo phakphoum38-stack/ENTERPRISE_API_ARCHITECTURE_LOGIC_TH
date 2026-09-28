@@ -1,0 +1,32 @@
+{
+  "contract_id": "research-os-platform-schedule-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Canonical execution-planning contract for platform work and project work without creating a second scheduler, queue, or execution runtime.",
+  "authority": {
+    "descriptive_only": true,
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "lifecycle": ["PLANNED","READY","BLOCKED","IN_PROGRESS","WAITING_VERIFICATION","DONE","DEFERRED","CANCELLED"],
+  "required_fields": ["schedule_id","work_id","scope","status","dependencies","blockers","owner","target_window","verification_refs"],
+  "rules": [
+    "schedule_is_not_a_runtime",
+    "schedule_does_not_replace_existing_queue",
+    "dependencies_are_explicit",
+    "blocked_work_is_not_done",
+    "done_requires_verification",
+    "deferred_is_not_done",
+    "final_gate_remains_single_release_authority"
+  ],
+  "integration": {
+    "execution": "existing event_queue_stateless_runner",
+    "dependencies": "existing platform graph",
+    "evidence": "existing canonical evidence plane",
+    "release": "current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
+  }
+}

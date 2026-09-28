@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from developer_access import DeveloperAccessStore
+from flutter_code_tool import apply as apply_flutter_code, list_files as list_flutter_files, preview as preview_flutter_code, project_map as flutter_projects, read_file as read_flutter_file
 from developer_identity import IdentityAssertionError, IdentityAssertionVerifier
 
 TRIAL_RESOURCES: tuple[dict[str, Any], ...] = (
@@ -197,6 +198,20 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
                     raise ValueError("view must be owner or developer")
                 self._send(HTTPStatus.OK, {"items":items,"count":len(items),"view":view})
                 return
+            if parsed.path == "/v2/developer/code/projects":
+                self._send(HTTPStatus.OK, {"projects": flutter_projects()})
+                return
+            if parsed.path == "/v2/developer/code/files":
+                project = (query.get("project") or ["research_os_flutter"])[0]
+                q = (query.get("q") or [""])[0]
+                self._send(HTTPStatus.OK, list_flutter_files(project, q))
+                return
+            prefix = "/v2/developer/code/file/"
+            if parsed.path.startswith(prefix):
+                project = (query.get("project") or ["research_os_flutter"])[0]
+                relative = unquote(parsed.path[len(prefix):]).strip("/")
+                self._send(HTTPStatus.OK, read_flutter_file(project, relative))
+                return
             if parsed.path == "/v2/developer/grants":
                 view = (query.get("view") or ["developer"])[0].strip().lower()
                 if view == "owner":
@@ -235,6 +250,23 @@ class DeveloperPlatformHandler(BaseHTTPRequestHandler):
 
             principal = self._principal()
             store = self._store()
+            if parsed.path == "/v2/developer/code/preview":
+                self._send(HTTPStatus.OK, preview_flutter_code(
+                    str(body.get("project") or "research_os_flutter"),
+                    str(body.get("path") or ""),
+                    str(body.get("original_sha256") or ""),
+                    str(body.get("content") or ""),
+                ))
+                return
+            if parsed.path == "/v2/developer/code/apply":
+                self._send(HTTPStatus.OK, apply_flutter_code(
+                    str(body.get("project") or "research_os_flutter"),
+                    str(body.get("path") or ""),
+                    str(body.get("original_sha256") or ""),
+                    str(body.get("content") or ""),
+                    principal,
+                ))
+                return
             if parsed.path == "/v2/developer/access-requests":
                 item = store.request_access(
                     developer_id=principal,

@@ -1,0 +1,16 @@
+{
+  "contract_id": "research-os-main-final-audit-control-center-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Expose Main Final Audit as a read-only mode inside the existing Native Control Center without creating a second authority, runtime, navigation registry, or evidence ledger.",
+  "surface_ref": "apps/research_os_flutter/lib/src/features/control_center/native_control_center_page.dart",
+  "view_ref": "apps/research_os_flutter/lib/src/features/control_center/native_control_audit_view.dart",
+  "control_ref": "current/NATIVE_CONTROL_CENTER_OPERATING_CONTRACT.json",
+  "surface_contract_ref": "current/NATIVE_CONTROL_SURFACE_CONTRACT.json",
+  "authority": {"mode":"descriptive_only","may_execute":false,"may_authorize":false,"may_approve":false,"may_release":false,"may_merge":false},
+  "states": ["PASS","FAIL","DEFERRED","UNKNOWN"],
+  "required_checks": ["runtime_observation","brain_observation","skills_observation","provider_observation","agent_observation","agent_readiness_observation","workflow_observation","offline_package_audit_deferred_when_not_exposed","installed_baseline_deferred_when_not_exposed","release_authority_decision_deferred_when_not_exposed"],
+  "invariants": ["unknown_is_not_pass","deferred_is_not_pass","audit_is_observation_only","audit_does_not_replace_final_gate","audit_does_not_create_authority","audit_history_is_append_only_in_view","export_contains_no_credentials"],
+  "features": ["run_audit","audit_snapshot","audit_history","why_failed_detail","json_export"],
+  "no_duplicates": ["runtime","scheduler","queue","evidence_ledger","authorization_engine","navigation_registry","release_authority"]
+}

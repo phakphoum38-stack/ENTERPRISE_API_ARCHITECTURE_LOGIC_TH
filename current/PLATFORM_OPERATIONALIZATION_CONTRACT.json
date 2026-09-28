@@ -1,0 +1,95 @@
+{
+  "contract_id": "platform-operationalization-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "role": "PLATFORM_OPERATIONALIZATION",
+  "purpose": "Reusable read-only operating boundary for continuity, impact guarding, lifecycle classification and evidence reconciliation across Platform projects and replaceable AI/workers.",
+  "source_of_truth": "Git repository, canonical contracts and source-pinned evidence",
+  "authority": {
+    "mode": "DESCRIPTIVE_VALIDATING",
+    "may_execute": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "operations": [
+    "SNAPSHOT_BUILD",
+    "SNAPSHOT_VALIDATE",
+    "RESUME",
+    "IMPACT_GUARD",
+    "LIFECYCLE_CLASSIFY",
+    "EVIDENCE_RECONCILE"
+  ],
+  "continuity": {
+    "required_fields": [
+      "repository",
+      "source_sha",
+      "protected_baseline_sha",
+      "active_work",
+      "deferred_work",
+      "decisions",
+      "verified_truths",
+      "evidence_refs",
+      "open_risks",
+      "unknowns",
+      "authority_boundaries",
+      "next_action"
+    ],
+    "chat_is_not_source_of_truth": true,
+    "sha_mismatch": "HOLD",
+    "unknown": "HOLD",
+    "deferred_preserved": true
+  },
+  "impact_guard": {
+    "checks": [
+      "contracts",
+      "workflows",
+      "tests",
+      "final_gate",
+      "invariants",
+      "product_surfaces"
+    ],
+    "missing_required_impact": "HOLD",
+    "source_sha_must_match": true
+  },
+  "lifecycle": {
+    "DISCOVER": "RECON",
+    "PLAN": "IMPACT_GUARD",
+    "EXECUTE": "EXTERNAL_EXECUTION_PLANE",
+    "VERIFY": "EVIDENCE_RECONCILE",
+    "DEFERRED": "PRESERVE_AND_RETURN",
+    "UNKNOWN": "HOLD",
+    "CONFLICT": "REJECT_AND_RELEASE",
+    "RELEASE": "FINAL_GATE_ONLY"
+  },
+  "evidence": {
+    "required_source_sha": true,
+    "missing_reference": "HOLD",
+    "stale_reference": "HOLD"
+  },
+  "rules": [
+    "no_runtime_mutation",
+    "no_per_project_runtime",
+    "no_per_project_queue",
+    "no_per_project_evidence_ledger",
+    "external_tools_are_not_authority",
+    "unknown_is_not_pass",
+    "deferred_is_not_done",
+    "resource_conflict_is_reject_and_release",
+    "same_version_overwrite_forbidden",
+    "alternate_version_branching_preserved",
+    "final_gate_is_single_release_authority"
+  ],
+  "fail_closed": [
+    "missing_contract",
+    "missing_required_field",
+    "source_sha_mismatch",
+    "unknown_state",
+    "missing_impact_category",
+    "missing_evidence",
+    "stale_evidence",
+    "invalid_authority_boundary"
+  ]
+}

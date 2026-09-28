@@ -1,0 +1,146 @@
+name: Continuous Generated Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: continuous-generated-release-main
+  cancel-in-progress: true
+
+jobs:
+  dispatch-windows-installer:
+    name: Generate current canonical Windows installer
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout main source of truth
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Capture exact source SHA
+        id: dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          test -n "$SOURCE_SHA"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "started_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch canonical Research OS Unified Windows Distribution
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          gh workflow run research-os-phase-e-unified-windows-distribution.yml --repo "$GITHUB_REPOSITORY" --ref main -f target_sha="$SOURCE_SHA"
+          echo "Canonical Research OS installer workflow dispatched for SHA $SOURCE_SHA."
+
+      - name: Wait for canonical Windows installer result
+        id: wait_windows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STARTED_EPOCH: ${{ steps.dispatch.outputs.started_epoch }}
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow="research-os-phase-e-unified-windows-distribution.yml"
+          for attempt in $(seq 1 360); do
+            run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 50 --json databaseId,status,conclusion,createdAt,event,headSha | jq -c --argjson started "$STARTED_EPOCH" --arg sha "$SOURCE_SHA" 'map(select(.event == "workflow_dispatch" and .headSha == $sha and (.createdAt|fromdateiso8601) >= ($started - 30))) | sort_by(.createdAt) | last')"
+            if [[ -n "$run" && "$run" != "null" ]]; then
+              id="$(jq -r '.databaseId' <<< "$run")"
+              status="$(jq -r '.status' <<< "$run")"
+              conclusion="$(jq -r '.conclusion // ""' <<< "$run")"
+              echo "Canonical Windows installer run=$id status=$status conclusion=$conclusion sha=$SOURCE_SHA"
+              if [[ "$status" == "completed" ]]; then
+                if [[ "$conclusion" != "success" ]]; then exit 1; fi
+                echo "windows_run_id=$id" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            sleep 30
+          done
+          echo "Timed out waiting for canonical Windows installer workflow."
+          exit 1
+
+      - name: Verify canonical installer and E2E evidence exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINDOWS_RUN_ID: ${{ steps.wait_windows.outputs.windows_run_id }}
+          SOURCE_SHA: ${{ steps.dispatch.outputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$WINDOWS_RUN_ID"
+          run_sha="$(gh run view "$WINDOWS_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          test "$run_sha" = "$SOURCE_SHA"
+          artifacts="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$WINDOWS_RUN_ID/artifacts" --jq '.artifacts')"
+          if [[ -z "$artifacts" || "$artifacts" == "null" ]]; then artifacts="[]"; fi
+          expected="Research-OS-Unified-Windows-x64-${SOURCE_SHA}"
+          match="$(jq -r --arg expected "$expected" 'map(select(.name == $expected and .expired == false)) | length' <<< "$artifacts")"
+          test "$match" = "1"
+          rm -rf canonical-release && mkdir -p canonical-release
+          gh run download "$WINDOWS_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$expected" --dir canonical-release
+          setup="$(find canonical-release -type f -name 'Research-OS-Owner-Special-Setup-*-x64.exe' -print -quit)"
+          manifest="$(find canonical-release -type f -name 'DISTRIBUTION_MANIFEST.json' -print -quit)"
+          manifest_hash="$(find canonical-release -type f -name 'DISTRIBUTION_MANIFEST.sha256' -print -quit)"
+          install_e2e="$(find canonical-release -type f -name 'WINDOWS_INSTALL_E2E_EVIDENCE.json' -print -quit)"
+          release_evidence="$(find canonical-release -type f -name 'RELEASE_EVIDENCE.json' -print -quit)"
+          platform_zip="$(find canonical-release -type f -name 'Research-OS-Platform-Windows-x64-*.zip' -print -quit)"
+          test -n "$setup" && test -s "$setup"
+          test -n "$platform_zip" && test -s "$platform_zip"
+          test -n "$manifest" && test -n "$manifest_hash" && test -n "$install_e2e" && test -n "$release_evidence"
+          python3 - "$SOURCE_SHA" "$setup" "$manifest" "$manifest_hash" "$install_e2e" "$release_evidence" "$platform_zip" <<'PY'
+          import hashlib, json, pathlib, sys
+          source_sha, setup, manifest, manifest_hash, install_e2e, release_evidence, platform_zip = sys.argv[1:]
+          m = json.loads(pathlib.Path(manifest).read_text(encoding="utf-8-sig"))
+          e2e = json.loads(pathlib.Path(install_e2e).read_text(encoding="utf-8-sig"))
+          release = json.loads(pathlib.Path(release_evidence).read_text(encoding="utf-8-sig"))
+          manifest_digest = hashlib.sha256(pathlib.Path(manifest).read_bytes()).hexdigest()
+          assert m["source_sha"] == source_sha
+          assert m["product_name"] == "Research OS"
+          assert m["company_name"] == "Research OS Team"
+          assert pathlib.Path(manifest_hash).read_text(encoding="utf-8").strip().split()[0].lower() == manifest_digest
+          assert e2e["source_sha"] == source_sha
+          assert e2e["manifest_sha256"] == manifest_digest
+          assert e2e["release_authority"] == "FINAL_GATE"
+          assert all(e2e["checks"].values())
+          assert release["source_sha"] == source_sha
+          assert release["release_authority"] == "FINAL_GATE"
+          assert release["installer_role"] == "OWNER_SPECIAL"
+          assert release["installation_payload"] == "RESEARCH_OS_PLATFORM_ZIP"
+          assert release["platform_zip"] == pathlib.Path(platform_zip).name
+          assert release["platform_zip_sha256"] == hashlib.sha256(pathlib.Path(platform_zip).read_bytes()).hexdigest()
+          assert release["owner_special_setup"] == pathlib.Path(setup).name
+          assert pathlib.Path(setup).stat().st_size > 0
+          print("RESEARCH_OS_OWNER_SPECIAL_SETUP=PASS")
+          print(f"setup={pathlib.Path(setup).name}")
+          print(f"setup_sha256={hashlib.sha256(pathlib.Path(setup).read_bytes()).hexdigest()}")
+          PY
+          echo "RESEARCH_OS_WINDOWS_SOURCE_SHA=$SOURCE_SHA"
+          echo "RESEARCH_OS_OWNER_SPECIAL_SETUP_INSTALLER=PASS"
+          echo "artifact=$expected"
+  nightly-source-check:
+    name: Scheduled source freshness check
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify main exists
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Report source revision
+        run: git log -1 --format='%H %cI %s'

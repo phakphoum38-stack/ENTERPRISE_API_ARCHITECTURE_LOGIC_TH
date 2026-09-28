@@ -1,0 +1,8 @@
+{
+  "contract_id":"research-os-platform-ai-code-writer-v1",
+  "version":"1.0.0",
+  "status":"ACTIVE",
+  "pipeline":["REGISTRY","RECON","DEPENDENCY_GRAPH","CONTRACT","CHANGE_BOUNDARY","CODE_WRITER","VALIDATION","EVIDENCE"],
+  "rules":{"must_not_invent_canonical_authority":true,"evidence_before_patch":true,"minimal_patch":true,"unknown":"HOLD","ambiguous":"STOP","protected_core":"STOP"},
+  "release_authority":"FINAL_GATE"
+}

@@ -2,8 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:research_os_flutter/src/api/research_os_api_client.dart';
 import 'package:research_os_flutter/src/app_shell.dart';
+import 'package:research_os_flutter/src/features/github/github_dashboard_page.dart';
+import 'package:research_os_flutter/src/features/graph/knowledge_graph_page.dart';
 import 'package:research_os_flutter/src/features/home/home_page.dart';
+import 'package:research_os_flutter/src/ui/enterprise_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+String researchNavigationItemsLabel(int index) {
+  return researchNavigationItems.singleWhere((item) => item.index == index).label;
+}
 
 class FakeResearchOSApiClient extends ResearchOSApiClient {
   FakeResearchOSApiClient() : super(baseUrl: 'http://127.0.0.1:8787');
@@ -18,6 +25,20 @@ class FakeResearchOSApiClient extends ResearchOSApiClient {
   Future<Map<String, dynamic>> getProviders() async => <String, dynamic>{
         'active': 'gemini',
         'providers': <String>['mock', 'gemini'],
+      };
+
+  @override
+  Future<Map<String, dynamic>> getAIProviderConnections() async =>
+      <String, dynamic>{
+        'providers': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'provider': 'gemini',
+            'label': 'Gemini',
+            'state': 'CONNECTED',
+            'adapter': 'fake-test-adapter',
+            'api_fallback_available': true,
+          },
+        ],
       };
 
   @override
@@ -112,13 +133,36 @@ void setDesktopTestSize(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
 }
 
-Future<void> openDesktopDestination(WidgetTester tester, int index) async {
-  final finder = find.byKey(Key('desktop-nav-$index'));
+Future<void> pumpShell(WidgetTester tester) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 250));
+}
+
+Future<void> openSidebarDestination(
+  WidgetTester tester,
+  int index,
+) async {
+  final finder = find.byKey(
+    Key('v2-nav-$index'),
+    skipOffstage: false,
+  );
+  await tester.scrollUntilVisible(
+    finder,
+    300,
+    scrollable: find.descendant(
+      of: find.byKey(const Key('desktop-navigation-list-v2')),
+      matching: find.byType(Scrollable),
+    ),
+  );
   expect(finder, findsOneWidget);
-  await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 150));
+  await tester.pump(const Duration(milliseconds: 250));
 }
 
 void main() {
@@ -130,8 +174,14 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    var selectedIndex = -1;
     await tester.pumpWidget(
-      MaterialApp(home: HomePage(apiClient: FakeResearchOSApiClient())),
+      MaterialApp(
+        home: HomePage(
+          apiClient: FakeResearchOSApiClient(),
+          onNavigate: (index) => selectedIndex = index,
+        ),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -142,34 +192,51 @@ void main() {
     expect(find.text('Online'), findsOneWidget);
     expect(find.text('gemini'), findsOneWidget);
     expect(find.text('Ready'), findsOneWidget);
+    expect(find.text('AI & Agents'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('home-workspace-ai-agents')));
+    expect(selectedIndex, 2);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('AI Chat answers with memory', (tester) async {
+  testWidgets('AI conversation workspace provides text and voice', (tester) async {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+    await pumpShell(tester);
+    await openSidebarDestination(tester, 1);
+
+    expect(find.text('สนทนา AI'), findsOneWidget);
+    expect(find.text('Friend AI • Text + Voice • Local-first'), findsOneWidget);
+    expect(find.byKey(const Key('research-os-text-composer')), findsOneWidget);
+    expect(find.byKey(const Key('research-os-text-send')), findsOneWidget);
+    expect(find.byIcon(Icons.mic), findsOneWidget);
+    expect(find.text('พร้อมสนทนา'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Google Identity account entry is visible in navigation', (tester) async {
+    setDesktopTestSize(tester);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await pumpShell(tester);
+
+    final googleNav = find.byKey(
+      const Key('v2-nav-12'),
+      skipOffstage: false,
+    );
+    await tester.scrollUntilVisible(
+      googleNav,
+      300,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('desktop-navigation-list-v2')),
+        matching: find.byType(Scrollable),
       ),
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await openDesktopDestination(tester, 1);
-
-    await tester.enterText(
-      find.byType(TextField).first,
-      'บ้านเรามีความรู้อะไรบ้าง',
+    expect(googleNav, findsOneWidget);
+    expect(
+      researchNavigationItemsLabel(12),
+      'Google Sign-In',
     );
-    await tester.tap(find.byTooltip('ส่ง'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
-
-    expect(find.text('คำตอบจาก Gemini ที่ใช้ความรู้ในห้องสมุด'), findsOneWidget);
-    expect(find.text('Memory 1 รายการ'), findsOneWidget);
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('research_os_chat_sessions_v1'), isNotNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -177,14 +244,8 @@ void main() {
     setDesktopTestSize(tester);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await openDesktopDestination(tester, 3);
+    await pumpShell(tester);
+    await openSidebarDestination(tester, 3);
 
     expect(find.text('Conversation to Knowledge'), findsOneWidget);
     expect(find.textContaining('active'), findsWidgets);
@@ -196,13 +257,10 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
-      ),
+      MaterialApp(home: KnowledgeGraphPage(apiClient: FakeResearchOSApiClient())),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await openDesktopDestination(tester, 4);
+    await tester.pump(const Duration(milliseconds: 150));
 
     expect(find.byKey(const Key('knowledge-graph-heading')), findsOneWidget);
     expect(find.text('Research Memory'), findsOneWidget);
@@ -218,13 +276,15 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
-        home: ResearchOSAppShell(apiClient: FakeResearchOSApiClient()),
+        home: Scaffold(
+          body: GitHubDashboardPage(apiClient: FakeResearchOSApiClient()),
+        ),
       ),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await openDesktopDestination(tester, 5);
+    await tester.pump(const Duration(milliseconds: 150));
 
+    expect(find.text('GitHub Control Center'), findsOneWidget);
     expect(find.text('Research OS Flutter'), findsOneWidget);
     expect(find.text('Add GitHub dashboard'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -246,8 +306,8 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await openDesktopDestination(tester, 9);
+    await tester.pump(const Duration(milliseconds: 250));
+    await openSidebarDestination(tester, 9);
 
     expect(find.text('Active Provider'), findsOneWidget);
     expect(find.text('gemini'), findsWidgets);
