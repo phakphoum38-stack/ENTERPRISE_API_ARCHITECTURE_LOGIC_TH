@@ -41,12 +41,6 @@ jobs:
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$TARGET_SHA"
           echo "CHECKED_OUT_SHA=$actual"
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-      - name: Install contract validator dependency
-        run: python -m pip install --disable-pip-version-check --no-input PyYAML
       - name: Validate unified final gate contract
         run: python tools/validate_research_os_unified_final_gate.py
       - name: Validate canonical platform contract
