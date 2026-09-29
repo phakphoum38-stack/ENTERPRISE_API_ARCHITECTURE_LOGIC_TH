@@ -34,6 +34,13 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+
+    final currentProfile =
+        ApiEndpointStore.profileForUrl(widget.apiClient.baseUrl);
+    _selectedPort = currentProfile == ApiEndpointStore.connectionOwnerSpecial
+        ? ApiEndpointStore.port2Label
+        : ApiEndpointStore.port1Label;
+
     _loadProviders();
   }
 
@@ -42,11 +49,15 @@ class _LoginPageState extends State<LoginPage> {
       final response = await widget.apiClient.getIdentityProviders();
       final raw = response['providers'];
       final providers = raw is List
-          ? raw.whereType<Map>().map((item) {
-              return Map<String, dynamic>.from(
-                item.map((key, value) => MapEntry(key.toString(), value)),
-              );
-            }).where((item) => item['available'] == true).toList(growable: false)
+          ? raw
+              .whereType<Map>()
+              .map((item) {
+                return Map<String, dynamic>.from(
+                  item.map((key, value) => MapEntry(key.toString(), value)),
+                );
+              })
+              .where((item) => item['available'] == true)
+              .toList(growable: false)
           : const <Map<String, dynamic>>[];
       if (!mounted) return;
       setState(() {
@@ -143,9 +154,113 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  String _selectedLoginMethod = '';
+  String _selectedUserLevel = '';
+  String _selectedPort = ApiEndpointStore.port1Label;
+
+  Future<void> _selectPort(String label) async {
+    final profile = ApiEndpointStore.profileForPortLabel(label);
+    final currentProfile =
+        ApiEndpointStore.profileForUrl(widget.apiClient.baseUrl);
+
+    if (profile == currentProfile) {
+      if (mounted) {
+        setState(() => _selectedPort = label);
+      }
+      return;
+    }
+
+    await widget.onConnectionChanged(
+      ApiEndpointStore.profileUrl(profile),
+    );
+
+    if (mounted) {
+      setState(() => _selectedPort = label);
+    }
+  }
+
+  String _providerIdForLoginMethod(String method) {
+    switch (method) {
+      case ApiEndpointStore.loginWindows:
+        return 'microsoft';
+      case ApiEndpointStore.loginGitHub:
+        return 'github';
+      case ApiEndpointStore.loginGoogle:
+        return 'google';
+      default:
+        return '';
+    }
+  }
+
+  Map<String, dynamic>? _providerForLoginMethod(String method) {
+    final providerId = _providerIdForLoginMethod(method);
+    if (providerId.isEmpty) return null;
+
+    for (final provider in _providers) {
+      if (provider['id']?.toString().toLowerCase() == providerId) {
+        return provider;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _continueLogin() async {
+    final method = _selectedLoginMethod;
+
+    if (method.isEmpty) {
+      setState(() {
+        _error = true;
+        _message = 'Please select a login method.';
+      });
+      return;
+    }
+
+    if (method == ApiEndpointStore.loginNone) {
+      setState(() {
+        _error = false;
+        _message = 'No login selected.';
+      });
+      return;
+    }
+
+    if (method == ApiEndpointStore.loginCustom) {
+      setState(() {
+        _error = false;
+        _message = 'Custom login is available through the configured API.';
+      });
+      return;
+    }
+
+    final provider = _providerForLoginMethod(method);
+    if (provider == null) {
+      setState(() {
+        _error = true;
+        _message = 'The selected login provider is not available.';
+      });
+      return;
+    }
+
+    await _login(provider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+
+    const loginMethods = <String, String>{
+      ApiEndpointStore.loginWindows: 'Windows',
+      ApiEndpointStore.loginGitHub: 'GitHub',
+      ApiEndpointStore.loginGoogle: 'Google',
+      ApiEndpointStore.loginNone: 'None',
+      ApiEndpointStore.loginCustom: 'Custom',
+    };
+
+    const userLevels = <String, String>{
+      ApiEndpointStore.userLevelOwner: 'Owner',
+      ApiEndpointStore.userLevelDeveloper: 'Developer',
+      ApiEndpointStore.userLevelGeneral: 'General',
+    };
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -154,159 +269,199 @@ class _LoginPageState extends State<LoginPage> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(30),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Icon(Icons.hub_outlined, size: 64, color: scheme.primary),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Research OS',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Sign in to continue',
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(context).dividerColor),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: ExpansionTile(
-                        initiallyExpanded: false,
-                        leading: const Icon(Icons.login_outlined),
-                        title: const Text(
-                          'Login',
+                padding: const EdgeInsets.all(28),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(30),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Icon(
+                          Icons.hub_outlined,
+                          size: 64,
+                          color: scheme.primary,
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Research OS',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Sign in to continue',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 28),
+
+                        // --------------------------------------------------
+                        // PORT
+                        // --------------------------------------------------
+                        const Text(
+                          'PORT',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
-                        subtitle: Text(
-                          _loading
-                              ? 'กำลังตรวจสอบตัวเลือกการเข้าสู่ระบบ…'
-                              : 'เลือกผู้ให้บริการภายใน',
-                        ),
-                        childrenPadding:
-                            const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                        children: <Widget>[
-                          if (_loading)
-                            const Padding(
-                              padding: EdgeInsets.all(18),
-                              child: CircularProgressIndicator(),
-                            )
-                          else if (_providers.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(18),
-                              child: Text(
-                                'ยังไม่มีผู้ให้บริการที่พร้อมใช้งาน',
-                                textAlign: TextAlign.center,
-                              ),
-                            )
-                          else
-                            ..._providers.map(
-                              (provider) => Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: _busyProvider == null
-                                        ? () => _login(provider)
-                                        : null,
-                                    icon: _busyProvider ==
-                                            provider['id']?.toString()
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : Icon(
-                                            _providerIcon(
-                                              provider['id']?.toString() ?? '',
-                                            ),
-                                          ),
-                                    label: Text(
-                                      _busyProvider ==
-                                              provider['id']?.toString()
-                                          ? 'กำลังเปิด…'
-                                          : 'Continue with ${provider['name']}',
-                                    ),
-                                  ),
-                                ),
-                              ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          key: const ValueKey('login-port-dropdown'),
+                          initialValue: _selectedPort,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const <DropdownMenuItem<String>>[
+                            DropdownMenuItem<String>(
+                              value: ApiEndpointStore.port1Label,
+                              child: Text(ApiEndpointStore.port1Label),
                             ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(context).dividerColor),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: ExpansionTile(
-                        initiallyExpanded: false,
-                        leading: const Icon(Icons.link_outlined),
-                        title: const Text(
-                          'Connection',
+                            DropdownMenuItem<String>(
+                              value: ApiEndpointStore.port2Label,
+                              child: Text(ApiEndpointStore.port2Label),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              _selectPort(value);
+                            }
+                          },
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // --------------------------------------------------
+                        // LOGIN
+                        // --------------------------------------------------
+                        const Text(
+                          'LOGIN',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
-                        subtitle: Text(
-                          ApiEndpointStore.profileLabel(widget.connectionProfile),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          key: const ValueKey('login-method-dropdown'),
+                          initialValue: _selectedLoginMethod.isEmpty
+                              ? null
+                              : _selectedLoginMethod,
+                          decoration: const InputDecoration(
+                            hintText: 'Select Login Method',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: loginMethods.entries
+                              .map(
+                                (entry) => DropdownMenuItem<String>(
+                                  value: entry.key,
+                                  child: Text(entry.value),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _selectedLoginMethod = value;
+                              _message = null;
+                              _error = false;
+                            });
+                          },
                         ),
-                        childrenPadding:
-                            const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                        children: <Widget>[
-                          RadioGroup<String>(
-                            groupValue: widget.connectionProfile,
-                            onChanged: (value) {
-                              if (value != null) {
-                                _selectConnection(value);
-                              }
-                            },
-                            child: Column(
-                              children: <Widget>[
-                                RadioListTile<String>(
-                                  value: ApiEndpointStore.connectionResearchOs,
-                                  title: const Text('Research OS'),
+
+                        const SizedBox(height: 20),
+
+                        // --------------------------------------------------
+                        // USER LEVEL
+                        // --------------------------------------------------
+                        const Text(
+                          'USER LEVEL',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          key: const ValueKey('login-user-level-dropdown'),
+                          initialValue: _selectedUserLevel.isEmpty
+                              ? null
+                              : _selectedUserLevel,
+                          decoration: const InputDecoration(
+                            hintText: 'Select User Level',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: userLevels.entries
+                              .map(
+                                (entry) => DropdownMenuItem<String>(
+                                  value: entry.key,
+                                  child: Text(entry.value),
                                 ),
-                                RadioListTile<String>(
-                                  value: ApiEndpointStore.connectionDeveloperRuntime,
-                                  title: const Text('Developer Runtime'),
-                                ),
-                              ],
+                              )
+                              .toList(growable: false),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _selectedUserLevel = value;
+                              _message = null;
+                              _error = false;
+                            });
+                          },
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // The selected user level is UI context only.
+                        // Authorization remains server-derived.
+                        FilledButton.icon(
+                          onPressed:
+                              _busyProvider == null ? _continueLogin : null,
+                          icon: _busyProvider != null
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.login),
+                          label: Text(
+                            _busyProvider == null
+                                ? 'Continue'
+                                : 'Signing in...',
+                          ),
+                        ),
+
+                        if (_message != null) ...<Widget>[
+                          const SizedBox(height: 18),
+                          Text(
+                            _message!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _error ? scheme.error : scheme.primary,
                             ),
                           ),
                         ],
-                      ),
+
+                        // Keep provider availability out of the primary
+                        // surface. The dropdown remains the single LOGIN
+                        // entry point; provider details stay folded.
+                        if (_loading) ...<Widget>[
+                          const SizedBox(height: 16),
+                          const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (_message != null) ...<Widget>[
-                      const SizedBox(height: 18),
-                      Text(
-                        _message!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: _error ? scheme.error : scheme.primary,
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  ),
-  );
+    );
   }
 }
