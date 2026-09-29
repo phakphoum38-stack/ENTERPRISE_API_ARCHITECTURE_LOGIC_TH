@@ -1,0 +1,48 @@
+name: Research OS GUI UX Validation
+
+"on":
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/research_os_flutter/**'
+      - 'design/**'
+      - '.github/workflows/gui-ux-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gui-ux-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gui-ux:
+    name: Flutter GUI UX checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate design assets
+        run: python design/validate_assets.py
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: apps/research_os_flutter
+        run: flutter pub get
+
+      - name: Analyze Flutter source
+        working-directory: apps/research_os_flutter
+        run: flutter analyze
+
+      - name: Run Flutter widget tests
+        working-directory: apps/research_os_flutter
+        run: flutter test

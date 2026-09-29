@@ -8,6 +8,13 @@ on:
         required: false
         type: string
         default: ""
+  workflow_call:
+    inputs:
+      target_sha:
+        description: Exact source commit SHA to build and validate
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
