@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101411">
+  <title>เข้าสู่ Research OS</title>
+  <link rel="stylesheet" href="/login.css">
+</head>
+<body>
+  <main class="login-shell">
+    <section class="login-panel" aria-labelledby="login-title">
+      <a class="brand" href="/" aria-label="กลับไป Research OS">
+        <span class="brand-mark">R</span>
+        <span><strong>Research OS</strong><small>Wide Research Workspace</small></span>
+      </a>
+
+      <div class="login-copy">
+        <span class="eyebrow">RESEARCH OS 3.2</span>
+        <h1 id="login-title">ยินดีต้อนรับกลับครับเพื่อน</h1>
+        <p>เข้าสู่ workspace ของคุณ เพื่อเริ่มงานวิจัย จัดการหลักฐาน และบันทึกความรู้ที่ผ่านการตรวจสอบ</p>
+      </div>
+
+      <form id="login-form" class="login-actions">
+        <label for="username">อีเมลหรือชื่อผู้ใช้</label>
+        <input id="username" name="username" type="text" autocomplete="username" required placeholder="you@example.com">
+        <label for="password">รหัสผ่าน</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="ป้อนรหัสผ่านของคุณ">
+        <button id="login-button" class="google-button" type="submit">
+          <span class="google-icon" aria-hidden="true">R</span>
+          <span>เข้าสู่ระบบ</span>
+          <span class="arrow" aria-hidden="true">&#8594;</span>
+        </button>
+        <p id="login-status" class="status" role="status" aria-live="polite"></p>
+      </form>
+
+      <div class="login-footer">
+        <span>หรือ</span>
+        <a href="/">เข้าดู Research workspace</a>
+      </div>
+      <p class="privacy">ข้อมูลรับรองและ OAuth token จะถูกจัดเก็บไว้ที่ backend เท่านั้น</p>
+    </section>
+
+    <aside class="login-aside" aria-label="Research loop">
+      <div class="orbit orbit-one"></div>
+      <div class="orbit orbit-two"></div>
+      <div class="aside-content">
+        <span class="eyebrow">THE RESEARCH LOOP</span>
+        <h2>Question<br><em>to knowledge.</em></h2>
+        <div class="loop-list">
+          <span><b>01</b> Define the question</span>
+          <span><b>02</b> Gather the evidence</span>
+          <span><b>03</b> Verify every claim</span>
+          <span><b>04</b> Remember what matters</span>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const form = document.getElementById('login-form');
+    const button = document.getElementById('login-button');
+    const status = document.getElementById('login-status');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      status.textContent = 'กำลังเข้าสู่ระบบ…';
+      try {
+        const response = await fetch('/v1/auth/login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+        }
+        window.location.assign('/');
+      } catch (error) {
+        status.textContent = error.message;
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
