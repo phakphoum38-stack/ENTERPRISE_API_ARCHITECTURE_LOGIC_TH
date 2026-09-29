@@ -136,24 +136,6 @@ class _LoginPageState extends State<LoginPage> {
     return false;
   }
 
-  Future<void> _selectConnection(String profile) async {
-    if (profile == ApiEndpointStore.profileForUrl(widget.apiClient.baseUrl)) {
-      return;
-    }
-    await widget.onConnectionChanged(ApiEndpointStore.profileUrl(profile));
-  }
-
-  IconData _providerIcon(String id) {
-    switch (id) {
-      case 'microsoft':
-        return Icons.window;
-      case 'github':
-        return Icons.code;
-      default:
-        return Icons.account_circle_outlined;
-    }
-  }
-
   String _selectedLoginMethod = '';
   String _selectedUserLevel = '';
   String _selectedPort = ApiEndpointStore.port1Label;

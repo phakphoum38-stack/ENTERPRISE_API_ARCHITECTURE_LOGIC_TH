@@ -30,7 +30,6 @@ void main() {
         }
 
         fail('Unexpected request: ${request.method} ${request.url}');
-        return http.Response('{}', 500);
       }),
     );
 
