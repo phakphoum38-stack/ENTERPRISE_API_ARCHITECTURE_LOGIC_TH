@@ -2,9 +2,9 @@ name: Research OS CI
 
 on:
   push:
-    branches: [ main, research-os-scaffold ]
+    branches: [main, research-os-scaffold]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -73,11 +73,35 @@ jobs:
           docker logs research-os-ci || true
           exit 1
 
+  registry-credentials:
+    runs-on: ubuntu-latest
+
+    outputs:
+      available: ${{ steps.detect.outputs.available }}
+
+    steps:
+      - name: Detect registry credentials
+        id: detect
+        env:
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          if [[ -n "$DOCKER_REGISTRY" && -n "$DOCKER_USERNAME" && -n "$DOCKER_PASSWORD" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Docker registry credentials: AVAILABLE"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Docker registry credentials: NOT CONFIGURED"
+          fi
+
   push-image:
     runs-on: ubuntu-latest
-    needs: build-and-test-image
+    needs:
+      - build-and-test-image
+      - registry-credentials
 
-    if: ${{ secrets.DOCKER_REGISTRY && secrets.DOCKER_USERNAME && secrets.DOCKER_PASSWORD }}
+    if: ${{ github.event_name == 'push' && needs.registry-credentials.outputs.available == 'true' }}
 
     steps:
       - uses: actions/checkout@v4
