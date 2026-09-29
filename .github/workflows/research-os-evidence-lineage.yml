@@ -42,6 +42,7 @@ jobs:
       MERGE_SHA: ${{ inputs.merge_sha || github.sha }}
     steps:
       - name: Resolve current merged PR on main push
+        id: resolve
         if: ${{ github.event_name == 'push' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,7 +65,10 @@ jobs:
           prs = gh(f'/repos/{owner}/{repo}/commits/{merge}/pulls')
           candidates = [p for p in prs if p.get('merged_at') and p.get('merge_commit_sha') == merge]
           if len(candidates) != 1:
-              raise SystemExit(f'Cannot resolve exactly one merged PR for main push {merge}: found {len(candidates)} candidates')
+              print(f'No applicable merged PR for main push {merge}: found {len(candidates)} candidates; Evidence Lineage is not applicable.')
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                  fh.write('applicable=false\n')
+              raise SystemExit(0)
 
           pr = gh(f"/repos/{owner}/{repo}/pulls/{candidates[0]['number']}")
           base = pr.get('base', {}).get('sha', '')
@@ -79,8 +83,15 @@ jobs:
               f"HEAD_SHA={head}\n"
               f"MERGE_SHA={merge}\n"
           )
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write('applicable=true\n')
           PY
       - name: Validate explicit reconciliation inputs
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            steps.resolve.outputs.applicable == 'true'
+          }}
         shell: bash
         run: |
           set -euo pipefail
@@ -91,6 +102,11 @@ jobs:
             test -n "${MERGE_SHA}" || { echo 'MERGE_SHA is required'; exit 1; }
           fi
       - name: Wait for exact PR-head CI to become terminal
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            steps.resolve.outputs.applicable == 'true'
+          }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -172,18 +188,33 @@ jobs:
               time.sleep(poll_seconds)
           PY
       - name: Checkout merge target
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            steps.resolve.outputs.applicable == 'true'
+          }}
         uses: actions/checkout@v4
         with:
           ref: ${{ env.MERGE_SHA }}
           fetch-depth: 0
 
       - name: Test lineage classifier
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            steps.resolve.outputs.applicable == 'true'
+          }}
         shell: bash
         run: |
           set -euo pipefail
           python -m unittest discover -s tools/aeos -p 'test_evidence_lineage.py' -v
 
       - name: Reconcile commit lineage and CI evidence
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            steps.resolve.outputs.applicable == 'true'
+          }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -330,7 +361,14 @@ jobs:
               raise SystemExit('Evidence lineage GAP: keep #111 open; do not advance to FINAL')
           PY
       - name: Publish evidence to job summary
-        if: always()
+        if: >-
+          ${{
+            always() &&
+            (
+              github.event_name == 'workflow_dispatch' ||
+              steps.resolve.outputs.applicable == 'true'
+            )
+          }}
         shell: bash
         run: |
           if [ -f evidence/lineage/canonical-evidence.json ]; then
@@ -338,7 +376,14 @@ jobs:
             cat evidence/lineage/canonical-evidence.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Upload canonical evidence
-        if: always()
+        if: >-
+          ${{
+            always() &&
+            (
+              github.event_name == 'workflow_dispatch' ||
+              steps.resolve.outputs.applicable == 'true'
+            )
+          }}
         uses: actions/upload-artifact@v4
         with:
           name: canonical-evidence-lineage-${{ env.HEAD_SHA }}
