@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../api/api_endpoint_store.dart';
 import '../../api/research_os_api_client.dart';
@@ -25,224 +25,149 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  List<Map<String, dynamic>> _providers = const <Map<String, dynamic>>[];
   bool _loading = true;
-  String? _busyProvider;
-  String? _message;
   bool _error = false;
+  String? _message;
+  String? _pairingId;
+  String? _pairingSecret;
+  String? _qrPayload;
+  Timer? _pollTimer;
+  bool _refreshing = false;
+  String _selectedPort = ApiEndpointStore.port1Label;
 
   @override
   void initState() {
     super.initState();
-
-    final currentProfile =
-        ApiEndpointStore.profileForUrl(widget.apiClient.baseUrl);
+    final currentProfile = ApiEndpointStore.profileForUrl(widget.apiClient.baseUrl);
     _selectedPort = currentProfile == ApiEndpointStore.connectionOwnerSpecial
         ? ApiEndpointStore.port2Label
         : ApiEndpointStore.port1Label;
-
-    _loadProviders();
+    _startPairing();
   }
 
-  Future<void> _loadProviders() async {
-    try {
-      final response = await widget.apiClient.getIdentityProviders();
-      final raw = response['providers'];
-      final providers = raw is List
-          ? raw
-              .whereType<Map>()
-              .map((item) {
-                return Map<String, dynamic>.from(
-                  item.map((key, value) => MapEntry(key.toString(), value)),
-                );
-              })
-              .where((item) => item['available'] == true)
-              .toList(growable: false)
-          : const <Map<String, dynamic>>[];
-      if (!mounted) return;
-      setState(() {
-        _providers = providers;
-        _loading = false;
-      });
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = true;
-        _message = error.toString();
-      });
-    }
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
-
-  Future<void> _login(Map<String, dynamic> provider) async {
-    final id = provider['id']?.toString().trim() ?? '';
-    final name = provider['name']?.toString().trim() ?? id;
-    if (id.isEmpty || _busyProvider != null) return;
-    setState(() {
-      _busyProvider = id;
-      _message = null;
-      _error = false;
-    });
-    try {
-      final response = await widget.apiClient.startProviderLogin(id);
-      final state = response['state']?.toString().trim() ?? '';
-      final rawUrl = response['authorization_url']?.toString().trim() ?? '';
-      final uri = Uri.tryParse(rawUrl);
-      if (state.isEmpty || uri == null || !uri.hasScheme) {
-        throw const ResearchOSApiException(
-          'Research OS ไม่ได้รับ OAuth state หรือ authorization URL ที่ถูกต้อง',
-        );
-      }
-      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!opened) {
-        throw ResearchOSApiException('เปิด $name Sign-In ไม่สำเร็จ');
-      }
-      setState(() {
-        _message = 'กรุณาเข้าสู่ระบบในเบราว์เซอร์ กำลังรอการยืนยัน…';
-      });
-      if (await _waitForHandoff(state)) {
-        if (mounted) widget.onAuthenticated();
-      } else {
-        throw const ResearchOSApiException(
-          'การเข้าสู่ระบบหมดเวลา กรุณาลองใหม่อีกครั้ง',
-        );
-      }
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = true;
-        _message = error.toString();
-      });
-    } finally {
-      if (mounted) setState(() => _busyProvider = null);
-    }
-  }
-
-  Future<bool> _waitForHandoff(String state) async {
-    for (var attempt = 0; attempt < 120; attempt++) {
-      await Future<void>.delayed(const Duration(seconds: 1));
-      try {
-        final result = await widget.apiClient.exchangeProviderHandoff(state);
-        final session = result['session']?.toString().trim() ?? '';
-        if (result['connected'] == true && session.isNotEmpty) {
-          widget.apiClient.setSession(session);
-          return true;
-        }
-      } on ResearchOSApiException {
-        // Handoff is unavailable until the provider callback completes.
-      }
-      if (!mounted) return false;
-    }
-    return false;
-  }
-
-  String _selectedLoginMethod = '';
-  String _selectedUserLevel = '';
-  String _selectedPort = ApiEndpointStore.port1Label;
 
   Future<void> _selectPort(String label) async {
     final profile = ApiEndpointStore.profileForPortLabel(label);
-    final currentProfile =
-        ApiEndpointStore.profileForUrl(widget.apiClient.baseUrl);
-
+    final currentProfile = ApiEndpointStore.profileForUrl(widget.apiClient.baseUrl);
     if (profile == currentProfile) {
-      if (mounted) {
-        setState(() => _selectedPort = label);
-      }
+      if (mounted) setState(() => _selectedPort = label);
       return;
     }
+    setState(() => _refreshing = true);
+    try {
+      await widget.onConnectionChanged(ApiEndpointStore.profileUrl(profile));
+      if (!mounted) return;
+      setState(() => _selectedPort = label);
+      await _startPairing();
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
 
-    await widget.onConnectionChanged(
-      ApiEndpointStore.profileUrl(profile),
-    );
+  Future<void> _startPairing() async {
+    _pollTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _refreshing = true;
+        _error = false;
+        _message = null;
+        _pairingId = null;
+        _pairingSecret = null;
+        _qrPayload = null;
+      });
+    }
+    try {
+      final result = await widget.apiClient.startPairing();
+      final id = result['pairing_id']?.toString().trim() ?? '';
+      final secret = result['pairing_secret']?.toString().trim() ?? '';
+      final payload = result['qr_payload']?.toString().trim() ?? '';
+      if (id.isEmpty || secret.isEmpty || payload.isEmpty) {
+        throw const ResearchOSApiException('Research OS did not return a valid QR pairing payload.');
+      }
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _refreshing = false;
+        _pairingId = id;
+        _pairingSecret = secret;
+        _qrPayload = payload;
+        _message = 'Scan this QR code with a trusted device.';
+      });
+      unawaited(_pollPairing());
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _refreshing = false;
+        _error = true;
+        _message = error.toString();
+      });
+    }
+  }
+
+  Future<void> _pollPairing() async {
+    final pairingId = _pairingId;
+    final secret = _pairingSecret;
+    if (pairingId == null || secret == null) return;
+
+    for (var attempt = 0; attempt < 180; attempt++) {
+      if (!mounted) return;
+      try {
+        final status = await widget.apiClient.getPairingStatus(pairingId, secret);
+        if (status['connected'] == true && status['handoff_ready'] == true) {
+          final result = await widget.apiClient.exchangeProviderHandoff(secret);
+          final session = result['session']?.toString().trim() ?? '';
+          if (result['connected'] == true && session.isNotEmpty) {
+            widget.apiClient.setSession(session);
+            if (!mounted) return;
+            setState(() {
+              _error = false;
+              _message = 'Connected';
+            });
+            widget.onAuthenticated();
+            return;
+          }
+          throw const ResearchOSApiException('Research OS did not return a valid session handoff.');
+        }
+        final statusName = status['status']?.toString() ?? 'PENDING';
+        if (statusName == 'EXPIRED' || statusName == 'CANCELLED') {
+          if (!mounted) return;
+          setState(() {
+            _error = true;
+            _message = 'QR pairing $statusName. Refresh the QR code and try again.';
+          });
+          return;
+        }
+      } on ResearchOSApiException {
+        // The pairing remains pending or a one-time handoff race is still settling.
+      } on Object catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _error = true;
+          _message = error.toString();
+        });
+        return;
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
 
     if (mounted) {
-      setState(() => _selectedPort = label);
-    }
-  }
-
-  String _providerIdForLoginMethod(String method) {
-    switch (method) {
-      case ApiEndpointStore.loginWindows:
-        return 'microsoft';
-      case ApiEndpointStore.loginGitHub:
-        return 'github';
-      case ApiEndpointStore.loginGoogle:
-        return 'google';
-      default:
-        return '';
-    }
-  }
-
-  Map<String, dynamic>? _providerForLoginMethod(String method) {
-    final providerId = _providerIdForLoginMethod(method);
-    if (providerId.isEmpty) return null;
-
-    for (final provider in _providers) {
-      if (provider['id']?.toString().toLowerCase() == providerId) {
-        return provider;
-      }
-    }
-    return null;
-  }
-
-  Future<void> _continueLogin() async {
-    final method = _selectedLoginMethod;
-
-    if (method.isEmpty) {
       setState(() {
         _error = true;
-        _message = 'Please select a login method.';
+        _message = 'QR pairing expired. Refresh the QR code and try again.';
       });
-      return;
     }
-
-    if (method == ApiEndpointStore.loginNone) {
-      setState(() {
-        _error = false;
-        _message = 'No login selected.';
-      });
-      return;
-    }
-
-    if (method == ApiEndpointStore.loginCustom) {
-      setState(() {
-        _error = false;
-        _message = 'Custom login is available through the configured API.';
-      });
-      return;
-    }
-
-    final provider = _providerForLoginMethod(method);
-    if (provider == null) {
-      setState(() {
-        _error = true;
-        _message = 'The selected login provider is not available.';
-      });
-      return;
-    }
-
-    await _login(provider);
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
-    const loginMethods = <String, String>{
-      ApiEndpointStore.loginWindows: 'Windows',
-      ApiEndpointStore.loginGitHub: 'GitHub',
-      ApiEndpointStore.loginGoogle: 'Google',
-      ApiEndpointStore.loginNone: 'None',
-      ApiEndpointStore.loginCustom: 'Custom',
-    };
-
-    const userLevels = <String, String>{
-      ApiEndpointStore.userLevelOwner: 'Owner',
-      ApiEndpointStore.userLevelDeveloper: 'Developer',
-      ApiEndpointStore.userLevelGeneral: 'General',
-    };
-
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -259,182 +184,77 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        Icon(
-                          Icons.hub_outlined,
-                          size: 64,
-                          color: scheme.primary,
-                        ),
+                        Icon(Icons.qr_code_2, size: 64, color: scheme.primary),
                         const SizedBox(height: 18),
                         Text(
                           'Research OS',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Sign in to continue',
+                          'Scan to Connect',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        const SizedBox(height: 28),
-
-                        // --------------------------------------------------
-                        // PORT
-                        // --------------------------------------------------
-                        const Text(
-                          'PORT',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                        const SizedBox(height: 24),
+                        const Text('PORT', style: TextStyle(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           key: const ValueKey('login-port-dropdown'),
                           initialValue: _selectedPort,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                          ),
+                          decoration: const InputDecoration(border: OutlineInputBorder()),
                           items: const <DropdownMenuItem<String>>[
-                            DropdownMenuItem<String>(
-                              value: ApiEndpointStore.port1Label,
-                              child: Text(ApiEndpointStore.port1Label),
-                            ),
-                            DropdownMenuItem<String>(
-                              value: ApiEndpointStore.port2Label,
-                              child: Text(ApiEndpointStore.port2Label),
-                            ),
+                            DropdownMenuItem<String>(value: ApiEndpointStore.port1Label, child: Text(ApiEndpointStore.port1Label)),
+                            DropdownMenuItem<String>(value: ApiEndpointStore.port2Label, child: Text(ApiEndpointStore.port2Label)),
                           ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              _selectPort(value);
-                            }
+                          onChanged: _refreshing ? null : (value) {
+                            if (value != null) _selectPort(value);
                           },
                         ),
-
-                        const SizedBox(height: 20),
-
-                        // --------------------------------------------------
-                        // LOGIN
-                        // --------------------------------------------------
-                        const Text(
-                          'LOGIN',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          key: const ValueKey('login-method-dropdown'),
-                          initialValue: _selectedLoginMethod.isEmpty
-                              ? null
-                              : _selectedLoginMethod,
-                          decoration: const InputDecoration(
-                            hintText: 'Select Login Method',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: loginMethods.entries
-                              .map(
-                                (entry) => DropdownMenuItem<String>(
-                                  value: entry.key,
-                                  child: Text(entry.value),
-                                ),
-                              )
-                              .toList(growable: false),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() {
-                              _selectedLoginMethod = value;
-                              _message = null;
-                              _error = false;
-                            });
-                          },
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // --------------------------------------------------
-                        // USER LEVEL
-                        // --------------------------------------------------
-                        const Text(
-                          'USER LEVEL',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          key: const ValueKey('login-user-level-dropdown'),
-                          initialValue: _selectedUserLevel.isEmpty
-                              ? null
-                              : _selectedUserLevel,
-                          decoration: const InputDecoration(
-                            hintText: 'Select User Level',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: userLevels.entries
-                              .map(
-                                (entry) => DropdownMenuItem<String>(
-                                  value: entry.key,
-                                  child: Text(entry.value),
-                                ),
-                              )
-                              .toList(growable: false),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() {
-                              _selectedUserLevel = value;
-                              _message = null;
-                              _error = false;
-                            });
-                          },
-                        ),
-
                         const SizedBox(height: 24),
-
-                        // The selected user level is UI context only.
-                        // Authorization remains server-derived.
-                        FilledButton.icon(
-                          onPressed:
-                              _busyProvider == null ? _continueLogin : null,
-                          icon: _busyProvider != null
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.login),
-                          label: Text(
-                            _busyProvider == null
-                                ? 'Continue'
-                                : 'Signing in...',
-                          ),
+                        if (_qrPayload != null)
+                          Center(
+                            child: Semantics(
+                              label: 'Research OS QR pairing code',
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: QrImageView(
+                                  data: _qrPayload!,
+                                  version: QrVersions.auto,
+                                  size: 260,
+                                  gapless: false,
+                                  backgroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          const Center(child: SizedBox(width: 48, height: 48, child: CircularProgressIndicator())),
+                        const SizedBox(height: 20),
+                        Text(
+                          _loading ? 'Creating a secure pairing code…' : 'Scan this code with your trusted device.',
+                          textAlign: TextAlign.center,
                         ),
-
                         if (_message != null) ...<Widget>[
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 12),
                           Text(
                             _message!,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _error ? scheme.error : scheme.primary,
-                            ),
+                            style: TextStyle(color: _error ? scheme.error : scheme.primary),
                           ),
                         ],
-
-                        // Keep provider availability out of the primary
-                        // surface. The dropdown remains the single LOGIN
-                        // entry point; provider details stay folded.
-                        if (_loading) ...<Widget>[
-                          const SizedBox(height: 16),
-                          const Center(
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
-                            ),
-                          ),
-                        ],
+                        const SizedBox(height: 22),
+                        OutlinedButton.icon(
+                          key: const ValueKey('refresh-qr-button'),
+                          onPressed: _refreshing ? null : _startPairing,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Refresh QR'),
+                        ),
                       ],
                     ),
                   ),

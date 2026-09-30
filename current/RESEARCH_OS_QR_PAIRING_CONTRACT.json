@@ -1,0 +1,48 @@
+{
+  "contract_id": "research-os-qr-pairing-v1",
+  "version": 1,
+  "status": "ACTIVE",
+  "purpose": "Provide a one-time QR pairing surface that connects a trusted authenticated device to an existing Research OS session without creating a new authentication or authorization runtime.",
+  "authority": {
+    "identity": "tools/research_os_api/api_auth.py",
+    "session": "tools/research_os_api/auth_session.py",
+    "identity_context": "tools/research_os_api/identity_context.py",
+    "authorization": "owner_special/research_os_friend/policy.py:OwnerPolicy",
+    "provider_runtime": "tools/research_os_api/multi_login_runtime.py",
+    "google_provider_runtime": "tools/research_os_api/google_identity.py",
+    "handoff": "tools/research_os_api/oauth_handoff.py"
+  },
+  "pairing": {
+    "module": "tools/research_os_api/qr_pairing.py",
+    "surface": "apps/research_os_flutter/lib/src/features/auth/login_page.dart",
+    "states": ["PENDING", "SCANNED", "CONNECTED", "EXPIRED", "CANCELLED"],
+    "ttl_seconds": 180,
+    "single_use": true,
+    "qr_payload": "one-time HTTPS pairing URL",
+    "must_not_contain": ["password", "research_os_session", "provider access token", "refresh token", "role grant", "permission grant"]
+  },
+  "runtime_rules": {
+    "new_auth_runtime": false,
+    "new_session_authority": false,
+    "new_authorization_authority": false,
+    "new_navigation_registry": false,
+    "provider_identity_remains_server_derived": true,
+    "role_remains_server_derived": true,
+    "authorization_remains_server_derived": true,
+    "qr_is_pairing_only": true
+  },
+  "security": {
+    "secret_storage": "SHA-256 hash at rest; transient raw secret only while binding OAuth state",
+    "replay": "deny after handoff consume",
+    "expiration": "deny after TTL",
+    "session_delivery": "existing one-time oauth_handoff",
+    "session_never_encoded_in_qr": true,
+    "fail_closed": true
+  },
+  "verification": {
+    "python_test": "tools/research_os_api/test_qr_pairing.py",
+    "flutter_test": "apps/research_os_flutter/test/login_page_test.dart",
+    "m2_audit": "tools/research_os_m2_audit.py",
+    "release_authority": "FINAL_GATE"
+  }
+}

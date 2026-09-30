@@ -41,6 +41,32 @@ class ResearchOSApiClient {
   Future<Map<String, dynamic>> getIdentityProviders() =>
       _getJson('/v1/auth/providers');
 
+  Future<Map<String, dynamic>> startPairing() =>
+      _postJson('/v1/auth/pairing/start', const <String, Object?>{});
+
+  Future<Map<String, dynamic>> getPairingStatus(
+    String pairingId,
+    String pairingSecret,
+  ) async {
+    final uri = _uri('/v1/auth/pairing/status').replace(
+      queryParameters: <String, String>{
+        'pairing_id': pairingId,
+        'secret': pairingSecret,
+      },
+    );
+    final response = await _client.get(uri);
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> cancelPairing(
+    String pairingId,
+    String pairingSecret,
+  ) =>
+      _postJson('/v1/auth/pairing/cancel', <String, Object?>{
+        'pairing_id': pairingId,
+        'pairing_secret': pairingSecret,
+      });
+
   Future<Map<String, dynamic>> startProviderLogin(String provider) =>
       _postJson('/v1/auth/providers/login', <String, Object?>{
         'provider': provider,

@@ -9,103 +9,74 @@ import 'package:research_os_flutter/src/api/research_os_api_client.dart';
 import 'package:research_os_flutter/src/features/auth/login_page.dart';
 
 void main() {
-  testWidgets(
-      'shared auth port and user-level controls use the canonical UI contract',
-      (tester) async {
+  testWidgets('shared auth surface uses QR pairing instead of login choices', (tester) async {
+    var authenticated = 0;
     final client = ResearchOSApiClient(
       baseUrl: 'http://research-os.test',
       client: MockClient((request) async {
-        if (request.url.path == '/v1/auth/providers') {
-          return http.Response(
-            jsonEncode({
-              'providers': [
-                {'id': 'google', 'name': 'Google', 'available': true},
-                {'id': 'microsoft', 'name': 'Microsoft', 'available': true},
-                {'id': 'github', 'name': 'GitHub', 'available': true},
-              ],
-            }),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
+        switch (request.url.path) {
+          case '/v1/auth/pairing/start':
+            return http.Response(
+              jsonEncode({
+                'pairing_id': 'pair-123',
+                'pairing_secret': 'secret-123',
+                'expires_at': 9999999999,
+                'status': 'PENDING',
+                'qr_payload': 'https://research-os.test/v1/auth/pairing/open?pairing_id=pair-123&secret=secret-123',
+              }),
+              201,
+              headers: {'content-type': 'application/json'},
+            );
+          case '/v1/auth/pairing/status':
+            return http.Response(
+              jsonEncode({
+                'pairing_id': 'pair-123',
+                'status': 'CONNECTED',
+                'expires_at': 9999999999,
+                'connected': true,
+                'handoff_ready': true,
+                'account': {'user_id': 'github:123', 'email': 'owner@example.com', 'role': 'owner'},
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          case '/v1/auth/providers/handoff':
+            expect(request.headers['x-research-os-oauth-state'], 'secret-123');
+            return http.Response(
+              jsonEncode({'connected': true, 'session': 'session-token'}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          default:
+            fail('Unexpected request: ${request.method} ${request.url}');
         }
-
-        fail('Unexpected request: ${request.method} ${request.url}');
       }),
     );
-
     addTearDown(client.close);
-
     await tester.pumpWidget(
       MaterialApp(
         home: LoginPage(
           apiClient: client,
           connectionProfile: 'research_os',
           onConnectionChanged: (_) async {},
-          onAuthenticated: () {},
+          onAuthenticated: () => authenticated++,
         ),
       ),
     );
-
     await tester.pumpAndSettle();
-
-    // PORT is a user-facing label, not a raw endpoint.
+    expect(find.text('Research OS'), findsOneWidget);
+    expect(find.text('Scan to Connect'), findsOneWidget);
     expect(find.text('PORT'), findsOneWidget);
     expect(find.text('PORT 1'), findsOneWidget);
-    expect(find.text('127.0.0.1:8787'), findsNothing);
-    expect(find.text('127.0.0.1:8790'), findsNothing);
-
-    // LOGIN starts as an explicit selection.
-    expect(find.text('LOGIN'), findsOneWidget);
-    expect(find.text('Select Login Method'), findsOneWidget);
-
-    // USER LEVEL starts as an explicit selection.
-    expect(find.text('USER LEVEL'), findsOneWidget);
-    expect(find.text('Select User Level'), findsOneWidget);
-
-    // Provider choices are hidden until the LOGIN dropdown is opened.
+    expect(find.byKey(const ValueKey('refresh-qr-button')), findsOneWidget);
+    expect(find.text('LOGIN'), findsNothing);
+    expect(find.text('Select Login Method'), findsNothing);
+    expect(find.text('USER LEVEL'), findsNothing);
     expect(find.text('Windows'), findsNothing);
     expect(find.text('GitHub'), findsNothing);
     expect(find.text('Google'), findsNothing);
     expect(find.text('None'), findsNothing);
     expect(find.text('Custom'), findsNothing);
-
-    // Open LOGIN dropdown.
-    await tester.tap(find.byKey(const ValueKey('login-method-dropdown')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Windows'), findsOneWidget);
-    expect(find.text('GitHub'), findsOneWidget);
-    expect(find.text('Google'), findsOneWidget);
-    expect(find.text('None'), findsOneWidget);
-    expect(find.text('Custom'), findsOneWidget);
-
-    // Close the menu by selecting Google.
-    await tester.tap(find.text('Google'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Google'), findsOneWidget);
-
-    // Open USER LEVEL dropdown.
-    await tester.tap(find.byKey(const ValueKey('login-user-level-dropdown')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Owner'), findsOneWidget);
-    expect(find.text('Developer'), findsOneWidget);
-    expect(find.text('General'), findsOneWidget);
-
-    // Selecting a level is UI context only; authorization remains server-side.
-    await tester.tap(find.text('Developer'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Developer'), findsOneWidget);
-
-    // PORT dropdown exposes only PORT labels.
-    await tester.tap(find.byKey(const ValueKey('login-port-dropdown')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('PORT 1'), findsWidgets);
-    expect(find.text('PORT 2'), findsOneWidget);
-    expect(find.text('8787'), findsNothing);
-    expect(find.text('8790'), findsNothing);
+    expect(authenticated, 1);
   });
 }
