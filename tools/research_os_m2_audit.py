@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a source-SHA-pinned searchable M.2 inventory and relationship graph."""
 from __future__ import annotations
-import argparse,json,re,subprocess
+import argparse,json,re,subprocess,hashlib,os
 try:
  from research_os_test_case_inventory import discover as discover_test_cases
 except ModuleNotFoundError:
@@ -9,7 +9,13 @@ except ModuleNotFoundError:
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-EXCLUDES={".git",".dart_tool","build","dist","node_modules","__pycache__",".venv","venv"}
+EXCLUDES={
+ ".git",".dart_tool","build","dist","node_modules","__pycache__",".venv","venv",
+ "m2_audit_index.json","m2_audit_index_summary.txt",
+}
+M2_STATE_DIR_NAME="m2"
+M2_STATE_FILE_NAME="audit_snapshot_state.json"
+M2_STATE_SCHEMA="RESEARCH_OS_M2_AUDIT_SNAPSHOT_V1"
 TEXT_SUFFIXES={".py",".dart",".json",".yml",".yaml",".md",".txt",".ps1",".sh",".toml",".html",".css",".js",".cs",".cpp",".h"}
 CONTRACT_RE=re.compile(r"current/[A-Z0-9_./-]+\.(?:json|ya?ml)")
 INV_RE=re.compile(r"\bINV-\d{3}\b")
@@ -27,9 +33,53 @@ CAPABILITY_RULES=[
 ]
 def git_sha():
  return subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip()
+
+def data_root():
+ configured=os.getenv("RESEARCH_OS_DATA_DIR","").strip()
+ if configured:
+  return Path(configured).expanduser().resolve()
+ return (ROOT/".research_os_data").resolve()
+
+def m2_state_path():
+ return data_root()/M2_STATE_DIR_NAME/M2_STATE_FILE_NAME
+
+def file_sha256(p):
+ digest=hashlib.sha256()
+ with p.open("rb") as handle:
+  for chunk in iter(lambda: handle.read(1024*1024),b""):
+   digest.update(chunk)
+ return digest.hexdigest()
+
 def files():
  return sorted(p for p in ROOT.rglob("*") if p.is_file() and not any(x in EXCLUDES for x in p.parts))
+
 def rel(p): return p.relative_to(ROOT).as_posix()
+
+def load_snapshot_state():
+ path=m2_state_path()
+ if not path.exists():
+  return {"schema":M2_STATE_SCHEMA,"files":{}}
+ try:
+  payload=json.loads(path.read_text(encoding="utf-8"))
+ except (OSError,UnicodeDecodeError,json.JSONDecodeError):
+  return {"schema":M2_STATE_SCHEMA,"files":{}}
+ if payload.get("schema")!=M2_STATE_SCHEMA or not isinstance(payload.get("files"),dict):
+  return {"schema":M2_STATE_SCHEMA,"files":{}}
+ return payload
+
+def save_snapshot_state(source,rows):
+ path=m2_state_path()
+ path.parent.mkdir(parents=True,exist_ok=True)
+ payload={
+  "schema":M2_STATE_SCHEMA,
+  "source_sha":source,
+  "root":str(ROOT),
+  "files":{row["path"]:row for row in rows},
+ }
+ temp=path.with_suffix(".tmp")
+ temp.write_text(json.dumps(payload,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+ temp.replace(path)
+ return path
 def kind(path):
  if path.startswith(".github/workflows/"): return "workflow"
  if path.startswith("current/"): return "contract"
@@ -62,17 +112,44 @@ def build_index():
  source=git_sha(); ps=files(); by_path={rel(p):p for p in ps}; rows=[]
  test_case_inventory=discover_test_cases()
  required_contracts,required_workflows=required_authority_paths(by_path)
+ snapshot=load_snapshot_state()
+ previous=snapshot.get("files",{})
+ current_paths={rel(p) for p in ps}
+ rows=[]
  for p in ps:
-  path=rel(p); txt=read_text(p)
-  rows.append({"path":path,"kind":kind(path),"size":p.stat().st_size,
-   "capabilities":capabilities(path,txt),
-   "contract_refs":sorted({x for x in CONTRACT_RE.findall(txt) if x in by_path}),
-   "invariant_refs":sorted(set(INV_RE.findall(txt))),
-   "has_contract_reference":bool(CONTRACT_RE.search(txt)),
-   "has_test_reference":bool(re.search(r"(?:test_|_test\.)",txt)),
-   "has_workflow_reference":".github/workflows/" in txt,
-   "has_evidence_reference":bool(re.search(r"evidence|provenance|lineage",txt,re.I)),
-   "has_final_gate_reference":bool(re.search(r"final[_ -]?gate|release_authority",txt,re.I))})
+  path=rel(p)
+  stat=p.stat()
+  old=previous.get(path)
+  unchanged=False
+  if old:
+   unchanged=(
+    old.get("size")==stat.st_size and
+    old.get("mtime_ns")==stat.st_mtime_ns and
+    isinstance(old.get("sha256"),str) and
+    len(old.get("sha256",""))==64
+   )
+  if unchanged:
+   row=dict(old)
+  else:
+   txt=read_text(p)
+   digest=file_sha256(p)
+   if old and old.get("sha256")==digest:
+    row=dict(old)
+    row["size"]=stat.st_size
+    row["mtime_ns"]=stat.st_mtime_ns
+    row["sha256"]=digest
+   else:
+    row={"path":path,"kind":kind(path),"size":stat.st_size,
+     "mtime_ns":stat.st_mtime_ns,"sha256":digest,
+     "capabilities":capabilities(path,txt),
+     "contract_refs":sorted({x for x in CONTRACT_RE.findall(txt) if x in by_path}),
+     "invariant_refs":sorted(set(INV_RE.findall(txt))),
+     "has_contract_reference":bool(CONTRACT_RE.search(txt)),
+     "has_test_reference":bool(re.search(r"(?:test_|_test\.)",txt)),
+     "has_workflow_reference":".github/workflows/" in txt,
+     "has_evidence_reference":bool(re.search(r"evidence|provenance|lineage",txt,re.I)),
+     "has_final_gate_reference":bool(re.search(r"final[_ -]?gate|release_authority",txt,re.I))}
+  rows.append(row)
  contracts=[r["path"] for r in rows if r["kind"]=="contract"]
  tests=[r["path"] for r in rows if r["kind"]=="test"]
  workflows=[r["path"] for r in rows if r["kind"]=="workflow"]
@@ -140,9 +217,13 @@ def build_index():
   "invariant_inventory":any(r["invariant_refs"] for r in rows),
   "final_gate_node":final_gate_exists and "FINAL_GATE:UNIFIED" in targets,
  }
+ save_snapshot_state(source,rows)
  return {"schema":"RESEARCH_OS_M2_AUDIT_GRAPH_V2","source_sha":source,"root":str(ROOT),
   "inventory":{"files":len(rows),"contracts":len(contracts),"implementations":len(implementations),"tests":len(tests),"workflows":len(workflows),"required_contracts":len(required_contracts),"required_workflows":len(required_workflows),"test_case_inventory":test_case_inventory["inventory"],"nodes":len(nodes),"edges":len(edges),"findings":len(findings)},
-  "integrity":integrity,"findings":findings,"nodes":nodes,"edges":edges,"files":rows,"dangling_edges":dangling}
+  "integrity":integrity,"findings":findings,"nodes":nodes,"edges":edges,"files":rows,"dangling_edges":dangling,
+  "incremental":{"state_path":str(m2_state_path()),"previous_files":len(previous),"current_files":len(current_paths),
+   "reused_files":sum(1 for r in rows if r["path"] in previous and previous[r["path"]].get("size")==r.get("size") and previous[r["path"]].get("mtime_ns")==r.get("mtime_ns")),
+   "deleted_files":sorted(set(previous)-current_paths)}}
 def build_graph(): return build_index()
 def main():
  p=argparse.ArgumentParser(); p.add_argument("--output",default="m2_audit_index.json"); p.add_argument("--summary",default="m2_audit_index_summary.txt"); p.add_argument("--query",default=""); a=p.parse_args()
