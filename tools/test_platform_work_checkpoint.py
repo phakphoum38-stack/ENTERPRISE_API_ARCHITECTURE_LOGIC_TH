@@ -65,6 +65,66 @@ class PlatformWorkCheckpointTests(unittest.TestCase):
             self.assertEqual("HOLD", result["status"])
             self.assertIn("source_sha_mismatch", result["failures"])
 
+    def test_resume_state_preserves_compact_work(self):
+        with patch.object(checkpoint, "canonical_sha", return_value=self.sha):
+            checkpoint.create_checkpoint(
+                owner_id="owner",
+                task_id="task-state",
+                workflow_state="ACTIVE",
+                current_step="recon",
+                deferred_work=["flutter"],
+                evidence_refs=["evidence:one"],
+                source_sha=self.sha,
+            )
+            checkpoint.create_checkpoint(
+                owner_id="owner",
+                task_id="task-deferred",
+                workflow_state="DEFERRED",
+                current_step="blocked",
+                deferred_work=["ios"],
+                evidence_refs=["evidence:two"],
+                source_sha=self.sha,
+            )
+
+            result = checkpoint.resume_state()
+
+        self.assertEqual(result["status"], "READY")
+        self.assertIn("task-state", result["active_work"])
+        self.assertIn("flutter", result["deferred_work"])
+        self.assertIn("ios", result["deferred_work"])
+        self.assertIn("evidence:one", result["evidence"])
+        self.assertIn("evidence:two", result["evidence"])
+        self.assertEqual(result["decisions"], [])
+        self.assertEqual(result["failures"], [])
+
+    def test_resume_state_holds_on_sha_drift(self):
+        checkpoint_sha = self.sha
+        current_sha = "b" * 40
+
+        with patch.object(
+            checkpoint,
+            "canonical_sha",
+            return_value=current_sha,
+        ):
+            checkpoint.create_checkpoint(
+                owner_id="owner",
+                task_id="task-drift",
+                workflow_state="ACTIVE",
+                current_step="verify",
+                source_sha=checkpoint_sha,
+            )
+
+            result = checkpoint.resume_state()
+
+        self.assertEqual(result["status"], "HOLD")
+        self.assertTrue(
+            any(
+                failure.startswith("source_sha_mismatch:")
+                for failure in result["failures"]
+            )
+        )
+        self.assertEqual(result["decisions"], [])
+
     def test_owner_and_path_safe_ids(self):
         with patch.object(checkpoint, "canonical_sha", return_value=self.sha):
             with self.assertRaises(ValueError):

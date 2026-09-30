@@ -191,6 +191,90 @@ def resume_checkpoint(owner_id: str, checkpoint_id: str) -> dict[str, Any]:
     }
 
 
+def resume_state() -> dict[str, Any]:
+    """Return the compact platform-wide resumable checkpoint state.
+
+    This is a read-only consumer surface for platform continuity.
+    It never grants authority and never mutates checkpoint storage.
+    """
+    current = canonical_sha()
+    with _LOCK:
+        records = [
+            item for item in _read()["checkpoints"]
+            if isinstance(item, dict)
+        ]
+
+    superseded: set[str] = {
+        str(item["supersedes"])
+        for item in records
+        if item.get("supersedes")
+    }
+
+    active_work: list[str] = []
+    deferred_work: list[str] = []
+    evidence: list[str] = []
+    failures: list[str] = []
+
+    for checkpoint in records:
+        checkpoint_id = str(checkpoint.get("checkpoint_id", "")).strip()
+        state = str(checkpoint.get("workflow_state", "")).strip().upper()
+
+        if checkpoint_id in superseded:
+            continue
+        if state in {"COMPLETED", "DEFERRED"}:
+            if state == "DEFERRED":
+                deferred_work.extend(
+                    str(item)
+                    for item in checkpoint.get("deferred_work", [])
+                )
+            evidence.extend(
+                str(item)
+                for item in checkpoint.get("evidence_refs", [])
+            )
+            continue
+
+        source_sha = checkpoint.get("source_sha")
+        if source_sha != current:
+            failures.append(f"source_sha_mismatch:{checkpoint_id}")
+
+        if state in {"ACTIVE", "PAUSED", "BLOCKED"}:
+            task_id = str(checkpoint.get("task_id", "")).strip()
+            if task_id:
+                active_work.append(task_id)
+
+        deferred_work.extend(
+            str(item)
+            for item in checkpoint.get("deferred_work", [])
+        )
+        evidence.extend(
+            str(item)
+            for item in checkpoint.get("evidence_refs", [])
+        )
+
+    active_work = list(dict.fromkeys(active_work))[:_MAX_ITEMS]
+    deferred_work = list(dict.fromkeys(deferred_work))[:_MAX_ITEMS]
+    evidence = list(dict.fromkeys(evidence))[:_MAX_REFS]
+    failures = list(dict.fromkeys(failures))[:_MAX_ITEMS]
+
+    if failures:
+        status = "HOLD"
+    elif active_work or deferred_work or evidence:
+        status = "READY"
+    else:
+        status = "EMPTY"
+
+    return {
+        "status": status,
+        "source_sha": current,
+        "active_work": active_work,
+        "deferred_work": deferred_work,
+        "decisions": [],
+        "evidence": evidence,
+        "failures": failures,
+        "checkpoint_count": len(records),
+    }
+
+
 def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
