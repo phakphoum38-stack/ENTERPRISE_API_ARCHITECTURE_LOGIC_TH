@@ -379,3 +379,5 @@ owner_special/installer/package/
 
 # Generated V3 event-delivery test databases
 /v3/test_event_delivery_EventDeliveryTests_*.db
+# Local Research OS checkpoint/runtime data
+/.research_os_data/
