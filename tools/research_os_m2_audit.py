@@ -11,11 +11,12 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 EXCLUDES={
  ".git",".dart_tool","build","dist","node_modules","__pycache__",".venv","venv",
+ ".research_os_data",
  "m2_audit_index.json","m2_audit_index_summary.txt",
 }
 M2_STATE_DIR_NAME="m2"
 M2_STATE_FILE_NAME="audit_snapshot_state.json"
-M2_STATE_SCHEMA="RESEARCH_OS_M2_AUDIT_SNAPSHOT_V1"
+M2_STATE_SCHEMA="RESEARCH_OS_M2_AUDIT_SNAPSHOT_V2"
 TEXT_SUFFIXES={".py",".dart",".json",".yml",".yaml",".md",".txt",".ps1",".sh",".toml",".html",".css",".js",".cs",".cpp",".h"}
 CONTRACT_RE=re.compile(r"current/[A-Z0-9_./-]+\.(?:json|ya?ml)")
 INV_RE=re.compile(r"\bINV-\d{3}\b")
@@ -80,13 +81,25 @@ def save_snapshot_state(source,rows):
  temp.write_text(json.dumps(payload,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
  temp.replace(path)
  return path
-def kind(path):
+def contract_stem(path):
+ """Return the canonical semantic stem for a contract path."""
+ stem=Path(path).stem.lower()
+ for suffix in ("_contract","-contract"):
+  if stem.endswith(suffix):
+   stem=stem[:-len(suffix)]
+   break
+ return stem
+
+def kind(path, required_contracts=()):
  if path.startswith(".github/workflows/"): return "workflow"
- if path.startswith("current/"): return "contract"
  if "/test" in path or path.startswith("tests/") or Path(path).name.startswith("test_") or "_test." in path: return "test"
  if path.startswith("docs/") or path.endswith((".md",".txt")): return "documentation"
  if path.startswith("scripts/"): return "script"
  if path.endswith((".py",".dart",".ps1",".sh",".cs",".cpp",".h")): return "implementation"
+ name=Path(path).name.upper()
+ if Path(path).suffix.lower()==".diff": return "other"
+ if path in required_contracts: return "contract"
+ if "CONTRACT" in name or path.startswith("current/CONTRACTS/"): return "contract"
  return "other"
 def read_text(p):
  if p.suffix.lower() not in TEXT_SUFFIXES: return ""
@@ -139,7 +152,7 @@ def build_index():
     row["mtime_ns"]=stat.st_mtime_ns
     row["sha256"]=digest
    else:
-    row={"path":path,"kind":kind(path),"size":stat.st_size,
+    row={"path":path,"kind":kind(path,required_contracts),"size":stat.st_size,
      "mtime_ns":stat.st_mtime_ns,"sha256":digest,
      "capabilities":capabilities(path,txt),
      "contract_refs":sorted({x for x in CONTRACT_RE.findall(txt) if x in by_path}),
@@ -166,12 +179,25 @@ def build_index():
   for inv in r["invariant_refs"]:
    add_node("INVARIANT:"+inv,"INVARIANT",inv)
    edges.append({"from":nid(k,r["path"]),"relation":"ENFORCES_OR_REFERENCES","to":"INVARIANT:"+inv})
+ def contract_test_matches(c,t):
+  """Return True for explicit or strong semantic contract/test binding."""
+  text=read_text(by_path[t])
+  cp=Path(c)
+  stem=contract_stem(c)
+  test_stem=Path(t).stem.lower()
+
+  if c in text or cp.name in text:
+   return True
+
+  if stem and stem in test_stem:
+   return True
+
+  return False
+
  for c in contracts:
-  stem=Path(c).stem.lower().replace("-contract","")
-  exact=[t for t in tests if c in read_text(by_path[t])]
-  named=[t for t in tests if stem and stem in Path(t).stem.lower()]
-  for t in sorted(set(exact+named)):
-   edges.append({"from":nid("CONTRACT",c),"relation":"VERIFIED_BY","to":nid("TEST",t)})
+  for t in tests:
+   if contract_test_matches(c,t):
+    edges.append({"from":nid("CONTRACT",c),"relation":"VERIFIED_BY","to":nid("TEST",t)})
  workflow_names={Path(w).name:w for w in workflows}
  for w in workflows:
   txt=read_text(by_path[w])
@@ -198,8 +224,7 @@ def build_index():
   if required not in by_path or required not in workflows:
    findings.append({"state":"MISSING","code":"REQUIRED_FINAL_GATE_WORKFLOW_MISSING_FROM_M2","path":required})
  for c in contracts:
-  stem=Path(c).stem.lower().replace("-contract","")
-  if not any((c in read_text(by_path[t])) or (stem and stem in Path(t).stem.lower()) for t in tests):
+  if not any(contract_test_matches(c,t) for t in tests):
    findings.append({"state":"INCOMPLETE","code":"CONTRACT_WITHOUT_NAMED_TEST","path":c})
  integrity={
   "exact_source_sha":bool(re.fullmatch(r"[0-9a-f]{40}",source)),
