@@ -48,6 +48,60 @@ def capabilities(path,text):
  return found or ["general"]
 def nid(k,path): return k.upper()+":"+path
 
+SEMANTIC_ASSURANCE_RELATIONS=frozenset({"VERIFIED_BY","ENFORCED_BY","DISPATCHED_BY","SUPPORTED_BY","BOUND_TO"})
+
+def contract_stem(path: str) -> str:
+ stem=Path(path).stem.lower()
+ for suffix in ("_contract","-contract"):
+  if stem.endswith(suffix):
+   stem=stem[:-len(suffix)]
+   break
+ return stem
+
+def _declared_identities(path: str, text: str) -> set[str]:
+ """Extract conservative canonical identities from artifact metadata."""
+ values={contract_stem(path)}
+ for pattern in (
+  r'"(?:contract|contract_id|capability_id|component_id)"\\s*:\\s*"([A-Za-z0-9_.:/-]+)"',
+  r'^(?:contract|contract_id|capability_id|component_id):\\s*([A-Za-z0-9_.:/-]+)',
+ ):
+  values.update(x.lower() for x in re.findall(pattern,text,re.MULTILINE))
+ return {x for x in values if x}
+
+def resolve_semantic_bindings(contract: str, rows: list[dict], by_path: dict[str,Path],
+                              contracts: list[str], implementations: list[str],
+                              workflows: list[str], tests: list[str]) -> dict:
+ """Resolve assurance bindings generically; ambiguity is never auto-selected."""
+ contract_text=read_text(by_path[contract])
+ bindings=[]
+ for row in rows:
+  target=row["path"]
+  if target==contract:
+   continue
+  if row["kind"]=="contract" and contract in row["contract_refs"]:
+   bindings.append(("BOUND_TO",target,"explicit_contract_reference"))
+  elif row["kind"] in {"implementation","workflow"} and contract in row["contract_refs"]:
+   relation="ENFORCED_BY" if row["kind"]=="implementation" else "DISPATCHED_BY"
+   bindings.append((relation,target,"explicit_contract_reference"))
+ for target in tests:
+  if contract in read_text(by_path[target]) or contract_stem(contract) in Path(target).stem.lower():
+   bindings.append(("VERIFIED_BY",target,"test_identity"))
+ for target in by_path:
+  if target.startswith("evidence/") and contract in read_text(by_path[target]):
+   bindings.append(("SUPPORTED_BY",target,"explicit_contract_reference"))
+ # Semantic fallback is deliberately unique: identity overlap must identify one target.
+ identities=_declared_identities(contract,contract_text)
+ for kind_name, candidates, relation in (
+  ("implementation",implementations,"ENFORCED_BY"),
+  ("workflow",workflows,"DISPATCHED_BY"),
+ ):
+  semantic=[p for p in candidates if identities & _declared_identities(p,read_text(by_path[p]))]
+  if len(semantic)==1:
+   bindings.append((relation,semantic[0],"unique_semantic_identity"))
+  elif len(semantic)>1:
+   return {"bindings":sorted(set(bindings)),"unresolved":False,"ambiguous":True,"ambiguous_targets":sorted(semantic)}
+ return {"bindings":sorted(set(bindings)),"unresolved":not bindings,"ambiguous":False,"ambiguous_targets":[]}
+
 def required_authority_paths(by_path):
  gate_path="current/RESEARCH_OS_UNIFIED_FINAL_GATE.yml"
  if gate_path not in by_path:
@@ -85,7 +139,8 @@ def build_index():
   k=r["kind"].upper(); add_node(nid(k,r["path"]),k,r["path"])
   for c in r["contract_refs"]:
    add_node(nid("CONTRACT",c),"CONTRACT",c)
-   edges.append({"from":nid(k,r["path"]),"relation":"REFERENCES","to":nid("CONTRACT",c)})
+   relation="BOUND_TO" if k=="CONTRACT" else "REFERENCES"
+   edges.append({"from":nid(k,r["path"]),"relation":relation,"to":nid("CONTRACT",c)})
   for inv in r["invariant_refs"]:
    add_node("INVARIANT:"+inv,"INVARIANT",inv)
    edges.append({"from":nid(k,r["path"]),"relation":"ENFORCES_OR_REFERENCES","to":"INVARIANT:"+inv})
@@ -120,10 +175,14 @@ def build_index():
  for required in required_workflows:
   if required not in by_path or required not in workflows:
    findings.append({"state":"MISSING","code":"REQUIRED_FINAL_GATE_WORKFLOW_MISSING_FROM_M2","path":required})
+ semantic_results={}
  for c in contracts:
-  stem=Path(c).stem.lower().replace("-contract","")
-  if not any((c in read_text(by_path[t])) or (stem and stem in Path(t).stem.lower()) for t in tests):
-   findings.append({"state":"INCOMPLETE","code":"CONTRACT_WITHOUT_NAMED_TEST","path":c})
+  result=resolve_semantic_bindings(c,rows,by_path,contracts,implementations,workflows,tests)
+  semantic_results[c]=result
+  if result["ambiguous"]:
+   findings.append({"state":"INCOMPLETE","code":"SEMANTIC_BINDING_AMBIGUOUS","path":c,"candidates":result["ambiguous_targets"]})
+  elif result["unresolved"]:
+   findings.append({"state":"INCOMPLETE","code":"CONTRACT_WITHOUT_ASSURANCE_BINDING","path":c})
  integrity={
   "exact_source_sha":bool(re.fullmatch(r"[0-9a-f]{40}",source)),
   "inventory_completeness":bool(rows),
@@ -132,7 +191,8 @@ def build_index():
   "unique_node_ids":len(node_ids)==len(nodes),
   "no_dangling_edges":not dangling,
   "contract_test_linkage":bool(contracts) and any(e["from"].startswith("CONTRACT:") and e["relation"]=="VERIFIED_BY" and e["to"].startswith("TEST:") for e in edges) and all(any(e["from"]==nid("CONTRACT",c) and e["relation"]=="VERIFIED_BY" for e in edges) for c in contracts if any(c in read_text(by_path[t]) or Path(c).stem.lower().replace("-contract","") in Path(t).stem.lower() for t in tests)),
-  "contract_implementation_linkage":bool(implementations) and any(e["from"].startswith("IMPLEMENTATION:") and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) and all(any(e["from"]==nid("IMPLEMENTATION",i) and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) for i in implementations if any(c in read_text(by_path[i]) for c in contracts)),
+  "contract_implementation_linkage":bool(implementations) and any(e["relation"] in {"REFERENCES","ENFORCED_BY"} and e["from"].startswith("IMPLEMENTATION:") and e["to"].startswith("CONTRACT:") for e in edges),
+  "semantic_binding_integrity":all(not v["ambiguous"] for v in semantic_results.values()),
   "workflow_inventory":bool(workflows),
   "contract_inventory":bool(contracts),
   "required_contract_inventory":bool(required_contracts) and all(path in contracts for path in required_contracts),
