@@ -35,6 +35,10 @@ REQUIRED_PACKAGE_PATHS = {
     "scripts/research-os-service.ps1",
 }
 
+SERVICE_SOURCE = ROOT / "tools" / "research_os_service" / "Program.cs"
+SERVICE_ENTRYPOINT = "server.py"
+FORBIDDEN_SERVICE_ENTRYPOINT = "render_server.py"
+
 
 def _read_phase_e_workflow(root: Path) -> str:
     return (
@@ -51,6 +55,12 @@ def _read_unified_final_gate(root: Path) -> str:
 def validate(root: Path = ROOT) -> tuple[str, ...]:
     errors: list[str] = []
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+
+    service_source = SERVICE_SOURCE.read_text(encoding="utf-8")
+    if SERVICE_ENTRYPOINT not in service_source:
+        errors.append("Windows service must use canonical server.py entrypoint")
+    if FORBIDDEN_SERVICE_ENTRYPOINT in service_source:
+        errors.append("Windows service must not use render_server.py entrypoint")
 
     if set(contract["required_components"]) != REQUIRED_COMPONENTS:
         errors.append("phase E required component set drifted")
