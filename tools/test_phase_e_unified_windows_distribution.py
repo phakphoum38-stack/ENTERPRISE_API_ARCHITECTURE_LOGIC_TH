@@ -60,6 +60,17 @@ class PhaseEUnifiedWindowsDistributionTests(unittest.TestCase):
             'RunOnceId: "ResearchOSServiceUninstall"',
             installer,
         )
+    def test_windows_service_uses_canonical_api_entrypoint(self) -> None:
+        source = (
+            validator.ROOT
+            / "tools"
+            / "research_os_service"
+            / "Program.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("server.py", source)
+        self.assertNotIn("render_server.py", source)
+
     def test_workflow_must_bind_owner_special(self) -> None:
         with patch.object(validator, "_read_phase_e_workflow", return_value=""):
             self.assertIn(
