@@ -14,16 +14,6 @@ on:
       - '.github/workflows/provenance-evidence-gate.yml'
   push:
     branches: [main]
-    paths:
-      - 'current/PROVENANCE_EVIDENCE_*.json'
-      - 'tools/validate_provenance_evidence.py'
-      - 'tools/record_provenance_entry.py'
-      - 'tools/generate_target_provenance.py'
-      - 'tools/test_validate_provenance_evidence.py'
-      - 'tools/provenance_conformance/**'
-      - 'docs/PROVENANCE_EVIDENCE_LEDGER.md'
-      - 'docs/PROVENANCE_THREAT_MODEL.md'
-      - '.github/workflows/provenance-evidence-gate.yml'
   workflow_dispatch:
     inputs:
       target_sha:
@@ -48,12 +38,16 @@ jobs:
         run: python -m unittest tools.test_validate_provenance_evidence -v
       - name: Compile verifier and producer
         run: python -m py_compile tools/validate_provenance_evidence.py tools/record_provenance_entry.py tools/generate_target_provenance.py tools/test_validate_provenance_evidence.py
-      - name: Select exact target SHA
+      - name: Select and verify exact target SHA
         env:
           TARGET_SHA: ${{ inputs.target_sha || github.sha }}
         run: |
+          set -euo pipefail
           git cat-file -e "$TARGET_SHA^{commit}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
           echo "TARGET_SHA=$TARGET_SHA" >> "$GITHUB_ENV"
+          echo "EXACT_TARGET_SHA=$TARGET_SHA"
       - name: Generate target-bound evidence and provenance
         run: python tools/generate_target_provenance.py --output-dir target-provenance --target-commit "$TARGET_SHA"
       - name: Independently verify target-bound provenance and roots
