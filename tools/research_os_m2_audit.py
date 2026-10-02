@@ -191,7 +191,7 @@ def build_index():
   "unique_node_ids":len(node_ids)==len(nodes),
   "no_dangling_edges":not dangling,
   "contract_test_linkage":bool(contracts) and any(e["from"].startswith("CONTRACT:") and e["relation"]=="VERIFIED_BY" and e["to"].startswith("TEST:") for e in edges) and all(any(e["from"]==nid("CONTRACT",c) and e["relation"]=="VERIFIED_BY" for e in edges) for c in contracts if any(c in read_text(by_path[t]) or Path(c).stem.lower().replace("-contract","") in Path(t).stem.lower() for t in tests)),
-  "contract_implementation_linkage":bool(implementations) and any(e["relation"] in {"REFERENCES","ENFORCED_BY"} and e["from"].startswith("IMPLEMENTATION:") and e["to"].startswith("CONTRACT:") for e in edges),
+  "contract_implementation_linkage":bool(implementations) and any(e["from"].startswith("IMPLEMENTATION:") and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) and all(any(e["from"]==nid("IMPLEMENTATION",i) and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) for i in implementations if any(c in read_text(by_path[i]) for c in contracts)),
   "semantic_binding_integrity":all(not v["ambiguous"] for v in semantic_results.values()),
   "workflow_inventory":bool(workflows),
   "contract_inventory":bool(contracts),
