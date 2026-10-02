@@ -1,4 +1,4 @@
-﻿import unittest
+import unittest
 
 from tools.research_os_resource_change_coalescer import (
     RESOURCE_CHANGE_COALESCER_SCHEMA,
