@@ -21,6 +21,9 @@ class M2AuditIndexTests(unittest.TestCase):
   self.assertTrue(g["integrity"]["final_gate_node"])
   self.assertIn("FINAL_GATE:UNIFIED",{n["id"] for n in g["nodes"]})
   self.assertTrue(any(e["relation"]=="BINDS_TO" and e["to"]=="FINAL_GATE:UNIFIED" for e in g["edges"]))
+  self.assertTrue(g["integrity"]["contract_nodes_are_inventory_backed"])
+  self.assertTrue(g["integrity"]["semantic_assurance_graph"])
+  self.assertTrue(any(e["relation"]=="ENFORCED_BY" and e["from"].startswith("CONTRACT:") for e in g["edges"]))
  def test_contract_implementation_integrity_is_explicit(self):
   g=build_index()
   self.assertIn("contract_implementation_linkage",g["integrity"])

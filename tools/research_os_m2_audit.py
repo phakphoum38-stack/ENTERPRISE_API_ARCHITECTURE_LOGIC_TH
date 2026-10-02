@@ -171,11 +171,27 @@ def build_index():
  def add_node(i,k,path=None,state="UNKNOWN"):
   if i not in node_ids:
    node_ids.add(i); nodes.append({"id":i,"kind":k,"path":path,"state":state})
+ contract_set=set(contracts)
+
  for r in rows:
-  k=r["kind"].upper(); add_node(nid(k,r["path"]),k,r["path"])
+  k=r["kind"].upper()
+  add_node(nid(k,r["path"]),k,r["path"])
+
   for c in r["contract_refs"]:
-   add_node(nid("CONTRACT",c),"CONTRACT",c)
-   edges.append({"from":nid(k,r["path"]),"relation":"REFERENCES","to":nid("CONTRACT",c)})
+   # Only authoritative inventory entries may become CONTRACT nodes.
+   if c in contract_set:
+    add_node(nid("CONTRACT",c),"CONTRACT",c)
+    edges.append({"from":nid(k,r["path"]),"relation":"REFERENCES","to":nid("CONTRACT",c)})
+
+    # Existing references are also semantic assurance evidence when the
+    # referencing artifact has an assurance-bearing role.
+    if k=="IMPLEMENTATION":
+     edges.append({"from":nid("CONTRACT",c),"relation":"ENFORCED_BY","to":nid(k,r["path"])})
+    elif k=="WORKFLOW":
+     edges.append({"from":nid("CONTRACT",c),"relation":"DISPATCHED_BY","to":nid(k,r["path"])})
+    elif r["path"].startswith("evidence/") or r["path"].startswith("evidence\\"):
+     edges.append({"from":nid("CONTRACT",c),"relation":"SUPPORTED_BY","to":nid(k,r["path"])})
+
   for inv in r["invariant_refs"]:
    add_node("INVARIANT:"+inv,"INVARIANT",inv)
    edges.append({"from":nid(k,r["path"]),"relation":"ENFORCES_OR_REFERENCES","to":"INVARIANT:"+inv})
@@ -211,6 +227,8 @@ def build_index():
  for r in rows:
   if r["has_final_gate_reference"] and r["kind"]!="workflow":
    edges.append({"from":nid(r["kind"],r["path"]),"relation":"BINDS_TO","to":"FINAL_GATE:UNIFIED"})
+   if r["kind"]=="contract":
+    edges.append({"from":nid("CONTRACT",r["path"]),"relation":"BOUND_TO","to":"FINAL_GATE:UNIFIED"})
  for w in workflows:
   if "unified-final-gate" in w or "RESEARCH_OS_UNIFIED_FINAL_GATE" in read_text(by_path[w]):
    edges.append({"from":nid("WORKFLOW",w),"relation":"PARTICIPATES_IN","to":"FINAL_GATE:UNIFIED"})
@@ -223,9 +241,21 @@ def build_index():
  for required in required_workflows:
   if required not in by_path or required not in workflows:
    findings.append({"state":"MISSING","code":"REQUIRED_FINAL_GATE_WORKFLOW_MISSING_FROM_M2","path":required})
+ assurance_relations={"VERIFIED_BY","ENFORCED_BY","DISPATCHED_BY","BOUND_TO","SUPPORTED_BY"}
+
  for c in contracts:
-  if not any(contract_test_matches(c,t) for t in tests):
-   findings.append({"state":"INCOMPLETE","code":"CONTRACT_WITHOUT_NAMED_TEST","path":c})
+  verified=any(contract_test_matches(c,t) for t in tests)
+  has_assurance=any(
+   e["from"]==nid("CONTRACT",c) and e["relation"] in assurance_relations
+   for e in edges
+  )
+
+  if not verified and not has_assurance:
+   findings.append({
+    "state":"INCOMPLETE",
+    "code":"CONTRACT_WITHOUT_ASSURANCE_BINDING",
+    "path":c,
+   })
  integrity={
   "exact_source_sha":bool(re.fullmatch(r"[0-9a-f]{40}",source)),
   "inventory_completeness":bool(rows),
@@ -233,7 +263,17 @@ def build_index():
   "duplicate_path_detection":len({r["path"] for r in rows})==len(rows),
   "unique_node_ids":len(node_ids)==len(nodes),
   "no_dangling_edges":not dangling,
-  "contract_test_linkage":bool(contracts) and any(e["from"].startswith("CONTRACT:") and e["relation"]=="VERIFIED_BY" and e["to"].startswith("TEST:") for e in edges) and all(any(e["from"]==nid("CONTRACT",c) and e["relation"]=="VERIFIED_BY" for e in edges) for c in contracts if any(c in read_text(by_path[t]) or Path(c).stem.lower().replace("-contract","") in Path(t).stem.lower() for t in tests)),
+  "contract_test_linkage":bool(contracts) and any(e["from"].startswith("CONTRACT:") and e["relation"]=="VERIFIED_BY" and e["to"].startswith("TEST:") for e in edges) and all(any(e["from"]==nid("CONTRACT",c) and e["relation"]=="VERIFIED_BY" for e in edges) for c in contracts if any(contract_test_matches(c,t) for t in tests)),
+  "contract_nodes_are_inventory_backed":all(
+   n["id"]==nid("CONTRACT",n["path"])
+   and n["path"] in contract_set
+   for n in nodes
+   if n["kind"]=="CONTRACT"
+  ),
+  "semantic_assurance_graph":any(
+   e["relation"] in {"VERIFIED_BY","ENFORCED_BY","DISPATCHED_BY","BOUND_TO","SUPPORTED_BY"}
+   for e in edges
+  ),
   "contract_implementation_linkage":bool(implementations) and any(e["from"].startswith("IMPLEMENTATION:") and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) and all(any(e["from"]==nid("IMPLEMENTATION",i) and e["relation"]=="REFERENCES" and e["to"].startswith("CONTRACT:") for e in edges) for i in implementations if any(c in read_text(by_path[i]) for c in contracts)),
   "workflow_inventory":bool(workflows),
   "contract_inventory":bool(contracts),
