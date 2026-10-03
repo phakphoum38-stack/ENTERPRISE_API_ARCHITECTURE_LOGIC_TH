@@ -55,7 +55,9 @@ class _FriendConnectPageState extends State<FriendConnectPage> {
 
   Future<void> _ask() async {
     final question = _controller.text.trim();
-    if (question.isEmpty || _sending) return;
+    if (question.isEmpty || _sending) {
+      return;
+    }
 
     _controller.clear();
     setState(() {
