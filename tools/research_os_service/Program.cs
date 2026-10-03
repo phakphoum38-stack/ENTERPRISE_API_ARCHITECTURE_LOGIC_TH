@@ -30,7 +30,7 @@ sealed class ResearchOsApiWorker : BackgroundService
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ResearchOS");
         var pythonExe = ResolvePython(repoRoot);
         var apiDir = Path.Combine(repoRoot, "tools", "research_os_api");
-        var serverPath = Path.Combine(apiDir, "render_server.py");
+        var serverPath = Path.Combine(apiDir, "server.py");
 
         if (!File.Exists(serverPath))
         {
@@ -211,7 +211,7 @@ sealed class ResearchOsApiWorker : BackgroundService
         // so the self-contained service never resolves to the Windows Program
         // Files parent or another stale development path.
         var packagedRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
-        var packagedEntrypoint = Path.Combine(packagedRoot, "tools", "research_os_api", "render_server.py");
+        var packagedEntrypoint = Path.Combine(packagedRoot, "tools", "research_os_api", "server.py");
         if (File.Exists(packagedEntrypoint))
         {
             return packagedRoot;
@@ -221,7 +221,7 @@ sealed class ResearchOsApiWorker : BackgroundService
         if (!string.IsNullOrWhiteSpace(configured))
         {
             var configuredRoot = Path.GetFullPath(configured);
-            var configuredEntrypoint = Path.Combine(configuredRoot, "tools", "research_os_api", "render_server.py");
+            var configuredEntrypoint = Path.Combine(configuredRoot, "tools", "research_os_api", "server.py");
             if (Directory.Exists(configuredRoot) && File.Exists(configuredEntrypoint))
             {
                 return configuredRoot;

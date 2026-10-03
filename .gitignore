@@ -371,3 +371,13 @@ htmlcov/
 
 # Research OS Owner Special installer staging output
 owner_special/installer/package/
+
+# Generated local Research OS assurance/audit outputs
+/aeos_master_assurance_manifest.json
+/m2_audit_index.json
+/m2_audit_index_summary.txt
+
+# Generated V3 event-delivery test databases
+/v3/test_event_delivery_EventDeliveryTests_*.db
+# Local Research OS checkpoint/runtime data
+/.research_os_data/

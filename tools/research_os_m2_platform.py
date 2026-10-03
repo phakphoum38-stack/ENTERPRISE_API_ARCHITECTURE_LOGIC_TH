@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from tools.research_os_m2_audit import build_index
+from tools.platform_work_checkpoint import resume_state as checkpoint_resume_state
 from tools.platform_graph import PlatformGraph
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -166,14 +167,36 @@ class M2Platform:
             r["path"] for r in files
             if "DEFERRED" in json.dumps(r).upper()
         ]
+
+        checkpoint = checkpoint_resume_state()
+
+        active_work = list(dict.fromkeys(
+            checkpoint["active_work"] + active[:MAX_RESULTS]
+        ))[:MAX_RESULTS]
+
+        deferred_work = list(dict.fromkeys(
+            checkpoint["deferred_work"] + deferred[:MAX_RESULTS]
+        ))[:MAX_RESULTS]
+
         return {
             "source_sha": self.source_sha,
             "chat_is_not_source_of_truth": True,
+            "checkpoint_status": checkpoint["status"],
+            "active_work": active_work,
+            "deferred_work": deferred_work,
+            "decisions": checkpoint["decisions"],
+            "evidence": checkpoint["evidence"],
+            "resume_failures": checkpoint["failures"],
+            "checkpoint_count": checkpoint["checkpoint_count"],
             "active_work_candidates": active[:MAX_RESULTS],
             "deferred_candidates": deferred[:MAX_RESULTS],
             "integrity": self.index["integrity"],
             "platform_graph": self.platform_graph_summary(),
-            "next_step": "Reconcile snapshot and inspect impact before mutation.",
+            "next_step": (
+                "HOLD: reconcile checkpoint source SHA before mutation."
+                if checkpoint["status"] == "HOLD"
+                else "Reconcile snapshot and inspect impact before mutation."
+            ),
         }
 
 

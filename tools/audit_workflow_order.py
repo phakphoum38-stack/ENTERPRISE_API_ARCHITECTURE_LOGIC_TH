@@ -67,7 +67,20 @@ def extract_dispatch_targets(text: str, known: set[str]) -> list[str]:
 
 
 def scan_workflows() -> tuple[dict[str, Any], list[dict[str, str]], list[dict[str, str]], list[str]]:
-    known = {p.name for p in WORKFLOWS.glob("*.y*ml")}
+    workflow_files = list(WORKFLOWS.glob("*.y*ml"))
+    known = {p.name for p in workflow_files}
+    workflow_name_to_file: dict[str, str] = {}
+
+    for workflow_file in workflow_files:
+        try:
+            workflow_data = read_yaml(workflow_file)
+        except Exception:
+            continue
+
+        workflow_name = workflow_data.get("name")
+        if isinstance(workflow_name, str) and workflow_name.strip():
+            workflow_name_to_file[workflow_name.strip()] = workflow_file.name
+
     records: dict[str, Any] = {}
     edges: list[dict[str, str]] = []
     artifact_edges: list[dict[str, str]] = []
@@ -105,8 +118,18 @@ def scan_workflows() -> tuple[dict[str, Any], list[dict[str, str]], list[dict[st
             if target != path.name:
                 edges.append({"from": path.name, "to": target, "type": "dispatch-text"})
         for target in workflow_run_edges(data):
-            if target in known:
-                edges.append({"from": target, "to": path.name, "type": "workflow_run"})
+            resolved_target = target
+            if target not in known:
+                resolved_target = workflow_name_to_file.get(str(target).strip())
+
+            if resolved_target in known:
+                edges.append(
+                    {
+                        "from": resolved_target,
+                        "to": path.name,
+                        "type": "workflow_run",
+                    }
+                )
         target_sha = {
             "input": bool(re.search(r"target_sha", text, re.I)),
             "immutable_propagation": bool(re.search(r"inputs\.target_sha|TARGET_SHA", text)),

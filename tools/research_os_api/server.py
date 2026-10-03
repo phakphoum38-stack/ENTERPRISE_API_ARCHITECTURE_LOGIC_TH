@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import html
 import json
 import mimetypes
 import os
@@ -32,13 +33,14 @@ from github_status import GitHubStatusError, dashboard as github_dashboard
 from google_identity import GoogleIdentityBroker
 from google_oauth import GoogleOAuthBroker, GoogleOAuthError
 from google_workspace import GoogleWorkspaceConfig, get_google_workspace_dashboard
-from server_auth_routes import auth_provider_handoff
+from server_auth_routes import auth_pairing_authorize, auth_provider_handoff
 from identity_providers import provider_catalog
 from identity_context import resolve_identity_context
 from memory import build_context, search_memory
 from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 from oauth_handoff import consume_handoff
+from qr_pairing import QRPairingError, cancel_pairing, create_pairing, get_status
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # The API supports both repository-root module execution and direct execution
 # from tools/research_os_api (the latter is used by the Windows/local launcher).
@@ -242,6 +244,20 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         port = int(os.getenv("RESEARCH_OS_API_PORT", "8787"))
         return f"http://127.0.0.1:{port}/v1/auth/{provider}/callback"
 
+    def _pairing_base_url(self) -> str:
+        explicit = (
+            os.getenv("RESEARCH_OS_PAIRING_BASE_URL")
+            or os.getenv("RESEARCH_OS_PUBLIC_BASE_URL")
+            or os.getenv("RENDER_EXTERNAL_URL")
+        )
+        if explicit and explicit.strip():
+            return explicit.strip().rstrip("/")
+        host = str(self.headers.get("Host") or "").strip()
+        if host:
+            return f"http://{host.rstrip('/')}"
+        port = int(os.getenv("RESEARCH_OS_API_PORT", "8787"))
+        return f"http://127.0.0.1:{port}"
+
     def _auth_status(self) -> dict[str, Any]:
         token = extract_session_token(self.headers)
         if not token:
@@ -285,27 +301,71 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             if path == "/v1/auth/providers":
                 self._send(HTTPStatus.OK, {"providers": provider_catalog()})
                 return
+            if path == "/v1/auth/pairing/status":
+                params = parse_qs(parsed.query)
+                self._send(HTTPStatus.OK, get_status(
+                    str(params.get("pairing_id", [""])[0]).strip(),
+                    str(params.get("secret", [""])[0]).strip(),
+                ))
+                return
+            if path == "/v1/auth/pairing/open":
+                params = parse_qs(parsed.query)
+                pairing_id = str(params.get("pairing_id", [""])[0]).strip()
+                secret = str(params.get("secret", [""])[0]).strip()
+                get_status(pairing_id, secret)
+                buttons = []
+                for item in provider_catalog():
+                    if not isinstance(item, dict) or item.get("available") is not True:
+                        continue
+                    provider = html.escape(str(item.get("id") or "").strip(), quote=True)
+                    name = html.escape(str(item.get("name") or provider), quote=True)
+                    pid = html.escape(pairing_id, quote=True)
+                    sec = html.escape(secret, quote=True)
+                    href = f"/v1/auth/pairing/authorize?provider={provider}&pairing_id={pid}&secret={sec}"
+                    buttons.append(f'<p><a href="{href}" style="display:inline-block;padding:12px 18px;border:1px solid #888;border-radius:8px;text-decoration:none">{name}</a></p>')
+                body = (
+                    '<html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
+                    '<title>Research OS Connect</title></head><body style="font-family:system-ui;max-width:520px;margin:48px auto;padding:20px">'
+                    '<h2>Research OS</h2><p>Choose the identity provider for this pairing.</p>'
+                    + "".join(buttons)
+                    + '<p>This pairing is single-use and expires automatically.</p></body></html>'
+                )
+                self._send_html(HTTPStatus.OK, body)
+                return
+            if path == "/v1/auth/pairing/authorize":
+                params = parse_qs(parsed.query)
+                provider = str(params.get("provider", [""])[0]).strip().lower()
+                pairing_id = str(params.get("pairing_id", [""])[0]).strip()
+                secret = str(params.get("secret", [""])[0]).strip()
+                authorization_url = auth_pairing_authorize(
+                    provider, pairing_id, secret, self._multi_login_redirect(provider)
+                )
+                self._redirect(authorization_url)
+                return
             if path in {"/v1/auth/status", "/v1/auth/google/status"}:
                 self._send(HTTPStatus.OK, self._auth_status())
                 return
             if path == "/v1/auth/google/callback":
-                params = parse_qs(parsed.query)
-                error = str(params.get("error", [""])[0]).strip()
-                if error:
-                    self._send_html(HTTPStatus.BAD_REQUEST, f"<html><body><h2>Research OS Google sign-in failed</h2><p>{error}</p><p>You can close this window.</p></body></html>")
-                    return
-                code = str(params.get("code", [""])[0]).strip()
-                state = str(params.get("state", [""])[0]).strip()
-                if not code or not state:
-                    raise ValueError("Google sign-in callback requires code and state")
-                result = GoogleIdentityBroker().complete(code=code, state=state)
-                email = ((result.get("account") or {}).get("email") or "Google account")
-                self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window.</p></body></html>")
+                from server_auth_routes import google_auth_callback
+                result, cookie = google_auth_callback(parsed.query)
+                pairing = result.get("pairing") if isinstance(result, dict) else None
+                account = result.get("account") if isinstance(result.get("account"), dict) else {}
+                email = html.escape(str(account.get("email") or "account"), quote=True)
+                if pairing:
+                    self._send_html(HTTPStatus.OK, f"<html><body><h2>Research OS pairing complete</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
+                else:
+                    self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window.</p></body></html>")
                 return
             for provider in ("microsoft", "github"):
                 if path == f"/v1/auth/{provider}/callback":
                     result, cookie = __import__("server_auth_routes").auth_callback(provider, parsed.query)
-                    self._redirect("/", cookie)
+                    pairing = result.get("pairing") if isinstance(result, dict) else None
+                    if pairing:
+                        account = result.get("principal") if isinstance(result.get("principal"), dict) else {}
+                        email = html.escape(str(account.get("email") or "account"), quote=True)
+                        self._send_html(HTTPStatus.OK, f"<html><body><h2>Research OS pairing complete</h2><p>{email}</p><p>You can close this window and return to Research OS.</p></body></html>")
+                    else:
+                        self._redirect("/", cookie)
                     return
             if path == "/v1/google-workspace/dashboard":
                 self._send(HTTPStatus.OK, get_google_workspace_dashboard())
@@ -387,7 +447,7 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, github_dashboard(repository))
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
-        except (ValueError, KeyError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
+        except (ValueError, KeyError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError, QRPairingError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
         except GitHubStatusError as exc:
             self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
@@ -448,6 +508,14 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 if not checkpoint_id:
                     raise ValueError("checkpoint_id is required")
                 self._send(HTTPStatus.OK, resume_checkpoint(user_id, checkpoint_id))
+                return
+            if path == "/v1/auth/pairing/start":
+                pairing = create_pairing()
+                pairing_url = f"{self._pairing_base_url()}/v1/auth/pairing/open?pairing_id={pairing['pairing_id']}&secret={pairing['pairing_secret']}"
+                self._send(HTTPStatus.CREATED, {**pairing, "qr_payload": pairing_url, "pairing_url": pairing_url, "qr_type": "research_os_pairing", "session_in_qr": False})
+                return
+            if path == "/v1/auth/pairing/cancel":
+                self._send(HTTPStatus.OK, cancel_pairing(str(body.get("pairing_id") or "").strip(), str(body.get("pairing_secret") or "").strip()))
                 return
             if path == "/v1/auth/providers/login":
                 provider = str(body.get("provider", "")).strip().lower()

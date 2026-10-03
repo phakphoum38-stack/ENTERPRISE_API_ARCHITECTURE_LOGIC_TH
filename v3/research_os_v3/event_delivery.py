@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -46,13 +47,25 @@ class DurableEventDelivery:
     Delivery is at-least-once and consumer acknowledgement is idempotent.
     """
 
+    @contextmanager
+    def _connection(self, **kwargs):
+        db = sqlite3.connect(self.path, **kwargs)
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     def __init__(self, path: Path, *, lease_seconds: int = 30) -> None:
         if lease_seconds < 1:
             raise ValueError("lease_seconds must be at least 1")
         self.path = path
         self.lease_seconds = lease_seconds
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path) as db:
+        with self._connection() as db:
             db.execute(
                 """CREATE TABLE IF NOT EXISTS events (
                     event_id TEXT PRIMARY KEY,
@@ -89,7 +102,7 @@ class DurableEventDelivery:
 
     def append(self, event: EventEnvelope) -> None:
         payload = json.dumps(event.payload, sort_keys=True, separators=(",", ":"))
-        with sqlite3.connect(self.path) as db:
+        with self._connection() as db:
             try:
                 db.execute(
                     """INSERT INTO events
@@ -107,7 +120,7 @@ class DurableEventDelivery:
             raise ValueError("event_id, consumer, delivery_id and idempotency_key are required")
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
-        with sqlite3.connect(self.path) as db:
+        with self._connection() as db:
             if db.execute("SELECT 1 FROM events WHERE event_id=?", (event_id,)).fetchone() is None:
                 raise KeyError(event_id)
             try:
@@ -131,7 +144,7 @@ class DurableEventDelivery:
         now_iso = now.isoformat()
         until = (now + timedelta(seconds=self.lease_seconds)).isoformat()
         lease_id = uuid.uuid4().hex
-        with sqlite3.connect(self.path, timeout=30, isolation_level=None) as db:
+        with self._connection(timeout=30, isolation_level=None) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
                 "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until,attempt,max_attempts "
@@ -151,7 +164,7 @@ class DurableEventDelivery:
     def ack(self, delivery_id: str, lease_id: str) -> None:
         if not lease_id:
             raise ValueError("lease_id is required")
-        with sqlite3.connect(self.path) as db:
+        with self._connection() as db:
             cursor = db.execute(
                 "UPDATE deliveries SET status='acked',lease_id=NULL,lease_until=NULL "
                 "WHERE delivery_id=? AND status='delivering' AND lease_id=?",
@@ -170,7 +183,7 @@ class DurableEventDelivery:
         """Release a failed lease for retry or terminally move it to DLQ."""
         if not lease_id:
             raise ValueError("lease_id is required")
-        with sqlite3.connect(self.path) as db:
+        with self._connection() as db:
             row = db.execute(
                 "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until,attempt,max_attempts "
                 "FROM deliveries WHERE delivery_id=?",
@@ -204,7 +217,7 @@ class DurableEventDelivery:
 
     def recover_expired(self) -> int:
         now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.path) as db:
+        with self._connection() as db:
             cursor = db.execute(
                 "UPDATE deliveries SET status='available',lease_id=NULL,lease_until=NULL "
                 "WHERE status='delivering' AND lease_until<=?",
@@ -213,7 +226,7 @@ class DurableEventDelivery:
             return cursor.rowcount
 
     def get_delivery(self, delivery_id: str) -> Delivery | None:
-        with sqlite3.connect(self.path) as db:
+        with self._connection() as db:
             row = db.execute(
                 "SELECT delivery_id,event_id,consumer,idempotency_key,status,lease_id,lease_until,attempt,max_attempts "
                 "FROM deliveries WHERE delivery_id=?",

@@ -2,6 +2,11 @@ name: Canonical Source Lineage Gate
 
 on:
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact immutable commit SHA to verify
+        required: false
+        type: string
   push:
     branches:
       - main
@@ -10,12 +15,6 @@ on:
       - fix/canonical-lineage-runtime-expression-hardening
       - fix/release-contract-lineage
       - fix/canonical-lineage-dynamic-artifact-contract
-    paths:
-      - ".github/workflows/research-os-windows-artifact.yml"
-      - ".github/workflows/owner-special-friend.yml"
-      - "owner_special/scripts/build_bundle.py"
-      - "owner_special/scripts/verify-installed-owner-provenance.ps1"
-      - ".github/workflows/canonical-source-lineage-gate.yml"
 
 permissions:
   contents: read
@@ -24,13 +23,27 @@ concurrency:
   group: canonical-source-lineage-gate-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+
 jobs:
   verify:
     name: Verify canonical Research OS + Friend release lineage
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout canonical source
+      - name: Checkout exact canonical source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+
+      - name: Verify exact checkout SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          echo "EXACT_TARGET_SHA=$TARGET_SHA"
 
       - name: Verify Research OS Windows artifact identity contract
         shell: bash
@@ -60,8 +73,8 @@ jobs:
           fi
 
           echo 'CANONICAL_LINEAGE_GATE=PASS'
-          echo "Canonical source SHA: $GITHUB_SHA"
-          echo "Research OS artifact contract: Research-OS-Windows-x64-${GITHUB_SHA}"
+          echo "Canonical source SHA: $TARGET_SHA"
+          echo "Research OS artifact contract: Research-OS-Windows-x64-${TARGET_SHA}"
 
       - name: Verify Research OS workflow does not bootstrap canonical source
         shell: bash

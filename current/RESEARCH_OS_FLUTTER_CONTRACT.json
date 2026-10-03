@@ -61,28 +61,67 @@
   },
   "shared_domain_contracts": {
     "runtime_status": {
-      "minimum_fields": ["status"],
-      "optional_fields": ["version", "server", "loopback_only", "capabilities"]
+      "minimum_fields": [
+        "status"
+      ],
+      "optional_fields": [
+        "version",
+        "server",
+        "loopback_only",
+        "capabilities"
+      ]
     },
     "provider": {
-      "minimum_identity": ["id"],
-      "optional_fields": ["name", "model", "status", "enabled", "cost", "latency"]
+      "minimum_identity": [
+        "id"
+      ],
+      "optional_fields": [
+        "name",
+        "model",
+        "status",
+        "enabled",
+        "cost",
+        "latency"
+      ]
     },
     "identity": {
-      "minimum_fields": ["authenticated"],
+      "minimum_fields": [
+        "authenticated"
+      ],
       "session_boundary": "session/token is owned by adapter, not UI widgets"
     },
     "memory": {
-      "minimum_operation": ["search"],
-      "conversation_sync": ["commit", "list", "sync", "delete"],
+      "minimum_operation": [
+        "search"
+      ],
+      "conversation_sync": [
+        "commit",
+        "list",
+        "sync",
+        "delete"
+      ],
       "session_key_boundary": "sync keys never belong in presentation widgets"
     },
     "orchestration": {
-      "lifecycle": ["intent", "validate", "authorize", "execute", "observe", "evidence", "complete"],
+      "lifecycle": [
+        "intent",
+        "validate",
+        "authorize",
+        "execute",
+        "observe",
+        "evidence",
+        "complete"
+      ],
       "execution_boundary": "UI prepares/requests; authority and execution remain external to presentation"
     },
     "platform": {
-      "supported_roles": ["windows", "ios", "android", "web", "other"],
+      "supported_roles": [
+        "windows",
+        "ios",
+        "android",
+        "web",
+        "other"
+      ],
       "rule": "runner and packaging identity are not duplicated application systems"
     }
   },
@@ -112,5 +151,20 @@
     "rewrite Git history",
     "replace platform runners with a single runner",
     "move backend/runtime into Flutter"
-  ]
+  ],
+  "canonical_product_surface": "apps/research_os_flutter",
+  "canonical_owner_surface": "owner_special/flutter_app",
+  "compatibility_surface": "v3/flutter_app",
+  "shared_contract_root": "packages/research_os_contracts",
+  "canonicality": {
+    "shell_meaning": "Owner Special Control Center shell and Windows identity/installer boundary",
+    "product_ui_meaning": "Shared Research OS product UI across Windows, Web and iOS",
+    "rule": "canonical_shell and canonical_product_surface are distinct authorities; neither replaces the other"
+  },
+  "sources_roles": {
+    "apps/research_os_flutter": "shared_product_surface",
+    "owner_special/flutter_app": "owner_special_surface",
+    "v3/flutter_app": "compatibility_surface",
+    "packages/research_os_contracts": "shared_contracts"
+  }
 }

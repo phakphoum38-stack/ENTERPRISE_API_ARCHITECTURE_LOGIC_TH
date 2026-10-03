@@ -1,7 +1,11 @@
 param(
   [ValidateSet('install','uninstall','start','stop','restart','status')]
   [string]$Action = 'status',
-  [string]$DataDir = "$env:USERPROFILE\ResearchOSData",
+  [string]$DataDir = $(if ($env:RESEARCH_OS_DATA_DIR) {
+  $env:RESEARCH_OS_DATA_DIR
+} else {
+  "$env:ProgramData\ResearchOS"
+}),
   [string]$ServiceName = 'ResearchOSService'
 )
 

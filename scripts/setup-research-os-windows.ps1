@@ -1,6 +1,10 @@
 param(
   [string]$Root = "$env:USERPROFILE\ResearchOS",
-  [string]$DataDir = "$env:USERPROFILE\ResearchOSData"
+  [string]$DataDir = $(if ($env:RESEARCH_OS_DATA_DIR) {
+  $env:RESEARCH_OS_DATA_DIR
+} else {
+  "$env:ProgramData\ResearchOS"
+})
 )
 
 $ErrorActionPreference = "Stop"
