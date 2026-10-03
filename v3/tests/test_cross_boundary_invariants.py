@@ -86,11 +86,15 @@ class CrossBoundaryInvariantTests(unittest.TestCase):
             self.assertIsNotNone(old)
 
             import sqlite3
-            with sqlite3.connect(delivery.path) as db:
+            db = sqlite3.connect(delivery.path)
+            try:
                 db.execute(
                     "UPDATE deliveries SET lease_until=? WHERE delivery_id=?",
                     ("2000-01-01T00:00:00+00:00", "delivery-cross-1"),
                 )
+                db.commit()
+            finally:
+                db.close()
 
             self.assertEqual(1, delivery.recover_expired())
             new = delivery.claim("delivery-cross-1")

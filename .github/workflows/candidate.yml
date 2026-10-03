@@ -8,6 +8,13 @@ on:
         required: false
         type: string
         default: ""
+  workflow_call:
+    inputs:
+      target_sha:
+        description: Exact source commit SHA to build and validate
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -158,6 +165,7 @@ jobs:
               } catch {}
               Start-Sleep -Milliseconds 500
             }
+
             if (-not $ready) { throw 'Local API did not become ready.' }
             $master = Invoke-RestMethod 'http://127.0.0.1:8787/v2/master' -TimeoutSec 5
             if ($master.master.contract -ne 'unified-master-orchestrator-v3-full') { throw 'Unified Master contract is missing.' }
@@ -172,8 +180,36 @@ jobs:
         working-directory: src
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $package = Join-Path $PWD 'installer\package'
+          $data = "$env:RUNNER_TEMP\ResearchOSServiceData"
+          try {
+            .\scripts\research-os-service.ps1 -Action install -DataDir $data
+            $ready = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 2
+                if ($health.status -eq "ok") { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $ready) { throw "Windows Service API did not become ready" }
+            $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
+            if ($master.master.contract -ne "unified-master-orchestrator-v3-full") {
+              throw "Windows Service Unified Master contract is missing"
+            }
+            $service = Get-CimInstance Win32_Service -Filter "Name='ResearchOSService'"
+            if (-not $service -or $service.State -ne 'Running') { throw "ResearchOSService is not running" }
+          }
+          finally {
+            if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) {
+              .\scripts\research-os-service.ps1 -Action uninstall -DataDir $data
+            }
+          }
+
+      - name: Stage one-click installer package
+        working-directory: src
+        shell: pwsh
+        run: |
+          $package = Join-Path $PWD "installer\package"
           if (Test-Path $package) { Remove-Item $package -Recurse -Force }
           New-Item -ItemType Directory -Force -Path "$package\app" | Out-Null
           Copy-Item 'D:\w\build\windows\x64\runner\Release\*' "$package\app" -Recurse -Force
@@ -277,8 +313,106 @@ jobs:
           if ($master.api_version -ne 'v2') { throw 'Unexpected master API version.' }
           Write-Host 'FULL WINDOWS E2E: PASS'
 
-      - name: Upload Windows candidate artifacts
-        if: always()
+          $master = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/master" -TimeoutSec 5
+          if ($master.master.contract -ne "unified-master-orchestrator-v3-full") {
+            throw "Installed candidate Unified Master contract is missing"
+          }
+          if ($master.master.capacity.assistant_6x3_capacity -ne 216 -or $master.master.capacity.max_leaf_capacity -ne 46656) {
+            throw "Installed candidate Unified Master capacity is invalid"
+          }
+
+          $providers = Invoke-RestMethod -Uri "http://127.0.0.1:8787/v2/brain/providers" -TimeoutSec 5
+          $serialized = @($providers, $master) | ConvertTo-Json -Depth 12 -Compress
+          if ($serialized -match '(?i)sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._-]+') {
+            throw "Provider or master status contains credential-like data"
+          }
+
+          $serviceLog = Join-Path $env:ProgramData 'ResearchOS\logs\service-api.err.log'
+          if (Test-Path $serviceLog) { Clear-Content $serviceLog -ErrorAction SilentlyContinue }
+          $installedApp = Join-Path $env:ProgramFiles 'Research OS\app\research_os_flutter.exe'
+          if (-not (Test-Path $installedApp)) { throw "Installed Flutter app executable is missing" }
+
+          $app = Start-Process -FilePath $installedApp -PassThru
+          try {
+            $appConnected = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              if ($app.HasExited) { throw "Installed Flutter app exited before app-to-service E2E completed" }
+              if (Test-Path $serviceLog) {
+                $requestLog = Get-Content $serviceLog -Raw -ErrorAction SilentlyContinue
+                $sawHealth = $requestLog -match '"GET /health HTTP/1\.[01]" 200'
+                $sawProviders = $requestLog -match '"GET /v1/providers HTTP/1\.[01]" 200'
+                if ($sawHealth -and $sawProviders) {
+                  $appConnected = $true
+                  break
+                }
+              }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $appConnected) {
+              if (Test-Path $serviceLog) { Get-Content $serviceLog -Tail 100 | Out-Host }
+              throw "Installed Flutter app did not prove app-to-service requests to /health and /v1/providers"
+            }
+            Write-Host "Installed Flutter app-to-service E2E passed."
+          }
+          finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+          $upgradeLog = "$env:RUNNER_TEMP\research-os-upgrade.log"
+          $u = Start-Process -FilePath $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$upgradeLog") -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "In-place upgrade failed with exit code $($u.ExitCode)" }
+
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+
+      - name: Uninstall candidate and verify data preservation
+        working-directory: src
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:ProgramFiles 'Research OS'
+          $uninstaller = Get-ChildItem $root -Filter 'unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $uninstaller) { throw "Uninstaller executable was not found" }
+          $p = Start-Process -FilePath $uninstaller.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($p.ExitCode)" }
+          for ($i = 0; $i -lt 20; $i++) {
+            if (-not (Get-Service ResearchOSService -ErrorAction SilentlyContinue)) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (Get-Service ResearchOSService -ErrorAction SilentlyContinue) { throw "ResearchOSService still exists after uninstall" }
+          .\scripts\v2-data-preservation.ps1 -Action Verify -DataDir "$env:ProgramData\ResearchOS"
+
+      - name: Create exact-SHA candidate evidence
+        working-directory: src
+        shell: pwsh
+        run: |
+          $out = "candidate-evidence"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $setup = Get-ChildItem "installer\output\Research-OS-Setup-*-x64.exe" | Select-Object -First 1
+          Copy-Item $setup.FullName $out -Force
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($setup.Name)" | Set-Content "$out\SHA256SUMS.txt" -Encoding utf8
+          $manifest = [ordered]@{
+            schema_version = 3
+            target_sha = "$env:TARGET_SHA"
+            candidate_run = "${{ github.run_id }}"
+            validation = "passed"
+            build_policy = "single-windows-runner"
+            app_to_service_e2e = "passed"
+            unified_master = "passed"
+            assistant_6x3_capacity = 216
+            compound_6x6_capacity = 46656
+            release_created = $false
+            tag_created = $false
+            artifact = [ordered]@{
+              name = $setup.Name
+              sha256 = $hash
+              size_bytes = $setup.Length
+            }
+            data_boundary = "C:\ProgramData\ResearchOS"
+            upgrade_policy = "preserve-local-data"
+          }
+          $manifest | ConvertTo-Json -Depth 8 | Set-Content "$out\candidate-manifest.json" -Encoding utf8
+
+      - name: Upload verified candidate artifact
         uses: actions/upload-artifact@v4
         with:
           name: research-os-windows-candidate-${{ env.TARGET_SHA }}

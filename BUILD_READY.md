@@ -99,6 +99,7 @@ The expected Owner executable identity is:
 From the repository root:
 
 ```bash
+python tools/validate_release_alignment.py
 python -m unittest discover -s tools/research_os_api -p "test_*.py" -v
 ```
 

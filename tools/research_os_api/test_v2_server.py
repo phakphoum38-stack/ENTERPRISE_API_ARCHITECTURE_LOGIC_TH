@@ -84,13 +84,20 @@ class V2CompatibilityTests(unittest.TestCase):
         self.assertEqual(created["api_version"], "v2")
         return created["run"]["run_id"]
 
-    def test_v2_master_delegates_to_v3_core(self) -> None:
+    def test_v2_master_delegates_to_v3_full_core(self) -> None:
         status, payload = self.request("/v2/master")
         self.assertEqual(status, 200)
         self.assertEqual(payload["api_version"], "v2")
-        self.assertEqual(payload["master"]["contract"], "unified-master-orchestrator-v3-full")
+        self.assertEqual(
+            payload["master"]["contract"],
+            "unified-master-orchestrator-v3-full",
+        )
         self.assertEqual(payload["master"]["capacity"]["assistant_6x3_capacity"], 216)
         self.assertEqual(payload["master"]["capacity"]["max_leaf_capacity"], 46656)
+        self.assertEqual(
+            payload["master"]["capacity"]["system_maximum_logical_capacity"],
+            20**20,
+        )
 
     def test_v1_and_v2_agent_catalog_share_registry(self) -> None:
         status_v1, v1 = self.request("/v1/agents")

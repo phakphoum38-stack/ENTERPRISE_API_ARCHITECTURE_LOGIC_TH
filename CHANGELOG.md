@@ -1,5 +1,39 @@
 # Changelog
 
+## v3.2.0
+
+- Marked the active Workflow Runtime contract set as the current development version.
+- Preserved `v1.0.0-draft` as a historical snapshot.
+- Recorded V3 runtime and Research OS API validation status: 130 V3 tests and 114 API tests passed.
+- Updated the validation snapshot after runtime hardening to 144 V3 tests passing with 1 skipped.
+- Declared the implemented Google, cloud conversation, memory, and GitHub dashboard routes in the draft OpenAPI contract.
+- Added OpenAPI security schemes for Research OS sessions and the server-side sync key.
+- Added a canonical tool registry with ownership, boundaries, evidence and lifecycle state.
+- Added a GitHub Actions deduplication matrix identifying canonical release gates and specialized evidence workflows.
+- Recorded V1/V2 ownership, migration boundaries and retirement criteria in the compatibility map.
+- Added the provider-neutral V3 service API contract draft for health, master, providers and user scope boundaries.
+- Recorded durable runtime gaps for event persistence and queue-to-engine state projection.
+- Added observability coverage for structured events, correlation IDs, redaction and production telemetry gaps.
+- Recorded source-level release artifact and installer alignment, including the intentional architecture/application version distinction.
+- Added a delete/retire candidate list with evidence requirements; no deletion is approved by the audit.
+- Recorded CI evidence status for `a06f0b7`: core gates passed, while Windows candidate/installer exact-SHA evidence remains open.
+- Added the first durable workflow event store foundation with sequence ordering and consumer idempotency tests.
+- Added durable event delivery lifecycle state with completion, failure and retry attempt tracking.
+- Added failure/retry coverage proving pending outbox events survive event-store unavailability without duplication.
+- Added bounded outbox draining with per-event failure isolation for retry workers.
+- Added `v3/scripts/drain_outbox.py` as a one-shot operational outbox publisher with JSON metrics.
+- Added dependency-free Prometheus text export for durable workflow event metrics.
+- Added a production observability runbook for outbox scheduling, metrics scrape and alert response.
+- Added a dedicated V3 Runtime Event Store CI gate for durable events, outbox, projection and metrics.
+- Added a repeatable release alignment validator for Flutter, installer, OpenAPI version and V3 packaging checks.
+- Added a GUI/UX audit status document that gates setup.exe until Flutter and visual review evidence is approved.
+- Added a dedicated GUI/UX CI workflow for asset validation, Flutter analyze and widget tests without release build steps.
+- Added a durable one-event delivery API that retries failed consumers and suppresses completed duplicates.
+- Added short-lived event delivery leases and expired-claim reclaim for distributed consumers.
+- Added safe durable delivery counters and a restart/replay integration test covering the full local event flow.
+- Added a transactional queue outbox and idempotent publisher bridge to the durable workflow event store.
+- Added an idempotent workflow state projector and end-to-end queue-to-projection coverage.
+
 บันทึกการเปลี่ยนแปลงทั้งหมดของ ENTERPRISE API ARCHITECTURE LOGIC TH และ ANEF
 
 รูปแบบเวอร์ชันใช้ Semantic Versioning และเก็บ Snapshot ทุกเวอร์ชันไว้ใน `versions/`
