@@ -1,0 +1,56 @@
+version: "1.0"
+kind: job_store_queue_adapter_contract
+status: foundation
+purpose: Define the storage and queue adapter boundary for atomic job claiming and durable execution.
+
+job_store:
+  operations:
+    create:
+      atomic: true
+      idempotency_key_required: true
+    get:
+      consistency: strong
+    claim:
+      atomic: true
+      requires_active_lease_exclusion: true
+    heartbeat:
+      requires_matching_lease: true
+    complete:
+      requires_matching_lease: true
+    fail:
+      requires_matching_lease: true
+    cancel:
+      requires_matching_lease: false
+    release_expired_lease:
+      atomic: true
+
+queue_adapter:
+  operations:
+    publish: durable
+    receive: at_least_once
+    acknowledge: durable
+    reject: retry_or_dead_letter
+
+concurrency:
+  claim_semantics: compare_and_set
+  lease_owner_required: true
+  stale_lease_must_not_complete_job: true
+  duplicate_delivery_must_be_safe: true
+
+state_transitions:
+  QUEUED: [CLAIMED, CANCELLED, DEAD_LETTER]
+  CLAIMED: [RUNNING, QUEUED, FAILED, CANCELLED]
+  RUNNING: [SUCCEEDED, FAILED, RETRYING, CANCELLED]
+  RETRYING: [QUEUED, DEAD_LETTER, CANCELLED]
+  SUCCEEDED: []
+  FAILED: [RETRYING, DEAD_LETTER]
+  CANCELLED: []
+  DEAD_LETTER: []
+
+acceptance_criteria:
+  - create is idempotent for the same idempotency key
+  - concurrent claims yield one successful lease owner
+  - expired leases can be reclaimed
+  - old lease owners cannot complete a reclaimed job
+  - duplicate queue delivery is safe
+  - terminal jobs are not returned as runnable
