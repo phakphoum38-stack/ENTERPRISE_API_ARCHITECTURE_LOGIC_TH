@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from auth_session import cookie_header, issue_session
+from google_workspace import GoogleWorkspaceConfig
+from oauth_handoff import create_handoff
 from identity_providers import get_provider
 from multi_login import normalize_callback
 
@@ -119,4 +121,18 @@ def complete_runtime_login(code: str, state: str) -> dict[str, Any]:
     principal["user_id"] = f"{provider.name}:{principal['sub']}"
     principal["provider"] = provider.name
     session = issue_session(principal)
-    return {"provider": provider.name, "principal": principal, "session": session, "set_cookie": cookie_header(session, secure=_secure_cookie(pending.redirect_uri))}
+    create_handoff(
+        GoogleWorkspaceConfig().root,
+        session,
+        pending.redirect_uri,
+        code=state,
+        audience=f"{provider.name}-native",
+    )
+    return {
+        "provider": provider.name,
+        "principal": principal,
+        "session": session,
+        "handoff_code": state,
+        "handoff_audience": f"{provider.name}-native",
+        "set_cookie": cookie_header(session, secure=_secure_cookie(pending.redirect_uri)),
+    }
