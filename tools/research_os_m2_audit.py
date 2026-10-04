@@ -7,6 +7,7 @@ try:
 except ModuleNotFoundError:
  from tools.research_os_test_case_inventory import discover as discover_test_cases
 from pathlib import Path
+from tools.research_os_semantic_binding import resolve_semantic_binding
 
 ROOT=Path(__file__).resolve().parents[1]
 EXCLUDES={".git",".dart_tool","build","dist","node_modules","__pycache__",".venv","venv"}
@@ -50,24 +51,6 @@ def nid(k,path): return k.upper()+":"+path
 
 SEMANTIC_ASSURANCE_RELATIONS=frozenset({"VERIFIED_BY","ENFORCED_BY","DISPATCHED_BY","SUPPORTED_BY","BOUND_TO"})
 
-def contract_stem(path: str) -> str:
- stem=Path(path).stem.lower()
- for suffix in ("_contract","-contract"):
-  if stem.endswith(suffix):
-   stem=stem[:-len(suffix)]
-   break
- return stem
-
-def _declared_identities(path: str, text: str) -> set[str]:
- """Extract conservative canonical identities from artifact metadata."""
- values={contract_stem(path)}
- for pattern in (
-  r'"(?:contract|contract_id|capability_id|component_id)"\\s*:\\s*"([A-Za-z0-9_.:/-]+)"',
-  r'^(?:contract|contract_id|capability_id|component_id):\\s*([A-Za-z0-9_.:/-]+)',
- ):
-  values.update(x.lower() for x in re.findall(pattern,text,re.MULTILINE))
- return {x for x in values if x}
-
 def resolve_semantic_bindings(contract: str, rows: list[dict], by_path: dict[str,Path],
                               contracts: list[str], implementations: list[str],
                               workflows: list[str], tests: list[str]) -> dict:
@@ -84,22 +67,30 @@ def resolve_semantic_bindings(contract: str, rows: list[dict], by_path: dict[str
    relation="ENFORCED_BY" if row["kind"]=="implementation" else "DISPATCHED_BY"
    bindings.append((relation,target,"explicit_contract_reference"))
  for target in tests:
-  if contract in read_text(by_path[target]) or contract_stem(contract) in Path(target).stem.lower():
+  if contract in read_text(by_path[target]) or Path(target).stem.lower().replace("-contract","") in Path(contract).stem.lower():
    bindings.append(("VERIFIED_BY",target,"test_identity"))
  for target in by_path:
   if target.startswith("evidence/") and contract in read_text(by_path[target]):
    bindings.append(("SUPPORTED_BY",target,"explicit_contract_reference"))
- # Semantic fallback is deliberately unique: identity overlap must identify one target.
- identities=_declared_identities(contract,contract_text)
- for kind_name, candidates, relation in (
-  ("implementation",implementations,"ENFORCED_BY"),
-  ("workflow",workflows,"DISPATCHED_BY"),
+ for candidates, relation in (
+  (implementations,"ENFORCED_BY"),
+  (workflows,"DISPATCHED_BY"),
  ):
-  semantic=[p for p in candidates if identities & _declared_identities(p,read_text(by_path[p]))]
-  if len(semantic)==1:
-   bindings.append((relation,semantic[0],"unique_semantic_identity"))
-  elif len(semantic)>1:
-   return {"bindings":sorted(set(bindings)),"unresolved":False,"ambiguous":True,"ambiguous_targets":sorted(semantic)}
+  result=resolve_semantic_binding(
+   target=contract,
+   relation=relation,
+   candidates=candidates,
+   texts={path:read_text(by_path[path]) for path in [contract,*candidates]},
+  )
+  if result.ambiguous:
+   return {
+    "bindings":sorted(set(bindings)),
+    "unresolved":False,
+    "ambiguous":True,
+    "ambiguous_targets":sorted(result.candidates),
+   }
+  for target in result.targets:
+   bindings.append((relation,target,str(result.tier or "semantic_binding").lower()))
  return {"bindings":sorted(set(bindings)),"unresolved":not bindings,"ambiguous":False,"ambiguous_targets":[]}
 
 def required_authority_paths(by_path):
