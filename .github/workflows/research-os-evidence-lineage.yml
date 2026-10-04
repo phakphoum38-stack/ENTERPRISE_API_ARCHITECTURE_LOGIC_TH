@@ -208,6 +208,7 @@ jobs:
 
           owner = os.environ['OWNER']
           repo = os.environ['REPO']
+          pr_repo = os.environ['PR_REPO']
           pr = os.environ['PR_NUMBER']
           base = os.environ['BASE_SHA']
           head = os.environ['HEAD_SHA']
