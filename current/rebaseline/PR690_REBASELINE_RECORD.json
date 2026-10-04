@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "contract": "RESEARCH_OS_REBASELINE",
+  "record_type": "EVIDENCE_PACKAGED_REBASELINE_RECORD",
+  "status": "READY_FOR_FINAL_VERIFICATION",
+  "parent_generation_sha": "2af48365d1b0e9e2bd57f3079d30e0d06634b602",
+  "successor_generation_sha": "ba8fa8ddf293ee42578dd333e4bc12956456fdca",
+  "evidence_root": "b10e63e26e49b79154ee95e0b6cf12c67f866724",
+  "provenance_root": "409892100323124bb5474948886f9488924e26f5",
+  "source_pr": 690,
+  "source_pr_head_sha": "b87a54347f635ab17e20b3cebc7ebc86822f2f9",
+  "merge_commit_sha": "e67e2cf707c015212cb8cd3843c9f3a13ab4e80c",
+  "assurance_state": "VERIFIED",
+  "known_risks": [
+    {
+      "id": "EXACT_HEAD_CI_UNVERIFIED",
+      "status": "UNVERIFIED",
+      "detail": "GitHub Checks were not used as runtime truth; the post-merge exact runtime suite is the available execution evidence plane."
+    }
+  ],
+  "lessons_learned": [
+    "Python 3.14 sqlite3 context-manager usage does not close connections; operation-scoped connections require explicit closing.",
+    "Durable recovery mutations require explicit commits when operation-scoped connections are used.",
+    "Test-side SQLite lifecycle must be audited separately from persistent production stores.",
+    "Runtime evidence must remain distinct from merge authority."
+  ],
+  "immutability_verified": true,
+  "verification_complete": false,
+  "verification_notes": [
+    "Forensic lineage is PASS.",
+    "Current runtime owners are verified.",
+    "Pre-merge V3 runtime gate is PASS at 220/220.",
+    "Post-merge V3 runtime gate is PASS at 220/220.",
+    "Worker recovery evidence shows reclaim=1, executions=1, completed status, and stale ACK rejection.",
+    "No ResourceWarning or WinError32 cleanup failure was observed in the post-merge suite.",
+    "Final rebaseline completion remains fail-closed until the remaining verification requirement is explicitly evidenced."
+  ],
+  "authority": {
+    "owner_authority_granted": false,
+    "merge_authority_granted": false,
+    "certification_inherited": false,
+    "history_rewrite_performed": false
+  }
+}

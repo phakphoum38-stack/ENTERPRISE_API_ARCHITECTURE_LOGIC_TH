@@ -1,0 +1,24 @@
+{
+  "assurance_state": "VERIFIED",
+  "merge_commit_sha": "e67e2cf707c015212cb8cd3843c9f3a13ab4e80c",
+  "parent_generation_sha": "2af48365d1b0e9e2bd57f3079d30e0d06634b602",
+  "pr_head_sha": "b87a54347f635ab17e20b3cebc7ebc86822f2f9",
+  "provenance_type": "RESEARCH_OS_REBASELINE_PROVENANCE",
+  "rebaseline_work_head_repository": "phakphum12345/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH",
+  "schema_version": "1.0",
+  "source_pr": 690,
+  "source_repository": "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH",
+  "verification_complete": false,
+  "verification_policy": {
+    "authority_escalation": "forbidden",
+    "github_checks": "not treated as runtime truth",
+    "history_rewrite": "forbidden",
+    "runtime_evidence": "accepted evidence plane"
+  },
+  "verification_sources": [
+    "PR #690 exact-SHA isolated worktree",
+    "post-merge main runtime execution",
+    "current/REBASELINE_CONTRACT.json",
+    "current/AEOS_H00_H27_AUTO_FIX_PROTOCOL.json"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "authority_state": "NOT_GRANTED",
+  "current_runtime_owners": [
+    "v3/research_os_v3/durable_events.py",
+    "v3/research_os_v3/event_delivery.py",
+    "v3/research_os_v3/workflow_projection.py",
+    ".github/workflows/v3-runtime-event-store-ci.yml",
+    ".github/workflows/research-os-evidence-lineage.yml"
+  ],
+  "evidence_type": "RESEARCH_OS_POST_MERGE_RUNTIME_EVIDENCE",
+  "forensic_lineage": {
+    "chain": "PR #690 -> b87a54347f635ab17e20b3cebc7ebc86822f2f9 -> e67e2cf707c015212cb8cd3843c9f3a13ab4e80c -> main -> current runtime owners",
+    "status": "PASS"
+  },
+  "history_integrity": "PASS",
+  "merge_commit_sha": "e67e2cf707c015212cb8cd3843c9f3a13ab4e80c",
+  "parent_generation_sha": "2af48365d1b0e9e2bd57f3079d30e0d06634b602",
+  "pr_head_sha": "b87a54347f635ab17e20b3cebc7ebc86822f2f9",
+  "pr_number": 690,
+  "runtime_gate": {
+    "command": "python -X tracemalloc=25 -W error::ResourceWarning -m unittest discover -s v3\\tests -p \"test_*.py\" -v",
+    "resource_warning": false,
+    "result": "PASS",
+    "tests_failed": 0,
+    "tests_run": 220,
+    "winerror_32": false
+  },
+  "schema_version": "1.0",
+  "worker_recovery_evidence": {
+    "executions": 1,
+    "final_status": "completed",
+    "gate": "v3.5-worker-recovery-evidence",
+    "reclaimed": 1,
+    "stale_ack_rejected": true
+  }
+}
