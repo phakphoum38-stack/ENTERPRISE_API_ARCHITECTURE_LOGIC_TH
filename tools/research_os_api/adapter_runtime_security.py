@@ -14,8 +14,6 @@ import time
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from v3.research_os_v3.research_tool_adapters import ToolResult
-
 
 class AdapterRuntimeDenied(PermissionError):
     """Raised when a request cannot cross the adapter runtime boundary."""
