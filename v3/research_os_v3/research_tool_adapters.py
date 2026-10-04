@@ -7,6 +7,8 @@ import ast
 import subprocess
 import sys
 
+from tools.research_os_api.adapter_runtime_security import AdapterRuntimeDecision, AdapterRuntimeSecurityBoundary
+
 
 @dataclass(frozen=True)
 class ToolRequest:
@@ -109,3 +111,25 @@ class BuiltinResearchTools:
         if adapter is None:
             return ToolResult(request.tool, request.action, False, error="ToolNotFound")
         return adapter.execute(request)
+
+    def execute_authorized(
+        self,
+        request: ToolRequest,
+        *,
+        principal: Mapping[str, Any],
+        request_id: str,
+        policy_decision: str,
+        security_boundary: AdapterRuntimeSecurityBoundary | None = None,
+    ) -> tuple[ToolResult, AdapterRuntimeDecision]:
+        """Cross the security wall, then execute through this existing registry."""
+        capability = f"{request.tool}.{request.action}"
+        gate = security_boundary or AdapterRuntimeSecurityBoundary()
+        decision = gate.enforce(
+            principal=principal,
+            capability=capability,
+            requested_tools=(request.tool,),
+            arguments=request.arguments,
+            request_id=request_id,
+            policy_decision=policy_decision,
+        )
+        return self.execute(request), decision
