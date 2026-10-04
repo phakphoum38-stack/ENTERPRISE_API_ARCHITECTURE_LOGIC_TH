@@ -88,7 +88,7 @@ def auth_provider_handoff(state: str) -> dict:
     handoff = str(state or "").strip()
     if not handoff:
         raise MultiLoginRuntimeError("OAuth handoff state is required")
-    session = consume_handoff(GoogleIdentityBroker().root, handoff)
+    session = consume_handoff(GoogleIdentityBroker().root, handoff, expected_audience="google-native")
     if not session:
         raise MultiLoginRuntimeError("OAuth handoff is missing, expired, or already consumed")
     principal = verify_session(session)
