@@ -18,6 +18,11 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .session_registry import mark_all_revoked, mark_revoked, register_session, touch_session
+except ImportError:  # pragma: no cover
+    from session_registry import mark_all_revoked, mark_revoked, register_session, touch_session
+
+try:
     from .identity_storage import storage_key
 except ImportError:  # pragma: no cover - supports direct script/test imports
     from identity_storage import storage_key
@@ -185,16 +190,22 @@ def issue_session(account: dict[str, Any], *, ttl_seconds: int = DEFAULT_TTL_SEC
         "iat": now,
         "exp": now + max(60, int(ttl_seconds)),
     }
-    return _encode(payload)
+    token = _encode(payload)
+    register_session(session_id=str(payload["session_id"]), user_id=user_id, email=email, role=role, provider=str(account.get("provider") or "") or None, issued_at=now, expires_at=int(payload["exp"]))
+    return token
 
 
 def revoke_session(token: str) -> None:
     payload = _decode(token)
-    SessionRevocationStore().revoke(str(payload["user_id"]), str(payload["session_id"]))
+    user_id = str(payload["user_id"])
+    sid = str(payload["session_id"])
+    SessionRevocationStore().revoke(user_id, sid)
+    mark_revoked(user_id, sid)
 
 
 def revoke_all_sessions(user_id: str) -> None:
     SessionRevocationStore().revoke_all(user_id)
+    mark_all_revoked(user_id)
 
 
 def verify_session(token: str | None) -> dict[str, Any]:
@@ -207,6 +218,7 @@ def verify_session(token: str | None) -> dict[str, Any]:
         int(payload["iat"]),
     ):
         raise ValueError("session revoked")
+    touch_session(str(payload["user_id"]), str(payload["session_id"]))
     return payload
 
 
