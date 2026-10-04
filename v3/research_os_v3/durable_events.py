@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -32,7 +33,7 @@ class DurableWorkflowEventStore:
     def __init__(self, path: Path) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             db.execute(
                 """CREATE TABLE IF NOT EXISTS workflow_events (
                     event_id TEXT PRIMARY KEY,
@@ -67,6 +68,7 @@ class DurableWorkflowEventStore:
                 db.execute("ALTER TABLE event_deliveries ADD COLUMN lease_until TEXT")
             if "delivery_token" not in columns:
                 db.execute("ALTER TABLE event_deliveries ADD COLUMN delivery_token TEXT")
+            db.commit()
 
     def append(
         self,
@@ -85,7 +87,7 @@ class DurableWorkflowEventStore:
             raise ValueError("event type and event identifiers are required")
         event_id = event_id or uuid.uuid4().hex
         occurred_at = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             existing = db.execute(
                 "SELECT * FROM workflow_events WHERE event_id=?", (event_id,)
             ).fetchone()
@@ -113,6 +115,7 @@ class DurableWorkflowEventStore:
             row = db.execute(
                 "SELECT * FROM workflow_events WHERE event_id=?", (event_id,)
             ).fetchone()
+            db.commit()
         return self._from_row(row)
 
     def list_events(self, workflow_id: str, task_id: str | None = None) -> list[WorkflowEvent]:
@@ -122,12 +125,12 @@ class DurableWorkflowEventStore:
             query += " AND task_id=?"
             params += (task_id,)
         query += " ORDER BY task_id, sequence"
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             rows = db.execute(query, params).fetchall()
         return [self._from_row(row) for row in rows]
 
     def get_event(self, event_id: str) -> WorkflowEvent:
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             row = db.execute(
                 "SELECT * FROM workflow_events WHERE event_id=?", (event_id,)
             ).fetchone()
@@ -152,7 +155,7 @@ class DurableWorkflowEventStore:
         now_iso = now.isoformat()
         lease_until = (now + timedelta(seconds=lease_seconds)).isoformat()
         delivery_token = uuid.uuid4().hex
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             exists = db.execute(
                 "SELECT 1 FROM workflow_events WHERE event_id=?", (event_id,)
             ).fetchone()
@@ -171,12 +174,15 @@ class DurableWorkflowEventStore:
                                             OR (event_deliveries.status='claimed' AND event_deliveries.lease_until<=?)""",
                                 (event_id, consumer_key, now_iso, lease_until, delivery_token, now_iso),
             )
-            return delivery_token if cursor.rowcount == 1 else None
+            if cursor.rowcount == 1:
+                db.commit()
+                return delivery_token
+            return None
 
     def complete_delivery(
         self, event_id: str, consumer_key: str, delivery_token: str | None = None
     ) -> None:
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             token_clause = " AND delivery_token=?" if delivery_token is not None else ""
             params = (event_id, consumer_key, delivery_token) if delivery_token is not None else (event_id, consumer_key)
             cursor = db.execute(
@@ -185,6 +191,7 @@ class DurableWorkflowEventStore:
             )
             if cursor.rowcount != 1:
                 raise ValueError("delivery is not actively claimed")
+            db.commit()
 
     def fail_delivery(
         self,
@@ -195,7 +202,7 @@ class DurableWorkflowEventStore:
     ) -> None:
         if not error.strip():
             raise ValueError("delivery error is required")
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             token_clause = " AND delivery_token=?" if delivery_token is not None else ""
             params = (error, event_id, consumer_key, delivery_token) if delivery_token is not None else (error, event_id, consumer_key)
             cursor = db.execute(
@@ -204,6 +211,7 @@ class DurableWorkflowEventStore:
             )
             if cursor.rowcount != 1:
                 raise ValueError("delivery is not actively claimed")
+            db.commit()
 
     def metrics(self, workflow_id: str | None = None) -> dict[str, int]:
         """Return safe delivery counters without exposing event payloads."""
@@ -212,7 +220,7 @@ class DurableWorkflowEventStore:
         if workflow_id is not None:
             scope = " WHERE workflow_id=?"
             params = (workflow_id,)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             event_count = db.execute(
                 f"SELECT COUNT(*) FROM workflow_events{scope}", params
             ).fetchone()[0]

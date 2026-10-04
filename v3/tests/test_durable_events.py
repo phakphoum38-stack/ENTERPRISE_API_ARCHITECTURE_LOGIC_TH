@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 import tempfile
 import unittest
+from contextlib import closing
 
 from research_os_v3.durable_events import DurableWorkflowEventStore
 from research_os_v3.queue import DurableTaskQueue, QueueTask
@@ -123,11 +124,12 @@ class DurableWorkflowEventStoreTests(unittest.TestCase):
             correlation_id="corr-1", causation_id="root", producer="runner",
         )
         self.assertTrue(store.claim_delivery(event.event_id, "consumer-a", lease_seconds=1))
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             db.execute(
                 "UPDATE event_deliveries SET lease_until=? WHERE event_id=?",
                 ("2000-01-01T00:00:00+00:00", event.event_id),
             )
+            db.commit()
         self.assertTrue(store.claim_delivery(event.event_id, "consumer-b"))
 
     def test_reclaimed_delivery_rejects_stale_completion_token(self) -> None:
@@ -138,11 +140,12 @@ class DurableWorkflowEventStoreTests(unittest.TestCase):
         )
         first_token = store.claim_delivery_token(event.event_id, "consumer-a", lease_seconds=1)
         self.assertIsNotNone(first_token)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db:
             db.execute(
                 "UPDATE event_deliveries SET lease_until=? WHERE event_id=?",
                 ("2000-01-01T00:00:00+00:00", event.event_id),
             )
+            db.commit()
         second_token = store.claim_delivery_token(event.event_id, "consumer-a")
         self.assertIsNotNone(second_token)
         self.assertNotEqual(first_token, second_token)
