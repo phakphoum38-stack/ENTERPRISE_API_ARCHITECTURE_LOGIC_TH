@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -14,6 +15,7 @@ class OAuthHandoffTests(unittest.TestCase):
     def setUp(self) -> None:
         self._previous_session_secret = os.environ.get("RESEARCH_OS_SESSION_SECRET")
         self._previous_data_dir = os.environ.get("RESEARCH_OS_V3_DATA_DIR")
+        self._previous_api_data_dir = os.environ.get("RESEARCH_OS_DATA_DIR")
         os.environ["RESEARCH_OS_SESSION_SECRET"] = "ci-oauth-handoff-test-secret"
 
     def tearDown(self) -> None:
@@ -25,10 +27,15 @@ class OAuthHandoffTests(unittest.TestCase):
             os.environ.pop("RESEARCH_OS_V3_DATA_DIR", None)
         else:
             os.environ["RESEARCH_OS_V3_DATA_DIR"] = self._previous_data_dir
+        if self._previous_api_data_dir is None:
+            os.environ.pop("RESEARCH_OS_DATA_DIR", None)
+        else:
+            os.environ["RESEARCH_OS_DATA_DIR"] = self._previous_api_data_dir
 
     def test_handoff_is_single_use_and_rotates_session(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             os.environ["RESEARCH_OS_V3_DATA_DIR"] = directory
+            os.environ["RESEARCH_OS_DATA_DIR"] = directory
             root = Path(directory) / "google_workspace"
             session = issue_session({"sub": "google-sub", "email": "owner@example.com", "role": "owner"})
             code = create_handoff(
