@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Build a source-SHA-pinned searchable M.2 inventory and relationship graph."""
 from __future__ import annotations
-import argparse,json,re,subprocess
+import argparse,json,re,subprocess,sys
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+ sys.path.insert(0,str(ROOT))
+
 try:
  from research_os_test_case_inventory import discover as discover_test_cases
 except ModuleNotFoundError:
  from tools.research_os_test_case_inventory import discover as discover_test_cases
-from pathlib import Path
 from tools.research_os_semantic_binding import resolve_semantic_binding
-
-ROOT=Path(__file__).resolve().parents[1]
 EXCLUDES={".git",".dart_tool","build","dist","node_modules","__pycache__",".venv","venv"}
 TEXT_SUFFIXES={".py",".dart",".json",".yml",".yaml",".md",".txt",".ps1",".sh",".toml",".html",".css",".js",".cs",".cpp",".h"}
 CONTRACT_RE=re.compile(r"current/[A-Z0-9_./-]+\.(?:json|ya?ml)")
