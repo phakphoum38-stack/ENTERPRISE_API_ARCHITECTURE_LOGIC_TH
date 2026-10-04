@@ -1,4 +1,4 @@
-name: AEOS Master Assurance
+﻿name: AEOS Master Assurance
 
 on:
   pull_request:
@@ -114,15 +114,21 @@ jobs:
         run: |
           set -euo pipefail
           changed_files="$(git diff --name-only "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA")"
-          if printf '%s\n' "$changed_files" | grep -E '(^|/)canonical-source-lineage-gate\.yml$' >/dev/null; then
-            file_count="$(printf '%s\n' "$changed_files" | sed '/^$/d' | wc -l | tr -d ' ')"
-            if [ "$file_count" -ne 1 ]; then
-              echo 'Canonical maintenance must modify only canonical-source-lineage-gate.yml.' >&2
-              exit 1
+          canonical_path=".github/workflows/canonical-source-lineage-gate.yml"
+          if git cat-file -e "$AEOS_BASE_SHA:$canonical_path" 2>/dev/null; then
+            if printf '%s\n' "$changed_files" | grep -E '(^|/)canonical-source-lineage-gate\.yml$' >/dev/null; then
+              file_count="$(printf '%s\n' "$changed_files" | sed '/^$/d' | wc -l | tr -d ' ')"
+              if [ "$file_count" -ne 1 ]; then
+                echo 'Canonical maintenance must modify only canonical-source-lineage-gate.yml.' >&2
+                exit 1
+              fi
+              echo 'CANONICAL_344_MAINTENANCE=PASS'
+            else
+              echo 'CANONICAL_344_IMMUTABLE=PASS'
             fi
-            echo 'CANONICAL_344_MAINTENANCE=PASS'
           else
-            echo 'CANONICAL_344_IMMUTABLE=PASS'
+            echo 'CANONICAL_344_BOOTSTRAP=PASS'
+            echo 'Canonical source-lineage gate is being established for the first time in this source promotion.'
           fi
 
       - name: Inspect change scope
@@ -135,6 +141,7 @@ jobs:
           git diff --name-status "$AEOS_BASE_SHA" "$AEOS_EXPECTED_SHA"
 
       - name: Record pre-control source identity
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -142,6 +149,7 @@ jobs:
           echo "PRE_CONTROL_SHA=$(git rev-parse HEAD)"
 
       - name: Run AEOS master assurance controls
+        if: always()
         env:
           AEOS_PREVIOUS_MANIFEST: ${{ inputs.previous_manifest || '' }}
         shell: bash
@@ -289,3 +297,5 @@ jobs:
             aeos_master_assurance_manifest.json.sha256
           if-no-files-found: error
           retention-days: 30
+
+

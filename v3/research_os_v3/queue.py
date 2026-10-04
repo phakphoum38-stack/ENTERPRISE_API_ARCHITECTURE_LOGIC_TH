@@ -20,6 +20,15 @@ class QueueTask:
     lease_until: str | None = None
 
 
+@dataclass(frozen=True)
+class QueueOutboxEvent:
+    event_id: str
+    event_type: str
+    task_id: str
+    occurred_at: str
+    payload: Mapping[str, object]
+
+
 class LeaseOwnershipError(RuntimeError):
     """Raised when a worker tries to mutate a task without its active lease."""
 
@@ -58,6 +67,17 @@ class DurableTaskQueue:
                     db.execute(f"ALTER TABLE research_queue ADD COLUMN {name} {definition}")
             db.execute("CREATE INDEX IF NOT EXISTS idx_research_queue_ready ON research_queue(status, available_at)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_research_queue_lease ON research_queue(status, lease_until)")
+            db.execute(
+                """CREATE TABLE IF NOT EXISTS queue_outbox (
+                    event_id TEXT PRIMARY KEY,
+                    event_type TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    occurred_at TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    published INTEGER NOT NULL DEFAULT 0
+                )"""
+            )
+            db.execute("CREATE INDEX IF NOT EXISTS idx_queue_outbox_pending ON queue_outbox(published, occurred_at)")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -86,6 +106,7 @@ class DurableTaskQueue:
                 "VALUES (?,?,?,?,?,?,?)",
                 (task.task_id, task.research_id, json.dumps(dict(task.payload), sort_keys=True), task.attempts, "queued", now, now),
             )
+            self._append_outbox(db, "task.queued", task.task_id, now, {"research_id": task.research_id})
 
     def claim(self, *, worker_id: str | None = None, lease_seconds: int | None = None) -> QueueTask | None:
         lease_seconds = self.default_lease_seconds if lease_seconds is None else lease_seconds
@@ -108,6 +129,7 @@ class DurableTaskQueue:
                 "UPDATE research_queue SET status='running', updated_at=?, lease_id=?, lease_until=?, worker_id=? WHERE task_id=?",
                 (now_iso, lease_id, lease_until, worker_id, row[0]),
             )
+            self._append_outbox(db, "task.started", row[0], now_iso, {"worker_id": worker_id or ""})
         return QueueTask(row[0], row[1], json.loads(row[2]), row[3], lease_id, lease_until)
 
     def renew_lease(self, task_id: str, lease_id: str, *, lease_seconds: int | None = None) -> QueueTask:
@@ -143,6 +165,7 @@ class DurableTaskQueue:
                 "UPDATE research_queue SET status='queued', attempts=attempts+1, available_at=?, updated_at=?, lease_id=NULL, lease_until=NULL, worker_id=NULL WHERE task_id=? AND lease_id=?",
                 (available_at, now.isoformat(), task_id, lease_id),
             )
+            self._append_outbox(db, "task.retry_scheduled", task_id, now.isoformat(), {"delay_seconds": max(0, delay_seconds)})
 
     def fail(self, task_id: str, lease_id: str) -> None:
         self._set_status(task_id, "failed", lease_id)
@@ -175,6 +198,91 @@ class DurableTaskQueue:
             )
             if cursor.rowcount != 1:
                 raise LeaseOwnershipError("task ownership changed before status update")
+            event_type = "task.succeeded" if status == "completed" else "task.failed"
+            self._append_outbox(db, event_type, task_id, now.isoformat(), {})
+
+    def outbox_events(self, *, include_published: bool = False) -> list[QueueOutboxEvent]:
+        query = "SELECT event_id,event_type,task_id,occurred_at,payload FROM queue_outbox"
+        if not include_published:
+            query += " WHERE published=0"
+        query += " ORDER BY occurred_at, event_id"
+        with self._connect() as db:
+            rows = db.execute(query).fetchall()
+        return [QueueOutboxEvent(row[0], row[1], row[2], row[3], json.loads(row[4])) for row in rows]
+
+    def mark_outbox_published(self, event_id: str) -> None:
+        with self._connect() as db:
+            cursor = db.execute(
+                "UPDATE queue_outbox SET published=1 WHERE event_id=? AND published=0",
+                (event_id,),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("outbox event does not exist or is already published")
+
+    def publish_outbox(self, event_store: object, *, workflow_id: str, correlation_id: str) -> int:
+        """Publish queued transitions to a durable event store and acknowledge them."""
+        if not workflow_id.strip() or not correlation_id.strip():
+            raise ValueError("workflow_id and correlation_id are required")
+        published = 0
+        for item in self.outbox_events():
+            event_store.append(
+                item.event_type,
+                workflow_id=workflow_id,
+                task_id=item.task_id,
+                correlation_id=correlation_id,
+                causation_id="queue",
+                producer="queue-outbox",
+                payload=dict(item.payload),
+                event_id=item.event_id,
+            )
+            self.mark_outbox_published(item.event_id)
+            published += 1
+        return published
+
+    def drain_outbox(
+        self,
+        event_store: object,
+        *,
+        workflow_id: str,
+        correlation_id: str,
+        max_events: int | None = None,
+    ) -> dict[str, int]:
+        """Process a bounded batch while leaving failed items pending."""
+        if max_events is not None and max_events < 1:
+            raise ValueError("max_events must be at least 1")
+        published = 0
+        failed = 0
+        for item in self.outbox_events()[:max_events]:
+            try:
+                event_store.append(
+                    item.event_type,
+                    workflow_id=workflow_id,
+                    task_id=item.task_id,
+                    correlation_id=correlation_id,
+                    causation_id="queue",
+                    producer="queue-outbox",
+                    payload=dict(item.payload),
+                    event_id=item.event_id,
+                )
+                self.mark_outbox_published(item.event_id)
+            except Exception:
+                failed += 1
+                continue
+            published += 1
+        return {"published": published, "failed": failed}
+
+    @staticmethod
+    def _append_outbox(
+        db: sqlite3.Connection,
+        event_type: str,
+        task_id: str,
+        occurred_at: str,
+        payload: Mapping[str, object],
+    ) -> None:
+        db.execute(
+            "INSERT INTO queue_outbox VALUES (?, ?, ?, ?, ?, 0)",
+            (uuid.uuid4().hex, event_type, task_id, occurred_at, json.dumps(dict(payload), sort_keys=True)),
+        )
 
     def close(self) -> None:
         return None
