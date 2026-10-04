@@ -122,6 +122,7 @@ class OAuthHandoffTests(unittest.TestCase):
     def test_auth_guard_resolves_native_oauth_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             os.environ["RESEARCH_OS_V3_DATA_DIR"] = directory
+            os.environ["RESEARCH_OS_DATA_DIR"] = directory
             root = Path(directory) / "google_workspace"
             session = issue_session({"sub": "google-sub", "email": "owner@example.com", "role": "owner"})
             create_handoff(
