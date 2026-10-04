@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import closing
+
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,22 +38,24 @@ class ReplayRestartMatrixTests(unittest.TestCase):
             self.assertIsNotNone(original)
 
             import sqlite3
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute(
                     "UPDATE deliveries SET lease_until=? WHERE delivery_id=?",
                     ("2000-01-01T00:00:00+00:00", "delivery-restart-1"),
                 )
+                db.commit()
 
             for _ in range(3):
                 restarted = DurableEventDelivery(path, lease_seconds=30)
                 self.assertEqual(1, restarted.recover_expired())
                 replacement = restarted.claim("delivery-restart-1")
                 self.assertIsNotNone(replacement)
-                with sqlite3.connect(path) as db:
+                with closing(sqlite3.connect(path)) as db:
                     db.execute(
                         "UPDATE deliveries SET lease_until=? WHERE delivery_id=?",
                         ("2000-01-01T00:00:00+00:00", "delivery-restart-1"),
                     )
+                    db.commit()
 
             final = DurableEventDelivery(path, lease_seconds=30)
             self.assertEqual(1, final.recover_expired())
@@ -61,7 +65,7 @@ class ReplayRestartMatrixTests(unittest.TestCase):
             self.assertEqual("acked", final.get_delivery(owner.delivery_id).status)
 
             # The durable identity remains one delivery row after repeated recovery.
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 count = db.execute(
                     "SELECT COUNT(*) FROM deliveries WHERE idempotency_key=?",
                     ("idem-restart-1",),

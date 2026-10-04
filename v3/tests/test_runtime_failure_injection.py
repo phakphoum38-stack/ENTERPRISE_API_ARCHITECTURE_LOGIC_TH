@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from v3.research_os_v3.event_delivery import DurableEventDelivery, EventEnvelope
@@ -34,11 +36,12 @@ class RuntimeFailureInjectionTests(unittest.TestCase):
             self.assertIsNotNone(crashed)
 
             # Failure injection: the process disappears before ACK.
-            with __import__("sqlite3").connect(queue.path) as db:
+            with closing(sqlite3.connect(queue.path)) as db:
                 db.execute(
                     "UPDATE research_queue SET lease_until=? WHERE task_id=?",
                     ("2000-01-01T00:00:00+00:00", "task-1"),
                 )
+                db.commit()
 
             self.assertEqual(1, queue.recover_expired_leases())
             recovered = queue.claim(worker_id="worker-b", lease_seconds=30)
@@ -66,11 +69,12 @@ class RuntimeFailureInjectionTests(unittest.TestCase):
             self.assertIsNotNone(crashed)
 
             # Failure injection: process dies while delivery is leased.
-            with __import__("sqlite3").connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute(
                     "UPDATE deliveries SET lease_until=? WHERE delivery_id=?",
                     ("2000-01-01T00:00:00+00:00", "delivery-1"),
                 )
+                db.commit()
 
             restarted = DurableEventDelivery(path, lease_seconds=30)
             self.assertEqual(1, restarted.recover_expired())
