@@ -6,7 +6,16 @@ import tempfile
 import threading
 import urllib.error
 import urllib.request
+import sys
 from pathlib import Path
+
+# Direct script execution puts v3/scripts on sys.path, but the hardened
+# adapter boundary lives in the repository-level tools package. Bootstrap the
+# repository root explicitly so the smoke test exercises the same import graph
+# as module-based execution.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from research_os_v3 import DataLayout, UserContext, V3LocalService
 
