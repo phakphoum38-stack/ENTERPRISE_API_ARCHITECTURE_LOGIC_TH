@@ -85,6 +85,33 @@ class OAuthHandoffTests(unittest.TestCase):
                 )
             )
 
+    def test_cross_user_binding_denies_tampered_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            os.environ["RESEARCH_OS_V3_DATA_DIR"] = directory
+            root = Path(directory)
+            session = issue_session({"sub": "google-sub", "email": "owner@example.com", "role": "owner"})
+            create_handoff(root, session, "https://example.test/callback", code="cross-user-state")
+            path = root / "oauth_handoffs.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            key = next(iter(payload))
+            payload[key]["user_id"] = "different-user"
+            payload[key]["email"] = "attacker@example.com"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertIsNone(consume_handoff(root, "cross-user-state"))
+
+    def test_expired_handoff_denies(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            os.environ["RESEARCH_OS_V3_DATA_DIR"] = directory
+            root = Path(directory)
+            session = issue_session({"sub": "google-sub", "email": "owner@example.com", "role": "owner"})
+            create_handoff(root, session, "https://example.test/callback", code="expired-state")
+            path = root / "oauth_handoffs.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            key = next(iter(payload))
+            payload[key]["exp"] = 0
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertIsNone(consume_handoff(root, "expired-state"))
+
     def test_auth_guard_resolves_native_oauth_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             os.environ["RESEARCH_OS_V3_DATA_DIR"] = directory
