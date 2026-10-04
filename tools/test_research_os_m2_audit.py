@@ -1,5 +1,6 @@
 import unittest
 from tools.research_os_m2_audit import build_index
+from tools.research_os_semantic_binding import resolve_semantic_binding
 
 class M2AuditIndexTests(unittest.TestCase):
  def test_index_is_source_pinned_and_integrity_complete(self):
@@ -44,5 +45,35 @@ class M2AuditIndexTests(unittest.TestCase):
   q="runner"
   nodes=[n for n in g["nodes"] if q in n["id"].lower() or q in (n.get("path") or "").lower()]
   self.assertTrue(nodes)
+
+
+ def test_canonical_semantic_binding_is_fail_closed(self):
+  unique=resolve_semantic_binding(
+   target="current/example_contract.json",
+   relation="ENFORCED_BY",
+   candidates=["tools/example_impl.py","tools/other.py"],
+   texts={
+    "current/example_contract.json": '"contract_id": "example"',
+    "tools/example_impl.py": '"contract_id": "example"',
+    "tools/other.py": '"contract_id": "other"',
+   },
+  )
+  self.assertEqual(unique.targets, ("tools/example_impl.py",))
+  self.assertFalse(unique.ambiguous)
+  ambiguous=resolve_semantic_binding(
+   target="current/example_contract.json",
+   relation="ENFORCED_BY",
+   candidates=["tools/example_impl.py","tools/example_impl_alt.py"],
+   texts={
+    "current/example_contract.json": '"contract_id": "example"',
+    "tools/example_impl.py": '"contract_id": "example"',
+    "tools/example_impl_alt.py": '"contract_id": "example"',
+   },
+  )
+  self.assertTrue(ambiguous.ambiguous)
+  self.assertEqual(
+   ambiguous.candidates,
+   ("tools/example_impl.py","tools/example_impl_alt.py"),
+  )
 
 if __name__=="__main__": unittest.main()
