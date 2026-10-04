@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, urlsplit
 from api_auth import extract_session_token, require_session
 from developer_identity import IdentityAssertionError
 from developer_identity_gateway import mint_developer_assertion
-from auth_session import clear_cookie_header, revoke_session, verify_session
+from auth_session import clear_cookie_header, revoke_all_sessions, revoke_session, session_id, verify_session
 from conversation_store import (
     authorize as authorize_sync,
     delete_session as delete_cloud_session,
@@ -39,6 +39,7 @@ from memory import build_context, search_memory
 from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
 from oauth_handoff import consume_handoff
+from session_registry import get_session, list_sessions, mark_revoked
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # The API supports both repository-root module execution and direct execution
 # from tools/research_os_api (the latter is used by the Windows/local launcher).
@@ -288,6 +289,18 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
             if path in {"/v1/auth/status", "/v1/auth/google/status"}:
                 self._send(HTTPStatus.OK, self._auth_status())
                 return
+            if path == "/v1/auth/sessions":
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                if not user_id:
+                    raise ValueError("verified session identity is incomplete")
+                current_token = extract_session_token(self.headers)
+                current_id = session_id(current_token) if current_token else ""
+                records = list_sessions(user_id)
+                for record in records:
+                    record["current"] = record.get("session_id") == current_id
+                self._send(HTTPStatus.OK, {"sessions": records, "count": len(records), "source": "platform-session-registry"})
+                return
             if path == "/v1/auth/google/callback":
                 params = parse_qs(parsed.query)
                 error = str(params.get("error", [""])[0]).strip()
@@ -408,6 +421,36 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
+    def do_DELETE(self) -> None:  # noqa: N802
+        path = urlsplit(self.path).path
+        try:
+            if path.startswith("/platform/v1"):
+                status, payload = _management_http().dispatch("DELETE", self.path, self.headers)
+                self._send(status, payload)
+                return
+            prefix = "/v1/auth/sessions/"
+            if path.startswith(prefix):
+                target_session_id = path[len(prefix):].strip()
+                if not target_session_id or "/" in target_session_id:
+                    self._send(HTTPStatus.BAD_REQUEST, {"error": "invalid_session_id"})
+                    return
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                record = get_session(user_id, target_session_id)
+                if record is None:
+                    self._send(HTTPStatus.NOT_FOUND, {"error": "session_not_found"})
+                    return
+                from auth_session import SessionRevocationStore
+                SessionRevocationStore().revoke(user_id, target_session_id)
+                mark_revoked(user_id, target_session_id)
+                self._send(HTTPStatus.OK, {"revoked": True, "session_id": target_session_id})
+                return
+            self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
+        except ValueError as exc:
+            self._send(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized", "detail": str(exc)})
+        except Exception as exc:
+            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
+
     def do_POST(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
         try:
@@ -448,6 +491,15 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 if not checkpoint_id:
                     raise ValueError("checkpoint_id is required")
                 self._send(HTTPStatus.OK, resume_checkpoint(user_id, checkpoint_id))
+                return
+            if path == "/v1/auth/sessions/revoke-all":
+                principal = require_session(self.headers)
+                user_id = str(principal.get("user_id") or "").strip()
+                if not user_id:
+                    raise ValueError("verified session identity is incomplete")
+                count = len(list_sessions(user_id))
+                revoke_all_sessions(user_id)
+                self._send(HTTPStatus.OK, {"revoked": True, "revoked_count": count})
                 return
             if path == "/v1/auth/providers/login":
                 provider = str(body.get("provider", "")).strip().lower()
