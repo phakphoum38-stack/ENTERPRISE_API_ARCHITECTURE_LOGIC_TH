@@ -21,18 +21,24 @@
         <p>เข้าสู่ workspace ของคุณ เพื่อเริ่มงานวิจัย จัดการหลักฐาน และบันทึกความรู้ที่ผ่านการตรวจสอบ</p>
       </div>
 
-      <form id="login-form" class="login-actions">
-        <label for="username">อีเมลหรือชื่อผู้ใช้</label>
-        <input id="username" name="username" type="text" autocomplete="username" required placeholder="you@example.com">
-        <label for="password">รหัสผ่าน</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="ป้อนรหัสผ่านของคุณ">
-        <button id="login-button" class="google-button" type="submit">
-          <span class="google-icon" aria-hidden="true">R</span>
-          <span>เข้าสู่ระบบ</span>
+      <div id="login-status" class="status" role="status" aria-live="polite"></div>
+      <div class="login-actions" id="provider-actions">
+        <button class="google-button provider-button" type="button" data-provider="google">
+          <span class="google-icon" aria-hidden="true">G</span>
+          <span>เข้าสู่ระบบด้วย Google</span>
           <span class="arrow" aria-hidden="true">&#8594;</span>
         </button>
-        <p id="login-status" class="status" role="status" aria-live="polite"></p>
-      </form>
+        <button class="google-button provider-button" type="button" data-provider="github">
+          <span class="google-icon" aria-hidden="true">GH</span>
+          <span>เข้าสู่ระบบด้วย GitHub</span>
+          <span class="arrow" aria-hidden="true">&#8594;</span>
+        </button>
+        <button class="google-button provider-button" type="button" data-provider="microsoft">
+          <span class="google-icon" aria-hidden="true">M</span>
+          <span>เข้าสู่ระบบด้วย Microsoft</span>
+          <span class="arrow" aria-hidden="true">&#8594;</span>
+        </button>
+      </div>
 
       <div class="login-footer">
         <span>หรือ</span>
@@ -57,33 +63,42 @@
     </aside>
   </main>
   <script>
-    const form = document.getElementById('login-form');
-    const button = document.getElementById('login-button');
     const status = document.getElementById('login-status');
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      button.disabled = true;
-      status.textContent = 'กำลังเข้าสู่ระบบ…';
+    const buttons = [...document.querySelectorAll('[data-provider]')];
+
+    async function startLogin(provider) {
+      buttons.forEach((button) => { button.disabled = true; });
+      status.textContent = 'กำลังเชื่อมต่อ ' + provider + '…';
       try {
-        const response = await fetch('/v1/auth/login', {
+        const response = await fetch('/v1/auth/providers/login', {
           method: 'POST',
           credentials: 'include',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            username: document.getElementById('username').value,
-            password: document.getElementById('password').value
-          })
+          body: JSON.stringify({provider})
         });
         const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.detail || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+        if (!response.ok || !payload.authorization_url) {
+          throw new Error(payload.detail || 'ผู้ให้บริการเข้าสู่ระบบยังไม่พร้อมใช้งาน');
         }
-        window.location.assign('/');
+        window.location.assign(payload.authorization_url);
       } catch (error) {
         status.textContent = error.message;
-        button.disabled = false;
+        buttons.forEach((button) => { button.disabled = false; });
       }
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => startLogin(button.dataset.provider));
     });
-  </script>
-</body>
+
+    fetch('/v1/auth/providers', {credentials: 'include'})
+      .then((response) => response.json())
+      .then((payload) => {
+        const availability = Object.fromEntries((payload.providers || []).map((item) => [item.id, item.available]));
+        buttons.forEach((button) => {
+          button.hidden = availability[button.dataset.provider] === false;
+        });
+      })
+      .catch(() => {});
+  </script></body>
 </html>
