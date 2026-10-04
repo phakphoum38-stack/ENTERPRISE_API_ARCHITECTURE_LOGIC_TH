@@ -1,0 +1,47 @@
+name: V3 Runtime Event Store CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'v3/research_os_v3/queue.py'
+      - 'v3/research_os_v3/durable_events.py'
+      - 'v3/research_os_v3/workflow_projection.py'
+      - 'v3/scripts/drain_outbox.py'
+      - 'v3/scripts/export_runtime_metrics.py'
+      - 'v3/tests/test_queue_outbox.py'
+      - 'v3/tests/test_durable_events.py'
+      - 'v3/tests/test_workflow_projection.py'
+      - 'v3/tests/test_runtime_metrics.py'
+      - '.github/workflows/v3-runtime-event-store-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-runtime-event-store-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  event-store:
+    name: Durable event store and outbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile runtime event components
+        run: python -m py_compile v3/research_os_v3/queue.py v3/research_os_v3/durable_events.py v3/research_os_v3/workflow_projection.py v3/scripts/drain_outbox.py v3/scripts/export_runtime_metrics.py
+
+      - name: Run event store tests
+        env:
+          PYTHONPATH: v3
+        run: python -m unittest v3.tests.test_queue_outbox v3.tests.test_durable_events v3.tests.test_workflow_projection v3.tests.test_runtime_metrics -v

@@ -17,11 +17,15 @@ class QueueLeaseFencingTests(unittest.TestCase):
             self.assertIsNotNone(first)
             self.assertIsNotNone(first.lease_id)
 
-            with sqlite3.connect(path) as db:
+            db = sqlite3.connect(path)
+            try:
                 db.execute(
                     "UPDATE research_queue SET lease_until=? WHERE task_id=?",
                     ("2000-01-01T00:00:00+00:00", "task-1"),
                 )
+                db.commit()
+            finally:
+                db.close()
 
             self.assertEqual(1, queue.recover_expired_leases())
             second = queue.claim(worker_id="worker-b", lease_seconds=30)

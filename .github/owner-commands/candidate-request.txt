@@ -1,3 +1,5 @@
-Owner command: run Research OS Candidate for the current integration SHA.
-Requested by owner via ChatGPT on 2026-08-14.
-Reason: rerun after fixing isolated E2E provider routing and static credential-like test fixture.
+UNIFIED WINDOWS CANDIDATE REQUEST
+Source branch: integrate/research-os-3.2-unified-10x10
+Validate this exact push SHA through Research OS Candidate workflow.
+Required gates: /v2/master, V1 preservation, Windows verification, EXE/SHA256, clean install, 8787/8790, Unified Master, 10x10/20x20 logical scaling, preservation, final SHA256.
+Owner/iOS artifacts must not satisfy Unified Windows gates.
