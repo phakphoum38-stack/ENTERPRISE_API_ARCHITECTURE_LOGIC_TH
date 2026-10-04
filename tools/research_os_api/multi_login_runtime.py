@@ -117,5 +117,6 @@ def complete_runtime_login(code: str, state: str) -> dict[str, Any]:
     principal = normalize_callback(provider.name, profile)
     principal["role"] = "OWNER" if _configured_owner(principal) else "USER"
     principal["user_id"] = f"{provider.name}:{principal['sub']}"
+    principal["provider"] = provider.name
     session = issue_session(principal)
     return {"provider": provider.name, "principal": principal, "session": session, "set_cookie": cookie_header(session, secure=_secure_cookie(pending.redirect_uri))}
