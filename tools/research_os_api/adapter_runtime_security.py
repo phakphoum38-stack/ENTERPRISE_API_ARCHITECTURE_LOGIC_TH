@@ -62,7 +62,8 @@ class AdapterRuntimeSecurityBoundary:
         email = str(principal.get("email") or "").strip()
         if not actor or not session or not email:
             return self._deny(request_id, actor, capability, "missing_verified_session")
-        if str(principal.get("role") or "").strip() != str(principal.get("role") or "").strip():
+        role = str(principal.get("role") or "").strip().upper()
+        if role not in {"OWNER", "USER"}:
             return self._deny(request_id, actor, capability, "invalid_server_role")
         exp = int(principal.get("exp") or 0)
         if exp <= current:
