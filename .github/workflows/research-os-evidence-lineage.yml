@@ -227,7 +227,7 @@ jobs:
           def is_ancestor(ancestor, descendant):
               return subprocess.run(['git', 'merge-base', '--is-ancestor', ancestor, descendant], check=False).returncode == 0
 
-          pr_data = gh(f'/repos/{owner}/{repo}/pulls/{pr}')
+          pr_data = gh(f'/repos/{pr_repo}/pulls/{pr}')
           head_data = gh(f'/repos/{owner}/{repo}/commits/{head}')
           merge_data = gh(f'/repos/{owner}/{repo}/commits/{merge}')
           status = gh(f'/repos/{owner}/{repo}/commits/{head}/status')
