@@ -14,6 +14,10 @@ abstract class OwnerFriendApi {
   Future<Map<String, dynamic>> startGoogleIdentity() => Future<Map<String, dynamic>>.error(UnsupportedError('Google Identity is not implemented by this API client'));
   Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) => Future<Map<String, dynamic>>.error(UnsupportedError('Google Identity handoff is not implemented by this API client'));
   Future<Map<String, dynamic>> signOut() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS sign-out is not implemented by this API client'));
+  Future<List<Map<String, dynamic>>> authSessions() => Future<List<Map<String, dynamic>>>.error(UnsupportedError('Research OS sessions are not implemented by this API client'));
+  Future<Map<String, dynamic>> revokeAuthSession(String sessionId) => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS session revoke is not implemented by this API client'));
+  Future<Map<String, dynamic>> revokeAllAuthSessions() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS session revoke-all is not implemented by this API client'));
+  Future<Map<String, dynamic>> createQrHandoff() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS QR handoff is not implemented by this API client'));
   void setSession(String token) {}
   void clearSession() {}
   Future<Map<String, dynamic>> researchGet(
@@ -93,6 +97,26 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
 
   @override
   Future<Map<String, dynamic>> signOut() => _researchRequest('POST', '/v1/auth/signout', authenticated: _sessionToken != null);
+
+  @override
+  Future<List<Map<String, dynamic>>> authSessions() async {
+    final result = await _researchJsonRequest('GET', '/v1/auth/sessions');
+    final sessions = result['sessions'];
+    if (sessions is! List) return const <Map<String, dynamic>>[];
+    return sessions.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList(growable: false);
+  }
+
+  @override
+  Future<Map<String, dynamic>> revokeAuthSession(String sessionId) =>
+      _researchRequest('DELETE', '/v1/auth/sessions/' + Uri.encodeComponent(sessionId), authenticated: true);
+
+  @override
+  Future<Map<String, dynamic>> revokeAllAuthSessions() =>
+      _researchRequest('POST', '/v1/auth/sessions/revoke-all', authenticated: true);
+
+  @override
+  Future<Map<String, dynamic>> createQrHandoff() =>
+      _researchRequest('POST', '/v1/auth/qr/handoff', authenticated: true);
 
   @override
   void setSession(String token) {
