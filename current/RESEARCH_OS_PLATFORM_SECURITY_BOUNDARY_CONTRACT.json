@@ -1,0 +1,57 @@
+{
+  "contract_id": "research-os-platform-security-boundary-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "baseline_sha": "069537fe8bb7669ae9d2225a8ffe7b46093e1259",
+  "purpose": "Bind canonical sessions, capabilities, policy, authorization, adapter runtime, QR/native handoff, and evidence into one fail-closed platform boundary.",
+  "architecture": [
+    "IDENTITY",
+    "CANONICAL_SESSION",
+    "QR_OR_OAUTH_HANDOFF",
+    "CAPABILITY",
+    "POLICY",
+    "AUTHORIZATION",
+    "ADAPTER_REGISTRY",
+    "ADAPTER_RUNTIME_SECURITY_BOUNDARY",
+    "EXECUTION",
+    "EVIDENCE"
+  ],
+  "handoff": {
+    "opaque_code": true,
+    "single_use": true,
+    "ttl_seconds": 120,
+    "persist_session_bearer": false,
+    "bind_redirect_uri": true,
+    "bind_audience": true,
+    "source_session_must_be_active": true,
+    "consume_rotates_session": true,
+    "qr_must_not_contain": [
+      "password",
+      "access_token",
+      "refresh_token",
+      "role",
+      "arbitrary_adapter",
+      "arbitrary_command",
+      "arbitrary_target"
+    ]
+  },
+  "runtime": {
+    "client_identity_override": false,
+    "unknown_capability": "DENY",
+    "unknown_adapter": "DENY",
+    "invalid_arguments": "DENY",
+    "path_traversal": "DENY",
+    "replay": "DENY",
+    "session_expired_or_revoked": "DENY",
+    "policy_unavailable": "DENY",
+    "authorization_unknown": "DENY",
+    "evidence_required": true
+  },
+  "authority": {
+    "flutter_is_client": true,
+    "qr_is_handoff_only": true,
+    "session_is_canonical_identity": true,
+    "adapter_runtime_is_execution_boundary": true,
+    "final_gate_is_release_authority": true
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "contract_id": "research-os-platform-qr-handoff-v1",
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "baseline_sha": "069537fe8bb7669ae9d2225a8ffe7b46093e1259",
+  "transport": "QR_OR_NATIVE_HANDOFF",
+  "qr_payload": {
+    "mode": "opaque_reference",
+    "contains": ["handoff_code", "audience"],
+    "must_not_contain": ["password", "access_token", "refresh_token", "role", "user_id", "capability", "adapter", "command", "target"],
+    "ttl_seconds": 120,
+    "single_use": true
+  },
+  "verification": [
+    "decode_opaque_reference",
+    "verify_single_use",
+    "verify_expiry",
+    "verify_audience",
+    "resolve_canonical_session_registry",
+    "reject_revoked_or_expired_source_session",
+    "issue_fresh_canonical_session"
+  ],
+  "authority": {
+    "qr_is_not_authority": true,
+    "qr_cannot_select_adapter": true,
+    "qr_cannot_select_capability": true,
+    "qr_cannot_select_target": true,
+    "qr_cannot_select_role": true,
+    "policy_and_authorization_remain_server_derived": true
+  },
+  "failure_mode": "DENY_AND_EVIDENCE"
+}

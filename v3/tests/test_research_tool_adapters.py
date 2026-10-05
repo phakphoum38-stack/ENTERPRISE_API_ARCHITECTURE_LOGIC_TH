@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.research_os_api.adapter_runtime_security import AdapterRuntimeDenied
 from research_os_v3.research_tool_adapters import (
     BuiltinResearchTools,
     ToolRequest,
@@ -39,6 +40,40 @@ class ResearchToolAdapterTests(unittest.TestCase):
         result = BuiltinResearchTools().execute(ToolRequest("network", "search", {}))
         self.assertFalse(result.success)
         self.assertEqual(result.error, "ToolNotFound")
+
+    def test_authorized_execution_crosses_security_wall(self) -> None:
+        principal = {
+            "user_id": "user-a",
+            "email": "owner@example.com",
+            "role": "owner",
+            "session_id": "session-a",
+            "exp": 4102444800,
+        }
+        result, decision = BuiltinResearchTools().execute_authorized(
+            ToolRequest("python", "analyze", {"source": "value = 1"}),
+            principal=principal,
+            request_id="req-runtime-1",
+            policy_decision="ALLOW",
+        )
+        self.assertTrue(result.success)
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.evidence["authorization_result"], "ALLOW")
+
+    def test_unauthorized_execution_never_reaches_adapter(self) -> None:
+        principal = {
+            "user_id": "user-a",
+            "email": "owner@example.com",
+            "role": "owner",
+            "session_id": "session-a",
+            "exp": 4102444800,
+        }
+        with self.assertRaises(AdapterRuntimeDenied):
+            BuiltinResearchTools().execute_authorized(
+                ToolRequest("shell", "run", {"command": ["rm", "-rf", "/"]}),
+                principal=principal,
+                request_id="req-runtime-2",
+                policy_decision="ALLOW",
+            )
 
 
 if __name__ == "__main__":

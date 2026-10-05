@@ -104,7 +104,7 @@ jobs:
           $env:RESEARCH_OS_DATA_DIR=$data
           $env:RESEARCH_OS_V3_HOST='127.0.0.1'
           $env:RESEARCH_OS_V3_PORT='8788'
-          $env:PYTHONPATH="$PWD\v3"
+          $env:PYTHONPATH="$PWD;$PWD\v3"
           $python=Join-Path $env:pythonLocation 'python.exe'
           if(-not (Test-Path $python)){throw "Python executable not found: $python"}
           $pythonInfo=& $python -c 'import sys,platform; print("PYTHON_EXE=" + sys.executable); print("PYTHON_VERSION=" + platform.python_version()); print("PYTHON_ARCH=" + platform.machine())'
@@ -124,7 +124,7 @@ jobs:
           # replace the child environment and cause Windows DLL initialization failure (0xC0000142).
           $childEnv=@{}
           Get-ChildItem Env: | ForEach-Object { $childEnv[$_.Name]=$_.Value }
-          $childEnv['PYTHONPATH']="$PWD\v3"
+          $childEnv['PYTHONPATH']="$PWD;$PWD\v3"
           $childEnv['RESEARCH_OS_DATA_DIR']=$data
           $childEnv['RESEARCH_OS_V3_HOST']='127.0.0.1'
           $childEnv['RESEARCH_OS_V3_PORT']='8788'

@@ -108,7 +108,7 @@ class GoogleIdentityBroker(GoogleOAuthBroker):
         redirect_uri = str(result.get("redirect_uri") or self.redirect_uri()).strip()
         # Native clients use the OAuth state as a short-lived, single-use
         # handoff code. The session itself never appears in the browser URL.
-        create_handoff(self.root, session, redirect_uri, code=state)
+        create_handoff(self.root, session, redirect_uri, code=state, audience="google-native")
         handler = _current_http_handler()
         if handler is not None:
             _install_signout_cookie_hook()
