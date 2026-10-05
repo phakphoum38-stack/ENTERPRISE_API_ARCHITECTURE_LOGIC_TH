@@ -17,6 +17,8 @@ class _SessionSecurityPageState extends State<SessionSecurityPage> {
   String? _message;
   bool _busy = false;
 
+  OwnerSessionSecurityApi get _securityApi => widget.api as OwnerSessionSecurityApi;
+
   @override
   void initState() {
     super.initState();
@@ -25,7 +27,7 @@ class _SessionSecurityPageState extends State<SessionSecurityPage> {
 
   Future<void> _refresh() async {
     try {
-      final sessions = await widget.api.authSessions();
+      final sessions = await _securityApi.authSessions();
       if (!mounted) return;
       setState(() {
         _sessions = sessions;
@@ -44,7 +46,7 @@ class _SessionSecurityPageState extends State<SessionSecurityPage> {
       _qrUri = null;
     });
     try {
-      final result = await widget.api.createQrHandoff();
+      final result = await _securityApi.createQrHandoff();
       final uri = result['qr_uri']?.toString();
       if (uri == null || uri.isEmpty) {
         throw const FormatException('QR handoff response is incomplete');
@@ -63,7 +65,7 @@ class _SessionSecurityPageState extends State<SessionSecurityPage> {
 
   Future<void> _revoke(String sessionId) async {
     try {
-      await widget.api.revokeAuthSession(sessionId);
+      await _securityApi.revokeAuthSession(sessionId);
       await _refresh();
     } catch (error) {
       if (mounted) setState(() => _message = 'Session revoke failed: $error');
@@ -72,7 +74,7 @@ class _SessionSecurityPageState extends State<SessionSecurityPage> {
 
   Future<void> _revokeAll() async {
     try {
-      await widget.api.revokeAllAuthSessions();
+      await _securityApi.revokeAllAuthSessions();
       await _refresh();
     } catch (error) {
       if (mounted) setState(() => _message = 'Revoke-all failed: $error');
