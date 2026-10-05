@@ -1,3 +1,4 @@
+import os
 import unittest
 from decimal import Decimal
 
@@ -10,6 +11,7 @@ from api_platform.management_service import JsonManagementStore, ManagementServi
 
 class APIPlatformProjectionTests(unittest.TestCase):
     def setUp(self) -> None:
+        os.environ.setdefault("RESEARCH_OS_API_KEY_PEPPER", "test-only-pepper")
         import tempfile
         self.tmp = tempfile.TemporaryDirectory()
         self.store = JsonManagementStore(__import__("pathlib").Path(self.tmp.name) / "management.json")
