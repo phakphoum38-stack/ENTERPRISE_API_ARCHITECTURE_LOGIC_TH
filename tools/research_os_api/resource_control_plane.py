@@ -17,7 +17,7 @@ from enum import Enum
 from threading import RLock
 from typing import Any, Callable, Iterable
 
-from api_keys import APIKeyManager, APIKeyRecord
+try:\n    from .api_keys import APIKeyManager, APIKeyRecord\nexcept ImportError:  # direct script/PYTHONPATH execution\n    from api_keys import APIKeyManager, APIKeyRecord
 from admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
 from agent_platform import AgentRouter
 from budgets import BudgetLedger, BudgetLimit
