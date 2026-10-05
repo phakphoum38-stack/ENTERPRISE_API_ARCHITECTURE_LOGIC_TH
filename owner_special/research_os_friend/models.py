@@ -36,6 +36,7 @@ class FriendRequest:
     text: str
     profile_id: str = "default"
     session_id: str = "default"
+    session_token: str = ""
     complexity: int = 1
     risk: int = 1
     parallelism: int = 1
