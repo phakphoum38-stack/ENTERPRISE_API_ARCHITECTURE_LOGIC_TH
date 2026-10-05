@@ -287,6 +287,7 @@ class FriendRuntime:
         capability: str,
         input: dict[str, object],
         task_id: str | None = None,
+        session_token: str | None = None,
     ):
         """Execute an explicitly requested V3 capability behind the owner boundary."""
         self.orchestrator.policy.authorize_request(self.owner, request)
@@ -297,6 +298,7 @@ class FriendRuntime:
             capability=capability,
             input=input,
             task_id=task_id,
+            session_token=session_token or request.session_token,
         )
 
     def architecture(self) -> dict[str, object]:
