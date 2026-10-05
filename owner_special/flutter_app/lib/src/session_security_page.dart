@@ -54,7 +54,7 @@ class _SessionSecurityPageState extends State<SessionSecurityPage> {
       if (!mounted) return;
       setState(() {
         _qrUri = uri;
-        _message = 'One-time QR handoff created. It expires in ' + (result['ttl_seconds'] ?? 120).toString() + ' seconds.';
+        _message = "One-time QR handoff created. It expires in ${result['ttl_seconds'] ?? 120} seconds.";
       });
     } catch (error) {
       if (mounted) setState(() => _message = 'QR handoff failed: $error');
@@ -167,11 +167,7 @@ class _SessionSecurityPageState extends State<SessionSecurityPage> {
                       leading: Icon(session['current'] == true ? Icons.verified_user_outlined : Icons.devices_outlined),
                       title: Text(session['email']?.toString() ?? 'Research OS session'),
                       subtitle: Text(
-                        (session['provider']?.toString() ?? 'native') +
-                        ' • ' +
-                        (session['role']?.toString() ?? 'user') +
-                        ' • session ' +
-                        (session['session_id']?.toString() ?? '-'),
+                        "${session['provider']?.toString() ?? 'native'} • ${session['role']?.toString() ?? 'user'} • session ${session['session_id']?.toString() ?? '-'}",
                       ),
                       trailing: session['current'] == true
                           ? const Chip(label: Text('Current'))
