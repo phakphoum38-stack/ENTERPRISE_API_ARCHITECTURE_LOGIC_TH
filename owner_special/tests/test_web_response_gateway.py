@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import unittest
 from unittest.mock import patch
 
+from tools.research_os_api.auth_session import issue_session
 from owner_special.research_os_friend.catalog import install_builtin_tools
 from owner_special.research_os_friend.models import FriendRequest
 from owner_special.research_os_friend.runtime import FriendRuntime
@@ -11,6 +13,16 @@ from v3.research_os_v3.research_tools import ToolResult
 
 
 class WebResponseGatewayTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._previous_secret = os.environ.get("RESEARCH_OS_SESSION_SECRET")
+        os.environ["RESEARCH_OS_SESSION_SECRET"] = "web-gateway-test-secret"
+
+    def tearDown(self) -> None:
+        if self._previous_secret is None:
+            os.environ.pop("RESEARCH_OS_SESSION_SECRET", None)
+        else:
+            os.environ["RESEARCH_OS_SESSION_SECRET"] = self._previous_secret
+
     def test_web_tool_is_registered(self) -> None:
         registry = install_builtin_tools(ToolRegistry())
         self.assertIn("web.fetch", registry.names())
@@ -35,10 +47,12 @@ class WebResponseGatewayTests(unittest.TestCase):
 
     def test_v3_web_tool_remains_explicit(self) -> None:
         runtime = FriendRuntime.create_owner_special("owner")
+        session_token = issue_session({"user_id": "owner", "email": "owner@research-os.local", "role": "owner"})
         request = FriendRequest(
             owner_id="owner",
             profile_id="default",
             session_id="v3",
+            session_token=session_token,
             text="fetch",
             requested_tools=("web",),
         )

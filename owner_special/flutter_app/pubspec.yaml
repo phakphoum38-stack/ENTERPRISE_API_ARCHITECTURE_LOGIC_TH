@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   research_os_contracts:
     path: ../../packages/research_os_contracts
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

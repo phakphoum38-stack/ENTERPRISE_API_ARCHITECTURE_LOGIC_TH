@@ -1,6 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+abstract class OwnerSessionSecurityApi {
+  Future<List<Map<String, dynamic>>> authSessions();
+  Future<Map<String, dynamic>> revokeAuthSession(String sessionId);
+  Future<Map<String, dynamic>> revokeAllAuthSessions();
+  Future<Map<String, dynamic>> createQrHandoff();
+}
+
 abstract class OwnerFriendApi {
   Future<Map<String, dynamic>> health();
   Future<Map<String, dynamic>> status();
@@ -43,7 +50,7 @@ void registerOwnerFriendApi(OwnerFriendApi api) {
 
 String _normalizeBaseUrl(String value) => value.endsWith('/') ? value.substring(0, value.length - 1) : value;
 
-final class HttpOwnerFriendApi implements OwnerFriendApi {
+final class HttpOwnerFriendApi implements OwnerFriendApi, OwnerSessionSecurityApi {
   HttpOwnerFriendApi({required String baseUrl, required this.ownerId, this.profileId = 'default', this.sessionId = 'desktop', String researchOsBaseUrl = 'http://127.0.0.1:8787', this.timeout = const Duration(seconds: 5), this.chatTimeout = const Duration(seconds: 30)})
       : baseUrl = _normalizeBaseUrl(baseUrl),
         researchOsBaseUrl = _normalizeBaseUrl(researchOsBaseUrl);
@@ -93,6 +100,26 @@ final class HttpOwnerFriendApi implements OwnerFriendApi {
 
   @override
   Future<Map<String, dynamic>> signOut() => _researchRequest('POST', '/v1/auth/signout', authenticated: _sessionToken != null);
+
+  @override
+  Future<List<Map<String, dynamic>>> authSessions() async {
+    final result = await _researchJsonRequest('GET', '/v1/auth/sessions');
+    final sessions = result['sessions'];
+    if (sessions is! List) return const <Map<String, dynamic>>[];
+    return sessions.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList(growable: false);
+  }
+
+  @override
+  Future<Map<String, dynamic>> revokeAuthSession(String sessionId) =>
+      _researchRequest('DELETE', '/v1/auth/sessions/${Uri.encodeComponent(sessionId)}', authenticated: true);
+
+  @override
+  Future<Map<String, dynamic>> revokeAllAuthSessions() =>
+      _researchRequest('POST', '/v1/auth/sessions/revoke-all', authenticated: true);
+
+  @override
+  Future<Map<String, dynamic>> createQrHandoff() =>
+      _researchRequest('POST', '/v1/auth/qr/handoff', authenticated: true);
 
   @override
   void setSession(String token) {

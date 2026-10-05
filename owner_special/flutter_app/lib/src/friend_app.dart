@@ -13,6 +13,7 @@ import 'mission_control_desktop_page.dart';
 import 'native_core_workspace_page.dart';
 import 'owner_api.dart';
 import 'team_center.dart';
+import 'session_security_page.dart';
 
 class OwnerFriendApp extends StatefulWidget {
   const OwnerFriendApp({required this.api, this.startup, this.startupError, this.researchCapabilities, super.key});
@@ -47,6 +48,7 @@ class _OwnerFriendAppState extends State<OwnerFriendApp> {
       _ProviderPage(api: widget.api),
       _TeamPage(team: _currentTeam),
       GoogleIdentityPage(api: widget.api),
+      SessionSecurityPage(api: widget.api),
     ];
 
     return MaterialApp(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from adapter_runtime_security import AdapterRuntimeDenied, AdapterRuntimeSecurityBoundary
 
@@ -20,6 +21,7 @@ class AdapterRuntimeSecurityTests(unittest.TestCase):
     def authorize(self, **overrides):
         values = {
             "principal": self.principal,
+            "session_token": "verified-session-token",
             "capability": "python.analyze",
             "requested_tools": ("python",),
             "arguments": {"source": "value = 1"},
@@ -28,13 +30,30 @@ class AdapterRuntimeSecurityTests(unittest.TestCase):
             "now": 150,
         }
         values.update(overrides)
-        return self.gate.authorize(**values)
+        with patch("adapter_runtime_security.verify_session", return_value=self.principal):
+            return self.gate.authorize(**values)
 
     def test_valid_request_crosses_boundary(self) -> None:
         decision = self.authorize()
         self.assertTrue(decision.allowed)
         self.assertEqual(decision.adapter, "python")
         self.assertEqual(decision.evidence["authorization_result"], "ALLOW")
+
+    def test_invalid_token_denied(self) -> None:
+        values = {
+            "principal": self.principal,
+            "session_token": "invalid-session-token",
+            "capability": "python.analyze",
+            "requested_tools": ("python",),
+            "arguments": {"source": "value = 1"},
+            "request_id": "req-invalid",
+            "policy_decision": "ALLOW",
+            "now": 150,
+        }
+        with patch("adapter_runtime_security.verify_session", side_effect=ValueError("invalid research session")):
+            decision = self.gate.authorize(**values)
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "invalid_or_revoked_session")
 
     def test_missing_session_denied(self) -> None:
         principal = dict(self.principal)
@@ -74,16 +93,18 @@ class AdapterRuntimeSecurityTests(unittest.TestCase):
         self.assertEqual(denied.reason, "shell_command_not_allowlisted")
 
     def test_enforce_raises_on_denial(self) -> None:
-        with self.assertRaises(AdapterRuntimeDenied):
-            self.gate.enforce(
-                principal=self.principal,
-                capability="python.analyze",
-                requested_tools=("python",),
-                arguments={"source": "x"},
-                request_id="req-1",
-                policy_decision="DENY",
-                now=150,
-            )
+        with patch("adapter_runtime_security.verify_session", return_value=self.principal):
+            with self.assertRaises(AdapterRuntimeDenied):
+                self.gate.enforce(
+                    principal=self.principal,
+                    session_token="verified-session-token",
+                    capability="python.analyze",
+                    requested_tools=("python",),
+                    arguments={"source": "x"},
+                    request_id="req-1",
+                    policy_decision="DENY",
+                    now=150,
+                )
 
 
 if __name__ == "__main__":

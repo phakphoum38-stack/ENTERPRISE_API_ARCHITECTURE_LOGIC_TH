@@ -38,7 +38,7 @@ from identity_context import resolve_identity_context
 from memory import build_context, search_memory
 from multi_login import MultiLoginError, begin_login
 from multi_login_runtime import MultiLoginRuntimeError, begin_runtime_login, complete_runtime_login
-from oauth_handoff import consume_handoff
+from oauth_handoff import consume_handoff, create_handoff
 from session_registry import get_session, list_sessions, mark_revoked
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # The API supports both repository-root module execution and direct execution
@@ -491,6 +491,48 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 if not checkpoint_id:
                     raise ValueError("checkpoint_id is required")
                 self._send(HTTPStatus.OK, resume_checkpoint(user_id, checkpoint_id))
+                return
+            if path == "/v1/auth/qr/handoff":
+                token = extract_session_token(self.headers)
+                principal = verify_session(token)
+                if not token:
+                    raise ValueError("authentication required")
+                native_redirect = (
+                    os.getenv("RESEARCH_OS_NATIVE_HANDOFF_REDIRECT_URI")
+                    or "researchos://handoff"
+                ).strip()
+                audience = "research-os-native"
+                handoff_code = create_handoff(
+                    GoogleIdentityBroker().root,
+                    token,
+                    native_redirect,
+                    audience=audience,
+                )
+                qr_payload = {
+                    "handoff_code": handoff_code,
+                    "audience": audience,
+                }
+                qr_uri = (
+                    f"{native_redirect}?code={handoff_code}"
+                    f"&audience={audience}"
+                )
+                self._send(
+                    HTTPStatus.OK,
+                    {
+                        "transport": "QR_OR_NATIVE_HANDOFF",
+                        "handoff_code": handoff_code,
+                        "audience": audience,
+                        "ttl_seconds": 120,
+                        "qr_payload": qr_payload,
+                        "qr_uri": qr_uri,
+                        "account": {
+                            "user_id": principal["user_id"],
+                            "email": principal["email"],
+                            "role": principal["role"],
+                        },
+                        "token_storage": "backend_only",
+                    },
+                )
                 return
             if path == "/v1/auth/sessions/revoke-all":
                 principal = require_session(self.headers)
