@@ -106,7 +106,23 @@ class BuiltinResearchTools:
     def register(self, adapter: ResearchToolAdapter) -> None:
         self._tools[adapter.name] = adapter
 
-    def execute(self, request: ToolRequest) -> ToolResult:
+    def execute(
+        self,
+        request: ToolRequest,
+        *,
+        authorization: AdapterRuntimeDecision | None = None,
+    ) -> ToolResult:
+        """Execute only after the canonical runtime security decision.
+
+        Direct adapter execution is deliberately fail-closed. Callers must use
+        execute_authorized() or provide the exact ALLOW decision returned by
+        AdapterRuntimeSecurityBoundary for this request.
+        """
+        if authorization is None or not authorization.allowed:
+            return ToolResult(request.tool, request.action, False, error="AuthorizationRequired")
+        expected_capability = f"{request.tool}.{request.action}"
+        if authorization.capability != expected_capability or authorization.adapter != request.tool:
+            return ToolResult(request.tool, request.action, False, error="AuthorizationBindingMismatch")
         adapter = self._tools.get(request.tool)
         if adapter is None:
             return ToolResult(request.tool, request.action, False, error="ToolNotFound")
@@ -132,4 +148,4 @@ class BuiltinResearchTools:
             request_id=request_id,
             policy_decision=policy_decision,
         )
-        return self.execute(request), decision
+        return self.execute(request, authorization=decision), decision
