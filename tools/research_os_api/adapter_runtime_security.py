@@ -14,6 +14,11 @@ import time
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+try:
+    from .auth_session import verify_session
+except ImportError:  # pragma: no cover
+    from auth_session import verify_session
+
 
 class AdapterRuntimeDenied(PermissionError):
     """Raised when a request cannot cross the adapter runtime boundary."""
@@ -49,6 +54,7 @@ class AdapterRuntimeSecurityBoundary:
         self,
         *,
         principal: Mapping[str, Any],
+        session_token: str,
         capability: str,
         requested_tools: tuple[str, ...],
         arguments: Mapping[str, Any],
@@ -60,8 +66,19 @@ class AdapterRuntimeSecurityBoundary:
         actor = str(principal.get("user_id") or "").strip()
         session = str(principal.get("session_id") or "").strip()
         email = str(principal.get("email") or "").strip()
-        if not actor or not session or not email:
+        if not actor or not session or not email or not str(session_token or "").strip():
             return self._deny(request_id, actor, capability, "missing_verified_session")
+        try:
+            verified = verify_session(session_token)
+        except ValueError:
+            return self._deny(request_id, actor, capability, "invalid_or_revoked_session")
+        if (
+            str(verified.get("user_id") or "") != actor
+            or str(verified.get("session_id") or "") != session
+            or str(verified.get("email") or "").lower() != email.lower()
+        ):
+            return self._deny(request_id, actor, capability, "session_principal_mismatch")
+        principal = verified
         role = str(principal.get("role") or "").strip().upper()
         if role not in {"OWNER", "USER"}:
             return self._deny(request_id, actor, capability, "invalid_server_role")
