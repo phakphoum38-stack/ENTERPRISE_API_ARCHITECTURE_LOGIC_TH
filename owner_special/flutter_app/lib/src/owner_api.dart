@@ -1,6 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+abstract class OwnerSessionSecurityApi {
+  Future<List<Map<String, dynamic>>> authSessions();
+  Future<Map<String, dynamic>> revokeAuthSession(String sessionId);
+  Future<Map<String, dynamic>> revokeAllAuthSessions();
+  Future<Map<String, dynamic>> createQrHandoff();
+}
+
 abstract class OwnerFriendApi {
   Future<Map<String, dynamic>> health();
   Future<Map<String, dynamic>> status();
@@ -14,10 +21,6 @@ abstract class OwnerFriendApi {
   Future<Map<String, dynamic>> startGoogleIdentity() => Future<Map<String, dynamic>>.error(UnsupportedError('Google Identity is not implemented by this API client'));
   Future<Map<String, dynamic>> exchangeGoogleIdentityHandoff(String state) => Future<Map<String, dynamic>>.error(UnsupportedError('Google Identity handoff is not implemented by this API client'));
   Future<Map<String, dynamic>> signOut() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS sign-out is not implemented by this API client'));
-  Future<List<Map<String, dynamic>>> authSessions() => Future<List<Map<String, dynamic>>>.error(UnsupportedError('Research OS sessions are not implemented by this API client'));
-  Future<Map<String, dynamic>> revokeAuthSession(String sessionId) => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS session revoke is not implemented by this API client'));
-  Future<Map<String, dynamic>> revokeAllAuthSessions() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS session revoke-all is not implemented by this API client'));
-  Future<Map<String, dynamic>> createQrHandoff() => Future<Map<String, dynamic>>.error(UnsupportedError('Research OS QR handoff is not implemented by this API client'));
   void setSession(String token) {}
   void clearSession() {}
   Future<Map<String, dynamic>> researchGet(
@@ -47,7 +50,7 @@ void registerOwnerFriendApi(OwnerFriendApi api) {
 
 String _normalizeBaseUrl(String value) => value.endsWith('/') ? value.substring(0, value.length - 1) : value;
 
-final class HttpOwnerFriendApi implements OwnerFriendApi {
+final class HttpOwnerFriendApi implements OwnerFriendApi, OwnerSessionSecurityApi {
   HttpOwnerFriendApi({required String baseUrl, required this.ownerId, this.profileId = 'default', this.sessionId = 'desktop', String researchOsBaseUrl = 'http://127.0.0.1:8787', this.timeout = const Duration(seconds: 5), this.chatTimeout = const Duration(seconds: 30)})
       : baseUrl = _normalizeBaseUrl(baseUrl),
         researchOsBaseUrl = _normalizeBaseUrl(researchOsBaseUrl);
