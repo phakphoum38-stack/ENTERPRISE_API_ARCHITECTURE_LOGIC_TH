@@ -40,8 +40,18 @@ class AdapterRuntimeSecurityTests(unittest.TestCase):
         self.assertEqual(decision.evidence["authorization_result"], "ALLOW")
 
     def test_invalid_token_denied(self) -> None:
+        values = {
+            "principal": self.principal,
+            "session_token": "invalid-session-token",
+            "capability": "python.analyze",
+            "requested_tools": ("python",),
+            "arguments": {"source": "value = 1"},
+            "request_id": "req-invalid",
+            "policy_decision": "ALLOW",
+            "now": 150,
+        }
         with patch("adapter_runtime_security.verify_session", side_effect=ValueError("invalid research session")):
-            decision = self.authorize()
+            decision = self.gate.authorize(**values)
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "invalid_or_revoked_session")
 
