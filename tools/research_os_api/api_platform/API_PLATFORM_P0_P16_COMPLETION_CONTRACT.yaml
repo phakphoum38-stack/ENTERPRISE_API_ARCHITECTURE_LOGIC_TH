@@ -1,0 +1,117 @@
+version: 1
+kind: research_os_api_platform_p0_p16_completion
+status: implementation_contract
+canonical_baseline: 8e8f4c2c200bd4e5858751529a8ae00bb2443d52
+namespace: /platform/v1
+
+architecture:
+  management_plane:
+    owns: [organization, project, application, api, api_version, endpoint, scope, plan, entitlement, api_key_metadata, product, gateway_route, webhook, developer_portal]
+  execution_plane:
+    authority: tools/research_os_api/resource_control_plane.py
+    owns: [authentication, authorization, policy, entitlement_enforcement, quota, budget, admission, routing, execution, usage, evidence]
+  rule: management_state_never_authorizes_execution
+
+phases:
+  P0:
+    name: Platform Foundation
+    status: IMPLEMENTED
+    evidence: [tools/research_os_api/api_management_models.py, tools/research_os_api/api_platform/API_PLATFORM_CONTRACT.yaml]
+  P1:
+    name: Identity and Developer Account
+    status: IMPLEMENTED
+    evidence: [tools/research_os_api/auth_session.py, tools/research_os_api/api_platform/management_identity.py]
+  P2:
+    name: Application Platform
+    status: IMPLEMENTED
+    evidence: [tools/research_os_api/api_platform/management_service.py]
+  P3:
+    name: Credential Platform
+    status: IMPLEMENTED
+    evidence: [tools/research_os_api/api_keys.py, tools/research_os_api/api_platform/management_service.py]
+  P4:
+    name: API Catalog
+    status: IMPLEMENTED
+    evidence: [tools/research_os_api/api_management_models.py, tools/research_os_api/api_platform/management_http.py]
+  P5:
+    name: OpenAPI Platform
+    status: PARTIAL
+    evidence: [tools/research_os_api/openapi.yaml]
+    gap: Management catalog publication must remain contract-bound to the canonical runtime API description.
+  P6:
+    name: Runtime Gateway
+    status: IMPLEMENTED_KERNEL
+    evidence: [tools/research_os_api/resource_control_http.py, tools/research_os_api/resource_control_plane.py]
+  P7:
+    name: Usage and Metering
+    status: PARTIAL
+    evidence: [tools/research_os_api/resource_control_plane.py]
+    gap: Management query endpoint currently returns an empty projection instead of the runtime ledger.
+  P8:
+    name: Quota and Billing
+    status: IMPLEMENTED_KERNEL
+    evidence: [tools/research_os_api/admission.py, tools/research_os_api/budgets.py]
+  P9:
+    name: Developer Portal
+    status: IMPLEMENTED_API
+    evidence: [tools/research_os_api/api_platform/management_http.py]
+  P10:
+    name: SDK Platform
+    status: IMPLEMENTED_API
+    evidence: [tools/research_os_api/api_platform/sdk_metadata.py]
+  P11:
+    name: CLI Platform
+    status: CONTRACT_REQUIRED
+    gap: Provide a thin client over management and runtime contracts without duplicating authority.
+  P12:
+    name: Webhooks and Events
+    status: IMPLEMENTED_API
+    evidence: [tools/research_os_api/api_management_models.py, tools/research_os_api/api_platform/management_http.py]
+  P13:
+    name: Observability
+    status: PARTIAL
+    evidence: [tools/research_os_api/resource_control_plane.py]
+    gap: Productized usage/cost/audit query projections.
+  P14:
+    name: Security and Assurance
+    status: IMPLEMENTED_KERNEL
+    evidence: [README.md, tools/research_os_api/adapter_runtime_security.py]
+  P15:
+    name: Multi-Tenant Platform
+    status: PARTIAL
+    gap: Explicit actor-to-organization/project authorization checks on every management mutation.
+  P16:
+    name: Platform Operations
+    status: CONTRACT_REQUIRED
+    gap: Production deployment contract, network/TLS boundary, migration/backup policy, health/readiness and release evidence.
+
+completion_rules:
+  - reuse_existing_capabilities_before_new_implementation
+  - no_second_execution_authority
+  - raw_api_secret_returned_only_on_create_or_rotate
+  - raw_api_secret_never_persisted
+  - revoked_and_expired_credentials_fail_closed
+  - management_mutations_require_verified_session
+  - cross_tenant_access_fails_closed
+  - every_runtime_execution_produces_usage_and_evidence
+  - immutable_evidence_and_canonical_provenance
+  - no_direct_main_push
+  - no_destructive_history_rewrite
+
+implementation_order:
+  - P3_credential_contract
+  - P6_runtime_gateway
+  - P5_openapi_binding
+  - P2_application_surface
+  - P9_developer_portal
+  - P10_sdk
+  - P11_cli
+  - P7_usage_projection
+  - P8_billing_projection
+  - P12_webhooks
+  - P13_observability
+  - P15_multi_tenant_authorization
+  - P14_assurance
+  - P16_operations
+  - final_forensic
+  - canonical_rebaseline
