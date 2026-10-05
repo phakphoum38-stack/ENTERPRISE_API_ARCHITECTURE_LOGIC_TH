@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from tools.research_os_api.api_platform.management_service import ManagementService
 from tools.research_os_api.api_platform.sdk_metadata import build_sdk_metadata
+from tools.research_os_api.resource_control_plane import ResourceControlPlane
 
 RESOURCE_BY_SEGMENT = {
     "organizations": "organizations", "projects": "projects", "applications": "applications",
@@ -24,9 +25,15 @@ STATUS = {"GET": 200, "POST": 201, "PATCH": 200}
 
 
 class ManagementHTTP:
-    def __init__(self, service: ManagementService, authenticate: Callable[[Any], dict[str, Any] | None]) -> None:
+    def __init__(
+        self,
+        service: ManagementService,
+        authenticate: Callable[[Any], dict[str, Any] | None],
+        runtime_plane: ResourceControlPlane | None = None,
+    ) -> None:
         self.service = service
         self.authenticate = authenticate
+        self.runtime_plane = runtime_plane
 
     @staticmethod
     def _segments(path: str) -> list[str]:
@@ -118,12 +125,25 @@ class ManagementHTTP:
         resource = RESOURCE_BY_SEGMENT.get(parts[0])
         if resource is None:
             if parts[0] == "usage":
-                return 200, {"items": [], "count": 0, "source": "runtime-ledger-projection", "status": "READY"}
+                if self.runtime_plane is None:
+                    return 503, {"error": "runtime_projection_unavailable"}
+                items = list(self.runtime_plane.usage_projection())
+                return 200, {"items": items, "count": len(items), "source": "runtime-usage-ledger"}
             if parts[0] == "costs":
-                return 200, {"items": [], "count": 0, "source": "runtime-ledger-projection", "status": "READY"}
+                if self.runtime_plane is None:
+                    return 503, {"error": "runtime_projection_unavailable"}
+                items = list(self.runtime_plane.cost_projection())
+                return 200, {"items": items, "count": len(items), "source": "runtime-usage-ledger"}
             if parts[0] == "audit":
-                items = self.service.store.audit()
-                return 200, {"items": items, "count": len(items), "source": "management-audit"}
+                management_items = self.service.store.audit()
+                runtime_items = list(self.runtime_plane.evidence_projection()) if self.runtime_plane is not None else []
+                return 200, {
+                    "items": management_items,
+                    "evidence": runtime_items,
+                    "count": len(management_items),
+                    "evidence_count": len(runtime_items),
+                    "source": "management-audit-and-runtime-evidence",
+                }
             raise KeyError("unknown management resource")
 
         if method == "GET" and len(parts) == 1:
