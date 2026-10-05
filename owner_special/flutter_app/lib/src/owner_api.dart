@@ -111,7 +111,7 @@ final class HttpOwnerFriendApi implements OwnerFriendApi, OwnerSessionSecurityAp
 
   @override
   Future<Map<String, dynamic>> revokeAuthSession(String sessionId) =>
-      _researchRequest('DELETE', '/v1/auth/sessions/' + Uri.encodeComponent(sessionId), authenticated: true);
+      _researchRequest('DELETE', '/v1/auth/sessions/${Uri.encodeComponent(sessionId)}', authenticated: true);
 
   @override
   Future<Map<String, dynamic>> revokeAllAuthSessions() =>
