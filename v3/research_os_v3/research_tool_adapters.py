@@ -133,6 +133,7 @@ class BuiltinResearchTools:
         request: ToolRequest,
         *,
         principal: Mapping[str, Any],
+        session_token: str,
         request_id: str,
         policy_decision: str,
         security_boundary: AdapterRuntimeSecurityBoundary | None = None,
@@ -142,6 +143,7 @@ class BuiltinResearchTools:
         gate = security_boundary or AdapterRuntimeSecurityBoundary()
         decision = gate.enforce(
             principal=principal,
+            session_token=session_token,
             capability=capability,
             requested_tools=(request.tool,),
             arguments=request.arguments,
