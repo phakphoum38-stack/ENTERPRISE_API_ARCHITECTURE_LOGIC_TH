@@ -1,0 +1,31 @@
+version: 1
+kind: api_credential_runtime_contract
+status: contract
+namespace: /platform/v1
+
+credential:
+  prefix: ro_live_
+  secret_return: create_and_rotate_only
+  persistence: digest_and_fingerprint_only
+  transport: TLS_required
+
+management:
+  create: POST /platform/v1/applications/{application_id}/keys
+  list: GET /platform/v1/applications/{application_id}/keys
+  get: GET /platform/v1/applications/{application_id}/keys/{key_id}
+  revoke: POST /platform/v1/applications/{application_id}/keys/{key_id}/revoke
+  rotate: POST /platform/v1/applications/{application_id}/keys/{key_id}/rotate
+
+runtime:
+  authentication: ResourceControlPlane.authenticate
+  scope_rule: requested_scopes_must_be_subset_of_authenticated_scopes
+  entitlement_rule: credential_scopes_must_be_subset_of_effective_entitlement
+  execution_authority: ResourceControlPlane
+  evidence_authority: ResourceControlPlane
+
+security:
+  raw_secret_never_persisted: true
+  provider_credentials_separate: true
+  management_state_does_not_authorize_execution: true
+  revoked_credentials_fail_closed: true
+  expired_credentials_fail_closed: true
