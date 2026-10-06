@@ -17,14 +17,24 @@ from enum import Enum
 from threading import RLock
 from typing import Any, Callable, Iterable
 
-from api_keys import APIKeyManager, APIKeyRecord
-from admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
-from agent_platform import AgentRouter
-from budgets import BudgetLedger, BudgetLimit
-from controlled_router import GovernedAgentRouter, GovernedRoute
-from execution_contract import MeasuredExecution
-from policy import PolicyEngine, PolicyRule
-from resource_governance import Entitlement, ResourceGovernance, Usage
+try:
+    from .api_keys import APIKeyManager, APIKeyRecord
+    from .admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
+    from .agent_platform import AgentRouter
+    from .budgets import BudgetLedger, BudgetLimit
+    from .controlled_router import GovernedAgentRouter, GovernedRoute
+    from .execution_contract import MeasuredExecution
+    from .policy import PolicyEngine, PolicyRule
+    from .resource_governance import Entitlement, ResourceGovernance, Usage
+except ImportError:  # direct script/PYTHONPATH execution
+    from api_keys import APIKeyManager, APIKeyRecord
+    from admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
+    from agent_platform import AgentRouter
+    from budgets import BudgetLedger, BudgetLimit
+    from controlled_router import GovernedAgentRouter, GovernedRoute
+    from execution_contract import MeasuredExecution
+    from policy import PolicyEngine, PolicyRule
+    from resource_governance import Entitlement, ResourceGovernance, Usage
 
 
 @dataclass(frozen=True)
@@ -158,6 +168,51 @@ class ResourceControlPlane:
     def evidence(self) -> tuple[dict[str, Any], ...]:
         with self._lock:
             return tuple(self._evidence)
+
+    def usage_projection(self) -> tuple[dict[str, Any], ...]:
+        """Read-only management projection of the canonical usage ledger."""
+        with self._lock:
+            return tuple(
+                {
+                    "sequence": entry.sequence,
+                    "request_id": entry.request_id,
+                    "principal_id": entry.principal_id,
+                    "admission_id": entry.admission_id,
+                    "provider": entry.provider,
+                    "model": entry.model,
+                    "usage": dict(entry.usage.__dict__),
+                    "cost": str(entry.cost),
+                    "currency": entry.currency,
+                    "status": entry.status,
+                    "recorded_at": entry.recorded_at.isoformat(),
+                    "entry_hash": entry.entry_hash,
+                    "previous_hash": entry.previous_hash,
+                }
+                for entry in self._ledger
+            )
+
+    def cost_projection(self) -> tuple[dict[str, Any], ...]:
+        """Read-only cost projection derived from the canonical usage ledger."""
+        return tuple(
+            {
+                "sequence": item["sequence"],
+                "request_id": item["request_id"],
+                "principal_id": item["principal_id"],
+                "provider": item["provider"],
+                "model": item["model"],
+                "cost": item["cost"],
+                "currency": item["currency"],
+                "status": item["status"],
+                "recorded_at": item["recorded_at"],
+                "entry_hash": item["entry_hash"],
+            }
+            for item in self.usage_projection()
+        )
+
+    def evidence_projection(self) -> tuple[dict[str, Any], ...]:
+        """Read-only projection of the immutable runtime evidence chain."""
+        with self._lock:
+            return tuple(dict(record) for record in self._evidence)
 
     def forensic_snapshot(self) -> dict[str, Any]:
         with self._lock:

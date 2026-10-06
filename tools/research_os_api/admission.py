@@ -15,9 +15,16 @@ import hashlib
 import json
 from threading import RLock
 
-from budgets import BudgetDecision, BudgetLedger
-from policy import PolicyContext, PolicyEffect, PolicyEngine
-from resource_governance import Decision, QuotaError, ResourceGovernance, Usage
+try:
+    from .budgets import BudgetDecision, BudgetLedger
+    from .policy import PolicyContext, PolicyEffect, PolicyEngine
+    from .resource_governance import Decision, QuotaError, ResourceGovernance, Usage
+    from .resource_runtime_variables import RESOURCE_RESERVATION_TTL
+except ImportError:  # direct script/PYTHONPATH execution
+    from budgets import BudgetDecision, BudgetLedger
+    from policy import PolicyContext, PolicyEffect, PolicyEngine
+    from resource_governance import Decision, QuotaError, ResourceGovernance, Usage
+    from resource_runtime_variables import RESOURCE_RESERVATION_TTL
 
 
 class AdmissionDecision(str, Enum):
@@ -90,7 +97,14 @@ class AdmissionRecord:
 class ResourceAdmissionGate:
     """Single deterministic gate joining policy, quota, and budget."""
 
-    def __init__(self, governance: ResourceGovernance, policy: PolicyEngine, budget: BudgetLedger, *, reservation_ttl: timedelta = timedelta(minutes=5)) -> None:
+    def __init__(
+        self,
+        governance: ResourceGovernance,
+        policy: PolicyEngine,
+        budget: BudgetLedger,
+        *,
+        reservation_ttl: timedelta = RESOURCE_RESERVATION_TTL,
+    ) -> None:
         if reservation_ttl <= timedelta(0):
             raise QuotaError("reservation_ttl must be positive")
         self._governance = governance
@@ -126,18 +140,38 @@ class ResourceAdmissionGate:
             if not request.scopes.issubset(entitlement.scopes):
                 return self._deny(request, "scope_not_entitled", now)
 
-            policy_decision = self._policy.evaluate(PolicyContext(request.principal_id, request.scopes, request.principal_type), request.usage)
+            policy_decision = self._policy.evaluate(
+                PolicyContext(request.principal_id, request.scopes, request.principal_type),
+                request.usage,
+            )
             if policy_decision.effect is PolicyEffect.DENY:
                 return self._deny(request, f"policy_denied:{policy_decision.rule_id}", now)
             if policy_decision.effect is PolicyEffect.THROTTLE:
-                return AdmissionRecord(AdmissionDecision.THROTTLE, request.request_id, request.principal_id, f"policy_throttled:{policy_decision.rule_id}", evaluated_at=now)
+                return AdmissionRecord(
+                    AdmissionDecision.THROTTLE,
+                    request.request_id,
+                    request.principal_id,
+                    f"policy_throttled:{policy_decision.rule_id}",
+                    evaluated_at=now,
+                )
 
             quota = self._governance.reserve(request.principal_id, request.usage, now=now)
             if quota.decision is not Decision.ALLOW or quota.reservation_id is None:
                 decision = AdmissionDecision.THROTTLE if quota.decision is Decision.THROTTLE else AdmissionDecision.DENY
-                return AdmissionRecord(decision, request.request_id, request.principal_id, f"quota:{quota.reason}", evaluated_at=now)
+                return AdmissionRecord(
+                    decision,
+                    request.request_id,
+                    request.principal_id,
+                    f"quota:{quota.reason}",
+                    evaluated_at=now,
+                )
 
-            budget = self._budget.reserve(request.principal_id, request.estimated_cost, currency=request.currency, now=now)
+            budget = self._budget.reserve(
+                request.principal_id,
+                request.estimated_cost,
+                currency=request.currency,
+                now=now,
+            )
             if budget.decision is not BudgetDecision.ALLOW or budget.reservation_id is None:
                 self._governance.release(quota.reservation_id)
                 return self._deny(request, f"budget:{budget.reason}", now)
@@ -145,16 +179,40 @@ class ResourceAdmissionGate:
             self._sequence += 1
             reservation_id = f"ares_{self._sequence:08d}"
             reservation = AdmissionReservation(
-                reservation_id, request.request_id, request.principal_id, request.usage,
-                request.estimated_cost, request.currency.strip().upper(), quota.reservation_id,
-                budget.reservation_id, now, now + self._reservation_ttl, fingerprint=fingerprint,
+                reservation_id,
+                request.request_id,
+                request.principal_id,
+                request.usage,
+                request.estimated_cost,
+                request.currency.strip().upper(),
+                quota.reservation_id,
+                budget.reservation_id,
+                now,
+                now + self._reservation_ttl,
+                fingerprint=fingerprint,
             )
             self._reservations[reservation_id] = reservation
             if request.idempotency_key:
                 self._idempotency[request.idempotency_key] = (fingerprint, reservation_id)
-            return AdmissionRecord(AdmissionDecision.ALLOW, request.request_id, request.principal_id, "reserved", reservation_id, quota.reservation_id, budget.reservation_id, now)
+            return AdmissionRecord(
+                AdmissionDecision.ALLOW,
+                request.request_id,
+                request.principal_id,
+                "reserved",
+                reservation_id,
+                quota.reservation_id,
+                budget.reservation_id,
+                now,
+            )
 
-    def commit(self, reservation_id: str, *, actual_usage: Usage | None = None, actual_cost: Decimal | None = None, now: datetime | None = None) -> AdmissionReservation:
+    def commit(
+        self,
+        reservation_id: str,
+        *,
+        actual_usage: Usage | None = None,
+        actual_cost: Decimal | None = None,
+        now: datetime | None = None,
+    ) -> AdmissionReservation:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         with self._lock:
             reservation = self._reservations.get(reservation_id)
@@ -195,7 +253,9 @@ class ResourceAdmissionGate:
         self._governance.release(reservation.quota_reservation_id)
         self._budget.release(reservation.budget_reservation_id)
         status = AdmissionStatus.EXPIRED if expired else AdmissionStatus.RELEASED
-        self._reservations[reservation.reservation_id] = AdmissionReservation(**{**reservation.__dict__, "status": status})
+        self._reservations[reservation.reservation_id] = AdmissionReservation(
+            **{**reservation.__dict__, "status": status}
+        )
 
     def _expire_locked(self, now: datetime) -> None:
         for reservation in tuple(self._reservations.values()):
@@ -222,8 +282,16 @@ class ResourceAdmissionGate:
             "scopes": sorted(request.scopes),
             "principal_type": request.principal_type,
         }
-        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
 
     @staticmethod
     def _deny(request: AdmissionRequest, reason: str, now: datetime) -> AdmissionRecord:
-        return AdmissionRecord(AdmissionDecision.DENY, request.request_id, request.principal_id, reason, evaluated_at=now)
+        return AdmissionRecord(
+            AdmissionDecision.DENY,
+            request.request_id,
+            request.principal_id,
+            reason,
+            evaluated_at=now,
+        )

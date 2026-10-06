@@ -225,16 +225,20 @@ class ManagementService:
         result["raw_secret"] = secret
         return result
 
-    def revoke_api_key(self, key_id: str, *, actor: str = "system") -> dict[str, Any]:
-        record = self.key_manager.revoke(key_id)
+    def revoke_api_key(self, key_id: str, *, application_id: str | None = None, actor: str = "system") -> dict[str, Any]:
         current = _decode("api_keys", self.get("api_keys", key_id))
+        if application_id is not None and current.application_id != application_id:
+            raise PermissionError("api key does not belong to application")
+        record = self.key_manager.revoke(key_id)
         updated = replace(current, revoked_at=record.revoked_at)
         self._replace_and_validate("api_keys", key_id, updated)
         result = self._persist("api_keys", updated, actor=actor, action="revoke")
         return result
 
-    def rotate_api_key(self, key_id: str, payload: dict[str, Any], *, actor: str = "system") -> dict[str, Any]:
+    def rotate_api_key(self, key_id: str, payload: dict[str, Any], *, application_id: str | None = None, actor: str = "system") -> dict[str, Any]:
         current = _decode("api_keys", self.get("api_keys", key_id))
+        if application_id is not None and current.application_id != application_id:
+            raise PermissionError("api key does not belong to application")
         scopes = frozenset(str(value) for value in payload.get("scopes", current.scopes))
         entitlement_id = str(payload.get("entitlement_id", current.entitlement_id or "")).strip()
         if not entitlement_id:
