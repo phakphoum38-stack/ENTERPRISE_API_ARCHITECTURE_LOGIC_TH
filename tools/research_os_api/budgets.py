@@ -11,7 +11,10 @@ from decimal import Decimal
 from enum import Enum
 from threading import RLock
 
-from resource_governance import QuotaError
+try:
+    from .resource_governance import QuotaError
+except ImportError:  # direct script/PYTHONPATH execution
+    from resource_governance import QuotaError
 
 
 class BudgetDecision(str, Enum):
