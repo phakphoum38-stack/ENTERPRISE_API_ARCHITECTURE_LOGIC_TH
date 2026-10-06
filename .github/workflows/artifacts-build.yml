@@ -62,7 +62,7 @@ jobs:
           python - <<'PY'
           import json, os
           from pathlib import Path
-          Path("artifact/manifest.json").write_text(json.dumps({"artifact":"research-os-website","target_sha":os.environ["TARGET_SHA"],"parts":["website-static","flutter-web"],"api_base_default":"http://127.0.0.1:8787"}, indent=2), encoding="utf-8")
+          Path("artifact/manifest.json").write_text(json.dumps({"artifact":"research-os-website","target_sha":os.environ["TARGET_SHA"],"canonical_web_source":"apps/research_os_flutter","canonical_web_artifact":"flutter-web","compatibility_web_source":"apps/research_os_web","compatibility_web_artifact":"website-static","parts":["flutter-web","website-static"],"api_base_default":"http://127.0.0.1:8787"}, indent=2), encoding="utf-8")
           PY
       - name: Upload website artifact
         uses: actions/upload-artifact@v4
