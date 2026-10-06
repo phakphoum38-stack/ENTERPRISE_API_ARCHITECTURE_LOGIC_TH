@@ -2,7 +2,7 @@
 
 ## Protocol
 
-Research OS Google sign-in uses the Google OAuth 2.0 Authorization Code flow with OpenID Connect identity scopes:
+Research OS Google sign-in uses the Google OAuth 2.0 Authorization Code flow with OpenID Connect identity scopes, PKCE (S256), and a per-flow nonce:
 
 - `openid`
 - `email`
