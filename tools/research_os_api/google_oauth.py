@@ -82,6 +82,7 @@ class GoogleOAuthBroker:
             "redirect_uri": redirect_uri,
             "nonce": nonce,
             "code_verifier": code_verifier,
+            "code_challenge": code_challenge,
         }
         self.state_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         params = {
