@@ -19,15 +19,22 @@ from typing import Any, Callable, Iterable
 
 try:
     from .api_keys import APIKeyManager, APIKeyRecord
+    from .admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
+    from .agent_platform import AgentRouter
+    from .budgets import BudgetLedger, BudgetLimit
+    from .controlled_router import GovernedAgentRouter, GovernedRoute
+    from .execution_contract import MeasuredExecution
+    from .policy import PolicyEngine, PolicyRule
+    from .resource_governance import Entitlement, ResourceGovernance, Usage
 except ImportError:  # direct script/PYTHONPATH execution
     from api_keys import APIKeyManager, APIKeyRecord
-from admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
-from agent_platform import AgentRouter
-from budgets import BudgetLedger, BudgetLimit
-from controlled_router import GovernedAgentRouter, GovernedRoute
-from execution_contract import MeasuredExecution
-from policy import PolicyEngine, PolicyRule
-from resource_governance import Entitlement, ResourceGovernance, Usage
+    from admission import AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
+    from agent_platform import AgentRouter
+    from budgets import BudgetLedger, BudgetLimit
+    from controlled_router import GovernedAgentRouter, GovernedRoute
+    from execution_contract import MeasuredExecution
+    from policy import PolicyEngine, PolicyRule
+    from resource_governance import Entitlement, ResourceGovernance, Usage
 
 
 @dataclass(frozen=True)
