@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 
 from v2_server import V2ResearchOSHandler
@@ -26,6 +27,15 @@ class CloudResearchOSHandler(V2ResearchOSHandler):
         )
         self.send_header("Access-Control-Max-Age", "86400")
         super().end_headers()
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        """Serve lightweight HEAD probes without emitting a response body."""
+        if self.path.split("?", 1)[0] in {"/", "/health", "/health/"}:
+            self.send_response(HTTPStatus.OK)
+        else:
+            self.send_response(HTTPStatus.NOT_FOUND)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_OPTIONS(self) -> None:  # noqa: N802
         self.send_response(204)
