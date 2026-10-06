@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Mapping
 
-from resource_governance import QuotaDimension, QuotaError, Usage
+try:
+    from .resource_governance import QuotaDimension, QuotaError, Usage
+except ImportError:  # direct script/PYTHONPATH execution
+    from resource_governance import QuotaDimension, QuotaError, Usage
 
 
 class PolicyEffect(str, Enum):
