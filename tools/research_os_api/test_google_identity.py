@@ -38,6 +38,23 @@ class GoogleIdentityBrokerTest(unittest.TestCase):
                 "https://research-os-api.example.com/v1/auth/google/callback",
             )
 
+    def test_production_redirect_binding_is_exact(self):
+        env = {
+            "RESEARCH_OS_GOOGLE_CLIENT_ID": "client-id.apps.googleusercontent.com",
+            "RESEARCH_OS_GOOGLE_CLIENT_SECRET": "client-secret",
+            "RESEARCH_OS_GOOGLE_IDENTITY_REDIRECT_URI": (
+                "https://research-os-api-phakphoum.onrender.com/v1/auth/google/callback"
+            ),
+        }
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, env, clear=True):
+            broker = GoogleIdentityBroker(tmp)
+            self.assertEqual(
+                broker.redirect_uri(),
+                "https://research-os-api-phakphoum.onrender.com/v1/auth/google/callback",
+            )
+            self.assertTrue(broker.redirect_uri().startswith("https://"))
+            self.assertNotIn("RESEARCH_OS_GOOGLE_CLIENT_SECRET", broker.redirect_uri())
+
     def test_explicit_identity_redirect_wins(self):
         env = {
             "RESEARCH_OS_GOOGLE_CLIENT_ID": "client-id.apps.googleusercontent.com",
@@ -55,3 +72,4 @@ class GoogleIdentityBrokerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
