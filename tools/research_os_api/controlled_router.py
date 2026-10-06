@@ -11,9 +11,14 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Iterable
 
-from admission import AdmissionDecision, AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
-from agent_platform import AgentRouter
-from resource_governance import Usage
+try:
+    from .admission import AdmissionDecision, AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
+    from .agent_platform import AgentRouter
+    from .resource_governance import Usage
+except ImportError:  # direct script/PYTHONPATH execution
+    from admission import AdmissionDecision, AdmissionRecord, AdmissionRequest, ResourceAdmissionGate
+    from agent_platform import AgentRouter
+    from resource_governance import Usage
 
 
 @dataclass(frozen=True)
