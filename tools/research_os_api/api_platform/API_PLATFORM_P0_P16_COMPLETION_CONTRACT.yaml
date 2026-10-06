@@ -10,6 +10,10 @@ architecture:
   execution_plane:
     authority: tools/research_os_api/resource_control_plane.py
     owns: [authentication, authorization, policy, entitlement_enforcement, quota, budget, admission, routing, execution, usage, evidence]
+  resource_variables:
+    authority: tools/research_os_api/resource_runtime_variables.py
+    owns: [namespace, default_currency, reservation_ttl, api_key_prefix]
+    rule: configuration_only_never_execution_authority
   rule: management_state_never_authorizes_execution
 
 phases:
@@ -41,16 +45,15 @@ phases:
   P6:
     name: Runtime Gateway
     status: IMPLEMENTED_KERNEL
-    evidence: [tools/research_os_api/resource_control_http.py, tools/research_os_api/resource_control_plane.py]
+    evidence: [tools/research_os_api/resource_control_http.py, tools/research_os_api/resource_control_plane.py, tools/research_os_api/resource_runtime_variables.py]
   P7:
     name: Usage and Metering
-    status: PARTIAL
-    evidence: [tools/research_os_api/resource_control_plane.py]
-    gap: Management query endpoint currently returns an empty projection instead of the runtime ledger.
+    status: IMPLEMENTED_API
+    evidence: [tools/research_os_api/resource_control_plane.py, tools/research_os_api/api_platform/management_http.py]
   P8:
     name: Quota and Billing
     status: IMPLEMENTED_KERNEL
-    evidence: [tools/research_os_api/admission.py, tools/research_os_api/budgets.py]
+    evidence: [tools/research_os_api/admission.py, tools/research_os_api/budgets.py, tools/research_os_api/resource_runtime_variables.py]
   P9:
     name: Developer Portal
     status: IMPLEMENTED_API
@@ -69,9 +72,8 @@ phases:
     evidence: [tools/research_os_api/api_management_models.py, tools/research_os_api/api_platform/management_http.py]
   P13:
     name: Observability
-    status: PARTIAL
-    evidence: [tools/research_os_api/resource_control_plane.py]
-    gap: Productized usage/cost/audit query projections.
+    status: IMPLEMENTED_API
+    evidence: [tools/research_os_api/resource_control_plane.py, tools/research_os_api/api_platform/management_http.py]
   P14:
     name: Security and Assurance
     status: IMPLEMENTED_KERNEL
@@ -88,6 +90,7 @@ phases:
 completion_rules:
   - reuse_existing_capabilities_before_new_implementation
   - no_second_execution_authority
+  - resource_variables_are_configuration_only
   - raw_api_secret_returned_only_on_create_or_rotate
   - raw_api_secret_never_persisted
   - revoked_and_expired_credentials_fail_closed
