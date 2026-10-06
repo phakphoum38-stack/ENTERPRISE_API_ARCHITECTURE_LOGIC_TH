@@ -230,6 +230,10 @@ class GoogleOAuthBroker:
             raise GoogleOAuthError("Google ID token nonce mismatch")
         if not str(claims.get("sub") or "").strip():
             raise GoogleOAuthError("Google ID token subject is missing")
+        if claims.get("email_verified") is not True:
+            raise GoogleOAuthError("Google account email is not verified")
+        if not str(claims.get("email") or "").strip():
+            raise GoogleOAuthError("Google ID token email is missing")
         return claims
 
     def complete(self, *, code: str, state: str) -> dict[str, Any]:
@@ -278,10 +282,15 @@ class GoogleOAuthBroker:
         account = self._fetch_userinfo(str(token["access_token"]))
         if not account:
             account = {}
+        if account.get("sub") and not secrets.compare_digest(str(account["sub"]), str(claims["sub"])):
+            raise GoogleOAuthError("Google identity subject mismatch")
+        if account.get("email") and not secrets.compare_digest(str(account["email"]).casefold(), str(claims["email"]).casefold()):
+            raise GoogleOAuthError("Google identity email mismatch")
         account.setdefault("sub", claims.get("sub"))
         account.setdefault("email", claims.get("email"))
         account.setdefault("name", claims.get("name"))
         account.setdefault("picture", claims.get("picture"))
+        account["email_verified"] = True
         if not str(account.get("sub") or "").strip() or not str(account.get("email") or "").strip():
             raise GoogleOAuthError("Google identity response is incomplete")
         existing = self._read_token(silent=True)
