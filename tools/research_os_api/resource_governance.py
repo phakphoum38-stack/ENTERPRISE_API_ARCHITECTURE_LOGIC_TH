@@ -1,6 +1,6 @@
 """Research OS resource governance primitives.
 
-This module is deliberately provider-agnostic and persistence-agnostic.  It is the
+This module is deliberately provider-agnostic and persistence-agnostic. It is the
 canonical policy/decision layer for API-key entitlements and quota accounting;
 HTTP handlers, databases, and provider adapters remain integration layers.
 """
@@ -11,6 +11,11 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from threading import RLock
 from typing import Mapping
+
+try:
+    from .resource_runtime_variables import RESOURCE_RESERVATION_TTL
+except ImportError:  # direct script/PYTHONPATH execution
+    from resource_runtime_variables import RESOURCE_RESERVATION_TTL
 
 
 class QuotaDimension(str, Enum):
@@ -145,7 +150,7 @@ def _window_start(now: datetime, window: Window) -> datetime:
 class ResourceGovernance:
     """Thread-safe quota decision engine with reservation semantics."""
 
-    def __init__(self, *, reservation_ttl: timedelta = timedelta(minutes=5)) -> None:
+    def __init__(self, *, reservation_ttl: timedelta = RESOURCE_RESERVATION_TTL) -> None:
         if reservation_ttl <= timedelta(0):
             raise QuotaError("reservation_ttl must be positive")
         self._reservation_ttl = reservation_ttl
@@ -181,13 +186,38 @@ class ResourceGovernance:
                     if r.expires_at > now
                 )
                 if used + reserved + requested > limit.amount:
-                    return DecisionRecord(Decision.DENY, principal_id, f"quota_exceeded:{limit.dimension.value}:{limit.window.value}", None, now, state.entitlement.tier)
+                    return DecisionRecord(
+                        Decision.DENY,
+                        principal_id,
+                        f"quota_exceeded:{limit.dimension.value}:{limit.window.value}",
+                        None,
+                        now,
+                        state.entitlement.tier,
+                    )
             concurrent = usage.concurrent_jobs
             if concurrent:
-                active = sum(r.usage.concurrent_jobs for r in state.reservations.values() if r.expires_at > now)
+                active = sum(
+                    r.usage.concurrent_jobs
+                    for r in state.reservations.values()
+                    if r.expires_at > now
+                )
                 if active + concurrent > state.entitlement.max_concurrency:
-                    return DecisionRecord(Decision.THROTTLE, principal_id, "concurrency_limit", None, now, state.entitlement.tier)
-            return DecisionRecord(Decision.ALLOW, principal_id, "within_entitlement", None, now, state.entitlement.tier)
+                    return DecisionRecord(
+                        Decision.THROTTLE,
+                        principal_id,
+                        "concurrency_limit",
+                        None,
+                        now,
+                        state.entitlement.tier,
+                    )
+            return DecisionRecord(
+                Decision.ALLOW,
+                principal_id,
+                "within_entitlement",
+                None,
+                now,
+                state.entitlement.tier,
+            )
 
     def reserve(self, principal_id: str, usage: Usage, *, now: datetime | None = None) -> DecisionRecord:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -197,11 +227,30 @@ class ResourceGovernance:
                 return decision
             self._sequence += 1
             reservation_id = f"qres_{self._sequence:08d}"
-            reservation = Reservation(reservation_id, principal_id, usage, now, now + self._reservation_ttl)
+            reservation = Reservation(
+                reservation_id,
+                principal_id,
+                usage,
+                now,
+                now + self._reservation_ttl,
+            )
             self._state(principal_id).reservations[reservation_id] = reservation
-            return DecisionRecord(Decision.ALLOW, principal_id, "reserved", reservation_id, now, decision.tier)
+            return DecisionRecord(
+                Decision.ALLOW,
+                principal_id,
+                "reserved",
+                reservation_id,
+                now,
+                decision.tier,
+            )
 
-    def commit(self, reservation_id: str, *, actual: Usage | None = None, now: datetime | None = None) -> None:
+    def commit(
+        self,
+        reservation_id: str,
+        *,
+        actual: Usage | None = None,
+        now: datetime | None = None,
+    ) -> None:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         with self._lock:
             principal_id, reservation = self._find_reservation(reservation_id)
@@ -221,7 +270,12 @@ class ResourceGovernance:
             principal_id, _ = self._find_reservation(reservation_id)
             del self._state(principal_id).reservations[reservation_id]
 
-    def snapshot(self, principal_id: str, *, now: datetime | None = None) -> Mapping[str, int | str]:
+    def snapshot(
+        self,
+        principal_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> Mapping[str, int | str]:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         with self._lock:
             state = self._state(principal_id)
