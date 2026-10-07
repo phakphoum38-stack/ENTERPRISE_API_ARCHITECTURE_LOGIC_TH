@@ -52,6 +52,22 @@ jobs:
           grep -q 'Authorization == ALLOWED' README.md
           grep -q 'Entitlement == ACTIVE' README.md
 
+      - name: Run canonical secret scanning
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python tools/security/secret_scanner.py \
+            --root . \
+            --source-sha "${{ github.sha }}" \
+            --output evidence/security-secret-scan.json
+
+      - name: Upload security secret-scan evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-secret-scan-${{ github.sha }}
+          path: evidence/security-secret-scan.json
+          if-no-files-found: error
+
   code-generation:
     name: Code generation validation
     runs-on: ubuntu-latest
