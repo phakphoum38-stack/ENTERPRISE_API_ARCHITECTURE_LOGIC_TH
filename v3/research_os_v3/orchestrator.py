@@ -13,7 +13,7 @@ from .providers import ProviderRegistry
 class UnifiedMasterOrchestrator:
     """Single coordination authority for V3 Full 10x10."""
 
-    contract = "unified-master-orchestrator-v3-full"
+    contract = "unified-master-orchestrator-v3"
 
     def __init__(
         self,
