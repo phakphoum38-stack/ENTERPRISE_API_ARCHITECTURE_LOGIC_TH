@@ -1,0 +1,60 @@
+{
+  "schema": "research-os.external-validation.v1",
+  "contract_id": "research-os-external-validation-plane-v1",
+  "version": "1.0.0",
+  "status": "CANONICAL",
+  "authority": "Research OS Platform",
+  "purpose": "Read-only validation of an exact repository source SHA using existing canonical validators.",
+  "authority_boundaries": {
+    "may_read_source": true,
+    "may_validate": true,
+    "may_generate_evidence": true,
+    "may_mutate_source": false,
+    "may_authorize": false,
+    "may_approve": false,
+    "may_merge": false,
+    "may_release": false,
+    "release_authority": "FINAL_GATE"
+  },
+  "input": {
+    "repository_root": "checkout root",
+    "source_sha": "required exact immutable git SHA"
+  },
+  "determinism": {
+    "same_sha_same_contract_same_environment": "same validation decisions",
+    "unknown_or_unavailable_validator": "HOLD",
+    "validator_nonzero": "FAIL",
+    "validator_timeout": "FAIL"
+  },
+  "scope": {
+    "excluded_path_segment": "efi",
+    "excluded_path_policy": "NEVER_SCAN",
+    "canonical_security_validator": "tools/security/secret_scanner.py"
+  },
+  "validators": [
+    {"id": "platform-recon", "command": ["tools/platform_service.py", "--recon"]},
+    {"id": "self-reconciliation", "command": ["tools/platform_self_reconciliation.py", "--scan"]},
+    {"id": "platform-governance", "command": ["tools/validate_platform_governance.py"]},
+    {"id": "canonical-security", "command": ["tools/security/secret_scanner.py", "--root", ".", "--source-sha", "{source_sha}"]}
+  ],
+  "evidence": {
+    "schema": "research-os.external-validation-evidence.v1",
+    "required": ["schema", "contract_id", "source_sha", "status", "validator_count", "validators", "excluded_path_segment"],
+    "status_values": ["PASS", "FAIL", "HOLD"],
+    "artifact": "evidence/external-validation.json"
+  },
+  "integration": {
+    "assurance": "evidence projection only",
+    "final_gate": "GitHub Final Gate remains merge and release authority",
+    "m2": "consumes recon and evidence; does not create a second authority",
+    "legacy_flutter_scanner": "capability source only; do not restore as duplicate authority"
+  },
+  "forbidden": [
+    "direct main mutation",
+    "merge or approval",
+    "release",
+    "gate bypass",
+    "raw credential output",
+    "scanning any path containing the excluded path segment"
+  ]
+}
