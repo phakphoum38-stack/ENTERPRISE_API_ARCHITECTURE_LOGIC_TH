@@ -74,6 +74,15 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _retryLoadingProviders() {
+    setState(() {
+      _loading = true;
+      _error = false;
+      _message = null;
+    });
+    _loadProviders();
+  }
+
   Future<void> _login(Map<String, dynamic> provider) async {
     final id = provider['id']?.toString().trim() ?? '';
     final name = provider['name']?.toString().trim() ?? id;
@@ -425,6 +434,11 @@ class _LoginPageState extends State<LoginPage> {
                         // entry point; provider details stay folded.
                         if (_loading) ...<Widget>[
                           const SizedBox(height: 16),
+                          const Text(
+                            'กำลังเชื่อมต่อกับ Research OS…',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
                           const Center(
                             child: SizedBox(
                               width: 20,
@@ -433,6 +447,14 @@ class _LoginPageState extends State<LoginPage> {
                                 strokeWidth: 2,
                               ),
                             ),
+                          ),
+                        ],
+                        if (_error && _providers.isEmpty && !_loading) ...<Widget>[
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _retryLoadingProviders,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('ลองโหลดอีกครั้ง'),
                           ),
                         ],
                       ],

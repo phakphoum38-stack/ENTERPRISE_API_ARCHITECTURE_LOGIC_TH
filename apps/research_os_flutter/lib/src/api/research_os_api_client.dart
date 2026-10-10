@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -16,10 +17,12 @@ class ResearchOSApiClient {
     required this.baseUrl,
     http.Client? client,
     this.preferredProvider,
+    this.authRequestTimeout = const Duration(seconds: 60),
   }) : _client = client ?? http.Client();
 
   final String baseUrl;
   final String? preferredProvider;
+  final Duration authRequestTimeout;
   final http.Client _client;
   String? _sessionToken;
 
@@ -36,30 +39,37 @@ class ResearchOSApiClient {
   void clearSession() => _sessionToken = null;
 
   Future<Map<String, dynamic>> getAuthStatus() =>
-      _getJson('/v1/auth/status');
+      _getJson('/v1/auth/status', timeout: authRequestTimeout);
 
   Future<Map<String, dynamic>> getIdentityProviders() =>
-      _getJson('/v1/auth/providers');
+      _getJson('/v1/auth/providers', timeout: authRequestTimeout);
 
   Future<Map<String, dynamic>> startProviderLogin(String provider) =>
       _postJson('/v1/auth/providers/login', <String, Object?>{
         'provider': provider,
-      });
+      }, timeout: authRequestTimeout);
 
   Future<Map<String, dynamic>> exchangeProviderHandoff(String state) async {
-    final response = await _client.post(
-      _uri('/v1/auth/providers/handoff'),
-      headers: <String, String>{
-        'Content-Type': 'application/json',
-        'X-Research-OS-OAuth-State': state,
-      },
-      body: '{}',
+    final response = await _send(
+      _client.post(
+        _uri('/v1/auth/providers/handoff'),
+        headers: <String, String>{
+          'Content-Type': 'application/json',
+          'X-Research-OS-OAuth-State': state,
+        },
+        body: '{}',
+      ),
+      timeout: authRequestTimeout,
     );
     return _decode(response);
   }
 
   Future<Map<String, dynamic>> signOut() =>
-      _postJson('/v1/auth/signout', const <String, Object?>{});
+      _postJson(
+        '/v1/auth/signout',
+        const <String, Object?>{},
+        timeout: authRequestTimeout,
+      );
 
   Future<Map<String, dynamic>> getHealth() => _getJson('/health');
   Future<Map<String, dynamic>> getProjects() => _getJson('/v1/projects');
@@ -79,11 +89,19 @@ class ResearchOSApiClient {
       _getJson('/v1/brain/providers');
 
   Future<Map<String, dynamic>> getGoogleIdentityStatus() =>
-      _getJson('/v1/auth/google/status');
+      _getJson('/v1/auth/google/status', timeout: authRequestTimeout);
   Future<Map<String, dynamic>> startGoogleIdentitySignIn() =>
-      _postJson('/v1/auth/google/start', const <String, Object?>{});
+      _postJson(
+        '/v1/auth/google/start',
+        const <String, Object?>{},
+        timeout: authRequestTimeout,
+      );
   Future<Map<String, dynamic>> signOutGoogleIdentity() =>
-      _postJson('/v1/auth/google/signout', const <String, Object?>{});
+      _postJson(
+        '/v1/auth/google/signout',
+        const <String, Object?>{},
+        timeout: authRequestTimeout,
+      );
 
   Future<Map<String, dynamic>> getGoogleWorkspaceDashboard() =>
       _getJson('/v1/google-workspace/dashboard');
@@ -335,27 +353,50 @@ class ResearchOSApiClient {
     });
   }
 
-  Future<Map<String, dynamic>> _getJson(String path) async {
-    final response = await _client.get(
-      _uri(path),
-      headers: _sessionHeaders(),
+  Future<Map<String, dynamic>> _getJson(
+    String path, {
+    Duration? timeout,
+  }) async {
+    final response = await _send(
+      _client.get(
+        _uri(path),
+        headers: _sessionHeaders(),
+      ),
+      timeout: timeout,
     );
     return _decode(response);
   }
 
   Future<Map<String, dynamic>> _postJson(
     String path,
-    Map<String, Object?> payload,
-  ) async {
-    final response = await _client.post(
-      _uri(path),
-      headers: <String, String>{
-        'Content-Type': 'application/json',
-        ..._sessionHeaders(),
-      },
-      body: jsonEncode(payload),
+    Map<String, Object?> payload, {
+    Duration? timeout,
+  }) async {
+    final response = await _send(
+      _client.post(
+        _uri(path),
+        headers: <String, String>{
+          'Content-Type': 'application/json',
+          ..._sessionHeaders(),
+        },
+        body: jsonEncode(payload),
+      ),
+      timeout: timeout,
     );
     return _decode(response);
+  }
+
+  Future<http.Response> _send(
+    Future<http.Response> request, {
+    Duration? timeout,
+  }) async {
+    try {
+      return timeout == null ? await request : await request.timeout(timeout);
+    } on TimeoutException {
+      throw const ResearchOSApiException(
+        'Research OS API request timed out. Check the connection and try again.',
+      );
+    }
   }
 
   Map<String, dynamic> _decode(http.Response response) {
