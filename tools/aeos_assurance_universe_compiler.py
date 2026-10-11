@@ -94,14 +94,19 @@ def compile_addresses(
     lifecycle: Sequence[str] = LIFECYCLE,
 ) -> tuple[AssuranceAddress, ...]:
     domains = tuple(domain_ids)
-    if len(families) != 100:
-        raise ValueError("assurance family catalog must contain exactly 100 entries")
-    if len(dimensions) != 100:
-        raise ValueError("assurance dimension catalog must contain exactly 100 entries")
-    if len(set(families)) != len(families) or len(set(dimensions)) != len(dimensions):
-        raise ValueError("catalog entries must be unique")
-    if not domains or not all(isinstance(d, str) and d for d in domains):
-        raise ValueError("domain ids must be non-empty strings")
+
+    def validate_catalog(name: str, values: Sequence[str]) -> None:
+        if not values:
+            raise ValueError(f"{name} catalog must not be empty")
+        if any(not isinstance(value, str) or not value.strip() for value in values):
+            raise ValueError(f"{name} entries must be non-empty strings")
+        if len(set(values)) != len(values):
+            raise ValueError(f"{name} entries must be unique")
+
+    validate_catalog("domain", domains)
+    validate_catalog("family", families)
+    validate_catalog("dimension", dimensions)
+    validate_catalog("lifecycle", lifecycle)
     return tuple(
         AssuranceAddress(assertion_id(d, f, x, l), d, f, x, l)
         for d in domains for f in families for x in dimensions for l in lifecycle
