@@ -52,24 +52,24 @@ ASSURANCE_FAMILIES: tuple[str, ...] = (
 ASSURANCE_FAMILY_ALIASES: dict[str, dict[str, tuple[str, ...]]] = {
     "common_mode_resistance": {
         "families": ("evidence_independence",),
-        "dimensions": ("common_mode", "correlation_group"),
+        "dimensions": ("common_mode", "correlation_group", "assurance_boundary"),
     },
     "assurance_completeness": {
         "families": ("coverage_integrity", "evidence_completeness"),
-        "dimensions": ("coverage_snapshot", "assurance_debt_id"),
+        "dimensions": ("coverage_snapshot", "assurance_debt_id", "assurance_scope", "assurance_result"),
     },
     "assurance_of_assurance": {
         "families": ("coverage_integrity",),
-        "dimensions": ("verifier_id", "oracle_id", "coverage_snapshot"),
+        "dimensions": ("verifier_id", "oracle_id", "coverage_snapshot", "assurance_method", "assurance_version"),
         "domains": ("D113",),
     },
     "constitutional_integrity": {
         "families": ("contract_integrity", "policy_integrity", "governance_integrity"),
-        "dimensions": ("policy_version", "contract_version", "human_approval"),
+        "dimensions": ("policy_version", "contract_version", "human_approval", "assurance_boundary", "assurance_owner"),
     },
     "knowledge_lifecycle_integrity": {
         "families": ("agent_memory_integrity",),
-        "dimensions": ("memory_ref", "expiry", "revocation"),
+        "dimensions": ("memory_ref", "expiry", "revocation", "assurance_scope"),
         "domains": ("D120",),
     },
 }
@@ -89,6 +89,7 @@ DIMENSIONS: tuple[str, ...] = (
     "canary_id", "bypass_surface", "recovery_point", "recovery_target", "rollback_target", "promotion_target",
     "deployment_target", "memory_ref", "prompt_ref", "tool_ref", "agent_ref", "tenant", "session",
     "release_ref", "main_sha", "coverage_snapshot", "assurance_debt_id", "expiry", "revocation", "novelty",
+    "assurance_scope", "assurance_method", "assurance_boundary", "assurance_owner", "assurance_version", "assurance_result",
 )
 
 NEVER_PASS = frozenset({"NOT_OBSERVED", "UNKNOWN", "STALE", "CONFLICT", "UNCLASSIFIED", "QUARANTINED"})

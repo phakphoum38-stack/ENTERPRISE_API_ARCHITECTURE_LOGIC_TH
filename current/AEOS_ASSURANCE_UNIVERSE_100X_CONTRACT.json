@@ -65,7 +65,8 @@
       ],
       "dimensions": [
         "common_mode",
-        "correlation_group"
+        "correlation_group",
+        "assurance_boundary"
       ],
       "preserves_concept": true
     },
@@ -76,7 +77,9 @@
       ],
       "dimensions": [
         "coverage_snapshot",
-        "assurance_debt_id"
+        "assurance_debt_id",
+        "assurance_scope",
+        "assurance_result"
       ],
       "preserves_concept": true
     },
@@ -87,7 +90,9 @@
       "dimensions": [
         "verifier_id",
         "oracle_id",
-        "coverage_snapshot"
+        "coverage_snapshot",
+        "assurance_method",
+        "assurance_version"
       ],
       "domains": [
         "D113"
@@ -104,7 +109,9 @@
       "dimensions": [
         "policy_version",
         "contract_version",
-        "human_approval"
+        "human_approval",
+        "assurance_boundary",
+        "assurance_owner"
       ],
       "contract": "current/AEOS_ASSURANCE_FABRIC_CONTRACT.json",
       "preserves_concept": true
@@ -116,7 +123,8 @@
       "dimensions": [
         "memory_ref",
         "expiry",
-        "revocation"
+        "revocation",
+        "assurance_scope"
       ],
       "domains": [
         "D120"
