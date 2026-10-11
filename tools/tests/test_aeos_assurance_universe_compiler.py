@@ -1,5 +1,6 @@
 from tools.aeos_assurance_universe_compiler import (
     ASSURANCE_FAMILIES,
+    ASSURANCE_FAMILY_ALIASES,
     DIMENSIONS,
     LIFECYCLE,
     NEVER_PASS,
@@ -18,6 +19,25 @@ def test_catalog_is_exactly_100_by_100():
     assert len(DIMENSIONS) == 100
     assert len(set(ASSURANCE_FAMILIES)) == 100
     assert len(set(DIMENSIONS)) == 100
+
+
+def test_extra_assurance_concepts_are_preserved_as_explicit_aliases():
+    expected = {
+        "common_mode_resistance",
+        "assurance_completeness",
+        "assurance_of_assurance",
+        "constitutional_integrity",
+        "knowledge_lifecycle_integrity",
+    }
+    assert set(ASSURANCE_FAMILY_ALIASES) == expected
+    assert len(ASSURANCE_FAMILIES) == 100
+    for mapping in ASSURANCE_FAMILY_ALIASES.values():
+        assert mapping["families"]
+        assert set(mapping["families"]) <= set(ASSURANCE_FAMILIES)
+        assert mapping["dimensions"]
+        assert set(mapping["dimensions"]) <= set(DIMENSIONS)
+    assert ASSURANCE_FAMILY_ALIASES["assurance_of_assurance"]["domains"] == ("D113",)
+    assert ASSURANCE_FAMILY_ALIASES["knowledge_lifecycle_integrity"]["domains"] == ("D120",)
 
 
 def test_address_identity_is_deterministic():

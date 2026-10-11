@@ -58,6 +58,81 @@
   ],
   "coverage_fields": ["assertion_id","domain_id","family_id","dimension_id","lifecycle","applicability","state","source_ref","observation_ref","evidence_refs","provenance_ref","verifier_id","independence_ref","policy_version","contract_version","target_sha","artifact_sha","unknowns","novelty","assurance_debt_id","recovery_ref","certificate_ref"],
   "coverage_status": ["MISSING","PARTIAL","HARDEN","FOUND","CONFLICT","REGRESSION","FALSE_NEGATIVE","FALSE_GREEN","PROVENANCE_GAP","AUTHORITY_GAP","GOVERNANCE_GAP","UNKNOWN","NOVEL","VERIFIED","CERTIFIED"],
+  "assurance_family_aliases": {
+    "common_mode_resistance": {
+      "families": [
+        "evidence_independence"
+      ],
+      "dimensions": [
+        "common_mode",
+        "correlation_group",
+        "assurance_boundary"
+      ],
+      "preserves_concept": true
+    },
+    "assurance_completeness": {
+      "families": [
+        "coverage_integrity",
+        "evidence_completeness"
+      ],
+      "dimensions": [
+        "coverage_snapshot",
+        "assurance_debt_id",
+        "assurance_scope",
+        "assurance_result"
+      ],
+      "preserves_concept": true
+    },
+    "assurance_of_assurance": {
+      "families": [
+        "coverage_integrity"
+      ],
+      "dimensions": [
+        "verifier_id",
+        "oracle_id",
+        "coverage_snapshot",
+        "assurance_method",
+        "assurance_version"
+      ],
+      "domains": [
+        "D113"
+      ],
+      "contract": "current/AEOS_ASSURANCE_OF_ASSURANCE_CONTRACT.json",
+      "preserves_concept": true
+    },
+    "constitutional_integrity": {
+      "families": [
+        "contract_integrity",
+        "policy_integrity",
+        "governance_integrity"
+      ],
+      "dimensions": [
+        "policy_version",
+        "contract_version",
+        "human_approval",
+        "assurance_boundary",
+        "assurance_owner"
+      ],
+      "contract": "current/AEOS_ASSURANCE_FABRIC_CONTRACT.json",
+      "preserves_concept": true
+    },
+    "knowledge_lifecycle_integrity": {
+      "families": [
+        "agent_memory_integrity"
+      ],
+      "dimensions": [
+        "memory_ref",
+        "expiry",
+        "revocation",
+        "assurance_scope"
+      ],
+      "domains": [
+        "D120"
+      ],
+      "contract": "current/AEOS_GLOBAL_ASSURANCE_UNIVERSE.json",
+      "preserves_concept": true
+    }
+  },
   "hard_rules": [
     "No coverage record is PASS merely because its address exists.",
     "No assertion can upgrade its own state.",
