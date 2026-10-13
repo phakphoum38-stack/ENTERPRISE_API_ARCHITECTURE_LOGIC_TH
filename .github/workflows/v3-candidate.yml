@@ -47,7 +47,17 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $expected = $env:TARGET_SHA.ToLowerInvariant()
-          if ($expected -notmatch '^[0-9a-f]{40}
+          if ($expected -notmatch '^[0-9a-f]{40}$') {
+            throw "TARGET_SHA must be an exact 40-character commit SHA; received '$env:TARGET_SHA'"
+          }
+          $actual = (git rev-parse HEAD).Trim().ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Checked out SHA '$actual' does not match requested TARGET_SHA '$expected'"
+          }
+          $tree = (git rev-parse "$actual^{tree}").Trim().ToLowerInvariant()
+          "RESEARCH_OS_V3_TARGET_SHA=$actual" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RESEARCH_OS_V3_TREE_SHA=$tree" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Verified candidate commit=$actual tree=$tree"
       - name: Enable Windows long paths
         shell: pwsh
         run: |
