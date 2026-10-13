@@ -73,7 +73,59 @@ function Invoke-Setup([string]$LogPath) {
     }
 }
 
+function Assert-ExistingV3ServiceOwnership {
+    $escapedName = $serviceName.Replace("'", "''")
+    $record = Get-CimInstance Win32_Service -Filter "Name='$escapedName'" -ErrorAction SilentlyContinue
+    if (-not $record) { return }
+    $expected = Join-Path $installDir 'service\ResearchOS.V3.ServiceHost.exe'
+    if (-not (Test-Path $expected -PathType Leaf)) {
+        throw "Refusing to modify existing service '$serviceName': expected ServiceHost is missing, so ownership cannot be proven"
+    }
+    $match = [regex]::Match([string]$record.PathName, '^\s*"(?<exe>[^"]+\.exe)"|^\s*(?<exe>.+?\.exe)(?:\s|$)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $match.Success) {
+        throw "Refusing to modify existing service '$serviceName': could not parse ImagePath"
+    }
+    $actual = [System.IO.Path]::GetFullPath($match.Groups['exe'].Value)
+    $expected = [System.IO.Path]::GetFullPath($expected)
+    if (-not [string]::Equals($actual, $expected, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to modify service '$serviceName': ImagePath '$actual' is not the installed V3 ServiceHost '$expected'"
+    }
+}
+
+function Test-V3ProcessDescendant([int]$ProcessId, [int]$AncestorProcessId) {
+    $current = $ProcessId
+    $seen = [System.Collections.Generic.HashSet[int]]::new()
+    while ($current -gt 0 -and $seen.Add($current)) {
+        if ($current -eq $AncestorProcessId) { return $true }
+        $processRecord = Get-CimInstance Win32_Process -Filter "ProcessId = $current" -ErrorAction SilentlyContinue
+        if (-not $processRecord) { return $false }
+        $current = [int]$processRecord.ParentProcessId
+    }
+    return $false
+}
+
+function Assert-V3OwnedLoopbackListener {
+    $escapedName = $serviceName.Replace("'", "''")
+    $record = Get-CimInstance Win32_Service -Filter "Name='$escapedName'" -ErrorAction SilentlyContinue
+    if (-not $record -or $record.State -ne 'Running' -or [int]$record.ProcessId -le 0) {
+        throw "V3 service '$serviceName' is not running with a valid service PID"
+    }
+    Assert-ExistingV3ServiceOwnership
+    $listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop)
+    if ($listeners.Count -lt 1) { throw "V3 service has no listener on port $port" }
+    foreach ($listener in $listeners) {
+        if ($listener.LocalAddress -ne '127.0.0.1') {
+            throw "V3 listener is bound to '$($listener.LocalAddress)', not IPv4 loopback"
+        }
+        if (-not (Test-V3ProcessDescendant -ProcessId ([int]$listener.OwningProcess) -AncestorProcessId ([int]$record.ProcessId))) {
+            throw "V3 listener PID $($listener.OwningProcess) is not a descendant of service PID $($record.ProcessId)"
+        }
+    }
+}
+
 function Remove-StaleInstallation {
+    # Validate the named service before invoking an uninstaller that may stop or remove it.
+    Assert-ExistingV3ServiceOwnership
     $uninstaller = Get-ChildItem $installDir -Filter 'unins*.exe' -File -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
@@ -136,6 +188,7 @@ try {
     Record-Evidence 'install_data_preservation' @{ marker_preserved = $true; data_root = 'ProgramData\\ResearchOSV3' }
 
     $health = Wait-V3Health
+    Assert-V3OwnedLoopbackListener
     Record-Evidence 'installed_readiness' @{ status = $health.status; endpoint = '127.0.0.1'; port = $port }
 
     $listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop)
@@ -258,6 +311,7 @@ try {
     Record-Evidence 'in_place_upgrade' @{ exit_code = 0 }
 
     Wait-V3Health | Out-Null
+    Assert-V3OwnedLoopbackListener
     Assert-Marker $marker 'preserve-v3-candidate-data' 'V3 legacy-compatible data marker was not preserved by in-place upgrade'
     Assert-Marker $aliceDefaultMarker 'alice-default' 'Alice default user data was not preserved by in-place upgrade'
     Assert-Marker $aliceWorkMarker 'alice-work' 'Alice work profile data was not preserved by in-place upgrade'
