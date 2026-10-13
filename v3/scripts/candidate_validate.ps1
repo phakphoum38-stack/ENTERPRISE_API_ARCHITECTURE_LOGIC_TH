@@ -81,28 +81,42 @@ function Remove-StaleInstallation {
     }
 
     $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-    if ($service -and $service.Status -ne 'Stopped') {
-        Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
-    }
-    if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-        sc.exe delete $serviceName | Out-Null
-        Start-Sleep -Seconds 1
+    if ($service) {
+        if ($service.Status -ne 'Stopped') {
+            Stop-Service -Name $serviceName -Force -ErrorAction Stop
+            $service = Get-Service -Name $serviceName -ErrorAction Stop
+            $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
+        }
+        $deleteOutput = sc.exe delete $serviceName 2>&1
+        if ($LASTEXITCODE -ne 0 -and ($deleteOutput -join ' ') -notmatch 'marked for deletion') {
+            throw "Failed to delete existing V3 service: $($deleteOutput -join ' ')"
+        }
+        for ($attempt = 0; $attempt -lt 40; $attempt++) {
+            if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) { break }
+            Start-Sleep -Milliseconds 250
+        }
+        if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+            throw 'Existing V3 service remained after delete request'
+        }
     }
 
     $listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
-    foreach ($listener in $listeners) {
-        Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+    if ($listeners.Count -gt 0) {
+        $pids = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+        throw "Port $port remains occupied by process(es) $pids after service removal; refusing to terminate unrelated listeners"
     }
     if (Test-Path $installDir) {
-        Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item $installDir -Recurse -Force -ErrorAction Stop
     }
 }
 
 try {
+    # Seed a unique sentinel before any install/uninstall. Never erase ProgramData:
+    # this sentinel proves that stale cleanup and installation preserve existing data.
+    New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
+    Set-Content -Path $marker -Value 'preserve-v3-candidate-data' -Encoding utf8
     Remove-StaleInstallation
-    if (Test-Path $dataDir) {
-        Remove-Item $dataDir -Recurse -Force
-    }
+    Assert-Marker $marker 'preserve-v3-candidate-data' 'Existing V3 data was not preserved by stale-install cleanup'
 
     $installLog = Join-Path $env:RUNNER_TEMP 'research-os-v3-install.log'
     Invoke-Setup $installLog
@@ -116,6 +130,9 @@ try {
             throw "Installed V3 data directory is missing: $name"
         }
     }
+
+    Assert-Marker $marker 'preserve-v3-candidate-data' 'V3 user data marker was not preserved by installation'
+    Record-Evidence 'install_data_preservation' @{ marker_preserved = $true; data_root = 'ProgramData\\ResearchOSV3' }
 
     $health = Wait-V3Health
     Record-Evidence 'installed_readiness' @{ status = $health.status; endpoint = '127.0.0.1'; port = $port }
@@ -190,9 +207,7 @@ try {
         traversal_guard = $true
     }
 
-    New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
-    Set-Content -Path $marker -Value 'preserve-v3-candidate-data' -Encoding utf8
-    Record-Evidence 'install_data_preservation' @{ marker_created = $true; data_root = 'ProgramData\\ResearchOSV3'; user_scopes = $true }
+    Assert-Marker $marker 'preserve-v3-candidate-data' 'V3 user data marker changed during user-scope validation'
 
     New-Item -ItemType Directory -Path (Split-Path $auditPath -Parent) -Force | Out-Null
     Set-Content -Path $auditPath -Value '' -Encoding utf8
