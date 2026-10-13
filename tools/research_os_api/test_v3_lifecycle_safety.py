@@ -22,6 +22,12 @@ class V3LifecycleSafetyTests(unittest.TestCase):
         self.assertLess(seed, stale_cleanup_call)
         self.assertIn("Assert-Marker $marker 'preserve-v3-candidate-data'", source)
 
+    def test_candidate_validation_supports_local_windows_without_runner_temp(self):
+        source = CANDIDATE.read_text(encoding="utf-8")
+        self.assertIn("$tempRoot = $env:RUNNER_TEMP", source)
+        self.assertIn("[System.IO.Path]::GetTempPath()", source)
+        self.assertNotIn("Join-Path $env:RUNNER_TEMP", source)
+
     def test_service_cleanup_never_kills_a_listener_by_port_alone(self):
         source = SERVICE.read_text(encoding="utf-8")
         self.assertNotIn("Stop-Process -Id $listener.OwningProcess", source)
