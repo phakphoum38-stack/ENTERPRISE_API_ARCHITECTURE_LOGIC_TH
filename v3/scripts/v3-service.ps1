@@ -9,6 +9,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ($Port -lt 1 -or $Port -gt 65535) {
+    throw "Port must be between 1 and 65535: $Port"
+}
+
 $appRoot = Split-Path -Parent $PSScriptRoot
 $serviceExe = Join-Path $appRoot 'service\ResearchOS.V3.ServiceHost.exe'
 $v3Root = Join-Path $appRoot 'v3'
@@ -17,27 +21,29 @@ $dataDir = Join-Path $env:ProgramData 'ResearchOSV3'
 
 function Remove-V3Service {
     $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-    if ($service -and $service.Status -ne 'Stopped') {
-        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-        try {
+    if ($service) {
+        if ($service.Status -ne 'Stopped') {
+            Stop-Service -Name $ServiceName -Force -ErrorAction Stop
+            $service = Get-Service -Name $ServiceName -ErrorAction Stop
             $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
         }
-        catch { }
-    }
-
-    if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-        sc.exe delete $ServiceName | Out-Null
+        $deleteOutput = sc.exe delete $ServiceName 2>&1
+        if ($LASTEXITCODE -ne 0 -and ($deleteOutput -join ' ') -notmatch 'marked for deletion') {
+            throw "Failed to delete V3 service '$ServiceName': $($deleteOutput -join ' ')"
+        }
         for ($attempt = 0; $attempt -lt 40; $attempt++) {
-            if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) {
-                break
-            }
+            if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) { break }
             Start-Sleep -Milliseconds 250
         }
+        if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+            throw "V3 service '$ServiceName' remained after delete request"
+        }
     }
-
+    # A port may belong to an unrelated process. Never kill by port alone.
     $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
-    foreach ($listener in $listeners) {
-        Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+    if ($listeners.Count -gt 0) {
+        $pids = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+        throw "Port $Port remains occupied by process(es) $pids; refusing to terminate unrelated listeners"
     }
 }
 
