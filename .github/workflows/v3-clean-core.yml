@@ -70,7 +70,9 @@ jobs:
 
       - name: Run V3 Clean unit tests
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python -m unittest discover -s tests -v
           python scripts/evidence.py --output evidence/progress.json --stage unit_tests --status passed
 
@@ -79,19 +81,25 @@ jobs:
 
       - name: Run provider adapter smoke
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/provider_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage provider_adapter --status passed --data '{"secret_exposed":false,"transport":"fake-no-network"}'
 
       - name: Run V3 local service smoke
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/service_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage local_service --status passed --data '{"binding":"127.0.0.1","contract":"v3","max_capacity":46656,"structured_http_audit":true}'
 
       - name: Validate V3 data ownership
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/storage_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage data_ownership --status passed --data '{"idempotent":true,"preserves_existing_data":true,"secret_storage":"excluded"}'
 
@@ -123,7 +131,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $serviceName = "ResearchOSV3CleanCI-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $serviceName = "ResearchOSV3CleanCI-$($env:GITHUB_RUN_ID)-$($env:GITHUB_RUN_ATTEMPT)"
           $exe = Join-Path $env:RUNNER_TEMP 'v3-service-host\ResearchOS.V3.ServiceHost.exe'
           $root = (Resolve-Path 'v3').Path
           $python = (Get-Command python).Source
@@ -226,6 +234,7 @@ jobs:
               data_layout = @('sessions','database','artifacts','logs','evidence')
             } | ConvertTo-Json -Compress
             python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_lifecycle --status passed --data $data
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to record Windows service lifecycle evidence' }
             $validated = $true
           }
           finally {
@@ -405,6 +414,7 @@ jobs:
               audit_secret_fields = $false
             } | ConvertTo-Json -Compress
             python v3/scripts/evidence.py --output v3/evidence/progress.json --stage flutter_app_to_service_e2e --status passed --data $data
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to record Flutter-to-service E2E evidence' }
           }
           finally {
             if ($app -and -not $app.HasExited) {
@@ -422,7 +432,9 @@ jobs:
 
       - name: Run V3 Clean smoke test
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage core_smoke --status passed --data '{"max_capacity":46656,"assistant_6x3_capacity":216}'
 
