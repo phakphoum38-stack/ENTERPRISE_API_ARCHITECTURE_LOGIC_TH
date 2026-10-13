@@ -18,10 +18,11 @@ $serviceName = 'ResearchOSV3Service'
 $port = 8788
 $appExe = Join-Path $installDir 'app\research_os_v3_flutter.exe'
 $auditPath = Join-Path $dataDir 'logs\http-audit.jsonl'
-$marker = Join-Path $dataDir 'sessions\candidate-preservation.marker'
-$aliceDefaultMarker = Join-Path $dataDir 'users\alice\profiles\default\sessions\candidate-user.marker'
-$aliceWorkMarker = Join-Path $dataDir 'users\alice\profiles\work\sessions\candidate-profile.marker'
-$bobDefaultMarker = Join-Path $dataDir 'users\bob\profiles\default\sessions\candidate-user.marker'
+$runToken = [guid]::NewGuid().ToString('N')
+$marker = Join-Path $dataDir ("sessions\candidate-preservation-{0}.marker" -f $runToken)
+$aliceDefaultMarker = Join-Path $dataDir ("users\alice\profiles\default\sessions\candidate-user-{0}.marker" -f $runToken)
+$aliceWorkMarker = Join-Path $dataDir ("users\alice\profiles\work\sessions\candidate-profile-{0}.marker" -f $runToken)
+$bobDefaultMarker = Join-Path $dataDir ("users\bob\profiles\default\sessions\candidate-user-{0}.marker" -f $runToken)
 $app = $null
 
 function Record-Evidence([string]$Stage, [hashtable]$Data = @{}) {
