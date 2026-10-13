@@ -123,7 +123,7 @@ if (-not (Test-Path (Join-Path $v3Root 'scripts\run_service.py') -PathType Leaf)
 New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
 Remove-V3Service
 
-$binaryPath = "\`"$serviceExe\`" --root \`"$v3Root\`" --python \`"$pythonExe\`" --port $Port --data-dir \`"$dataDir\`" --service-name \`"$ServiceName\`""
+$binaryPath = "`"$serviceExe`" --root `"$v3Root`" --python `"$pythonExe`" --port $Port --data-dir `"$dataDir`" --service-name `"$ServiceName`""
 New-Service -Name $ServiceName -BinaryPathName $binaryPath -StartupType Automatic -DisplayName 'Research OS V3 Local Service' | Out-Null
 
 try {
