@@ -14,14 +14,22 @@ $setup = (Resolve-Path $SetupPath).Path
 $evidence = [System.IO.Path]::GetFullPath($EvidencePath)
 $installDir = Join-Path $env:ProgramFiles 'Research OS V3'
 $dataDir = Join-Path $env:ProgramData 'ResearchOSV3'
+# RUNNER_TEMP exists on GitHub-hosted runners but is normally unset in local Windows sessions.
+$tempRoot = $env:RUNNER_TEMP
+if ([string]::IsNullOrWhiteSpace($tempRoot)) {
+    $tempRoot = [System.IO.Path]::GetTempPath()
+}
+$tempRoot = [System.IO.Path]::GetFullPath($tempRoot)
+New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 $serviceName = 'ResearchOSV3Service'
 $port = 8788
 $appExe = Join-Path $installDir 'app\research_os_v3_flutter.exe'
 $auditPath = Join-Path $dataDir 'logs\http-audit.jsonl'
-$marker = Join-Path $dataDir 'sessions\candidate-preservation.marker'
-$aliceDefaultMarker = Join-Path $dataDir 'users\alice\profiles\default\sessions\candidate-user.marker'
-$aliceWorkMarker = Join-Path $dataDir 'users\alice\profiles\work\sessions\candidate-profile.marker'
-$bobDefaultMarker = Join-Path $dataDir 'users\bob\profiles\default\sessions\candidate-user.marker'
+$runToken = [guid]::NewGuid().ToString('N')
+$marker = Join-Path $dataDir ("sessions\candidate-preservation-{0}.marker" -f $runToken)
+$aliceDefaultMarker = Join-Path $dataDir ("users\alice\profiles\default\sessions\candidate-user-{0}.marker" -f $runToken)
+$aliceWorkMarker = Join-Path $dataDir ("users\alice\profiles\work\sessions\candidate-profile-{0}.marker" -f $runToken)
+$bobDefaultMarker = Join-Path $dataDir ("users\bob\profiles\default\sessions\candidate-user-{0}.marker" -f $runToken)
 $app = $null
 
 function Record-Evidence([string]$Stage, [hashtable]$Data = @{}) {
@@ -72,7 +80,59 @@ function Invoke-Setup([string]$LogPath) {
     }
 }
 
+function Assert-ExistingV3ServiceOwnership {
+    $escapedName = $serviceName.Replace("'", "''")
+    $record = Get-CimInstance Win32_Service -Filter "Name='$escapedName'" -ErrorAction SilentlyContinue
+    if (-not $record) { return }
+    $expected = Join-Path $installDir 'service\ResearchOS.V3.ServiceHost.exe'
+    if (-not (Test-Path $expected -PathType Leaf)) {
+        throw "Refusing to modify existing service '$serviceName': expected ServiceHost is missing, so ownership cannot be proven"
+    }
+    $match = [regex]::Match([string]$record.PathName, '^\s*"(?<exe>[^"]+\.exe)"|^\s*(?<exe>.+?\.exe)(?:\s|$)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $match.Success) {
+        throw "Refusing to modify existing service '$serviceName': could not parse ImagePath"
+    }
+    $actual = [System.IO.Path]::GetFullPath($match.Groups['exe'].Value)
+    $expected = [System.IO.Path]::GetFullPath($expected)
+    if (-not [string]::Equals($actual, $expected, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to modify service '$serviceName': ImagePath '$actual' is not the installed V3 ServiceHost '$expected'"
+    }
+}
+
+function Test-V3ProcessDescendant([int]$ProcessId, [int]$AncestorProcessId) {
+    $current = $ProcessId
+    $seen = [System.Collections.Generic.HashSet[int]]::new()
+    while ($current -gt 0 -and $seen.Add($current)) {
+        if ($current -eq $AncestorProcessId) { return $true }
+        $processRecord = Get-CimInstance Win32_Process -Filter "ProcessId = $current" -ErrorAction SilentlyContinue
+        if (-not $processRecord) { return $false }
+        $current = [int]$processRecord.ParentProcessId
+    }
+    return $false
+}
+
+function Assert-V3OwnedLoopbackListener {
+    $escapedName = $serviceName.Replace("'", "''")
+    $record = Get-CimInstance Win32_Service -Filter "Name='$escapedName'" -ErrorAction SilentlyContinue
+    if (-not $record -or $record.State -ne 'Running' -or [int]$record.ProcessId -le 0) {
+        throw "V3 service '$serviceName' is not running with a valid service PID"
+    }
+    Assert-ExistingV3ServiceOwnership
+    $listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop)
+    if ($listeners.Count -lt 1) { throw "V3 service has no listener on port $port" }
+    foreach ($listener in $listeners) {
+        if ($listener.LocalAddress -ne '127.0.0.1') {
+            throw "V3 listener is bound to '$($listener.LocalAddress)', not IPv4 loopback"
+        }
+        if (-not (Test-V3ProcessDescendant -ProcessId ([int]$listener.OwningProcess) -AncestorProcessId ([int]$record.ProcessId))) {
+            throw "V3 listener PID $($listener.OwningProcess) is not a descendant of service PID $($record.ProcessId)"
+        }
+    }
+}
+
 function Remove-StaleInstallation {
+    # Validate the named service before invoking an uninstaller that may stop or remove it.
+    Assert-ExistingV3ServiceOwnership
     $uninstaller = Get-ChildItem $installDir -Filter 'unins*.exe' -File -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
@@ -81,30 +141,44 @@ function Remove-StaleInstallation {
     }
 
     $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-    if ($service -and $service.Status -ne 'Stopped') {
-        Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
-    }
-    if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-        sc.exe delete $serviceName | Out-Null
-        Start-Sleep -Seconds 1
+    if ($service) {
+        if ($service.Status -ne 'Stopped') {
+            Stop-Service -Name $serviceName -Force -ErrorAction Stop
+            $service = Get-Service -Name $serviceName -ErrorAction Stop
+            $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
+        }
+        $deleteOutput = sc.exe delete $serviceName 2>&1
+        if ($LASTEXITCODE -ne 0 -and ($deleteOutput -join ' ') -notmatch 'marked for deletion') {
+            throw "Failed to delete existing V3 service: $($deleteOutput -join ' ')"
+        }
+        for ($attempt = 0; $attempt -lt 40; $attempt++) {
+            if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) { break }
+            Start-Sleep -Milliseconds 250
+        }
+        if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+            throw 'Existing V3 service remained after delete request'
+        }
     }
 
     $listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
-    foreach ($listener in $listeners) {
-        Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+    if ($listeners.Count -gt 0) {
+        $pids = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+        throw "Port $port remains occupied by process(es) $pids after service removal; refusing to terminate unrelated listeners"
     }
     if (Test-Path $installDir) {
-        Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item $installDir -Recurse -Force -ErrorAction Stop
     }
 }
 
 try {
+    # Seed a unique sentinel before any install/uninstall. Never erase ProgramData:
+    # this sentinel proves that stale cleanup and installation preserve existing data.
+    New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
+    Set-Content -Path $marker -Value 'preserve-v3-candidate-data' -Encoding utf8
     Remove-StaleInstallation
-    if (Test-Path $dataDir) {
-        Remove-Item $dataDir -Recurse -Force
-    }
+    Assert-Marker $marker 'preserve-v3-candidate-data' 'Existing V3 data was not preserved by stale-install cleanup'
 
-    $installLog = Join-Path $env:RUNNER_TEMP 'research-os-v3-install.log'
+    $installLog = Join-Path $tempRoot 'research-os-v3-install.log'
     Invoke-Setup $installLog
     Record-Evidence 'install' @{ exit_code = 0; mode = 'clean' }
 
@@ -117,7 +191,11 @@ try {
         }
     }
 
+    Assert-Marker $marker 'preserve-v3-candidate-data' 'V3 user data marker was not preserved by installation'
+    Record-Evidence 'install_data_preservation' @{ marker_preserved = $true; data_root = 'ProgramData\\ResearchOSV3' }
+
     $health = Wait-V3Health
+    Assert-V3OwnedLoopbackListener
     Record-Evidence 'installed_readiness' @{ status = $health.status; endpoint = '127.0.0.1'; port = $port }
 
     $listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop)
@@ -176,7 +254,7 @@ try {
     Set-Content -Path $aliceDefaultMarker -Value 'alice-default' -Encoding utf8
     Set-Content -Path $aliceWorkMarker -Value 'alice-work' -Encoding utf8
     Set-Content -Path $bobDefaultMarker -Value 'bob-default' -Encoding utf8
-    if (Test-Path (Join-Path (Split-Path $bobDefaultMarker -Parent) 'candidate-profile.marker')) {
+    if (Test-Path (Join-Path (Split-Path $bobDefaultMarker -Parent) (Split-Path $aliceWorkMarker -Leaf))) {
         throw 'Installed V3 cross-user marker leakage detected'
     }
     Record-Evidence 'user_isolation' @{
@@ -190,9 +268,7 @@ try {
         traversal_guard = $true
     }
 
-    New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
-    Set-Content -Path $marker -Value 'preserve-v3-candidate-data' -Encoding utf8
-    Record-Evidence 'install_data_preservation' @{ marker_created = $true; data_root = 'ProgramData\\ResearchOSV3'; user_scopes = $true }
+    Assert-Marker $marker 'preserve-v3-candidate-data' 'V3 user data marker changed during user-scope validation'
 
     New-Item -ItemType Directory -Path (Split-Path $auditPath -Parent) -Force | Out-Null
     Set-Content -Path $auditPath -Value '' -Encoding utf8
@@ -237,11 +313,12 @@ try {
     }
     $app = $null
 
-    $upgradeLog = Join-Path $env:RUNNER_TEMP 'research-os-v3-upgrade.log'
+    $upgradeLog = Join-Path $tempRoot 'research-os-v3-upgrade.log'
     Invoke-Setup $upgradeLog
     Record-Evidence 'in_place_upgrade' @{ exit_code = 0 }
 
     Wait-V3Health | Out-Null
+    Assert-V3OwnedLoopbackListener
     Assert-Marker $marker 'preserve-v3-candidate-data' 'V3 legacy-compatible data marker was not preserved by in-place upgrade'
     Assert-Marker $aliceDefaultMarker 'alice-default' 'Alice default user data was not preserved by in-place upgrade'
     Assert-Marker $aliceWorkMarker 'alice-work' 'Alice work profile data was not preserved by in-place upgrade'

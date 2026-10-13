@@ -2,6 +2,12 @@ name: Research OS V3 Clean Core
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'v3/**'
+      - 'packages/research_os_contracts/**'
+      - '.github/workflows/v3-clean-core.yml'
+      - 'tools/research_os_api/test_v3_lifecycle_safety.py'
   push:
     branches:
       - architecture/v3-clean
@@ -64,25 +70,36 @@ jobs:
 
       - name: Run V3 Clean unit tests
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python -m unittest discover -s tests -v
           python scripts/evidence.py --output evidence/progress.json --stage unit_tests --status passed
 
+      - name: Guard V3 lifecycle ownership and data preservation
+        run: python -m unittest discover -s tools/research_os_api -p test_v3_lifecycle_safety.py -v
+
       - name: Run provider adapter smoke
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/provider_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage provider_adapter --status passed --data '{"secret_exposed":false,"transport":"fake-no-network"}'
 
       - name: Run V3 local service smoke
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/service_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage local_service --status passed --data '{"binding":"127.0.0.1","contract":"v3","max_capacity":46656,"structured_http_audit":true}'
 
       - name: Validate V3 data ownership
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/storage_smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage data_ownership --status passed --data '{"idempotent":true,"preserves_existing_data":true,"secret_storage":"excluded"}'
 
@@ -114,7 +131,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $serviceName = 'ResearchOSV3CleanCI'
+          $serviceName = "ResearchOSV3CleanCI-$($env:GITHUB_RUN_ID)-$($env:GITHUB_RUN_ATTEMPT)"
           $exe = Join-Path $env:RUNNER_TEMP 'v3-service-host\ResearchOS.V3.ServiceHost.exe'
           $root = (Resolve-Path 'v3').Path
           $python = (Get-Command python).Source
@@ -129,16 +146,27 @@ jobs:
 
           $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
           if ($existing) {
-            if ($existing.Status -ne 'Stopped') { Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue }
-            sc.exe delete $serviceName | Out-Null
-            Start-Sleep -Seconds 1
+            throw "Refusing to modify CI service '$serviceName': run-scoped service name already exists"
           }
 
           $binaryPath = "`"$exe`" --root `"$root`" --python `"$python`" --port $port --data-dir `"$dataDir`" --service-name `"$serviceName`""
           $validated = $false
+          $createdByThisRun = $false
           $marker = Join-Path $dataDir 'sessions\service-preservation.marker'
+          function Test-CIProcessDescendant([int]$ProcessId, [int]$AncestorProcessId) {
+            $current = $ProcessId
+            $seen = [System.Collections.Generic.HashSet[int]]::new()
+            while ($current -gt 0 -and $seen.Add($current)) {
+              if ($current -eq $AncestorProcessId) { return $true }
+              $processRecord = Get-CimInstance Win32_Process -Filter "ProcessId = $current" -ErrorAction SilentlyContinue
+              if (-not $processRecord) { return $false }
+              $current = [int]$processRecord.ParentProcessId
+            }
+            return $false
+          }
           try {
             New-Service -Name $serviceName -BinaryPathName $binaryPath -StartupType Manual | Out-Null
+            $createdByThisRun = $true
             Start-Service -Name $serviceName
 
             $health = $null
@@ -155,6 +183,22 @@ jobs:
               if (Test-Path $outLog) { Get-Content $outLog -ErrorAction SilentlyContinue }
               if (Test-Path $errLog) { Get-Content $errLog -ErrorAction SilentlyContinue }
               throw 'Windows ServiceHost did not expose /health'
+            }
+            $serviceRecord = Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction Stop
+            $imageMatch = [regex]::Match([string]$serviceRecord.PathName, '^\s*"(?<exe>[^"]+\.exe)"|^\s*(?<exe>.+?\.exe)(?:\s|$)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            if (-not $imageMatch.Success) { throw "Unable to parse CI service ImagePath for '$serviceName'" }
+            $actualExe = [System.IO.Path]::GetFullPath($imageMatch.Groups['exe'].Value)
+            $expectedExe = [System.IO.Path]::GetFullPath($exe)
+            if (-not [string]::Equals($actualExe, $expectedExe, [System.StringComparison]::OrdinalIgnoreCase)) {
+              throw "Refusing to trust health response: CI service ImagePath '$actualExe' is not '$expectedExe'"
+            }
+            $ownedListeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop)
+            if ($ownedListeners.Count -lt 1) { throw 'V3 service health endpoint has no listening socket' }
+            foreach ($ownedListener in $ownedListeners) {
+              if ($ownedListener.LocalAddress -ne '127.0.0.1') { throw "V3 service listener is bound to '$($ownedListener.LocalAddress)'" }
+              if (-not (Test-CIProcessDescendant -ProcessId ([int]$ownedListener.OwningProcess) -AncestorProcessId ([int]$serviceRecord.ProcessId))) {
+                throw "Health response came from unowned listener PID $($ownedListener.OwningProcess)"
+              }
             }
 
             foreach ($name in @('sessions','database','artifacts','logs','evidence')) {
@@ -190,21 +234,45 @@ jobs:
               data_layout = @('sessions','database','artifacts','logs','evidence')
             } | ConvertTo-Json -Compress
             python v3/scripts/evidence.py --output v3/evidence/progress.json --stage windows_service_lifecycle --status passed --data $data
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to record Windows service lifecycle evidence' }
             $validated = $true
           }
           finally {
             $svc = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-            if ($svc -and $svc.Status -ne 'Stopped') {
-              Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
-              try { $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(15)) } catch { }
+            if ($svc) {
+              if (-not $createdByThisRun) {
+                throw "Refusing to modify CI service '$serviceName': this workflow did not create it"
+              }
+              $serviceRecord = Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction Stop
+              $imageMatch = [regex]::Match([string]$serviceRecord.PathName, '^\s*"(?<exe>[^"]+\.exe)"|^\s*(?<exe>.+?\.exe)(?:\s|$)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+              if (-not $imageMatch.Success) { throw "Unable to parse CI service ImagePath for '$serviceName' during cleanup" }
+              $actualExe = [System.IO.Path]::GetFullPath($imageMatch.Groups['exe'].Value)
+              $expectedExe = [System.IO.Path]::GetFullPath($exe)
+              if (-not [string]::Equals($actualExe, $expectedExe, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing to modify CI service '$serviceName': ImagePath '$actualExe' is not '$expectedExe'"
+              }
+              if ($svc.Status -ne 'Stopped') {
+                Stop-Service -Name $serviceName -Force -ErrorAction Stop
+                $svc = Get-Service -Name $serviceName -ErrorAction Stop
+                $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
+              }
+              $deleteOutput = sc.exe delete $serviceName 2>&1
+              if ($LASTEXITCODE -ne 0 -and ($deleteOutput -join ' ') -notmatch 'marked for deletion') {
+                throw "Could not delete CI service: $($deleteOutput -join ' ')"
+              }
+              for ($attempt = 0; $attempt -lt 40; $attempt++) {
+                if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) { break }
+                Start-Sleep -Milliseconds 250
+              }
+              if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+                throw 'CI service remained after delete request'
+              }
             }
-            if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-              sc.exe delete $serviceName | Out-Null
-              Start-Sleep -Seconds 1
-            }
+            # This workflow owns the service, not arbitrary listeners on its port.
             $leftovers = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
-            foreach ($connection in $leftovers) {
-              Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
+            if ($leftovers.Count -gt 0) {
+              $pids = @($leftovers | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+              throw "Port $port remains occupied by process(es) $pids; refusing to terminate unrelated listeners"
             }
           }
 
@@ -267,9 +335,13 @@ jobs:
           if (Test-Path $dataDir) { Remove-Item $dataDir -Recurse -Force }
           New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
           $audit = Join-Path $dataDir 'logs\http-audit.jsonl'
+          $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+          $listener.Start()
+          $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+          $listener.Stop()
           $env:RESEARCH_OS_V3_DATA_DIR = $dataDir
           $env:RESEARCH_OS_V3_HOST = '127.0.0.1'
-          $env:RESEARCH_OS_V3_PORT = '8788'
+          $env:RESEARCH_OS_V3_PORT = "$port"
 
           $service = $null
           $app = $null
@@ -283,7 +355,7 @@ jobs:
             $ready = $false
             for ($attempt = 0; $attempt -lt 40; $attempt++) {
               try {
-                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8788/health' -TimeoutSec 2
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
                 if ($health.status -eq 'ok') { $ready = $true; break }
               } catch { }
               Start-Sleep -Milliseconds 250
@@ -342,6 +414,7 @@ jobs:
               audit_secret_fields = $false
             } | ConvertTo-Json -Compress
             python v3/scripts/evidence.py --output v3/evidence/progress.json --stage flutter_app_to_service_e2e --status passed --data $data
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to record Flutter-to-service E2E evidence' }
           }
           finally {
             if ($app -and -not $app.HasExited) {
@@ -350,15 +423,18 @@ jobs:
             if ($service -and -not $service.HasExited) {
               Stop-Process -Id $service.Id -Force -ErrorAction SilentlyContinue
             }
-            $leftovers = @(Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)
-            foreach ($connection in $leftovers) {
-              Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
+            $leftovers = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+            if ($leftovers.Count -gt 0) {
+              $pids = @($leftovers | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+              throw "Port $port remains occupied by process(es) $pids after stopping the workflow-owned Python process"
             }
           }
 
       - name: Run V3 Clean smoke test
         working-directory: v3
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/smoke.py
           python scripts/evidence.py --output evidence/progress.json --stage core_smoke --status passed --data '{"max_capacity":46656,"assistant_6x3_capacity":216}'
 

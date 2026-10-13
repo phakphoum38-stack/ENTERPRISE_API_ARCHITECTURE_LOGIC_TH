@@ -7,6 +7,12 @@ on:
         description: Exact commit SHA to validate
         required: false
         type: string
+  pull_request:
+    paths:
+      - 'v3/**'
+      - 'packages/research_os_contracts/**'
+      - '.github/workflows/v3-candidate.yml'
+      - 'tools/research_os_api/test_v3_lifecycle_safety.py'
   push:
     branches:
       - architecture/v3-clean
@@ -24,7 +30,7 @@ concurrency:
 
 jobs:
   candidate:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[candidate]')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || contains(github.event.head_commit.message, '[candidate]')
     runs-on: windows-latest
     timeout-minutes: 60
     env:
@@ -36,6 +42,22 @@ jobs:
         with:
           ref: ${{ env.TARGET_SHA }}
 
+      - name: Verify exact source SHA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = $env:TARGET_SHA.ToLowerInvariant()
+          if ($expected -notmatch '^[0-9a-f]{40}$') {
+            throw "TARGET_SHA must be an exact 40-character commit SHA; received '$env:TARGET_SHA'"
+          }
+          $actual = (git rev-parse HEAD).Trim().ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Checked out SHA '$actual' does not match requested TARGET_SHA '$expected'"
+          }
+          $tree = (git rev-parse "$actual^{tree}").Trim().ToLowerInvariant()
+          "RESEARCH_OS_V3_TARGET_SHA=$actual" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RESEARCH_OS_V3_TREE_SHA=$tree" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Verified candidate commit=$actual tree=$tree"
       - name: Enable Windows long paths
         shell: pwsh
         run: |
@@ -70,6 +92,8 @@ jobs:
         run: |
           python -m unittest discover -s tests -v
           if ($LASTEXITCODE -ne 0) { throw 'V3 source unit tests failed' }
+          python -m unittest discover -s ../tools/research_os_api -p "test_v3_lifecycle_safety.py" -v
+          if ($LASTEXITCODE -ne 0) { throw 'V3 lifecycle safety regression tests failed' }
           python scripts/factory_execution_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'V3 factory execution smoke failed' }
           python scripts/evidence.py --output evidence/candidate-progress.json --stage source_validation --status passed --data '{"unit_tests":true,"factory_execution":true}'
@@ -181,7 +205,8 @@ jobs:
           $progressPath = 'v3\evidence\candidate-progress.json'
           $progress = Get-Content $progressPath -Raw | ConvertFrom-Json -AsHashtable
           $progress['candidate_status'] = 'passed'
-          $progress['target_sha'] = $env:TARGET_SHA
+          $progress['target_sha'] = $env:RESEARCH_OS_V3_TARGET_SHA
+          $progress['source_tree_sha'] = $env:RESEARCH_OS_V3_TREE_SHA
           $progress['run_id'] = '${{ github.run_id }}'
           $progress | ConvertTo-Json -Depth 30 | Set-Content $progressPath -Encoding utf8
 
@@ -189,7 +214,8 @@ jobs:
           $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           $manifest = [ordered]@{
             schema_version = 1
-            target_sha = $env:TARGET_SHA
+            target_sha = $env:RESEARCH_OS_V3_TARGET_SHA
+            source_tree_sha = $env:RESEARCH_OS_V3_TREE_SHA
             candidate_run = '${{ github.run_id }}'
             validation = 'passed'
             build_policy = 'single-windows-runner'
@@ -227,16 +253,19 @@ jobs:
         if: always()
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $serviceName = 'ResearchOSV3Service'
           $script = Join-Path $env:ProgramFiles 'Research OS V3\scripts\v3-service.ps1'
           if (Test-Path $script -PathType Leaf) {
-            try { & $script -Action uninstall } catch { }
+            & $script -Action uninstall
           }
-          $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-          if ($service -and $service.Status -ne 'Stopped') { Stop-Service $serviceName -Force -ErrorAction SilentlyContinue }
-          if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) { sc.exe delete $serviceName | Out-Null }
-          foreach ($listener in @(Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)) {
-            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+          if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+            throw 'V3 service remains after cleanup; refusing to report cleanup as successful'
+          }
+          $listeners = @(Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)
+          if ($listeners.Count -gt 0) {
+            $pids = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+            throw "Port 8788 remains occupied by process(es) $pids; refusing to terminate unrelated listeners"
           }
 
       - name: Upload incremental V3 candidate evidence
@@ -247,3 +276,15 @@ jobs:
           path: v3/evidence/candidate-progress.json
           if-no-files-found: warn
           retention-days: 30
+) {
+            throw "TARGET_SHA must be an exact 40-character commit SHA; received '$env:TARGET_SHA'"
+          }
+          $actual = (git rev-parse HEAD).Trim().ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Checked out SHA '$actual' does not match requested TARGET_SHA '$expected'"
+          }
+          $tree = (git rev-parse "$actual^{tree}").Trim().ToLowerInvariant()
+          "RESEARCH_OS_V3_TARGET_SHA=$actual" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RESEARCH_OS_V3_TREE_SHA=$tree" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Verified candidate commit=$actual tree=$tree"
+
