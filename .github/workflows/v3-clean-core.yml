@@ -68,6 +68,9 @@ jobs:
           python -m unittest discover -s tests -v
           python scripts/evidence.py --output evidence/progress.json --stage unit_tests --status passed
 
+      - name: Guard V3 lifecycle ownership and data preservation
+        run: python -m unittest discover -s tools/research_os_api -p test_v3_lifecycle_safety.py -v
+
       - name: Run provider adapter smoke
         working-directory: v3
         run: |
