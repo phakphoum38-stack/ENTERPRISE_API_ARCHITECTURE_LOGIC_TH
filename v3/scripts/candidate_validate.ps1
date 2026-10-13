@@ -194,7 +194,7 @@ try {
     Set-Content -Path $aliceDefaultMarker -Value 'alice-default' -Encoding utf8
     Set-Content -Path $aliceWorkMarker -Value 'alice-work' -Encoding utf8
     Set-Content -Path $bobDefaultMarker -Value 'bob-default' -Encoding utf8
-    if (Test-Path (Join-Path (Split-Path $bobDefaultMarker -Parent) 'candidate-profile.marker')) {
+    if (Test-Path (Join-Path (Split-Path $bobDefaultMarker -Parent) (Split-Path $aliceWorkMarker -Leaf))) {
         throw 'Installed V3 cross-user marker leakage detected'
     }
     Record-Evidence 'user_isolation' @{
