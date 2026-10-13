@@ -129,9 +129,22 @@ jobs:
 
           $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
           if ($existing) {
-            if ($existing.Status -ne 'Stopped') { Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue }
-            sc.exe delete $serviceName | Out-Null
-            Start-Sleep -Seconds 1
+            if ($existing.Status -ne 'Stopped') {
+              Stop-Service -Name $serviceName -Force -ErrorAction Stop
+              $existing = Get-Service -Name $serviceName -ErrorAction Stop
+              $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
+            }
+            $deleteOutput = sc.exe delete $serviceName 2>&1
+            if ($LASTEXITCODE -ne 0 -and ($deleteOutput -join ' ') -notmatch 'marked for deletion') {
+              throw "Could not remove stale CI service: $($deleteOutput -join ' ')"
+            }
+            for ($attempt = 0; $attempt -lt 40; $attempt++) {
+              if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) { break }
+              Start-Sleep -Milliseconds 250
+            }
+            if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+              throw 'Stale CI service remained after delete request'
+            }
           }
 
           $binaryPath = "`"$exe`" --root `"$root`" --python `"$python`" --port $port --data-dir `"$dataDir`" --service-name `"$serviceName`""
@@ -194,17 +207,29 @@ jobs:
           }
           finally {
             $svc = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-            if ($svc -and $svc.Status -ne 'Stopped') {
-              Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
-              try { $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(15)) } catch { }
+            if ($svc) {
+              if ($svc.Status -ne 'Stopped') {
+                Stop-Service -Name $serviceName -Force -ErrorAction Stop
+                $svc = Get-Service -Name $serviceName -ErrorAction Stop
+                $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
+              }
+              $deleteOutput = sc.exe delete $serviceName 2>&1
+              if ($LASTEXITCODE -ne 0 -and ($deleteOutput -join ' ') -notmatch 'marked for deletion') {
+                throw "Could not delete CI service: $($deleteOutput -join ' ')"
+              }
+              for ($attempt = 0; $attempt -lt 40; $attempt++) {
+                if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) { break }
+                Start-Sleep -Milliseconds 250
+              }
+              if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+                throw 'CI service remained after delete request'
+              }
             }
-            if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-              sc.exe delete $serviceName | Out-Null
-              Start-Sleep -Seconds 1
-            }
+            # This workflow owns the service, not arbitrary listeners on its port.
             $leftovers = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
-            foreach ($connection in $leftovers) {
-              Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
+            if ($leftovers.Count -gt 0) {
+              $pids = @($leftovers | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+              throw "Port $port remains occupied by process(es) $pids; refusing to terminate unrelated listeners"
             }
           }
 
@@ -267,9 +292,13 @@ jobs:
           if (Test-Path $dataDir) { Remove-Item $dataDir -Recurse -Force }
           New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
           $audit = Join-Path $dataDir 'logs\http-audit.jsonl'
+          $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+          $listener.Start()
+          $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+          $listener.Stop()
           $env:RESEARCH_OS_V3_DATA_DIR = $dataDir
           $env:RESEARCH_OS_V3_HOST = '127.0.0.1'
-          $env:RESEARCH_OS_V3_PORT = '8788'
+          $env:RESEARCH_OS_V3_PORT = "$port"
 
           $service = $null
           $app = $null
@@ -283,7 +312,7 @@ jobs:
             $ready = $false
             for ($attempt = 0; $attempt -lt 40; $attempt++) {
               try {
-                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8788/health' -TimeoutSec 2
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
                 if ($health.status -eq 'ok') { $ready = $true; break }
               } catch { }
               Start-Sleep -Milliseconds 250
@@ -350,9 +379,10 @@ jobs:
             if ($service -and -not $service.HasExited) {
               Stop-Process -Id $service.Id -Force -ErrorAction SilentlyContinue
             }
-            $leftovers = @(Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)
-            foreach ($connection in $leftovers) {
-              Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
+            $leftovers = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+            if ($leftovers.Count -gt 0) {
+              $pids = @($leftovers | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+              throw "Port $port remains occupied by process(es) $pids after stopping the workflow-owned Python process"
             }
           }
 
