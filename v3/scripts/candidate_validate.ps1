@@ -14,6 +14,13 @@ $setup = (Resolve-Path $SetupPath).Path
 $evidence = [System.IO.Path]::GetFullPath($EvidencePath)
 $installDir = Join-Path $env:ProgramFiles 'Research OS V3'
 $dataDir = Join-Path $env:ProgramData 'ResearchOSV3'
+# RUNNER_TEMP exists on GitHub-hosted runners but is normally unset in local Windows sessions.
+$tempRoot = $env:RUNNER_TEMP
+if ([string]::IsNullOrWhiteSpace($tempRoot)) {
+    $tempRoot = [System.IO.Path]::GetTempPath()
+}
+$tempRoot = [System.IO.Path]::GetFullPath($tempRoot)
+New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 $serviceName = 'ResearchOSV3Service'
 $port = 8788
 $appExe = Join-Path $installDir 'app\research_os_v3_flutter.exe'
@@ -171,7 +178,7 @@ try {
     Remove-StaleInstallation
     Assert-Marker $marker 'preserve-v3-candidate-data' 'Existing V3 data was not preserved by stale-install cleanup'
 
-    $installLog = Join-Path $env:RUNNER_TEMP 'research-os-v3-install.log'
+    $installLog = Join-Path $tempRoot 'research-os-v3-install.log'
     Invoke-Setup $installLog
     Record-Evidence 'install' @{ exit_code = 0; mode = 'clean' }
 
@@ -306,7 +313,7 @@ try {
     }
     $app = $null
 
-    $upgradeLog = Join-Path $env:RUNNER_TEMP 'research-os-v3-upgrade.log'
+    $upgradeLog = Join-Path $tempRoot 'research-os-v3-upgrade.log'
     Invoke-Setup $upgradeLog
     Record-Evidence 'in_place_upgrade' @{ exit_code = 0 }
 
