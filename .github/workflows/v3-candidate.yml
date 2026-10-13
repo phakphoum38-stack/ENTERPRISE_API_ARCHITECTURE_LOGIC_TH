@@ -227,16 +227,19 @@ jobs:
         if: always()
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $serviceName = 'ResearchOSV3Service'
           $script = Join-Path $env:ProgramFiles 'Research OS V3\scripts\v3-service.ps1'
           if (Test-Path $script -PathType Leaf) {
-            try { & $script -Action uninstall } catch { }
+            & $script -Action uninstall
           }
-          $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-          if ($service -and $service.Status -ne 'Stopped') { Stop-Service $serviceName -Force -ErrorAction SilentlyContinue }
-          if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) { sc.exe delete $serviceName | Out-Null }
-          foreach ($listener in @(Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)) {
-            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+          if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+            throw 'V3 service remains after cleanup; refusing to report cleanup as successful'
+          }
+          $listeners = @(Get-NetTCPConnection -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)
+          if ($listeners.Count -gt 0) {
+            $pids = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) -join ','
+            throw "Port 8788 remains occupied by process(es) $pids; refusing to terminate unrelated listeners"
           }
 
       - name: Upload incremental V3 candidate evidence
