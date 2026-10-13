@@ -2,6 +2,12 @@ name: Research OS V3 Clean Core
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'v3/**'
+      - 'packages/research_os_contracts/**'
+      - '.github/workflows/v3-clean-core.yml'
+      - 'tools/research_os_api/test_v3_lifecycle_safety.py'
   push:
     branches:
       - architecture/v3-clean
@@ -117,7 +123,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $serviceName = 'ResearchOSV3CleanCI'
+          $serviceName = "ResearchOSV3CleanCI-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           $exe = Join-Path $env:RUNNER_TEMP 'v3-service-host\ResearchOS.V3.ServiceHost.exe'
           $root = (Resolve-Path 'v3').Path
           $python = (Get-Command python).Source
@@ -132,29 +138,27 @@ jobs:
 
           $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
           if ($existing) {
-            if ($existing.Status -ne 'Stopped') {
-              Stop-Service -Name $serviceName -Force -ErrorAction Stop
-              $existing = Get-Service -Name $serviceName -ErrorAction Stop
-              $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(20))
-            }
-            $deleteOutput = sc.exe delete $serviceName 2>&1
-            if ($LASTEXITCODE -ne 0 -and ($deleteOutput -join ' ') -notmatch 'marked for deletion') {
-              throw "Could not remove stale CI service: $($deleteOutput -join ' ')"
-            }
-            for ($attempt = 0; $attempt -lt 40; $attempt++) {
-              if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) { break }
-              Start-Sleep -Milliseconds 250
-            }
-            if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-              throw 'Stale CI service remained after delete request'
-            }
+            throw "Refusing to modify CI service '$serviceName': run-scoped service name already exists"
           }
 
           $binaryPath = "`"$exe`" --root `"$root`" --python `"$python`" --port $port --data-dir `"$dataDir`" --service-name `"$serviceName`""
           $validated = $false
+          $createdByThisRun = $false
           $marker = Join-Path $dataDir 'sessions\service-preservation.marker'
+          function Test-CIProcessDescendant([int]$ProcessId, [int]$AncestorProcessId) {
+            $current = $ProcessId
+            $seen = [System.Collections.Generic.HashSet[int]]::new()
+            while ($current -gt 0 -and $seen.Add($current)) {
+              if ($current -eq $AncestorProcessId) { return $true }
+              $processRecord = Get-CimInstance Win32_Process -Filter "ProcessId = $current" -ErrorAction SilentlyContinue
+              if (-not $processRecord) { return $false }
+              $current = [int]$processRecord.ParentProcessId
+            }
+            return $false
+          }
           try {
             New-Service -Name $serviceName -BinaryPathName $binaryPath -StartupType Manual | Out-Null
+            $createdByThisRun = $true
             Start-Service -Name $serviceName
 
             $health = $null
@@ -171,6 +175,22 @@ jobs:
               if (Test-Path $outLog) { Get-Content $outLog -ErrorAction SilentlyContinue }
               if (Test-Path $errLog) { Get-Content $errLog -ErrorAction SilentlyContinue }
               throw 'Windows ServiceHost did not expose /health'
+            }
+            $serviceRecord = Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction Stop
+            $imageMatch = [regex]::Match([string]$serviceRecord.PathName, '^\s*"(?<exe>[^"]+\.exe)"|^\s*(?<exe>.+?\.exe)(?:\s|$)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            if (-not $imageMatch.Success) { throw "Unable to parse CI service ImagePath for '$serviceName'" }
+            $actualExe = [System.IO.Path]::GetFullPath($imageMatch.Groups['exe'].Value)
+            $expectedExe = [System.IO.Path]::GetFullPath($exe)
+            if (-not [string]::Equals($actualExe, $expectedExe, [System.StringComparison]::OrdinalIgnoreCase)) {
+              throw "Refusing to trust health response: CI service ImagePath '$actualExe' is not '$expectedExe'"
+            }
+            $ownedListeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop)
+            if ($ownedListeners.Count -lt 1) { throw 'V3 service health endpoint has no listening socket' }
+            foreach ($ownedListener in $ownedListeners) {
+              if ($ownedListener.LocalAddress -ne '127.0.0.1') { throw "V3 service listener is bound to '$($ownedListener.LocalAddress)'" }
+              if (-not (Test-CIProcessDescendant -ProcessId ([int]$ownedListener.OwningProcess) -AncestorProcessId ([int]$serviceRecord.ProcessId))) {
+                throw "Health response came from unowned listener PID $($ownedListener.OwningProcess)"
+              }
             }
 
             foreach ($name in @('sessions','database','artifacts','logs','evidence')) {
@@ -211,6 +231,17 @@ jobs:
           finally {
             $svc = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
             if ($svc) {
+              if (-not $createdByThisRun) {
+                throw "Refusing to modify CI service '$serviceName': this workflow did not create it"
+              }
+              $serviceRecord = Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction Stop
+              $imageMatch = [regex]::Match([string]$serviceRecord.PathName, '^\s*"(?<exe>[^"]+\.exe)"|^\s*(?<exe>.+?\.exe)(?:\s|$)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+              if (-not $imageMatch.Success) { throw "Unable to parse CI service ImagePath for '$serviceName' during cleanup" }
+              $actualExe = [System.IO.Path]::GetFullPath($imageMatch.Groups['exe'].Value)
+              $expectedExe = [System.IO.Path]::GetFullPath($exe)
+              if (-not [string]::Equals($actualExe, $expectedExe, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing to modify CI service '$serviceName': ImagePath '$actualExe' is not '$expectedExe'"
+              }
               if ($svc.Status -ne 'Stopped') {
                 Stop-Service -Name $serviceName -Force -ErrorAction Stop
                 $svc = Get-Service -Name $serviceName -ErrorAction Stop
