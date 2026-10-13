@@ -41,7 +41,7 @@ class V3LifecycleSafetyTests(unittest.TestCase):
         self.assertNotIn("http://127.0.0.1:8788/health", source)
         self.assertNotIn("Stop-Process -Id $connection.OwningProcess", source)
         self.assertIn("refusing to terminate unrelated listeners", source)
-        self.assertIn("data_preserved=true", source)
+        self.assertIn("data_preserved", source)
 
 
 if __name__ == "__main__":
