@@ -58,6 +58,8 @@ class V3LifecycleSafetyTests(unittest.TestCase):
         self.assertIn('$env:GITHUB_RUN_ID', source)
         self.assertIn("Refusing to modify CI service", source)
         self.assertIn("$createdByThisRun", source)
+        self.assertIn("set -euo pipefail", source)
+        self.assertIn("Failed to record Windows service lifecycle evidence", source)
 
     def test_clean_core_uses_dynamic_e2e_port_and_preserves_foreign_listeners(self):
         source = CLEAN_CORE_WORKFLOW.read_text(encoding="utf-8")
