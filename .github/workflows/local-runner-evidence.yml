@@ -14,10 +14,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: local-runner-evidence-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   manager-unit-tests:
     name: Python manager regression tests (hosted Windows)
@@ -40,6 +36,9 @@ jobs:
 
   validate-on-local-runner:
     name: Validate source and publish evidence
+    concurrency:
+      group: local-runner-evidence-${{ github.ref }}
+      cancel-in-progress: false
     runs-on: [self-hosted, Windows, X64, research-os-local]
     timeout-minutes: 45
     steps:
