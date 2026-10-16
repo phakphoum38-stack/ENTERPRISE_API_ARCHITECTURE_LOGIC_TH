@@ -36,15 +36,23 @@ class RunnerManagerHelperTests(unittest.TestCase):
             stdout="example-user/zeta\nexample-user/alpha\nbad value\n",
             stderr=None,
         )
+        env_snapshot: dict[str, str] = {}
+        def fake_run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            supplied_env = kwargs.get("env")
+            if isinstance(supplied_env, dict):
+                env_snapshot.update(supplied_env)
+            return result
+
+        original_token = os.environ.get("GH_TOKEN")
         with mock.patch.object(manager, "account_token", return_value="test-secret-token"), \
-             mock.patch.object(manager, "run_command", return_value=result) as run:
+             mock.patch.object(manager, "run_command", side_effect=fake_run) as run:
             repositories = manager.repositories_for("example-user")
 
         self.assertEqual(repositories, ["example-user/alpha", "example-user/zeta"])
-        args, kwargs = run.call_args
+        args, _kwargs = run.call_args
         self.assertEqual(args[0][:3], ["gh", "api", "user/repos"])
-        self.assertEqual(kwargs["env"]["GH_TOKEN"], "test-secret-token")
-        self.assertNotIn("GH_TOKEN", os.environ)
+        self.assertEqual(env_snapshot["GH_TOKEN"], "test-secret-token")
+        self.assertEqual(os.environ.get("GH_TOKEN"), original_token)
         self.assertNotIn("auth", args[0])
 
     def test_repository_discovery_rejects_invalid_lines(self) -> None:
@@ -53,8 +61,11 @@ class RunnerManagerHelperTests(unittest.TestCase):
             stdout="owner/repo\nnot-a-repository\nowner/repo\n",
             stderr=None,
         )
+        def fake_run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            return result
+
         with mock.patch.object(manager, "account_token", return_value="test-secret-token"), \
-             mock.patch.object(manager, "run_command", return_value=result):
+             mock.patch.object(manager, "run_command", side_effect=fake_run):
             repositories = manager.repositories_for("example-user")
 
         self.assertEqual(repositories, ["owner/repo"])
