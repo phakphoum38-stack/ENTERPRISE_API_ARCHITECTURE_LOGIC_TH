@@ -102,7 +102,7 @@ def account_token(login: str) -> str:
             "Run gh auth status and re-authenticate that account if needed."
         )
     token = result.stdout.strip()
-    if not token or "\\n" in token or "\\r" in token:
+    if not token or "\n" in token or "\r" in token:
         raise RuntimeError(f"GitHub CLI returned an invalid credential for {login}.")
     return token
 
@@ -123,7 +123,7 @@ def repositories_for(login: str) -> list[str]:
         env.pop("GH_TOKEN", None)
     if result.returncode != 0:
         raise RuntimeError(
-            f"Could not list repositories for {login}:\\n{result.stdout.strip()}"
+            f"Could not list repositories for {login}:\n{result.stdout.strip()}"
         )
     return sorted(
         {line.strip() for line in result.stdout.splitlines()
