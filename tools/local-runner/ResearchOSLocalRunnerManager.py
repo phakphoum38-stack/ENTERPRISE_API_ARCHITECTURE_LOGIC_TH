@@ -15,10 +15,9 @@ import subprocess
 import threading
 import time
 import tkinter as tk
-from contextlib import contextmanager
 from pathlib import Path
 from tkinter import messagebox, ttk
-from typing import Any, Iterator
+from typing import Any
 
 APP_NAME = "ResearchOS Local Runner Manager"
 REPOSITORY_DEFAULT = "phakphoum38-stack/ENTERPRISE_API_ARCHITECTURE_LOGIC_TH"
@@ -48,11 +47,14 @@ def save_settings(data: dict[str, Any]) -> None:
     os.replace(temp, path)
 
 
-def run_command(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
+def run_command(
+    args: list[str], timeout: int = 30, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         args, text=True, encoding="utf-8", errors="replace",
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout,
         check=False, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        env=env,
     )
 
 
@@ -89,46 +91,45 @@ def active_login() -> str | None:
     return active[0] if active else (accounts[0]["login"] if len(accounts) == 1 else None)
 
 
-def switch_account(login: str) -> None:
-    result = run_command(["gh", "auth", "switch", "--hostname", GITHUB_HOST, "--user", login])
+def account_token(login: str) -> str:
+    """Read a selected account token into memory only; never log or persist it."""
+    result = run_command([
+        "gh", "auth", "token", "--hostname", GITHUB_HOST, "--user", login
+    ])
     if result.returncode != 0:
-        raise RuntimeError(f"Could not select GitHub account {login}:\n{result.stdout.strip()}")
-
-
-@contextmanager
-def selected_account(login: str) -> Iterator[None]:
-    """Temporarily select a gh account, then restore the previous active account."""
-    previous = active_login()
-    changed = previous != login
-    if changed:
-        switch_account(login)
-    try:
-        yield
-    finally:
-        if changed and previous:
-            try:
-                switch_account(previous)
-            except Exception as exc:
-                raise RuntimeError(
-                    f"Could not restore the previously active GitHub account ({previous}). "
-                    f"Run gh auth switch --hostname github.com --user {previous} manually.\n\n{exc}"
-                ) from exc
+        raise RuntimeError(
+            f"Could not obtain a credential for GitHub account {login}. "
+            "Run gh auth status and re-authenticate that account if needed."
+        )
+    token = result.stdout.strip()
+    if not token or "\\n" in token or "\\r" in token:
+        raise RuntimeError(f"GitHub CLI returned an invalid credential for {login}.")
+    return token
 
 
 def repositories_for(login: str) -> list[str]:
-    with selected_account(login):
+    # GH_TOKEN scopes this child process to the chosen account without changing
+    # the user's global active gh account (which could race other tools).
+    token = account_token(login)
+    env = os.environ.copy()
+    env["GH_TOKEN"] = token
+    try:
         result = run_command(
-            ["gh", "api", "user/repos", "--paginate", "--jq", ".[].full_name"], timeout=90
+            ["gh", "api", "user/repos", "--paginate", "--jq", ".[].full_name"],
+            timeout=90, env=env,
         )
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Could not list repositories for {login}:\n{result.stdout.strip()}"
-            )
-        return sorted(
-            {line.strip() for line in result.stdout.splitlines()
-             if REPO_PATTERN.fullmatch(line.strip())},
-            key=str.casefold,
+    finally:
+        token = ""
+        env.pop("GH_TOKEN", None)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Could not list repositories for {login}:\\n{result.stdout.strip()}"
         )
+    return sorted(
+        {line.strip() for line in result.stdout.splitlines()
+         if REPO_PATTERN.fullmatch(line.strip())},
+        key=str.casefold,
+    )
 
 
 class RunnerManager:
@@ -357,21 +358,24 @@ class RunnerManager:
         threading.Thread(target=self.runner_worker, args=(login, repository, installer), daemon=True).start()
 
     def runner_worker(self, login: str, repository: str, installer: Path) -> None:
-        previous: str | None = None
-        switched = False
         exit_code = 1
+        token = ""
+        env: dict[str, str] | None = None
         try:
-            previous = active_login()
-            if previous != login:
-                switch_account(login)
-                switched = True
+            token = account_token(login)
+            env = os.environ.copy()
+            env["GH_TOKEN"] = token
             command = [
                 "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
                 "-File", str(installer), "-Repository", repository,
+                "-GitHubAccount", login,
             ]
-            self.post_log("Launching existing installer; output follows.")
+            self.post_log(
+                f"Launching the existing installer for {repository} with an isolated "
+                f"credential for {login}; the global gh account will not be switched."
+            )
             self.runner_process = subprocess.Popen(
-                command, cwd=str(installer.parent.parent.parent),
+                command, cwd=str(installer.parent.parent.parent), env=env,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 encoding="utf-8", errors="replace", bufsize=1,
                 creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
@@ -384,15 +388,12 @@ class RunnerManager:
         except Exception as exc:
             self.post_log(f"ERROR: {exc}")
         finally:
-            if switched and previous:
-                try:
-                    switch_account(previous)
-                    self.post_log(f"Restored previously active GitHub account: {previous}.")
-                except Exception as exc:
-                    self.post_log(
-                        f"IMPORTANT: Could not restore account {previous}. "
-                        f"Run gh auth switch --hostname github.com --user {previous} manually. Details: {exc}"
-                    )
+            # Remove references as soon as the child exits. The credential is
+            # never written to settings or emitted to the log.
+            if env is not None:
+                env.pop("GH_TOKEN", None)
+            token = ""
+            env = None
             self.root.after(0, self.runner_finished, exit_code)
 
     def runner_finished(self, exit_code: int) -> None:
