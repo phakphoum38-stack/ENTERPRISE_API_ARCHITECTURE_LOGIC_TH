@@ -1,0 +1,111 @@
+name: Local Runner Evidence
+
+on:
+  push:
+    branches:
+      - feat/local-ephemeral-runner-evidence
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to check out and verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-runner-evidence-\${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-on-local-runner:
+    name: Validate source and publish evidence
+    runs-on: [self-hosted, Windows, X64, research-os-local]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact workflow source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Capture runner and source identity
+        shell: pwsh
+        env:
+          EXPECTED_SHA: \${{ inputs.target_sha || github.sha }}
+          EVENT_NAME: \${{ github.event_name }}
+          RUN_ID: \${{ github.run_id }}
+          RUN_ATTEMPT: \${{ github.run_attempt }}
+          REPOSITORY: \${{ github.repository }}
+          REF_NAME: \${{ github.ref }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'evidence/local-runner'
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          $actual = (git rev-parse HEAD).Trim()
+          $gitExit = $LASTEXITCODE
+          if ($gitExit -ne 0) { throw "git rev-parse failed with exit code $gitExit" }
+          @"
+          repository=$env:REPOSITORY
+          event=$env:EVENT_NAME
+          ref=$env:REF_NAME
+          expected_sha=$env:EXPECTED_SHA
+          checked_out_sha=$actual
+          run_id=$env:RUN_ID
+          run_attempt=$env:RUN_ATTEMPT
+          runner_name=$env:RUNNER_NAME
+          runner_os=$env:RUNNER_OS
+          runner_arch=$env:RUNNER_ARCH
+          powershell=$($PSVersionTable.PSVersion)
+          utc=$([DateTime]::UtcNow.ToString('o'))
+          "@ | Set-Content -LiteralPath (Join-Path $evidence 'runner-manifest.txt') -Encoding utf8
+          git status --short | Out-File -FilePath (Join-Path $evidence 'git-status.txt') -Encoding utf8
+          if ($actual -ne $env:EXPECTED_SHA) {
+            "SHA_CHECK=FAIL expected=$env:EXPECTED_SHA actual=$actual" | Add-Content (Join-Path $evidence 'runner-manifest.txt')
+            throw "SOURCE_SHA_MISMATCH: expected=$env:EXPECTED_SHA actual=$actual"
+          }
+          "SHA_CHECK=PASS" | Add-Content (Join-Path $evidence 'runner-manifest.txt')
+
+      - name: Run source validators and preserve exit codes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'evidence/local-runner'
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          $overall = 0
+
+          python --version 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'python-version.txt')
+          if ($LASTEXITCODE -ne 0) {
+            "python-version: exit=$LASTEXITCODE" | Add-Content (Join-Path $evidence 'validation-exit-codes.txt')
+            throw "Python is required on the local runner."
+          }
+
+          python -m pip install --disable-pip-version-check pyyaml 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'dependency-install.log')
+          $installCode = $LASTEXITCODE
+          "pyyaml-install: exit=$installCode" | Add-Content (Join-Path $evidence 'validation-exit-codes.txt')
+          if ($installCode -ne 0) { throw "Could not install validator dependency; see evidence artifact." }
+
+          $checks = @(
+            @{ Name = 'validate_generate_orchestrator'; Path = 'tools/validate_generate_orchestrator.py' },
+            @{ Name = 'validate_generate_determinism'; Path = 'tools/validate_generate_determinism.py' }
+          )
+          foreach ($check in $checks) {
+            $log = Join-Path $evidence ($check.Name + '.log')
+            "=== $($check.Name) ===" | Tee-Object -FilePath $log
+            python $check.Path 2>&1 | Tee-Object -FilePath $log -Append
+            $code = $LASTEXITCODE
+            "$($check.Name): exit=$code" | Tee-Object -FilePath (Join-Path $evidence 'validation-exit-codes.txt') -Append
+            if ($code -ne 0) { $overall = 1 }
+          }
+
+          if ($overall -ne 0) { exit $overall }
+          "ALL_VALIDATORS=PASS" | Set-Content -LiteralPath (Join-Path $evidence 'validation-summary.txt') -Encoding utf8
+
+      - name: Upload evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: local-runner-evidence-\${{ github.run_id }}-\${{ github.run_attempt }}
+          path: evidence/local-runner/**
+          if-no-files-found: warn
+          retention-days: 14
