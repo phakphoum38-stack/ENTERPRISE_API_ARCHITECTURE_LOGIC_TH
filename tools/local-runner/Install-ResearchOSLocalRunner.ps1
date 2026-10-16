@@ -7,140 +7,64 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-if (-not (Get-Command "gh" -ErrorAction SilentlyContinue)) {
-    throw "GitHub CLI (gh) is required. Install it and sign in before running this script."
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    throw "GitHub CLI is required."
 }
 gh auth status --hostname github.com
-if ($LASTEXITCODE -ne 0) { throw "GitHub CLI authentication is not ready." }
+if ($LASTEXITCODE -ne 0) { throw "GitHub CLI authentication failed." }
 if ($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw "Repository must be owner/name." }
 
 if (Test-Path -LiteralPath $InstallRoot) {
-    $existing = @(Get-ChildItem -LiteralPath $InstallRoot -Force -ErrorAction Stop)
-    if ($existing.Count -gt 0) {
-        throw "InstallRoot is not empty; refusing to overwrite or delete existing files: $InstallRoot"
+    if (@(Get-ChildItem -LiteralPath $InstallRoot -Force).Count -gt 0) {
+        throw "InstallRoot is not empty; refusing to overwrite: $InstallRoot"
     }
 } else {
     New-Item -ItemType Directory -Path $InstallRoot | Out-Null
 }
 
-# Download the official GitHub Actions runner release for Windows x64.
-$headers = @{ "User-Agent" = "ResearchOS-LocalRunner-Bootstrap"; "Accept" = "application/vnd.github+json" }
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/actions/runner/releases/latest" -Headers $headers
+$release = Invoke-RestMethod -Uri "https://api.github.com/repos/actions/runner/releases/latest" -Headers @{ "User-Agent" = "ResearchOS-LocalRunner" }
 $asset = @($release.assets | Where-Object { $_.name -match '^actions-runner-win-x64-.*\.zip$' } | Select-Object -First 1)
-if ($asset.Count -ne 1) { throw "Could not identify the official Windows x64 runner asset in the latest release." }
-
-$zipPath = Join-Path $InstallRoot $asset[0].name
-Invoke-WebRequest -Uri $asset[0].browser_download_url -OutFile $zipPath -Headers @{ "User-Agent" = "ResearchOS-LocalRunner-Bootstrap" }
-$zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-$publishedDigest = [string]$asset[0].digest
-if ($publishedDigest -notmatch '^sha256:([a-fA-F0-9]{64})
-Remove-Item -LiteralPath $zipPath -Force
-
-# Registration tokens are short-lived. Never write the token to disk or print it.
-$tokenResponse = gh api "repos/$Repository/actions/runners/registration-token" --method POST
-if ($LASTEXITCODE -ne 0) { throw "Could not obtain a runner registration token. Repository admin permission may be required." }
-$tokenObject = $tokenResponse | ConvertFrom-Json
-$registrationToken = [string]$tokenObject.token
-if ([string]::IsNullOrWhiteSpace($registrationToken)) { throw "GitHub returned an empty registration token." }
-
-$runnerName = "research-os-local-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))-$PID"
-Push-Location $InstallRoot
-try {
-    $configArgs = @(
-        "--url", "https://github.com/$Repository",
-        "--token", $registrationToken,
-        "--name", $runnerName,
-        "--labels", "research-os-local",
-        "--work", "_work",
-        "--ephemeral",
-        "--unattended"
-    )
-    & .\config.cmd @configArgs
-    if ($LASTEXITCODE -ne 0) { throw "Runner configuration failed with exit code $LASTEXITCODE." }
-} finally {
-    $registrationToken = $null
-    $tokenObject = $null
-    [GC]::Collect()
-    Pop-Location
-}
-
-@"
-Repository: $Repository
-Runner name: $runnerName
-Runner mode: ephemeral
-Custom label: research-os-local
-Runner release: $($release.tag_name)
-Downloaded asset: $($asset[0].name)
-Downloaded asset SHA-256: $zipHash
-Configured UTC: $([DateTime]::UtcNow.ToString('o'))
-"@ | Set-Content -LiteralPath (Join-Path $InstallRoot "research-os-runner-install-manifest.txt") -Encoding utf8
-
-Write-Host ""
-Write-Host "Runner configured. Starting it in the foreground; keep this window open."
-Write-Host "Dispatch .github/workflows/local-runner-evidence.yml from GitHub and select the target branch/SHA."
-Write-Host "The runner is ephemeral and will accept one job. Logs and install manifest remain at: $InstallRoot"
-Push-Location $InstallRoot
-try {
-    & .\run.cmd
-    $runnerExit = $LASTEXITCODE
-} finally {
-    Pop-Location
-}
-Write-Host "Runner process exit code: $runnerExit"
-exit $runnerExit
-) {
-    throw "Official release metadata did not provide a SHA-256 digest; refusing to configure an unverified runner archive."
-}
+if ($asset.Count -ne 1) { throw "Official Windows x64 runner archive was not found." }
+if ([string]$asset[0].digest -notmatch '^sha256:([a-fA-F0-9]{64})$') { throw "Release has no valid SHA-256 digest; refusing unverified download." }
 $expectedHash = $Matches[1].ToLowerInvariant()
-if ($zipHash -ne $expectedHash) {
-    throw "RUNNER_ARCHIVE_SHA256_MISMATCH: expected=$expectedHash actual=$zipHash"
-}
+$zipPath = Join-Path $InstallRoot $asset[0].name
+Invoke-WebRequest -Uri $asset[0].browser_download_url -OutFile $zipPath -Headers @{ "User-Agent" = "ResearchOS-LocalRunner" }
+$actualHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualHash -ne $expectedHash) { throw "RUNNER_ARCHIVE_SHA256_MISMATCH expected=$expectedHash actual=$actualHash" }
 Expand-Archive -LiteralPath $zipPath -DestinationPath $InstallRoot
 Remove-Item -LiteralPath $zipPath -Force
 
-# Registration tokens are short-lived. Never write the token to disk or print it.
-$tokenResponse = gh api "repos/$Repository/actions/runners/registration-token" --method POST
-if ($LASTEXITCODE -ne 0) { throw "Could not obtain a runner registration token. Repository admin permission may be required." }
-$tokenObject = $tokenResponse | ConvertFrom-Json
-$registrationToken = [string]$tokenObject.token
-if ([string]::IsNullOrWhiteSpace($registrationToken)) { throw "GitHub returned an empty registration token." }
+$tokenJson = gh api "repos/$Repository/actions/runners/registration-token" --method POST
+if ($LASTEXITCODE -ne 0) { throw "Could not obtain runner registration token; repository admin permission may be required." }
+$token = [string](($tokenJson | ConvertFrom-Json).token)
+if ([string]::IsNullOrWhiteSpace($token)) { throw "GitHub returned an empty registration token." }
 
-$runnerName = "research-os-local-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))-$PID"
+$name = "research-os-local-" + [DateTime]::UtcNow.ToString("yyyyMMddHHmmss") + "-" + $PID
 Push-Location $InstallRoot
 try {
-    $configArgs = @(
-        "--url", "https://github.com/$Repository",
-        "--token", $registrationToken,
-        "--name", $runnerName,
-        "--labels", "research-os-local",
-        "--work", "_work",
-        "--ephemeral",
-        "--unattended"
-    )
-    & .\config.cmd @configArgs
-    if ($LASTEXITCODE -ne 0) { throw "Runner configuration failed with exit code $LASTEXITCODE." }
+    & .\config.cmd --url "https://github.com/$Repository" --token $token --name $name --labels "research-os-local" --work "_work" --ephemeral --unattended
+    if ($LASTEXITCODE -ne 0) { throw "Runner configuration failed: exit $LASTEXITCODE" }
 } finally {
-    $registrationToken = $null
-    $tokenObject = $null
+    $token = $null
+    $tokenJson = $null
     [GC]::Collect()
     Pop-Location
 }
 
-@"
-Repository: $Repository
-Runner name: $runnerName
-Runner mode: ephemeral
-Custom label: research-os-local
-Runner release: $($release.tag_name)
-Downloaded asset: $($asset[0].name)
-Downloaded asset SHA-256: $zipHash
-Configured UTC: $([DateTime]::UtcNow.ToString('o'))
-"@ | Set-Content -LiteralPath (Join-Path $InstallRoot "research-os-runner-install-manifest.txt") -Encoding utf8
+$manifest = @(
+    "Repository=$Repository"
+    "RunnerName=$name"
+    "Mode=ephemeral"
+    "Label=research-os-local"
+    "Release=$($release.tag_name)"
+    "Archive=$($asset[0].name)"
+    "ArchiveSHA256=$actualHash"
+    "ConfiguredUTC=$([DateTime]::UtcNow.ToString('o'))"
+)
+$manifest | Set-Content -LiteralPath (Join-Path $InstallRoot "research-os-runner-install-manifest.txt") -Encoding utf8
 
-Write-Host ""
-Write-Host "Runner configured. Starting it in the foreground; keep this window open."
-Write-Host "Dispatch .github/workflows/local-runner-evidence.yml from GitHub and select the target branch/SHA."
-Write-Host "The runner is ephemeral and will accept one job. Logs and install manifest remain at: $InstallRoot"
+Write-Host "Runner configured. Keep this window open while the single job runs."
+Write-Host "Install manifest: $(Join-Path $InstallRoot 'research-os-runner-install-manifest.txt')"
 Push-Location $InstallRoot
 try {
     & .\run.cmd
