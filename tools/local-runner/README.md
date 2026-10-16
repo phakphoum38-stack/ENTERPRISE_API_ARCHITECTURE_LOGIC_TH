@@ -27,7 +27,7 @@ The GUI provides:
 - a start button that calls the existing PowerShell installer with the selected repository;
 - a trust confirmation before any runner starts.
 
-The app does not store GitHub tokens. It uses GitHub CLI authentication. To list repositories under a non-active account, it temporarily switches the active GitHub CLI account and restores the prior account afterward. When a runner is active, keep the GUI open so it can restore the previous account when the process ends. If the app is forcibly terminated, check the active account with `gh auth status` and restore it with `gh auth switch --hostname github.com --user YOUR_PREVIOUS_LOGIN` if necessary.
+The app does not store GitHub tokens. It reads the selected account's credential from GitHub CLI into memory and passes it as `GH_TOKEN` only to the repository-query or installer process. It does not change the globally active GitHub CLI account, avoiding races with other terminals and tools. The installer verifies the credential's account through the GitHub API before registering a runner. 
 
 Settings store preferences only; they do not store access tokens, registration tokens, or repository secrets. The account/repository selectors are not proof of permissions; GitHub remains authoritative when the installer requests a short-lived runner registration token.
 
