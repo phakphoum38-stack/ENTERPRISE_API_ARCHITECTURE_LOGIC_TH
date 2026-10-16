@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: local-runner-evidence-\${{ github.ref }}
+  group: local-runner-evidence-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -32,12 +32,12 @@ jobs:
       - name: Capture runner and source identity
         shell: pwsh
         env:
-          EXPECTED_SHA: \${{ inputs.target_sha || github.sha }}
-          EVENT_NAME: \${{ github.event_name }}
-          RUN_ID: \${{ github.run_id }}
-          RUN_ATTEMPT: \${{ github.run_attempt }}
-          REPOSITORY: \${{ github.repository }}
-          REF_NAME: \${{ github.ref }}
+          EXPECTED_SHA: ${{ inputs.target_sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref }}
         run: |
           $ErrorActionPreference = 'Stop'
           $evidence = Join-Path $env:GITHUB_WORKSPACE 'evidence/local-runner'
@@ -105,7 +105,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: local-runner-evidence-\${{ github.run_id }}-\${{ github.run_attempt }}
+          name: local-runner-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: evidence/local-runner/**
           if-no-files-found: warn
           retention-days: 14
