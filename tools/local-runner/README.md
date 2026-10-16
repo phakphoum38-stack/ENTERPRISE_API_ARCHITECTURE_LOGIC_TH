@@ -31,6 +31,14 @@ The app does not store GitHub tokens. It reads the selected account's credential
 
 Settings store preferences only; they do not store access tokens, registration tokens, or repository secrets. The account/repository selectors are not proof of permissions; GitHub remains authoritative when the installer requests a short-lived runner registration token.
 
+Run the standard-library regression tests from the repository root with:
+
+```powershell
+python -m unittest discover -s tools/local-runner -p 'test_local_runner_manager.py' -v
+```
+
+The dedicated workflow runs these tests on a GitHub-hosted Windows runner as well as checking the selected source SHA on the local runner.
+
 ## Manual install fallback
 
 Open PowerShell in a trusted checkout and inspect `tools/local-runner/Install-ResearchOSLocalRunner.ps1` first:
