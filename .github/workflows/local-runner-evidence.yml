@@ -87,6 +87,12 @@ jobs:
           "local-runner-manager-syntax: exit=$managerCode" | Add-Content (Join-Path $evidence 'validation-exit-codes.txt')
           if ($managerCode -ne 0) { $overall = 1 }
 
+          $unitLog = Join-Path $evidence 'local-runner-manager-tests.log'
+          python -m unittest discover -s tools/local-runner -p 'test_local_runner_manager.py' 2>&1 | Tee-Object -FilePath $unitLog
+          $unitCode = $LASTEXITCODE
+          "local-runner-manager-tests: exit=$unitCode" | Add-Content (Join-Path $evidence 'validation-exit-codes.txt')
+          if ($unitCode -ne 0) { $overall = 1 }
+
           python -m pip install --disable-pip-version-check pyyaml 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'dependency-install.log')
           $installCode = $LASTEXITCODE
           "pyyaml-install: exit=$installCode" | Add-Content (Join-Path $evidence 'validation-exit-codes.txt')
