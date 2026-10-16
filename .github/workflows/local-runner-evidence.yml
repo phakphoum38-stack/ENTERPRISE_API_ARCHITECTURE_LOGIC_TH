@@ -81,6 +81,12 @@ jobs:
             throw "Python is required on the local runner."
           }
 
+          $managerLog = Join-Path $evidence 'local-runner-manager-syntax.log'
+          python -c "import ast,pathlib; ast.parse(pathlib.Path('tools/local-runner/ResearchOSLocalRunnerManager.py').read_text(encoding='utf-8')); print('LOCAL_RUNNER_MANAGER_SYNTAX=PASS')" 2>&1 | Tee-Object -FilePath $managerLog
+          $managerCode = $LASTEXITCODE
+          "local-runner-manager-syntax: exit=$managerCode" | Add-Content (Join-Path $evidence 'validation-exit-codes.txt')
+          if ($managerCode -ne 0) { $overall = 1 }
+
           python -m pip install --disable-pip-version-check pyyaml 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'dependency-install.log')
           $installCode = $LASTEXITCODE
           "pyyaml-install: exit=$installCode" | Add-Content (Join-Path $evidence 'validation-exit-codes.txt')
