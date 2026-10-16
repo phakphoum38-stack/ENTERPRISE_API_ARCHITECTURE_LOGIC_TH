@@ -101,6 +101,16 @@ stages:
     dispatchable: true
     role: sha-locked-validation-gate
 
+  - stage: 78
+    file: candidate.yml
+    dispatchable: true
+    role: windows-candidate-build
+
+  - stage: 79
+    file: v3-candidate.yml
+    dispatchable: true
+    role: v3-release-candidate
+
   - stage: 80
     file: release.yml
     dispatchable: true
@@ -110,11 +120,6 @@ stages:
     file: candidate-trigger.yml
     dispatchable: false
     role: trigger-only
-
-  - stage: 91
-    file: candidate.yml
-    dispatchable: true
-    role: candidate-build
 
   - stage: 100
     file: generate-orchestrator.yml
