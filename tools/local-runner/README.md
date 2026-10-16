@@ -16,11 +16,11 @@ The runner executes repository code on your computer. Only dispatch it against b
 
 Open PowerShell in a trusted checkout of this repository and inspect tools/local-runner/Install-ResearchOSLocalRunner.ps1 first. Then run:
 
-\`\`\`powershell
+```powershell
 gh auth status --hostname github.com
 Set-ExecutionPolicy -Scope Process Bypass
 .\tools\local-runner\Install-ResearchOSLocalRunner.ps1
-\`\`\`
+```
 
 The default installation directory is D:\ResearchOS-LocalRunner to avoid consuming space on a nearly-full C: drive. If that directory exists and is not empty, the script stops without overwriting or deleting its contents. Use -InstallRoot to choose another empty directory.
 
