@@ -32,6 +32,69 @@ if ($asset.Count -ne 1) { throw "Could not identify the official Windows x64 run
 $zipPath = Join-Path $InstallRoot $asset[0].name
 Invoke-WebRequest -Uri $asset[0].browser_download_url -OutFile $zipPath -Headers @{ "User-Agent" = "ResearchOS-LocalRunner-Bootstrap" }
 $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$publishedDigest = [string]$asset[0].digest
+if ($publishedDigest -notmatch '^sha256:([a-fA-F0-9]{64})
+Remove-Item -LiteralPath $zipPath -Force
+
+# Registration tokens are short-lived. Never write the token to disk or print it.
+$tokenResponse = gh api "repos/$Repository/actions/runners/registration-token" --method POST
+if ($LASTEXITCODE -ne 0) { throw "Could not obtain a runner registration token. Repository admin permission may be required." }
+$tokenObject = $tokenResponse | ConvertFrom-Json
+$registrationToken = [string]$tokenObject.token
+if ([string]::IsNullOrWhiteSpace($registrationToken)) { throw "GitHub returned an empty registration token." }
+
+$runnerName = "research-os-local-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))-$PID"
+Push-Location $InstallRoot
+try {
+    $configArgs = @(
+        "--url", "https://github.com/$Repository",
+        "--token", $registrationToken,
+        "--name", $runnerName,
+        "--labels", "research-os-local",
+        "--work", "_work",
+        "--ephemeral",
+        "--unattended"
+    )
+    & .\config.cmd @configArgs
+    if ($LASTEXITCODE -ne 0) { throw "Runner configuration failed with exit code $LASTEXITCODE." }
+} finally {
+    $registrationToken = $null
+    $tokenObject = $null
+    [GC]::Collect()
+    Pop-Location
+}
+
+@"
+Repository: $Repository
+Runner name: $runnerName
+Runner mode: ephemeral
+Custom label: research-os-local
+Runner release: $($release.tag_name)
+Downloaded asset: $($asset[0].name)
+Downloaded asset SHA-256: $zipHash
+Configured UTC: $([DateTime]::UtcNow.ToString('o'))
+"@ | Set-Content -LiteralPath (Join-Path $InstallRoot "research-os-runner-install-manifest.txt") -Encoding utf8
+
+Write-Host ""
+Write-Host "Runner configured. Starting it in the foreground; keep this window open."
+Write-Host "Dispatch .github/workflows/local-runner-evidence.yml from GitHub and select the target branch/SHA."
+Write-Host "The runner is ephemeral and will accept one job. Logs and install manifest remain at: $InstallRoot"
+Push-Location $InstallRoot
+try {
+    & .\run.cmd
+    $runnerExit = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
+Write-Host "Runner process exit code: $runnerExit"
+exit $runnerExit
+) {
+    throw "Official release metadata did not provide a SHA-256 digest; refusing to configure an unverified runner archive."
+}
+$expectedHash = $Matches[1].ToLowerInvariant()
+if ($zipHash -ne $expectedHash) {
+    throw "RUNNER_ARCHIVE_SHA256_MISMATCH: expected=$expectedHash actual=$zipHash"
+}
 Expand-Archive -LiteralPath $zipPath -DestinationPath $InstallRoot
 Remove-Item -LiteralPath $zipPath -Force
 
