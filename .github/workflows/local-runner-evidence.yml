@@ -19,6 +19,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  manager-unit-tests:
+    name: Python manager regression tests (hosted Windows)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.target_sha || github.sha }}
+          persist-credentials: false
+      - name: Verify manager syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -c "import ast,pathlib; ast.parse(pathlib.Path('tools/local-runner/ResearchOSLocalRunnerManager.py').read_text(encoding='utf-8')); print('LOCAL_RUNNER_MANAGER_SYNTAX=PASS')"
+      - name: Run manager regression tests
+        shell: pwsh
+        run: python -m unittest discover -s tools/local-runner -p 'test_local_runner_manager.py' -v
+
   validate-on-local-runner:
     name: Validate source and publish evidence
     runs-on: [self-hosted, Windows, X64, research-os-local]
