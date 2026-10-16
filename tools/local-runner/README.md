@@ -24,11 +24,13 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 The default installation directory is D:\ResearchOS-LocalRunner to avoid consuming space on a nearly-full C: drive. If that directory exists and is not empty, the script stops without overwriting or deleting its contents. Use -InstallRoot to choose another empty directory.
 
-The script downloads the official latest Windows x64 runner release from actions/runner, records the downloaded archive's SHA-256, requests a short-lived registration token through gh, configures the runner as --ephemeral, and starts it in the foreground. The token is not written to a file or printed. Keep the PowerShell window open while the job runs.
+The script downloads the official latest Windows x64 runner release from actions/runner, compares the downloaded archive's SHA-256 against the digest published in GitHub release metadata, requests a short-lived registration token through gh, configures the runner as --ephemeral, and starts it in the foreground. The token is not written to a file or printed. Keep the PowerShell window open while the job runs.
 
 ## Evidence workflow
 
 .github/workflows/local-runner-evidence.yml targets only the labels self-hosted, Windows, X64, and research-os-local. The first push on the setup branch should queue a job; once the local runner connects, it checks out that branch and uploads local-runner-evidence-<run-id>-<attempt> as a GitHub Actions artifact.
+
+For manual dispatch, set the requested commit SHA in the input; the workflow checks out that exact SHA rather than assuming the branch tip.
 
 The workflow records:
 - repository, event, ref, run ID, runner identity, and checked-out source SHA;
