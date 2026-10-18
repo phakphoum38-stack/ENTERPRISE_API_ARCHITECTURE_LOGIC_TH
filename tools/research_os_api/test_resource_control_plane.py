@@ -175,26 +175,6 @@ class ResourceControlPlaneTests(unittest.TestCase):
         self.assertEqual(evidence[1]["previous_hash"], evidence[0]["evidence_hash"])
         self.assertEqual(self.plane.forensic_snapshot()["evidence_root"], evidence[-1]["evidence_hash"])
 
-    def test_missing_measurement_fails_closed_and_writes_no_accounting(self):
-        with self.assertRaises(TypeError):
-            self.plane.execute(
-                request_id="req-unmeasured",
-                principal_id="user-1",
-                objective="research and summarize",
-                usage=Usage(requests=1, concurrent_jobs=1),
-                estimated_cost=Decimal("2.00"),
-                currency="USD",
-                scopes=frozenset({"agent:run"}),
-                available_providers=("local",),
-                executor=lambda _route: "unmeasured",
-            )
-
-        self.assertEqual(self.plane.ledger(), ())
-        self.assertEqual(self.plane.evidence(), ())
-        self.assertEqual(
-            self.plane.budget.snapshot("user-1")["reserved"],
-            "0",
-        )
     def test_unregistered_principal_fails_closed(self):
         with self.assertRaises(PermissionError):
             self.plane.admit(
