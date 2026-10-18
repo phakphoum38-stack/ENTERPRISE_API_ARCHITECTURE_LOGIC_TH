@@ -205,11 +205,42 @@ class ResourceAdmissionGate:
             if reservation.expires_at <= now:
                 self._release_locked(reservation, expired=True)
                 raise QuotaError("admission reservation expired")
-            usage = actual_usage or reservation.usage
-            cost = reservation.estimated_cost if actual_cost is None else actual_cost
+            if actual_usage is None or actual_cost is None:
+                raise QuotaError("authoritative actual_usage and actual_cost are required")
+            usage = actual_usage
+            cost = actual_cost
             self._validate_actual(reservation, usage, cost)
-            self._governance.commit(reservation.quota_reservation_id, actual=usage, now=now)
-            self._budget.commit(reservation.budget_reservation_id, actual=cost)
+
+            # Keep both in-memory accounting ledgers locked for the transaction.
+            # Snapshot their mutable accounting state so an unexpected failure
+            # in either commit restores both ledgers before the exception escapes.
+            with self._governance._lock, self._budget._lock:
+                governance_snapshot = {
+                    principal_id: (state, dict(state.usage), dict(state.reservations))
+                    for principal_id, state in self._governance._principals.items()
+                }
+                budget_reservations_snapshot = dict(self._budget._reservations)
+                budget_committed_snapshot = dict(self._budget._committed)
+                try:
+                    self._governance.commit(
+                        reservation.quota_reservation_id,
+                        actual=usage,
+                        now=now,
+                    )
+                    self._budget.commit(reservation.budget_reservation_id, actual=cost)
+                except BaseException:
+                    self._governance._principals.clear()
+                    for principal_id, (state, usage_state, reservation_state) in governance_snapshot.items():
+                        state.usage.clear()
+                        state.usage.update(usage_state)
+                        state.reservations.clear()
+                        state.reservations.update(reservation_state)
+                        self._governance._principals[principal_id] = state
+                    self._budget._reservations.clear()
+                    self._budget._reservations.update(budget_reservations_snapshot)
+                    self._budget._committed.clear()
+                    self._budget._committed.update(budget_committed_snapshot)
+                    raise
             updated = AdmissionReservation(**{**reservation.__dict__, "status": AdmissionStatus.COMMITTED})
             self._reservations[reservation_id] = updated
             return updated
@@ -244,7 +275,9 @@ class ResourceAdmissionGate:
 
     @staticmethod
     def _validate_actual(reservation: AdmissionReservation, usage: Usage, cost: Decimal) -> None:
-        for dimension in type(usage).__dataclass_fields__:
+        if not isinstance(usage, Usage):
+            raise QuotaError("actual_usage must be a Usage instance")
+        for dimension in Usage.__dataclass_fields__:
             if getattr(usage, dimension) > getattr(reservation.usage, dimension):
                 raise QuotaError(f"actual usage exceeds reservation: {dimension}")
         if not isinstance(cost, Decimal) or cost.is_nan() or cost.is_infinite() or cost < Decimal("0"):
