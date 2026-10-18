@@ -25,6 +25,15 @@ class ExecutionContractTests(unittest.TestCase):
                 currency="USD",
             )
 
+    def test_measured_execution_rejects_non_finite_cost_and_invalid_currency(self):
+        for cost in (Decimal("NaN"), Decimal("Infinity"), Decimal("-Infinity")):
+            with self.assertRaisesRegex(ValueError, "finite Decimal"):
+                MeasuredExecution(value=None, usage=Usage(requests=1), cost=cost, currency="USD")
+        with self.assertRaisesRegex(ValueError, "three-letter code"):
+            MeasuredExecution(value=None, usage=Usage(requests=1), cost=Decimal("0"), currency="US")
+        with self.assertRaisesRegex(ValueError, "Usage instance"):
+            MeasuredExecution(value=None, usage=None, cost=Decimal("0"), currency="USD")
+
     def test_execution_context_requires_identity_and_route_metadata(self):
         with self.assertRaises(ValueError):
             ExecutionContext("", "user-1", "mock", "model", {})
