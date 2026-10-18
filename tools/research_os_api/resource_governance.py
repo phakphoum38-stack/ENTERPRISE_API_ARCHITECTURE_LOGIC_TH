@@ -47,6 +47,8 @@ class Limit:
     amount: int
 
     def __post_init__(self) -> None:
+        if not isinstance(self.amount, int) or isinstance(self.amount, bool):
+            raise QuotaError("quota amount must be an integer")
         if self.amount < 0:
             raise QuotaError("quota amount must be non-negative")
 
