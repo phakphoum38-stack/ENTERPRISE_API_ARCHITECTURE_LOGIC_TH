@@ -64,6 +64,35 @@ class ResourceGovernanceTests(unittest.TestCase):
         self.assertEqual(snapshot["requests:day:used"], 3)
         self.assertEqual(snapshot["tokens:day:used"], 250)
 
+    def test_commit_requires_actual_usage_and_preserves_reservation(self) -> None:
+        engine = ResourceGovernance()
+        engine.register("user-1", entitlement())
+        result = engine.reserve("user-1", Usage(requests=5, tokens=500), now=NOW)
+
+        with self.assertRaisesRegex(QuotaError, "actual usage is required"):
+            engine.commit(result.reservation_id, now=NOW)
+        with self.assertRaisesRegex(QuotaError, "exceeds reservation"):
+            engine.commit(
+                result.reservation_id,
+                actual=Usage(requests=6, tokens=250),
+                now=NOW,
+            )
+
+        snapshot = engine.snapshot("user-1", now=NOW)
+        self.assertEqual(snapshot["requests:day:used"], 0)
+        self.assertEqual(snapshot["tokens:day:used"], 0)
+        engine.commit(
+            result.reservation_id,
+            actual=Usage(requests=3, tokens=250),
+            now=NOW,
+        )
+        self.assertEqual(engine.snapshot("user-1", now=NOW)["requests:day:used"], 3)
+
+    def test_usage_dimensions_must_be_non_boolean_integers(self) -> None:
+        for value in (1.5, True, "2"):
+            with self.assertRaises(QuotaError):
+                Usage(requests=value)
+
     def test_release_returns_reserved_capacity(self) -> None:
         engine = ResourceGovernance()
         engine.register("user-1", entitlement())
