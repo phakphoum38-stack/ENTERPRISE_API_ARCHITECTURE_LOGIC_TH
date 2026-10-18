@@ -33,6 +33,23 @@ class BudgetLedgerTests(unittest.TestCase):
         self.assertEqual(snapshot["reserved"], "0")
         self.assertEqual(decision.currency, "USD")
 
+    def test_invalid_commit_does_not_consume_reservation(self) -> None:
+        decision = self.ledger.reserve("user-1", Decimal("4.00"), currency="USD")
+        reservation_id = decision.reservation_id
+        self.assertIsNotNone(reservation_id)
+
+        with self.assertRaises(QuotaError):
+            self.ledger.commit(reservation_id, actual=Decimal("-1.00"))
+        with self.assertRaisesRegex(QuotaError, "actual budget cost is required"):
+            self.ledger.commit(reservation_id)
+
+        snapshot = self.ledger.snapshot("user-1")
+        self.assertEqual(snapshot["reserved"], "4.00")
+        self.assertEqual(snapshot["committed"], "0")
+        self.ledger.commit(reservation_id, actual=Decimal("3.00"))
+        self.assertEqual(self.ledger.snapshot("user-1")["reserved"], "0")
+        self.assertEqual(self.ledger.snapshot("user-1")["committed"], "3.00")
+
     def test_release_returns_capacity(self) -> None:
         self.ledger.reserve("user-1", Decimal("7.00"), currency="USD")
         reservation_id = next(iter(self.ledger._reservations))
