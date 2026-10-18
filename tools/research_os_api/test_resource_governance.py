@@ -45,6 +45,11 @@ class ResourceGovernanceTests(unittest.TestCase):
         self.assertIs(result.decision, Decision.ALLOW)
         self.assertEqual(result.reason, "within_entitlement")
 
+    def test_quota_limit_requires_non_boolean_integer_amount(self) -> None:
+        for amount in (1.5, True, "2", -1):
+            with self.assertRaises(QuotaError):
+                Limit(QuotaDimension.REQUESTS, Window.DAY, amount)
+
     def test_denies_when_window_limit_would_be_exceeded(self) -> None:
         engine = ResourceGovernance()
         engine.register("user-1", entitlement())
