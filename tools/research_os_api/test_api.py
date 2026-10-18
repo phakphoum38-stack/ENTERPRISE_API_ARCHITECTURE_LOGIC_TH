@@ -46,16 +46,18 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertEqual("ok", payload["status"])
         self.assertTrue(payload["memory"])
 
-    @patch.dict(
-        os.environ,
-        {"RESEARCH_OS_AI_ROUTE": "direct-provider"},
-        clear=False,
-    )
-    def test_mock_provider_generation(self):
-        status, payload = self.request("POST", "/v1/ai/generate", {
-            "provider": "mock",
-            "prompt": "วิเคราะห์แนวคิดนี้",
-        })
+    @patch("server._friend_chat")
+    def test_mock_provider_generation(self, friend_chat):
+        friend_chat.return_value = {"provider": "mock", "text": "วิเคราะห์แนวคิดนี้"}
+        with patch.dict(
+            os.environ,
+            {"RESEARCH_OS_AI_ROUTE": "friend"},
+            clear=False,
+        ):
+            status, payload = self.request("POST", "/v1/ai/generate", {
+                "provider": "mock",
+                "prompt": "วิเคราะห์แนวคิดนี้",
+            })
         self.assertEqual(200, status)
         self.assertEqual("mock", payload["provider"])
         self.assertIn("วิเคราะห์", payload["text"])
@@ -117,17 +119,19 @@ class ResearchOSAPITests(unittest.TestCase):
         self.assertIn("artifact_id", payload["hits"][0])
         self.assertIn("score", payload["hits"][0])
 
-    @patch.dict(
-        os.environ,
-        {"RESEARCH_OS_AI_ROUTE": "direct-provider"},
-        clear=False,
-    )
-    def test_answer_with_memory_uses_mock_provider(self):
-        status, payload = self.request("POST", "/v1/ai/answer-with-memory", {
-            "provider": "mock",
-            "question": "conversation knowledge",
-            "session_id": "memory-test",
-        })
+    @patch("server._friend_chat")
+    def test_answer_with_memory_uses_mock_provider(self, friend_chat):
+        friend_chat.return_value = {"provider": "mock", "text": "memory-backed mock answer"}
+        with patch.dict(
+            os.environ,
+            {"RESEARCH_OS_AI_ROUTE": "friend"},
+            clear=False,
+        ):
+            status, payload = self.request("POST", "/v1/ai/answer-with-memory", {
+                "provider": "mock",
+                "question": "conversation knowledge",
+                "session_id": "memory-test",
+            })
         self.assertEqual(200, status)
         self.assertEqual("mock", payload["provider"])
         self.assertEqual("memory-test", payload["session_id"])
