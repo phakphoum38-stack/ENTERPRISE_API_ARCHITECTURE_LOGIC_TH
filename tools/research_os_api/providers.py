@@ -241,6 +241,10 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
 
 
 def build_provider(name: str | None = None) -> AIProvider:
+    if os.getenv("RESEARCH_OS_AI_ROUTE", "friend").strip().lower() == "direct-provider":
+        raise ProviderError(
+            "direct-provider route is disabled; AI execution must enter the canonical Friend Resource Control boundary"
+        )
     selected = (name or os.getenv("RESEARCH_OS_PROVIDER", "mock")).lower()
     if selected == "mock":
         return MockProvider()

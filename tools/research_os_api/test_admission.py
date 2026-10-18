@@ -2,6 +2,7 @@
 from decimal import Decimal
 from datetime import timedelta
 import unittest
+from unittest.mock import patch
 
 from admission import AdmissionDecision, AdmissionRequest, AdmissionStatus, ResourceAdmissionGate
 from budgets import BudgetLedger, BudgetLimit
@@ -96,6 +97,40 @@ class ResourceAdmissionGateTests(unittest.TestCase):
         self.assertEqual(self.budget.snapshot("user-1")["committed"], "1.25")
         self.assertEqual(self.budget.snapshot("user-1")["reserved"], "0")
 
+    def test_commit_requires_authoritative_measurement_without_mutation(self):
+        result = self.gate.admit(self.request())
+        with self.assertRaisesRegex(ValueError, "authoritative actual_usage and actual_cost are required"):
+            self.gate.commit(result.reservation_id)
+
+        self.assertEqual(self.gate.reservation(result.reservation_id).status, AdmissionStatus.RESERVED)
+        self.assertEqual(self.governance.snapshot("user-1")["requests:hour:used"], 0)
+        self.assertEqual(self.budget.snapshot("user-1")["committed"], "0")
+        self.assertEqual(self.budget.snapshot("user-1")["reserved"], "2.00")
+
+    def test_commit_rolls_back_both_ledgers_if_budget_commit_fails_after_mutation(self):
+        result = self.gate.admit(self.request())
+        original_commit = self.budget.commit
+
+        def fail_after_commit(reservation_id, *, actual=None):
+            original_commit(reservation_id, actual=actual)
+            raise RuntimeError("injected post-commit failure")
+
+        with patch.object(self.budget, "commit", side_effect=fail_after_commit):
+            with self.assertRaisesRegex(RuntimeError, "injected post-commit failure"):
+                self.gate.commit(
+                    result.reservation_id,
+                    actual_usage=Usage(requests=1, concurrent_jobs=1),
+                    actual_cost=Decimal("1.25"),
+                )
+
+        self.assertEqual(self.governance.snapshot("user-1")["requests:hour:used"], 0)
+        snapshot = self.budget.snapshot("user-1")
+        self.assertEqual(snapshot["committed"], "0")
+        self.assertEqual(snapshot["reserved"], "2.00")
+        self.assertEqual(self.gate.reservation(result.reservation_id).status, AdmissionStatus.RESERVED)
+        self.gate.release(result.reservation_id)
+        self.assertEqual(self.budget.snapshot("user-1")["reserved"], "0")
+
     def test_release_returns_both_capacities(self):
         result = self.gate.admit(self.request())
         reservation = self.gate.release(result.reservation_id)
@@ -118,7 +153,11 @@ class ResourceAdmissionGateTests(unittest.TestCase):
     def test_actual_usage_or_cost_above_reservation_fails(self):
         result = self.gate.admit(self.request())
         with self.assertRaisesRegex(ValueError, "exceeds reservation"):
-            self.gate.commit(result.reservation_id, actual_usage=Usage(requests=2, concurrent_jobs=1))
+            self.gate.commit(
+                result.reservation_id,
+                actual_usage=Usage(requests=2, concurrent_jobs=1),
+                actual_cost=Decimal("1.25"),
+            )
 
 
 if __name__ == "__main__":

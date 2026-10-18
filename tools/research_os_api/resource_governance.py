@@ -47,6 +47,8 @@ class Limit:
     amount: int
 
     def __post_init__(self) -> None:
+        if not isinstance(self.amount, int) or isinstance(self.amount, bool):
+            raise QuotaError("quota amount must be an integer")
         if self.amount < 0:
             raise QuotaError("quota amount must be non-negative")
 
@@ -90,7 +92,7 @@ class Usage:
         }[dimension]
 
     def __post_init__(self) -> None:
-        if any(v < 0 for v in (
+        values = (
             self.requests,
             self.tokens,
             self.compute_units,
@@ -98,7 +100,10 @@ class Usage:
             self.workers,
             self.storage_bytes,
             self.bandwidth_bytes,
-        )):
+        )
+        if any(not isinstance(value, int) or isinstance(value, bool) for value in values):
+            raise QuotaError("usage values must be integers")
+        if any(value < 0 for value in values):
             raise QuotaError("usage values must be non-negative")
 
 
@@ -207,10 +212,14 @@ class ResourceGovernance:
             principal_id, reservation = self._find_reservation(reservation_id)
             if reservation.expires_at <= now:
                 raise QuotaError("reservation expired")
-            usage = actual or reservation.usage
+            if not isinstance(actual, Usage):
+                raise QuotaError("actual usage is required and must be a Usage instance")
+            for dimension in Usage.__dataclass_fields__:
+                if getattr(actual, dimension) > getattr(reservation.usage, dimension):
+                    raise QuotaError(f"actual usage exceeds reservation: {dimension}")
             state = self._state(principal_id)
             for limit in state.entitlement.limits:
-                value = usage.value(limit.dimension)
+                value = actual.value(limit.dimension)
                 if value:
                     key = (limit.dimension, limit.window, _window_start(now, limit.window))
                     state.usage[key] = state.usage.get(key, 0) + value

@@ -45,6 +45,11 @@ class ResourceGovernanceTests(unittest.TestCase):
         self.assertIs(result.decision, Decision.ALLOW)
         self.assertEqual(result.reason, "within_entitlement")
 
+    def test_quota_limit_requires_non_boolean_integer_amount(self) -> None:
+        for amount in (1.5, True, "2", -1):
+            with self.assertRaises(QuotaError):
+                Limit(QuotaDimension.REQUESTS, Window.DAY, amount)
+
     def test_denies_when_window_limit_would_be_exceeded(self) -> None:
         engine = ResourceGovernance()
         engine.register("user-1", entitlement())
@@ -63,6 +68,35 @@ class ResourceGovernanceTests(unittest.TestCase):
         snapshot = engine.snapshot("user-1", now=NOW)
         self.assertEqual(snapshot["requests:day:used"], 3)
         self.assertEqual(snapshot["tokens:day:used"], 250)
+
+    def test_commit_requires_actual_usage_and_preserves_reservation(self) -> None:
+        engine = ResourceGovernance()
+        engine.register("user-1", entitlement())
+        result = engine.reserve("user-1", Usage(requests=5, tokens=500), now=NOW)
+
+        with self.assertRaisesRegex(QuotaError, "actual usage is required"):
+            engine.commit(result.reservation_id, now=NOW)
+        with self.assertRaisesRegex(QuotaError, "exceeds reservation"):
+            engine.commit(
+                result.reservation_id,
+                actual=Usage(requests=6, tokens=250),
+                now=NOW,
+            )
+
+        snapshot = engine.snapshot("user-1", now=NOW)
+        self.assertEqual(snapshot["requests:day:used"], 0)
+        self.assertEqual(snapshot["tokens:day:used"], 0)
+        engine.commit(
+            result.reservation_id,
+            actual=Usage(requests=3, tokens=250),
+            now=NOW,
+        )
+        self.assertEqual(engine.snapshot("user-1", now=NOW)["requests:day:used"], 3)
+
+    def test_usage_dimensions_must_be_non_boolean_integers(self) -> None:
+        for value in (1.5, True, "2"):
+            with self.assertRaises(QuotaError):
+                Usage(requests=value)
 
     def test_release_returns_reserved_capacity(self) -> None:
         engine = ResourceGovernance()
