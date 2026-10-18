@@ -25,11 +25,18 @@ class BudgetLimit:
     amount: Decimal
 
     def __post_init__(self) -> None:
+        if not isinstance(self.currency, str):
+            raise QuotaError("currency must be a three-letter code")
         currency = self.currency.strip().upper()
         if len(currency) != 3 or not currency.isalpha():
             raise QuotaError("currency must be a three-letter code")
-        if self.amount < Decimal("0"):
-            raise QuotaError("budget amount must be non-negative")
+        if (
+            not isinstance(self.amount, Decimal)
+            or self.amount.is_nan()
+            or self.amount.is_infinite()
+            or self.amount < Decimal("0")
+        ):
+            raise QuotaError("budget amount must be a finite non-negative Decimal")
         object.__setattr__(self, "currency", currency)
 
 
