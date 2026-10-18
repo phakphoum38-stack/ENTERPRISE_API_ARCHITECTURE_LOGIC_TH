@@ -18,6 +18,13 @@ class BudgetLedgerTests(unittest.TestCase):
         self.assertEqual(snapshot["reserved"], "6.00")
         self.assertEqual(snapshot["remaining"], "4.00")
 
+    def test_budget_limit_requires_finite_decimal_amount(self) -> None:
+        for amount in (Decimal("NaN"), Decimal("Infinity"), Decimal("-Infinity"), Decimal("-1")):
+            with self.assertRaises(QuotaError):
+                BudgetLimit("USD", amount)
+        with self.assertRaises(QuotaError):
+            BudgetLimit("USD", 10)
+
     def test_budget_exceeded_denies(self) -> None:
         self.ledger.reserve("user-1", Decimal("8.00"), currency="USD")
         decision = self.ledger.evaluate("user-1", Decimal("3.00"), currency="USD")
