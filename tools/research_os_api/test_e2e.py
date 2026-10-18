@@ -5,14 +5,16 @@ import unittest
 import urllib.request
 from http.server import ThreadingHTTPServer
 
+import server
 from server import ResearchOSHandler
+from unittest.mock import patch
 
 
 class ResearchOSEndToEndTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.previous_ai_route = os.environ.get("RESEARCH_OS_AI_ROUTE")
-        os.environ["RESEARCH_OS_AI_ROUTE"] = "direct-provider"
+        os.environ["RESEARCH_OS_AI_ROUTE"] = "friend"
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), ResearchOSHandler)
         cls.base_url = f"http://127.0.0.1:{cls.server.server_address[1]}"
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -50,14 +52,19 @@ class ResearchOSEndToEndTests(unittest.TestCase):
         self.assertTrue(health["ui"])
 
         session_id = "e2e-session"
-        status, generated = self.request_json(
-            "/v1/ai/generate",
-            {
-                "provider": "mock",
-                "prompt": "ช่วยสรุปภารกิจของบ้าน",
-                "session_id": session_id,
-            },
-        )
+        with patch.object(
+            server,
+            "_friend_chat",
+            return_value={"provider": "mock", "text": "ช่วยสรุปภารกิจของบ้าน"},
+        ):
+            status, generated = self.request_json(
+                "/v1/ai/generate",
+                {
+                    "provider": "mock",
+                    "prompt": "ช่วยสรุปภารกิจของบ้าน",
+                    "session_id": session_id,
+                },
+            )
         self.assertEqual(status, 200)
         self.assertEqual(generated["provider"], "mock")
         self.assertEqual(generated["session_id"], session_id)
