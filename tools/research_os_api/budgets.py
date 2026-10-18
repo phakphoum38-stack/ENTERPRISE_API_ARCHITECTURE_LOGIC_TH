@@ -113,16 +113,20 @@ class BudgetLedger:
 
     def commit(self, reservation_id: str, *, actual: Decimal | None = None) -> None:
         with self._lock:
-            reservation = self._reservations.pop(reservation_id, None)
+            reservation = self._reservations.get(reservation_id)
             if reservation is None:
                 raise QuotaError("unknown budget reservation")
-            amount = reservation.amount if actual is None else self._validate_amount(actual)
+            if actual is None:
+                raise QuotaError("actual budget cost is required")
+            amount = self._validate_amount(actual)
             if reservation.currency != self._currency(reservation.principal_id):
                 raise QuotaError("budget currency mismatch")
             committed = self._committed.get(reservation.principal_id, Decimal("0"))
             limit = self._limit(reservation.principal_id)
             if committed + amount > limit.amount:
                 raise QuotaError("budget commit exceeds limit")
+            # Mutate only after every validation has succeeded.
+            self._reservations.pop(reservation_id)
             self._committed[reservation.principal_id] = committed + amount
 
     def release(self, reservation_id: str) -> None:
