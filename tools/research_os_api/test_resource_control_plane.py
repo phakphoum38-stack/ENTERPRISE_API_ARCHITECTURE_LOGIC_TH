@@ -2,6 +2,7 @@
 from decimal import Decimal
 import os
 import unittest
+from unittest.mock import patch
 
 from budgets import BudgetLimit
 from execution_contract import MeasuredExecution
@@ -72,6 +73,57 @@ class ResourceControlPlaneTests(unittest.TestCase):
         self.assertEqual(self.plane.ledger(), ())
         self.assertEqual(self.plane.evidence(), ())
         self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0")
+
+    def test_missing_measurement_fails_closed_and_writes_no_accounting(self):
+        with self.assertRaisesRegex(TypeError, "authoritative execution measurement is required"):
+            self.plane.execute(
+                request_id="req-unmeasured",
+                principal_id="user-1",
+                objective="research and summarize",
+                usage=Usage(requests=1, concurrent_jobs=1),
+                estimated_cost=Decimal("2.00"),
+                currency="USD",
+                scopes=frozenset({"agent:run"}),
+                available_providers=("local",),
+                executor=lambda _route: "unmeasured",
+            )
+
+        self.assertEqual(self.plane.governance.snapshot("user-1")["requests:hour:used"], 0)
+        self.assertEqual(self.plane.ledger(), ())
+        self.assertEqual(self.plane.evidence(), ())
+        self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0")
+
+    def test_budget_commit_failure_rolls_back_quota_and_writes_no_evidence(self):
+        original_commit = self.plane.budget.commit
+
+        def fail_after_commit(reservation_id, *, actual=None):
+            original_commit(reservation_id, actual=actual)
+            raise RuntimeError("injected budget commit failure")
+
+        with patch.object(self.plane.budget, "commit", side_effect=fail_after_commit):
+            with self.assertRaisesRegex(RuntimeError, "injected budget commit failure"):
+                self.plane.execute(
+                    request_id="req-atomic-failure",
+                    principal_id="user-1",
+                    objective="research and summarize",
+                    usage=Usage(requests=1, concurrent_jobs=1),
+                    estimated_cost=Decimal("2.00"),
+                    currency="USD",
+                    scopes=frozenset({"agent:run"}),
+                    available_providers=("local",),
+                    executor=lambda route: MeasuredExecution(
+                        {"provider": route["provider"], "model": route["model"], "text": "ok"},
+                        Usage(requests=1, concurrent_jobs=1),
+                        Decimal("1.25"),
+                        "USD",
+                    ),
+                )
+
+        self.assertEqual(self.plane.governance.snapshot("user-1")["requests:hour:used"], 0)
+        self.assertEqual(self.plane.budget.snapshot("user-1")["committed"], "0")
+        self.assertEqual(self.plane.budget.snapshot("user-1")["reserved"], "0")
+        self.assertEqual(self.plane.ledger(), ())
+        self.assertEqual(self.plane.evidence(), ())
 
     def test_invalid_measured_currency_releases_reservation(self):
         with self.assertRaises(ValueError):
