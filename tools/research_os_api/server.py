@@ -299,8 +299,23 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 if not code or not state:
                     raise ValueError("Google sign-in callback requires code and state")
                 result = GoogleIdentityBroker().complete(code=code, state=state)
-                email = ((result.get("account") or {}).get("email") or "Google account")
-                self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window.</p></body></html>")
+                email = str((result.get("account") or {}).get("email") or "Google account")
+                dashboard_origin = (os.getenv("RESEARCH_OS_DASHBOARD_ORIGIN") or "https://phakphum12345.github.io").strip().rstrip("/")
+                safe_state = json.dumps(state).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+                safe_origin = json.dumps(dashboard_origin).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+                safe_email = __import__("html").escape(email)
+                page = (
+                    "<!doctype html><html><head><meta charset='utf-8'><meta name='referrer' content='no-referrer'>"
+                    "<meta name='viewport' content='width=device-width,initial-scale=1'></head><body>"
+                    "<h2>Signed in to Research OS</h2><p>" + safe_email + "</p>"
+                    "<p id='status'>Returning to Development Control Platform…</p>"
+                    "<script>const handoffState=" + safe_state + ";const targetOrigin=" + safe_origin + ";"
+                    "if(window.opener){window.opener.postMessage({type:'research-os-oauth-complete',state:handoffState},targetOrigin);"
+                    "document.getElementById('status').textContent='Connected. You may close this window.';window.close();}"
+                    "else{document.getElementById('status').textContent='Sign-in completed. Return to the dashboard and connect again.';}"
+                    "</script></body></html>"
+                )
+                self._send_html(HTTPStatus.OK, page)
                 return
             for provider in ("microsoft", "github"):
                 if path == f"/v1/auth/{provider}/callback":
