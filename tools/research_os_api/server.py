@@ -299,8 +299,23 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 if not code or not state:
                     raise ValueError("Google sign-in callback requires code and state")
                 result = GoogleIdentityBroker().complete(code=code, state=state)
-                email = ((result.get("account") or {}).get("email") or "Google account")
-                self._send_html(HTTPStatus.OK, f"<html><body><h2>Signed in to Research OS</h2><p>{email}</p><p>You can close this window.</p></body></html>")
+                email = str((result.get("account") or {}).get("email") or "Google account")
+                dashboard_origin = (os.getenv("RESEARCH_OS_DASHBOARD_ORIGIN") or "https://phakphum12345.github.io").strip().rstrip("/")
+                safe_state = json.dumps(state).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+                safe_origin = json.dumps(dashboard_origin).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+                safe_email = __import__("html").escape(email)
+                page = (
+                    "<!doctype html><html><head><meta charset='utf-8'><meta name='referrer' content='no-referrer'>"
+                    "<meta name='viewport' content='width=device-width,initial-scale=1'></head><body>"
+                    "<h2>Signed in to Research OS</h2><p>" + safe_email + "</p>"
+                    "<p id='status'>Returning to Development Control Platform…</p>"
+                    "<script>const handoffState=" + safe_state + ";const targetOrigin=" + safe_origin + ";"
+                    "if(window.opener){window.opener.postMessage({type:'research-os-oauth-complete',state:handoffState},targetOrigin);"
+                    "document.getElementById('status').textContent='Connected. You may close this window.';window.close();}"
+                    "else{document.getElementById('status').textContent='Sign-in completed. Return to the dashboard and connect again.';}"
+                    "</script></body></html>"
+                )
+                self._send_html(HTTPStatus.OK, page)
                 return
             for provider in ("microsoft", "github"):
                 if path == f"/v1/auth/{provider}/callback":
@@ -382,15 +397,35 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 )
                 return
             if path == "/v1/github/dashboard":
+                try:
+                    principal = require_session(self.headers)
+                except (ValueError, RuntimeError):
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required", "detail": "A valid Research OS session is required."})
+                    return
+                if str(principal.get("role") or "").strip().casefold() != "owner":
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_authorization_required"})
+                    return
                 params = parse_qs(parsed.query)
-                repository = str(params.get("repository", [os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY)])[0]).strip()
-                self._send(HTTPStatus.OK, github_dashboard(repository))
+                default_repository = os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY).strip()
+                allowed_repositories = {
+                    item.strip()
+                    for item in os.getenv("RESEARCH_OS_GITHUB_ALLOWED_REPOSITORIES", default_repository).split(",")
+                    if item.strip()
+                }
+                repository = str(params.get("repository", [default_repository])[0]).strip()
+                if repository not in allowed_repositories:
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "repository_not_allowed"})
+                    return
+                try:
+                    self._send(HTTPStatus.OK, github_dashboard(repository))
+                except GitHubStatusError:
+                    self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_provider_unavailable"})
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
         except (ValueError, KeyError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
-        except GitHubStatusError as exc:
-            self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
+        except GitHubStatusError:
+            self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_provider_unavailable"})
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
