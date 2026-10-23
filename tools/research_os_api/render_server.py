@@ -13,16 +13,19 @@ class CloudResearchOSHandler(V2ResearchOSHandler):
     """Primary Research OS handler with V1 compatibility and V2 namespace."""
 
     def end_headers(self) -> None:
-        allowed_origin = os.getenv(
-            "RESEARCH_OS_ALLOWED_ORIGIN",
-            "https://phakphoum38-stack.github.io",
+        configured_origins = os.getenv(
+            "RESEARCH_OS_ALLOWED_ORIGINS",
+            "https://phakphum12345.github.io,https://phakphoum38-stack.github.io",
         )
-        self.send_header("Access-Control-Allow-Origin", allowed_origin)
+        allowed_origins = {item.strip() for item in configured_origins.split(",") if item.strip()}
+        request_origin = (self.headers.get("Origin") or "").strip()
+        if request_origin in allowed_origins:
+            self.send_header("Access-Control-Allow-Origin", request_origin)
         self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header(
             "Access-Control-Allow-Headers",
-            "Content-Type, Authorization, X-Research-OS-Sync-Key",
+            "Content-Type, Authorization, X-Research-OS-Sync-Key, X-Research-OS-Session, X-Research-OS-OAuth-State",
         )
         self.send_header("Access-Control-Max-Age", "86400")
         super().end_headers()
