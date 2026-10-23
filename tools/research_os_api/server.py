@@ -382,15 +382,35 @@ class ResearchOSHandler(BaseHTTPRequestHandler):
                 )
                 return
             if path == "/v1/github/dashboard":
+                try:
+                    principal = require_session(self.headers)
+                except (ValueError, RuntimeError):
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required", "detail": "A valid Research OS session is required."})
+                    return
+                if str(principal.get("role") or "").strip().casefold() != "owner":
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "owner_authorization_required"})
+                    return
                 params = parse_qs(parsed.query)
-                repository = str(params.get("repository", [os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY)])[0]).strip()
-                self._send(HTTPStatus.OK, github_dashboard(repository))
+                default_repository = os.getenv("RESEARCH_OS_GITHUB_REPOSITORY", DEFAULT_GITHUB_REPOSITORY).strip()
+                allowed_repositories = {
+                    item.strip()
+                    for item in os.getenv("RESEARCH_OS_GITHUB_ALLOWED_REPOSITORIES", default_repository).split(",")
+                    if item.strip()
+                }
+                repository = str(params.get("repository", [default_repository])[0]).strip()
+                if repository not in allowed_repositories:
+                    self._send(HTTPStatus.FORBIDDEN, {"error": "repository_not_allowed"})
+                    return
+                try:
+                    self._send(HTTPStatus.OK, github_dashboard(repository))
+                except GitHubStatusError:
+                    self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_provider_unavailable"})
                 return
             self._send(HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path})
         except (ValueError, KeyError, GoogleOAuthError, MultiLoginError, MultiLoginRuntimeError) as exc:
             self._send(HTTPStatus.BAD_REQUEST, {"error": "bad_request", "detail": str(exc)})
-        except GitHubStatusError as exc:
-            self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_error", "detail": str(exc)})
+        except GitHubStatusError:
+            self._send(HTTPStatus.BAD_GATEWAY, {"error": "github_provider_unavailable"})
         except Exception as exc:
             self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal_error", "detail": str(exc)})
 
